@@ -152,29 +152,56 @@ class PurchaseDayDto {
 
 /// GET /api/purchases/{book}?limit=100&before
 class PurchasesBookPage {
-  const PurchasesBookPage({
-    required this.page,
-    this.lifetimeTotals = const {},
-  });
+  const PurchasesBookPage({required this.page, this.lifetimeTotals});
   final Paged<PurchaseDayDto> page;
 
-  /// "إجماليات السجل من البداية". Every value is parsed with [unitsOrNull].
-  /// One invalid value rejects the whole response.
-  final Map<String, int?> lifetimeTotals;
+  /// Null when the server omits the totals object.
+  final PurchasesLifetimeTotalsDto? lifetimeTotals;
 
   factory PurchasesBookPage.fromData(Object? data) {
     final p = Paged.fromData(data, PurchaseDayDto.fromJson, itemsKey: 'days');
-    final raw = p.raw['lifetimeTotals'] ?? p.raw['totals'];
-    if (raw != null && raw is! Map) {
+    return PurchasesBookPage(
+      page: p,
+      lifetimeTotals: PurchasesLifetimeTotalsDto.fromJsonOrNull(
+        p.raw['lifetimeTotals'] ?? p.raw['totals'],
+      ),
+    );
+  }
+}
+
+/// Register totals since the beginning (per API contract). Every value parsed with strict unitsOrNull:
+/// a malformed value fails the WHOLE response (INVALID_SERVER_RESPONSE). Key names pending server confirmation.
+class PurchasesLifetimeTotalsDto {
+  const PurchasesLifetimeTotalsDto({
+    this.resultUnits,
+    this.paidUnits,
+    this.remainingUnits,
+    this.all = const {},
+  });
+
+  final int? resultUnits;
+  final int? paidUnits;
+  final int? remainingUnits; // LYD
+  final Map<String, int> all;
+
+  static PurchasesLifetimeTotalsDto? fromJsonOrNull(Object? v) {
+    if (v == null) return null;
+    if (v is! Map) {
       throw const InvalidServerResponseException(
-        message: 'استجابة الخادم غير صالحة',
+        message: 'استجابة الخادم غير صالحة (إجماليات السجل)',
       );
     }
-    final totals = <String, int?>{};
-    for (final entry in asJson(raw).entries) {
-      totals[entry.key] = unitsOrNull(entry.value);
-    }
-    return PurchasesBookPage(page: p, lifetimeTotals: totals);
+    final all = <String, int>{};
+    v.forEach((k, value) {
+      final u = unitsOrNull(value);
+      if (u != null) all['$k'] = u;
+    });
+    return PurchasesLifetimeTotalsDto(
+      resultUnits: all['resultUnits'],
+      paidUnits: all['paidUnits'],
+      remainingUnits: all['remainingUnits'],
+      all: Map.unmodifiable(all),
+    );
   }
 }
 

@@ -66,15 +66,11 @@ class AccountCardDto {
   /// Server flag. System cards can be opened and have no write controls.
   final bool systemManaged;
 
-  /// Raw `systemLinkKey` from the server. Not copied from [systemKind].
+  /// Confirmed server field: link key of a system-managed card (e.g. masraweya_remainder, purchases_vodafone_remainder). Raw, as sent.
   final String? systemLinkKey;
 
-  /// Raw `systemKind` from the server. Not overwritten by [systemLinkKey].
+  /// Pending server confirmation. Raw systemKind only, never aliased to or inferred from systemLinkKey.
   final String? systemKind;
-
-  /// Link used by callers, per API contract. [systemLinkKey] when the server
-  /// sent it; otherwise the raw [systemKind]. The two fields stay separate.
-  String? get resolvedSystemLink => systemLinkKey ?? systemKind;
 
   factory AccountCardDto.fromJson(Json j, AccountSection s) => AccountCardDto(
         id: str(j['id']),

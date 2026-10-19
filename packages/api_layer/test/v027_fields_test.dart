@@ -7,7 +7,7 @@ final _invalid = throwsA(isA<InvalidServerResponseException>());
 
 void main() {
   group('AccountCardDto system fields', () {
-    test('systemLinkKey and systemKind stay separate; logic falls back', () {
+    test('systemLinkKey and systemKind are parsed independently', () {
       final c = AccountCardDto.fromJson(
           _j('{"id":"system-egp-masraweya:org-default","name":"x","balanceUnits":5,'
               '"systemManaged":true,"systemKind":"legacy","systemLinkKey":"masraweya_remainder"}'),
@@ -15,20 +15,20 @@ void main() {
       expect(c.systemManaged, isTrue);
       expect(c.systemLinkKey, 'masraweya_remainder');
       expect(c.systemKind, 'legacy');
-      expect(c.resolvedSystemLink, 'masraweya_remainder');
-      final fallback = AccountCardDto.fromJson(
+      final kindOnly = AccountCardDto.fromJson(
           _j('{"id":"2","name":"z","balanceUnits":0,"systemKind":"legacy"}'),
           AccountSection.customers);
-      expect(fallback.systemManaged, isFalse);
-      expect(fallback.systemLinkKey, isNull);
-      expect(fallback.systemKind, 'legacy');
-      expect(fallback.resolvedSystemLink, 'legacy');
-      final d = AccountCardDto.fromJson(
+      expect(kindOnly.systemLinkKey, isNull);
+      expect(kindOnly.systemKind, 'legacy');
+      final linkOnly = AccountCardDto.fromJson(
+          _j('{"id":"3","name":"w","balanceUnits":0,"systemLinkKey":"purchases_vodafone_remainder"}'),
+          AccountSection.customers);
+      expect(linkOnly.systemLinkKey, 'purchases_vodafone_remainder');
+      expect(linkOnly.systemKind, isNull);
+      final absent = AccountCardDto.fromJson(
           _j('{"id":"1","name":"y","balanceUnits":0}'), AccountSection.customers);
-      expect(d.systemManaged, isFalse);
-      expect(d.systemLinkKey, isNull);
-      expect(d.systemKind, isNull);
-      expect(d.resolvedSystemLink, isNull);
+      expect(absent.systemLinkKey, isNull);
+      expect(absent.systemKind, isNull);
     });
   });
 
@@ -69,33 +69,24 @@ void main() {
     });
   });
 
-  test('one corrupt lifetimeTotals value rejects the whole purchases response', () {
-    expect(
-      () => PurchasesBookPage.fromData({
-        'days': [],
-        'lifetimeTotals': {'resultUnits': 1, 'paidUnits': '2'},
-      }),
-      _invalid,
+  test('lifetimeTotals rejects a bad value and stays null when omitted', () {
+    PurchasesBookPage pageOf(String json) =>
+        PurchasesBookPage.fromData(PreciseJson.decode(json));
+
+    expect(() => pageOf('{"days":[],"lifetimeTotals":{"paidUnits":"47447"}}'), _invalid);
+    expect(() => pageOf('{"days":[],"lifetimeTotals":{"resultUnits":1.5}}'), _invalid);
+    expect(() => pageOf('{"days":[],"lifetimeTotals":{"remainingUnits":4.5e2}}'), _invalid);
+    expect(() => pageOf('{"days":[],"lifetimeTotals":[50000]}'), _invalid);
+
+    expect(pageOf('{"days":[]}').lifetimeTotals, isNull);
+    expect(PurchasesLifetimeTotalsDto.fromJsonOrNull(null), isNull);
+
+    final page = pageOf(
+      '{"days":[],"lifetimeTotals":{"resultUnits":50000,"paidUnits":null,"remainingUnits":2553}}',
     );
-    expect(
-      () => PurchasesBookPage.fromData({
-        'days': [],
-        'lifetimeTotals': {'resultUnits': 1.5},
-      }),
-      _invalid,
-    );
-    expect(
-      () => PurchasesBookPage.fromData({
-        'days': [],
-        'lifetimeTotals': ['50000'],
-      }),
-      _invalid,
-    );
-    final page = PurchasesBookPage.fromData({
-      'days': [],
-      'lifetimeTotals': {'resultUnits': 50000, 'paidUnits': null},
-    });
-    expect(page.lifetimeTotals, {'resultUnits': 50000, 'paidUnits': null});
+    expect(page.lifetimeTotals?.resultUnits, 50000);
+    expect(page.lifetimeTotals?.paidUnits, isNull);
+    expect(page.lifetimeTotals?.remainingUnits, 2553);
   });
 
   test('proposed changeUnits and activeCashTone stay null when absent', () {

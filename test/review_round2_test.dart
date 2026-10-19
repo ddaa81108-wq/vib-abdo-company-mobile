@@ -79,14 +79,15 @@ void main() {
     await go(tester, '/purchases');
 
     expect(find.text(AppStrings.retry), findsOneWidget);
-    expect(find.textContaining('resultUnits'), findsNothing);
-    expect(find.textContaining('paidUnits'), findsNothing);
+    expect(find.textContaining('الناتج من الخادم 50,000'), findsNothing);
+    expect(find.textContaining('المسدد 47,447'), findsNothing);
 
     gate.failing = false;
     await tester.tap(find.text(AppStrings.retry));
     await settle(tester);
-    expect(find.textContaining('resultUnits'), findsOneWidget);
-    expect(find.textContaining('paidUnits'), findsOneWidget);
+    expect(find.textContaining('الناتج من الخادم 50,000 د.ل'), findsOneWidget);
+    expect(find.textContaining('المسدد 47,447 د.ل'), findsOneWidget);
+    expect(find.textContaining('المتبقي 2,553 د.ل'), findsOneWidget);
     expect(find.text(AppStrings.retry), findsNothing);
   });
 

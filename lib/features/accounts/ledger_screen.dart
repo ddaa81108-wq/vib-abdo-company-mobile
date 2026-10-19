@@ -372,7 +372,6 @@ class _Header extends StatelessWidget {
       section: section,
       serverLabel: value.ageStatusLabel,
     );
-    final link = value.resolvedSystemLink;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -386,7 +385,10 @@ class _Header extends StatelessWidget {
         ),
         if (visual.label != null) Text(visual.label!),
         if (value.systemManaged)
-          Text(AppStrings.systemCard, key: ValueKey('system-${link ?? 'managed'}')),
+          Text(
+            AppStrings.systemCard,
+            key: ValueKey('system-${value.systemLinkKey ?? 'managed'}'),
+          ),
       ],
     );
   }

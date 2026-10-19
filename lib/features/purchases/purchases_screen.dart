@@ -65,15 +65,27 @@ class PurchasesScreen extends ConsumerWidget {
                 ),
               const SizedBox(height: AppSpacing.md),
               Text(AppStrings.registerTotals, style: Theme.of(context).textTheme.titleSmall),
-              for (final entry in data.lifetimeTotals.entries)
-                Text(
-                  '${entry.key} ${entry.value == null ? AppStrings.dash : money.formatNumber(entry.value!)}',
-                ),
+              _LifetimeLine(AppStrings.resultFromServer, data.lifetimeTotals?.resultUnits, money),
+              _LifetimeLine(AppStrings.paid, data.lifetimeTotals?.paidUnits, money),
+              _LifetimeLine(AppStrings.remaining, data.lifetimeTotals?.remainingUnits, money),
             ],
           ),
         ),
       ],
     );
+  }
+}
+
+class _LifetimeLine extends StatelessWidget {
+  const _LifetimeLine(this.label, this.units, this.money);
+
+  final String label;
+  final int? units;
+  final MoneyFormatter money;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text('$label ${money.formatOrDash(units, Currency.lyd)}');
   }
 }
 
