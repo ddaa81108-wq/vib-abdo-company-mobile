@@ -13,7 +13,7 @@ import 'dio_api_client.dart';
 import 'get_retry_interceptor.dart';
 import 'logging_interceptor.dart';
 
-/// Wires the network stack. Interceptor order (doc 04 §6):
+/// Wires the network stack. Interceptor order per API contract:
 ///   [AuthInterceptor, GetRetryInterceptor, SafeLoggingInterceptor]
 class ApiStack {
   ApiStack._(this.client, this.strategy, this.dio);
@@ -43,10 +43,11 @@ class ApiStack {
 
     final options = DioApiClient.baseOptions(config);
     final bareDio = Dio(options); // no interceptors: CSRF fetch only
+    DioApiClient.usePreciseJson(bareDio);
     final dio = Dio(options);
     // TLS pinning hook (optional): configure dio.httpClientAdapter with an
     // IOHttpClientAdapter + SecurityContext / badCertificateCallback using SPKI
-    // pins supplied by the server owner (contract §13). 🔶
+    // pins supplied by the server owner, per API contract.
 
     final AuthStrategy strategy = switch (config.authStrategy) {
       AuthStrategyKind.cookieCsrf => CookieCsrfAuthStrategy(

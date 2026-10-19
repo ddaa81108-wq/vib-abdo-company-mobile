@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 import 'api_exception.dart';
 
 /// Maps transport errors + the REAL error envelope to typed ApiExceptions.
-/// Envelope (observed on the existing system, analysis doc §4.3):
+/// Error envelope per API contract:
 ///   { "ok": false, "error": { "code": "AUTH_REQUIRED", "message": "...", "details": {...}, "correlationId": "uuid" } }
 /// Observed server codes: AUTH_REQUIRED, VERSION_CONFLICT. Others are mapped by HTTP status.
 class ErrorMapper {

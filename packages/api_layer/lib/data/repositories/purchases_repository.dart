@@ -42,18 +42,22 @@ class RemotePurchasesRepository implements PurchasesRepository {
 
   @override
   Future<MutationAck> create(
-          PurchaseBook book, PurchaseEntryRequest r, MutationMeta meta) async =>
-      MutationAck.fromData((await _api.post(ApiEndpoints.purchases(book.path),
-              body: {...meta.toBody(versionField: _v), ...r.toJson()}))
-          .data);
+      PurchaseBook book, PurchaseEntryRequest r, MutationMeta meta) async {
+    PurchaseItemCodes.require(r.itemCode, r.itemLabel);
+    return MutationAck.fromData((await _api.post(ApiEndpoints.purchases(book.path),
+            body: {...meta.toBody(versionField: _v), ...r.toJson()}))
+        .data);
+  }
 
   @override
   Future<MutationAck> update(PurchaseBook book, String entryId,
-          PurchaseEntryRequest r, MutationMeta meta) async =>
-      MutationAck.fromData((await _api.patch(
-              ApiEndpoints.purchaseEntry(book.path, entryId),
-              body: {...meta.toBody(versionField: _v), ...r.toJson()}))
-          .data);
+      PurchaseEntryRequest r, MutationMeta meta) async {
+    PurchaseItemCodes.require(r.itemCode, r.itemLabel);
+    return MutationAck.fromData((await _api.patch(
+            ApiEndpoints.purchaseEntry(book.path, entryId),
+            body: {...meta.toBody(versionField: _v), ...r.toJson()}))
+        .data);
+  }
 
   @override
   Future<MutationAck> delete(

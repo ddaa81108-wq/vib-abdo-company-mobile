@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 
 import '../network/api_endpoints.dart';
+import '../network/precise_json.dart';
 import 'realtime_service.dart';
 
 /// SSE client over Dio streaming. Goes through the main Dio, so AuthInterceptor
@@ -146,7 +147,7 @@ class SseRealtimeService implements RealtimeService {
     if (!topics.contains(topic)) return;
     String? aggregateId;
     try {
-      final j = jsonDecode(data);
+      final j = PreciseJson.decode(data);
       if (j is Map && j['aggregateId'] is String) {
         aggregateId = j['aggregateId'] as String;
       }

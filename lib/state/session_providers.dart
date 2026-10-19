@@ -2,7 +2,9 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_providers.dart';
+import '../features/home/home_fallback.dart';
 import '../models/home_summary.dart';
+import 'theme_controller.dart';
 
 /// Mirrors [SessionManager.listenable] so widgets rebuild when the session changes.
 class SessionStateNotifier extends Notifier<SessionState> {
@@ -35,6 +37,7 @@ final startupProvider = FutureProvider<void>((ref) async {
 });
 
 final homeSummaryProvider = Provider<HomeSummary?>((ref) {
+  ref.watch(permissionRevisionProvider);
   final session = ref.watch(sessionStateProvider);
   if (session is! SessionAuthenticated) return null;
   final permissions = ref.watch(apiLayerProvider).permissions;
@@ -44,10 +47,10 @@ final homeSummaryProvider = Provider<HomeSummary?>((ref) {
   );
 });
 
-/// Proposed `GET /api/home`. Values are rendered as returned. A failure leaves
-/// the permission-gated section list in place and shows no invented cards.
+/// Proposed `GET /api/home`. When that call fails, per-section fields are shown
+/// as returned, with no totals combined across sections.
 final homeDashboardProvider = FutureProvider<HomeDto?>((ref) async {
   final session = ref.watch(sessionStateProvider);
   if (session is! SessionAuthenticated) return null;
-  return ref.read(apiLayerProvider).home.fetch();
+  return loadHome(ref.read(apiLayerProvider));
 });

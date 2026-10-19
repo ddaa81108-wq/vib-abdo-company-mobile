@@ -2,7 +2,7 @@ import 'common.dart';
 
 /// GET /api/me -> { ok:true, data: { user: { id?, username, displayName, role, permissions[],
 ///   sectionAccess{ customerDebts: none|read|manage, ... }, mustChangePassword } } }
-/// 🔶 sectionAccess was observed on GET /api/users (01b §1.2); presence on /api/me to confirm.
+/// sectionAccess was observed on GET /api/users (per API contract); presence on /api/me to confirm.
 class UserProfile {
   const UserProfile({
     required this.id,

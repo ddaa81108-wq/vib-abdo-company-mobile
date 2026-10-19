@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/app.dart';
+import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 
 /// Pumps the app with an injected fake [ApiLayer]. The provider does not build one.
-Future<void> pumpFakeApp(WidgetTester tester) async {
-  tester.view.physicalSize = const Size(800, 1400);
+Future<ApiLayer> pumpFakeApp(
+  WidgetTester tester, {
+  Size size = const Size(800, 1400),
+  List<Override> overrides = const [],
+  ConnectivityPort? connectivity,
+}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -20,7 +27,15 @@ Future<void> pumpFakeApp(WidgetTester tester) async {
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [apiLayerProvider.overrideWithValue(layer)],
+      // Failed loads should surface immediately. The app keeps Riverpod's retry.
+      retry: (retryCount, error) => null,
+      overrides: [
+        apiLayerProvider.overrideWithValue(layer),
+        connectivityPortProvider.overrideWithValue(
+          connectivity ?? const FixedConnectivity(true),
+        ),
+        ...overrides,
+      ],
       child: const CompanyApp(),
     ),
   );
@@ -29,6 +44,7 @@ Future<void> pumpFakeApp(WidgetTester tester) async {
     EnginePhase.sendSemanticsUpdate,
     const Duration(seconds: 20),
   );
+  return layer;
 }
 
 Future<void> signIn(

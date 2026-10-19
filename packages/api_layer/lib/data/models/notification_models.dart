@@ -2,7 +2,7 @@ import 'common.dart';
 
 /// GET /api/notifications?before -> { items: [...], unreadCount }
 /// The web client builds the notification TEXT locally from `action` + `details`.
-/// We request server-provided `title`/`body` (contract §12); until then the app shows
+/// We request server-provided `title`/`body`, per API contract; until then the app shows
 /// a static label per `action` and NEVER renders numbers from `details`.
 class NotificationDto {
   const NotificationDto(
@@ -41,7 +41,9 @@ class NotificationsPage {
   const NotificationsPage(
       {required this.items, required this.unreadCount, this.nextBefore});
   final List<NotificationDto> items;
-  final int unreadCount;
+
+  /// Null when the server omits `unreadCount`. The badge stays hidden; 0 is a real count.
+  final int? unreadCount;
   final String? nextBefore;
   factory NotificationsPage.fromData(Object? data) {
     final d = asJson(data);
@@ -50,7 +52,7 @@ class NotificationsPage {
         .toList(growable: false);
     return NotificationsPage(
       items: items,
-      unreadCount: intOrNull(d['unreadCount']) ?? 0,
+      unreadCount: intOrNull(d['unreadCount']),
       nextBefore: strOrNull(d['nextBefore'] ?? d['nextCursor']),
     );
   }

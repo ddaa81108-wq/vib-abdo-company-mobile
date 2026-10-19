@@ -1,6 +1,6 @@
-/// Mobile push abstraction (doc 04 §4). The existing system only has WEB Push
+/// Mobile push abstraction (per API contract). The server today only has web push
 /// (/api/browser-push/*, VAPID + service worker) — NOT usable by a native app.
-/// No FCM/APNs exists today. 🔶 Open question to the server owner.
+/// No FCM/APNs exists today, per API contract. Pending server confirmation.
 /// Until then: NoopPushService + RealtimeService (SSE / polling) while the app is in foreground.
 /// Rule: a push message is a SIGNAL only (type + entity id) — never numbers to display or apply.
 class PushMessage {

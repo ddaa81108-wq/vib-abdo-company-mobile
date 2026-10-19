@@ -23,7 +23,7 @@ class SessionUnauthenticated extends SessionState {
 }
 
 /// Not produced by the current server (no OTP). Kept so the router's exhaustive
-/// switch (doc 04 §2) stays valid and for a possible future mobile token scheme.
+/// switch (per API contract) stays valid and for a possible future mobile token scheme.
 class SessionOtpRequired extends SessionState {
   const SessionOtpRequired(this.challenge);
   final LoginChallenge challenge;

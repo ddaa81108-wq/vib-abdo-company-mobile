@@ -22,7 +22,7 @@ class RealtimeSignal {
       sequence: 0, topic: 'full_resync_required', fullResync: true);
 }
 
-/// Topics observed in the web client (analysis doc §4.4).
+/// Topics observed in the web client (per API contract).
 class RealtimeTopics {
   RealtimeTopics._();
   static const customerChanged = 'customer.changed';

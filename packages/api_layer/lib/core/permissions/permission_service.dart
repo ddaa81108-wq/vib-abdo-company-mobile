@@ -6,17 +6,17 @@ import 'permission_codes.dart';
 /// `sectionAccess{}`, and the proposed 🔶 `fullAccess` flag) for UI gating only.
 /// NOT a security boundary: the server enforces every request.
 ///
-/// FINAL PM DECISION (contract v0.2.3):
+/// Permission rules, per API contract:
 /// - The server `role` is treated as an explicit server flag ONLY HERE, by EXACT
 ///   (case-sensitive, untrimmed) match with the real system's values `"admin"` /
-///   `"employee"` (frontend `role === "admin"`, analysis 01 §4.2 / 01b §1.1).
+///   `"employee"` (exact role values, per API contract).
 ///   No role comparison anywhere else (guarded by test/permission_service_test.dart).
 /// - Unknown or missing role grants NOTHING (even if codes are present).
 /// - Precedence: (1) `fullAccess` if the server sends it (true or false);
 ///   (2) for an admin, an explicit non-empty `permissions[]` or `sectionAccess{}` applies
 ///   (same rules as an employee); (3) admin with both empty -> unrestricted (role flag).
 /// - Disallowed buttons/tiles/sections are HIDDEN, never shown disabled.
-/// - For sections in `sectionAccess` BOTH are required (open question §15, priority):
+/// - For sections in `sectionAccess` BOTH are required, per API contract:
 ///     read  = `<section>.read`  AND sectionAccess != none
 ///     write = `<section>.write` AND sectionAccess == manage
 ///   Collections (not in `sectionAccess`) use the codes only. Missing/unknown entry = none.
@@ -113,7 +113,8 @@ class PermissionService extends ChangeNotifier {
       return false; // read-only section (reports), even with full access
     }
     if (_fullAccess) return true;
-    if (!_granted.contains(w)) return false;
+    // Write needs the section read code too, per API contract.
+    if (!_granted.contains(s.read) || !_granted.contains(w)) return false;
     final level = accessLevel(s);
     return level == null || level == SectionAccessLevel.manage;
   }
@@ -123,6 +124,13 @@ class PermissionService extends ChangeNotifier {
       _fullAccess ||
       (_granted.contains(Permission.purchasesFinalize) &&
           canWrite(SectionKey.purchases));
+
+  /// The admin financial ledger (`GET /api/financial-ledger`) — FULL ACCESS ONLY,
+  /// per API contract. No permission code opens it.
+  bool get canViewFinancialLedger => _fullAccess;
+
+  /// PDF export — FULL ACCESS ONLY, per API contract.
+  bool get canExportPdf => _fullAccess;
 
   /// Management actions: explicit (proposed) code, or full access (flag / admin role flag).
   bool canDo(ManagementAction a) => canRaw(a.proposedCode);

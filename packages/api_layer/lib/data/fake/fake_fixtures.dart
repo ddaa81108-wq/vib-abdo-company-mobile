@@ -10,7 +10,7 @@ class FakeFixtures {
     'debts.read'
   ];
 
-  /// Proposed management codes (🔶 contract §4) used by the limited-admin fixture.
+  /// Proposed management codes, per API contract, used by the limited-admin fixture.
   static const limitedAdminPermissions = [
     'collections.read',
     'collections.write',
@@ -129,7 +129,31 @@ class FakeFixtures {
         },
       };
 
-  static Map<String, dynamic> ledger() => {
+  static Map<String, dynamic> ledger({String? before}) {
+    if (before != null && before.isNotEmpty) {
+      return {
+        'items': [
+          {
+            'id': 'tx_old',
+            'sequence': 0,
+            'type': 'debt',
+            'status': 'posted',
+            'date': '2026-09-01T10:00:00+02:00',
+            'note': 'دين أقدم',
+            'amountUnits': 40,
+            'inputValue': 40,
+            'calculationMode': 'direct',
+            'balanceAfterUnits': 40,
+            'createdByName': 'مدير تجريبي',
+            'version': 1
+          },
+        ],
+        'pageOpeningBalanceUnits': 0,
+        'nextBefore': null,
+        'hasMore': false,
+      };
+    }
+    return {
         'items': [
           {
             'id': 'tx_1',
@@ -161,9 +185,10 @@ class FakeFixtures {
           },
         ],
         'pageOpeningBalanceUnits': 0,
-        'nextBefore': null,
-        'hasMore': false,
+        'nextBefore': 'tx_1',
+        'hasMore': true,
       };
+  }
 
   /// Proposed GET /api/home — HARDCODED server-style values (nothing computed), filtered per user.
   static Map<String, dynamic> home({required bool admin}) => {
@@ -288,7 +313,14 @@ class FakeFixtures {
             'pendingCount': 1
           },
         ],
-        'metrics': {'collectedUnits': 0, 'dayTotalUnits': 100},
+        'metrics': {
+          'collectedUnits': 0,
+          'dayTotalUnits': 100,
+          'pendingCount': 1,
+          'unlinkedPendingCount': 1,
+          'cashOutstandingUnits': 250,
+        },
+        'assignedCount': 1,
         'batchId': 'b_1',
       };
 
@@ -371,11 +403,30 @@ class FakeFixtures {
           'egyptianSourceUnits': 95000,
           'egyptianRate': '9.5',
           'egyptianConvertedUnits': 10000,
-          'netUnits': 51000
+          'netUnits': 51000,
+          'activeCashTone': 'positive'
         },
       };
 
-  static Map<String, dynamic> cashLedger() => {
+  static Map<String, dynamic> cashLedger({String? before}) {
+    if (before != null && before.isNotEmpty) {
+      return {
+        'items': [
+          {
+            'id': 'ce_old',
+            'direction': 'out',
+            'amountUnits': 200,
+            'description': 'خروج أقدم',
+            'balanceAfterUnits': 7000,
+            'createdAt': '2026-09-01T09:00:00+02:00',
+            'createdByName': 'مدير تجريبي'
+          },
+        ],
+        'nextBefore': null,
+        'hasMore': false,
+      };
+    }
+    return {
         'items': [
           {
             'id': 'ce_1',
@@ -387,8 +438,10 @@ class FakeFixtures {
             'createdByName': 'مدير تجريبي'
           },
         ],
-        'nextBefore': null,
+        'nextBefore': 'ce_1',
+        'hasMore': true,
       };
+  }
 
   static Map<String, dynamic> reports() => {
         'items': [
@@ -403,7 +456,10 @@ class FakeFixtures {
             'netUnits': 51000,
             'netChangeUnits': 1200,
             'status': 'normal',
-            'note': ''
+            'note': 'ملاحظة النظام',
+            'reasons': [
+              {'text': 'سبب تجريبي', 'changeUnits': 1200}
+            ]
           },
         ],
         'methodology': {

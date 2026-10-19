@@ -1,5 +1,4 @@
 import 'package:flutter_api_layer/api_layer.dart';
-import 'package:flutter_api_layer/data/models/account_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -69,7 +68,7 @@ void main() {
     expect(overview.submissions.first.cashStatus, CashStatus.notApplicable);
     expect(overview.unlinkedReceipts.single.version, 1);
 
-    // Without expectedVersion the repository refuses to send (س-89).
+    // Without expectedVersion the repository refuses to send, per API contract.
     expect(() => api.collections.markCashReceived('sb_2', MutationMeta()),
         throwsArgumentError);
     final ack = await api.collections.markCashReceived(

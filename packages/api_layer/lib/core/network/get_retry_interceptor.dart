@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'package:dio/dio.dart';
 
-/// Retries ONLY GET/HEAD (doc 04 §6). Never retries POST/PUT/PATCH/DELETE.
+/// Retries only GET/HEAD (per API contract). Never retries POST/PUT/PATCH/DELETE.
 /// - max 2 retries; delay ~ base * 3^n ± 20% (400ms, 1200ms).
 /// - retry on connectionError / timeouts / 502 / 503 / 504.
 /// - never on 4xx, 500, badCertificate, cancel.

@@ -2,7 +2,7 @@ import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../models/auth_models.dart';
 
-/// Real cookie-session endpoints (analysis doc §4.2).
+/// Cookie-session endpoints (per API contract).
 abstract interface class AuthRepository {
   /// POST /api/auth/login {username, password} -> {user, csrfToken}. Sets the session cookie.
   Future<LoginResult> login(

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../data/models/common.dart';
 import '../network/api_client.dart';
 import '../network/api_endpoints.dart';
 import 'realtime_service.dart';
@@ -52,11 +53,11 @@ class PollingRealtimeService implements RealtimeService {
           query: {'after': _cursor.value},
           options: const ApiRequestOptions(noRetry: true));
       final d = res.dataMap;
-      final latest = (d['latest'] as num?)?.toInt();
+      final latest = intOrNull(d['latest']);
       if (d['fullResync'] == true) _signals.add(RealtimeSignal.resync);
       for (final e in (d['events'] is List ? d['events'] as List : const [])) {
         if (e is! Map) continue;
-        final seq = (e['sequence'] as num?)?.toInt() ?? 0;
+        final seq = intOrNull(e['sequence']) ?? 0;
         final topic = '${e['topic'] ?? ''}';
         _cursor.advance(seq);
         if (!topics.contains(topic)) continue;

@@ -4,6 +4,8 @@ import '../config/api_config.dart';
 import 'api_client.dart';
 import 'api_exception.dart';
 import 'error_mapper.dart';
+import 'precise_json.dart';
+import 'reachability.dart';
 import 'wire_json.dart';
 
 /// Dio-based implementation for the REAL envelope:
@@ -13,7 +15,16 @@ class DioApiClient implements ApiClient {
   DioApiClient(this._dio,
       {ErrorMapper errorMapper = const ErrorMapper(),
       this.rateWireFormat = RateWireFormat.number})
-      : _errorMapper = errorMapper;
+      : _errorMapper = errorMapper {
+    usePreciseJson(_dio);
+  }
+
+  /// Response JSON is decoded by [PreciseJson]: non-integer numbers keep their exact
+  /// text ([JsonNumberText]); no double is ever produced, per API contract.
+  static void usePreciseJson(Dio dio) {
+    dio.transformer = BackgroundTransformer()
+      ..jsonDecodeCallback = PreciseJson.decode;
+  }
 
   final Dio _dio;
   final RateWireFormat rateWireFormat;
@@ -21,7 +32,7 @@ class DioApiClient implements ApiClient {
 
   Dio get dio => _dio;
 
-  /// Same headers the existing web client sends (analysis doc §4.2).
+  /// Same headers the web client sends (per API contract).
   static BaseOptions baseOptions(ApiConfig config) => BaseOptions(
         baseUrl: config.baseUrl,
         connectTimeout: config.connectTimeout,
@@ -90,11 +101,20 @@ class DioApiClient implements ApiClient {
           },
         ),
       );
-      return _normalize(res);
-    } on ApiException {
+      final normalized = _normalize(res);
+      ApiReachability.instance.recordSuccess();
+      return normalized;
+    } on ApiException catch (error) {
+      if (error is NetworkException || error is TimeoutApiException) {
+        ApiReachability.instance.recordTransportFailure();
+      }
       rethrow;
     } catch (e) {
-      throw _errorMapper.map(e);
+      final mapped = _errorMapper.map(e);
+      if (mapped is NetworkException || mapped is TimeoutApiException) {
+        ApiReachability.instance.recordTransportFailure();
+      }
+      throw mapped;
     }
   }
 

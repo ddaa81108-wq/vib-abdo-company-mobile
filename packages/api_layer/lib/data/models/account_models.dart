@@ -39,6 +39,9 @@ class AccountCardDto {
     this.ageStatusLabel,
     this.zeroReview,
     this.allowedActions,
+    this.systemManaged = false,
+    this.systemLinkKey,
+    this.systemKind,
   });
 
   final String id;
@@ -54,11 +57,20 @@ class AccountCardDto {
   final int?
       debtAgeDays; // display only; the app does NOT apply 3/7-day thresholds
 
-  /// REQUIRED FROM SERVER (contract §12): new | warning | overdue | zero | credit + label.
+  /// Required from the server, per API contract: new | warning | overdue | zero | credit + label.
   final String? ageStatus;
   final String? ageStatusLabel;
   final Json? zeroReview;
   final List<String>? allowedActions;
+
+  /// Server flag. System cards can be opened and have no write controls.
+  final bool systemManaged;
+
+  /// Confirmed server field: link key of a system-managed card (e.g. masraweya_remainder, purchases_vodafone_remainder). Raw, as sent.
+  final String? systemLinkKey;
+
+  /// Pending server confirmation. Raw systemKind only, never aliased to or inferred from systemLinkKey.
+  final String? systemKind;
 
   factory AccountCardDto.fromJson(Json j, AccountSection s) => AccountCardDto(
         id: str(j['id']),
@@ -78,10 +90,13 @@ class AccountCardDto {
         zeroReview: j['zeroReview'] is Map ? asJson(j['zeroReview']) : null,
         allowedActions:
             j['allowedActions'] is List ? strList(j['allowedActions']) : null,
+        systemManaged: boolOf(j['systemManaged']),
+        systemLinkKey: strOrNull(j['systemLinkKey']),
+        systemKind: strOrNull(j['systemKind']),
       );
 }
 
-/// `summary` object of GET /api/{section} (real shape, 01b §2.1 + web Dashboard code):
+/// `summary` object of GET /api/{section} (per API contract):
 /// `data.summary = {netBalance, totalDebt, activeCards, pendingReviewCount}`.
 /// `netBalance`/`totalDebt` are integer money units WITHOUT the `Units` suffix on the wire.
 /// - netBalance: section net (what the web card "صافي إجمالي الديون" actually shows).
@@ -99,7 +114,7 @@ class AccountsSummaryDto {
   final int? activeCards;
   final int? pendingReviewCount;
 
-  /// ➕ requested (contract §12 #5): {active, today, debts, paid, pinned, pendingReview}.
+  /// Requested from the server, per API contract: {active, today, debts, paid, pinned, pendingReview}.
   final Map<String, int> tabCounts;
 
   factory AccountsSummaryDto.fromJson(Json j) => AccountsSummaryDto(
@@ -149,10 +164,13 @@ class LedgerEntryDto {
     this.createdByName,
     this.corrected = false,
     this.version,
+    this.paymentMode,
   });
 
   final String id;
-  final int sequence;
+
+  /// Absent on the wire stays null. The UI shows a dash; it does not invent 0.
+  final int? sequence;
   final String type; // debt | payment (deposits: in/out wording in UI)
   final String
       status; // posted | draft | finalized | reversed | corrected | deleted
@@ -165,20 +183,23 @@ class LedgerEntryDto {
   final int?
       factorMicros; // rate × 1e6, display via MoneyFormatter.formatScaled(…, 6)
 
-  /// REQUIRED FROM SERVER (contract §12): the web client computes this locally; we must not.
+  /// Required from the server, per API contract. The app does not compute this.
   final int? balanceAfterUnits;
   final String? createdByName;
   final bool corrected;
   final int? version;
 
+  /// Server value `full` / `partial` when present. Never inferred from amounts.
+  final String? paymentMode;
+
   factory LedgerEntryDto.fromJson(Json j) => LedgerEntryDto(
         id: str(j['id']),
-        sequence: intOrNull(j['sequence']) ?? 0,
+        sequence: intOrNull(j['sequence']),
         type: str(j['type']),
         status: str(j['status']),
         date: dateOrNull(j['date']),
         recordedAt: dateOrNull(j['createdAt']),
-        note: strOrNull(j['note']),
+        note: strOrNull(j['displayNote'] ?? j['note']),
         amountUnits: unitsOrNull(j['amountUnits']),
         inputValue: unitsOrNull(j['inputValue']),
         calculationMode: CalculationMode.fromName(j['calculationMode']),
@@ -187,6 +208,7 @@ class LedgerEntryDto {
         createdByName: strOrNull(j['createdByName'] ?? j['actorName']),
         corrected: boolOf(j['corrected']) || j['correctedAt'] != null,
         version: intOrNull(j['version']),
+        paymentMode: strOrNull(j['paymentMode']),
       );
 }
 
@@ -243,7 +265,7 @@ enum PaymentMode { partial, full }
 
 /// POST /api/{section}/{id}/transactions
 /// {requestId, expectedVersion, type: debt|payment, paymentMode?, inputValue, calculationMode, factor?, date, note}
-/// The SERVER computes the final amount. The app shows no preview (requested server preview, §12).
+/// The server computes the final amount. The app shows no preview, per API contract.
 class AccountTransactionRequest {
   const AccountTransactionRequest._({
     required this.type,
@@ -301,7 +323,7 @@ class AccountTransactionRequest {
   final CalculationMode calculationMode;
 
   /// Rate as typed by the user, kept as decimal TEXT (no float). On the wire it is a JSON
-  /// number literal or string per ApiConfig.rateWireFormat (default number; §15 q13).
+  /// number literal or string per ApiConfig.rateWireFormat (default number), per API contract.
   final DecimalString? factor;
   final DateTime date;
   final String? note;

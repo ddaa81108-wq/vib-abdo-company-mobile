@@ -5,7 +5,7 @@ import '../session/token_storage.dart';
 import 'auth_strategy.dart';
 
 /// 🔶 STUB — PENDING the server owner's answer about a mobile token scheme
-/// (contract §3.B). The real system today only supports cookie + CSRF.
+/// per API contract. The real system today only supports cookie + CSRF.
 /// Proposed contract: POST /api/auth/mobile/login -> {accessToken, refreshToken, expiresIn},
 /// POST /api/auth/mobile/refresh (rotation), POST /api/auth/mobile/logout.
 /// Until confirmed: no refresh is attempted; 401 -> forced logout.
@@ -50,7 +50,7 @@ class BearerTokenAuthStrategy implements AuthStrategy {
       await _tokens.saveTokens(
         accessToken: access,
         refreshToken: refresh,
-        expiresInSeconds: (loginData['expiresIn'] as num?)?.toInt(),
+        expiresInSeconds: (loginData['expiresIn'] is int ? loginData['expiresIn'] as int : null),
       );
     }
   }

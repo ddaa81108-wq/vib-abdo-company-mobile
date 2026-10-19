@@ -37,7 +37,7 @@ class CollectionAssignmentDto {
       );
 }
 
-/// "ينتظر النقد" status — ➕ SERVER-PROVIDED ONLY (contract §12 #15, 04_ui_spec §3.5).
+/// "ينتظر النقد" status — server-provided only (per API contract).
 /// Proposed wire fields: `cashStatus: "pending"|"received"|"not_applicable"` and/or
 /// `cashPending: bool`. The app NEVER derives it from `status` + `cashReceivedAt`.
 enum CashStatus {
@@ -80,7 +80,7 @@ class CollectionSubmissionDto {
       cashStatus; // server-provided only (null until the server adds it)
   final DateTime?
       cashReceivedAt; // shown as a timestamp only; not used to derive status
-  /// ➕ required from server (QA س-89): sent back as `expectedVersion` on decision / cash-received.
+  /// Required from the server, per API contract: sent back as `expectedVersion` on decision / cash-received.
   final int? version;
   final String? submittedByName;
   final DateTime? createdAt;
@@ -157,6 +157,10 @@ class CollectionsOverviewDto {
     required this.employeeTotals,
     this.collectedUnits,
     this.dayTotalUnits,
+    this.assignedCount,
+    this.pendingCount,
+    this.unlinkedPendingCount,
+    this.cashOutstandingUnits,
     this.batchId,
     this.raw = const {},
   });
@@ -166,8 +170,12 @@ class CollectionsOverviewDto {
   final List<EmployeeTotalDto> employeeTotals;
   final int? collectedUnits; // metrics.collectedUnits
 
-  /// REQUIRED FROM SERVER (contract §12): web client sums the PDF day total locally.
+  /// Required from the server, per API contract: the day total is not summed on the device.
   final int? dayTotalUnits;
+  final int? assignedCount;
+  final int? pendingCount;
+  final int? unlinkedPendingCount;
+  final int? cashOutstandingUnits;
   final String? batchId;
   final Json raw;
 
@@ -192,6 +200,11 @@ class CollectionsOverviewDto {
       collectedUnits: unitsOrNull(metrics['collectedUnits']),
       dayTotalUnits:
           unitsOrNull(metrics['dayTotalUnits'] ?? d['dayTotalUnits']),
+      // Top-level in data, per API contract; metrics is only a fallback.
+      assignedCount: intOrNull(d['assignedCount'] ?? metrics['assignedCount']),
+      pendingCount: intOrNull(metrics['pendingCount']),
+      unlinkedPendingCount: intOrNull(metrics['unlinkedPendingCount']),
+      cashOutstandingUnits: unitsOrNull(metrics['cashOutstandingUnits']),
       batchId: strOrNull(d['batchId'] ?? asJson(d['batch'])['id']),
       raw: d,
     );

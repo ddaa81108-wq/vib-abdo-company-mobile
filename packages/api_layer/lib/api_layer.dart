@@ -29,6 +29,7 @@ export 'core/auth/cookie_store.dart';
 export 'core/config/api_config.dart';
 export 'core/money/money_formatter.dart';
 export 'core/network/api_exception.dart';
+export 'core/network/reachability.dart';
 export 'core/network/idempotency.dart';
 export 'core/permissions/permission_codes.dart';
 export 'core/permissions/permission_service.dart';
@@ -37,10 +38,17 @@ export 'core/realtime/realtime_service.dart';
 export 'core/security/redactor.dart';
 export 'core/session/session_manager.dart';
 export 'core/session/token_storage.dart';
+export 'data/models/account_models.dart';
 export 'data/models/auth_models.dart';
 export 'data/models/collection_models.dart';
+export 'data/models/common.dart';
 export 'data/models/home_models.dart';
+export 'data/models/masraweya_models.dart';
+export 'data/models/notification_models.dart';
 export 'data/models/profile_models.dart';
+export 'data/models/purchase_models.dart';
+export 'data/models/report_models.dart';
+export 'data/models/treasury_models.dart';
 
 class ApiLayer {
   ApiLayer._({
@@ -60,6 +68,7 @@ class ApiLayer {
     required this.reports,
     required this.notifications,
     required this.home,
+    required this.useFakeApi,
   });
 
   final ApiClient client;
@@ -78,6 +87,9 @@ class ApiLayer {
   final ReportsRepository reports;
   final NotificationsRepository notifications;
   final HomeRepository home;
+
+  /// True only for the in-memory client. Real mode never calls proposed paths.
+  final bool useFakeApi;
 
   static ApiLayer create({
     ApiConfig? config,
@@ -149,6 +161,7 @@ class ApiLayer {
       reports: RemoteReportsRepository(api),
       notifications: RemoteNotificationsRepository(api),
       home: RemoteHomeRepository(api),
+      useFakeApi: cfg.useFakeApi,
     );
   }
 

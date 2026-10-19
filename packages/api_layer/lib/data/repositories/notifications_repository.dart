@@ -12,7 +12,7 @@ abstract interface class NotificationsRepository {
 
   /// No dedicated endpoint exists today: reads `unreadCount` from the first page of
   /// GET /api/notifications. 🔶 Requested: a light GET /api/notifications/unread-count.
-  Future<int> fetchUnreadCount();
+  Future<int?> fetchUnreadCount();
   Future<Json> preferences();
   Future<Json> updatePreferences(Json prefs);
 }
@@ -38,7 +38,7 @@ class RemoteNotificationsRepository implements NotificationsRepository {
   }
 
   @override
-  Future<int> fetchUnreadCount() async => (await list()).unreadCount;
+  Future<int?> fetchUnreadCount() async => (await list()).unreadCount;
 
   @override
   Future<Json> preferences() async =>

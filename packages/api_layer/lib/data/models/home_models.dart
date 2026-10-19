@@ -1,6 +1,6 @@
 import 'common.dart';
 
-/// ➕ PROPOSED `GET /api/home` (تحتاج إضافة من الخادم; contract §5.0 / §14; 04_ui_spec §6.2, §8).
+/// Proposed `GET /api/home` (per API contract). The server does not provide this yet.
 /// The server returns ONLY what the current user may see (filtered by permissions).
 /// Every number, colour (`tone`), counter and date comes from the server as-is:
 /// the app performs no sums across sections, no currency conversion, no date math.

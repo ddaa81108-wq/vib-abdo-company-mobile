@@ -1,5 +1,5 @@
-/// REAL paths from the existing system (analysis doc §4.5), extracted from the
-/// public frontend code — NOT called live. Paths still unknown are marked 🔶.
+/// Paths per API contract, taken from the public client. Not called live.
+/// Paths still unknown are marked 🔶.
 /// Changing the backend should only require editing this file + mappers.
 class ApiEndpoints {
   ApiEndpoints._();
@@ -97,9 +97,12 @@ class ApiEndpoints {
   static const notificationsReadAll = '/api/notifications/read-all';
   static const notificationPreferences = '/api/notification-preferences';
 
-  // 🔶 Do not exist — requested from the server owner (see contract §14).
+  // Proposed paths. The server does not implement these yet.
   static const proposedUnreadCount = '/api/notifications/unread-count';
   static const proposedMobilePushDevices = '/api/mobile-push/devices';
-  static const proposedHome =
-      '/api/home'; // aggregated home screen (contract §5.0)
+  static const proposedHome = '/api/home';
+
+  /// Proposed endpoint, pending server confirmation. The server has no PDF
+  /// export. The app calls this only while the fake client is in use.
+  static const statementPdf = '/api/statements/pdf';
 }

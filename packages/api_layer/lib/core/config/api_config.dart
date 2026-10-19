@@ -11,10 +11,10 @@ enum AuthStrategyKind {
 /// Inside the app they are always decimal text with no operations.
 enum RateWireFormat {
   /// JSON number literal written from the exact digits (e.g. `9.5`), no float conversion.
-  /// Default: the current server sends/expects JSON numbers (01b §5, `exchangeRate: float`).
+  /// Default: the current server sends and expects JSON numbers for rates (per API contract).
   number,
 
-  /// JSON string (e.g. `"9.5"`) — the contract's target (§2.6, question 13).
+  /// JSON string (e.g. `"9.5"`) — per API contract, the target wire form.
   string,
 }
 

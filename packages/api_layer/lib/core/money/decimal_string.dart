@@ -1,38 +1,55 @@
+import '../network/api_exception.dart';
+import '../network/precise_json.dart';
+
 /// A non-money decimal value (exchange rate, multiply/divide factor) kept as TEXT.
 ///
 /// HARD RULE: no `double`/`num`/float for any monetary value or rate in the app.
-/// The contract requires the server to send/accept rates as decimal STRINGS
+/// Per API contract, the server sends and accepts rates as decimal STRINGS
 /// (e.g. `"9.5"`, `"0.105263"`). This type validates the text and never converts it
 /// to a number; display uses MoneyFormatter.formatDecimal (string grouping only).
 class DecimalString {
   const DecimalString._(this.value);
 
-  /// Canonical text, e.g. "9.5". Only digits, optional leading '-', optional one '.'.
+  /// Validated text, kept verbatim after digit and decimal-separator normalization.
+  /// Only digits, optional leading '-', optional one '.'. Leading zeros stay.
   final String value;
 
   static final RegExp _pattern = RegExp(r'^-?\d+(\.\d+)?$');
 
-  /// User input (accepts Arabic-Indic digits and ',' / '٫' as decimal mark). Null if invalid.
+  /// USER INPUT. Arabic-Indic and Persian digits are normalized to ASCII.
+  /// At most one of ',' '٫' '.' may appear, and that single mark is the decimal
+  /// separator. Repeated marks, mixed marks, grouping, and exponents are rejected.
+  /// The matched text is stored verbatim (no leading-zero rewrite). Null if invalid.
   static DecimalString? tryParse(String? input) {
     if (input == null) return null;
-    final normalized = _normalizeDigits(input.trim())
-        .replaceAll('٫', '.')
-        .replaceAll(',', '.');
-    if (!_pattern.hasMatch(normalized)) return null;
-    return DecimalString._(_stripLeadingZeros(normalized));
+    final normalized = _normalizeRate(input.trim());
+    if (normalized == null || !_pattern.hasMatch(normalized)) return null;
+    return DecimalString._(normalized);
   }
 
-  /// Server value. Contract: a JSON STRING. Transitional (🔶 contract §15): the current
-  /// server still sends JSON numbers for `exchangeRate`/`egpPerLyd`; the JSON decoder has
-  /// already produced a Dart number, so it is turned into text right here, once, with no
-  /// arithmetic, and never stored as a number. Remove when the server sends strings.
+  /// Server value, per API contract. null/missing -> null. Accepted: a JSON string, an int, or
+  /// a [JsonNumberText] (the EXACT numeric text from the body, preserved by PreciseJson —
+  /// never `toString()` of a double). The text must be plain ASCII `-?digits(.digits)?`:
+  /// comma separators, exponents (1e5, 1E-2), Arabic digits, or a Dart `double` (text
+  /// already lost) => [InvalidServerResponseException].
   static DecimalString? fromJson(Object? v) {
-    if (v is String) return tryParse(v);
-    if (v is int) return DecimalString._('$v');
-    if (v is num) {
-      return tryParse(v.toString()); // transitional text conversion only
+    if (v == null) return null;
+    final String text;
+    if (v is String) {
+      text = v.trim();
+    } else if (v is int) {
+      text = '$v';
+    } else if (v is JsonNumberText) {
+      text = v.text;
+    } else {
+      throw const InvalidServerResponseException(
+          message: 'استجابة الخادم غير صالحة (قيمة عشرية بنوع غير مدعوم)');
     }
-    return null;
+    if (!_pattern.hasMatch(text)) {
+      throw const InvalidServerResponseException(
+          message: 'استجابة الخادم غير صالحة (قيمة عشرية بصيغة غير مقبولة)');
+    }
+    return DecimalString._(text);
   }
 
   /// Text form. Wire encoding (string vs number) is decided ONLY by WireJson / ApiConfig.rateWireFormat.
@@ -48,16 +65,25 @@ class DecimalString {
   @override
   int get hashCode => value.hashCode;
 
-  /// "007.50" -> "7.50", "-00" -> "-0": text edit only, so the value is a valid JSON number literal.
-  static String _stripLeadingZeros(String s) {
-    final negative = s.startsWith('-');
-    var body = negative ? s.substring(1) : s;
-    final dot = body.indexOf('.');
-    var intPart = dot < 0 ? body : body.substring(0, dot);
-    final rest = dot < 0 ? '' : body.substring(dot);
-    intPart = intPart.replaceFirst(RegExp(r'^0+(?=\d)'), '');
-    body = '$intPart$rest';
-    return negative ? '-$body' : body;
+  /// ASCII digits for user input. Arabic-Indic and Persian digits map to 0-9.
+  static String normalizeDigits(String s) => _normalizeDigits(s);
+
+  /// One decimal mark among comma, Arabic decimal, and dot. Null when mixed,
+  /// repeated, or an exponent is present.
+  static String? _normalizeRate(String raw) {
+    if (raw.isEmpty) return null;
+    if (raw.contains('e') || raw.contains('E')) return null;
+    final text = _normalizeDigits(raw);
+    const marks = [',', '٫', '.'];
+    final used = <String>[];
+    for (final mark in marks) {
+      final count = mark.allMatches(text).length;
+      if (count > 1) return null;
+      if (count == 1) used.add(mark);
+    }
+    if (used.length > 1) return null;
+    if (used.isEmpty) return text;
+    return text.replaceAll(used.single, '.');
   }
 
   static String _normalizeDigits(String s) {

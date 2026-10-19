@@ -2,10 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../../core/config/api_config.dart';
+import '../../core/network/precise_json.dart';
 import '../../core/network/wire_json.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/network/error_mapper.dart';
+import '../../core/network/reachability.dart';
+import '../models/purchase_models.dart';
 import 'fake_fixtures.dart';
 
 /// In-memory fake of the REAL API shapes so the UI can be built with zero contact
@@ -23,6 +27,33 @@ class FakeApiClient implements ApiClient {
 
   /// Last request body exactly as it would go on the wire (for tests).
   String? lastWireBody;
+
+  /// Request ids of business mutations, in send order (tests).
+  final List<String> mutationRequestIds = [];
+
+  /// The next N business mutations fail before they change fake state (tests).
+  int failMutationsRemaining = 0;
+
+  /// When set, business mutations wait here after their requestId is recorded (tests).
+  Completer<void>? pauseMutations;
+
+  /// The next N account-suggestion reads fail (tests).
+  int failSuggestionsRemaining = 0;
+
+  /// The next N proposed home reads fail so the app can use per-section data.
+  int failHomeRemaining = 0;
+
+  /// The next N older-page reads (`before`) fail (tests).
+  int failOlderRemaining = 0;
+
+  /// The next N notification writes fail (tests).
+  int failNotificationWritesRemaining = 0;
+
+  /// Omit `unreadCount` from the notifications page (tests).
+  bool omitUnreadCount = false;
+
+  /// When set, account-suggestion reads wait here (tests).
+  Completer<void>? pauseSuggestions;
   bool _loggedIn = false;
   bool _admin = false;
   Map<String, dynamic> _me = FakeFixtures.me(admin: false);
@@ -33,7 +64,7 @@ class FakeApiClient implements ApiClient {
   Future<ApiResponse> get(String path,
           {Map<String, dynamic>? query,
           ApiRequestOptions options = const ApiRequestOptions()}) =>
-      _handle('GET', path, null, options);
+      _handle('GET', path, null, options, query: query);
   @override
   Future<ApiResponse> post(String path,
           {Object? body,
@@ -56,19 +87,29 @@ class FakeApiClient implements ApiClient {
           ApiRequestOptions options = const ApiRequestOptions()}) =>
       _handle('DELETE', path, body, options);
 
-  ApiResponse _ok(Object? data, {int status = 200}) =>
-      ApiResponse(statusCode: status, data: data, correlationId: 'fake');
+  ApiResponse _ok(Object? data, {int status = 200}) {
+    ApiReachability.instance.recordSuccess();
+    return ApiResponse(
+        statusCode: status,
+        // Same decode path as the real client: fixtures -> JSON text -> PreciseJson.
+        data: data == null ? null : PreciseJson.decode(jsonEncode(data)),
+        correlationId: 'fake');
+  }
 
-  Never _fail(int status, String code, String message) =>
-      throw _err.fromResponse(status, {
-        'ok': false,
-        'error': {
-          'code': code,
-          'message': message,
-          'details': {},
-          'correlationId': 'fake'
-        },
-      });
+  Never _fail(int status, String code, String message) {
+    if (code == 'NETWORK_UNAVAILABLE' || code == 'TIMEOUT') {
+      ApiReachability.instance.recordTransportFailure();
+    }
+    throw _err.fromResponse(status, {
+      'ok': false,
+      'error': {
+        'code': code,
+        'message': message,
+        'details': {},
+        'correlationId': 'fake'
+      },
+    });
+  }
 
   void _requireAdmin() {
     if (!_admin) _fail(403, 'FORBIDDEN', 'هذا الإجراء للإدارة فقط');
@@ -80,8 +121,9 @@ class FakeApiClient implements ApiClient {
     }
   }
 
-  Future<ApiResponse> _handle(String method, String path, Object? body,
-      ApiRequestOptions options) async {
+  Future<ApiResponse> _handle(
+      String method, String path, Object? body, ApiRequestOptions options,
+      {Map<String, dynamic>? query}) async {
     await Future<void>.delayed(latency);
     // Same serialization as the real client, then decoded like a server would.
     lastWireBody = body == null ? null : WireJson.encode(body, rateWireFormat);
@@ -119,10 +161,21 @@ class FakeApiClient implements ApiClient {
         head != 'notifications' &&
         head != 'notification-preferences') {
       _requireMutationMeta(b);
+      mutationRequestIds.add('${b['requestId']}');
+      final paused = pauseMutations;
+      if (paused != null) await paused.future;
+      if (failMutationsRemaining > 0) {
+        failMutationsRemaining--;
+        _fail(400, 'MUTATION_FAILED', 'تعذر تنفيذ الطلب.');
+      }
     }
 
     switch (head) {
       case 'home': // 🔶 proposed endpoint, fake only
+        if (failHomeRemaining > 0) {
+          failHomeRemaining--;
+          _fail(404, 'NOT_FOUND', 'المسار غير موجود');
+        }
         return _ok(FakeFixtures.home(admin: _admin));
       case 'customers':
       case 'companies':
@@ -135,10 +188,21 @@ class FakeApiClient implements ApiClient {
           return _ok(FakeFixtures.accounts(egp: head == 'egyptian-deposits'));
         }
         if (method == 'GET' && seg.length > 1 && seg[1] == 'suggestions') {
+          final paused = pauseSuggestions;
+          if (paused != null) await paused.future;
+          if (failSuggestionsRemaining > 0) {
+            failSuggestionsRemaining--;
+            _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر البحث.');
+          }
           return _ok({'items': []});
         }
         if (method == 'GET' && seg.length == 3 && seg[2] == 'ledger') {
-          return _ok(FakeFixtures.ledger());
+          final before = query?['before']?.toString();
+          if (before != null && before.isNotEmpty && failOlderRemaining > 0) {
+            failOlderRemaining--;
+            _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
+          }
+          return _ok(FakeFixtures.ledger(before: before));
         }
         if (method == 'GET' && seg.length == 2) {
           return _ok(
@@ -158,6 +222,13 @@ class FakeApiClient implements ApiClient {
         if (method == 'GET' && seg.length > 1 && seg[1] == 'payroll') {
           return _ok(FakeFixtures.payroll());
         }
+        if (method == 'GET' && seg.length > 1 && seg[1] == 'assignees') {
+          return _ok({
+            'items': [
+              {'id': 'u_12', 'displayName': 'موظف استلام تجريبي'}
+            ]
+          });
+        }
         if (method == 'GET') return _ok({'items': []});
         final employeeAllowed = (seg.length > 2 &&
                 seg[1] == 'assignments' &&
@@ -175,15 +246,43 @@ class FakeApiClient implements ApiClient {
         return _ok(FakeFixtures.masraweyaDay());
       case 'purchases':
         if (method == 'GET') return _ok(FakeFixtures.purchases());
+        final entryWrite = (method == 'POST' && seg.length == 2) ||
+            ((method == 'POST' || method == 'PATCH') &&
+                seg.length > 3 &&
+                seg[2] == 'entries');
+        if (entryWrite) {
+          try {
+            PurchaseItemCodes.require(
+              b['itemCode']?.toString(),
+              b['itemLabel']?.toString(),
+            );
+          } on BadRequestException catch (error) {
+            _fail(400, error.code, error.message);
+          }
+        }
         return _ok({'id': 'pe_new', 'version': 4});
       case 'treasury':
         if (method == 'GET' && seg.length == 1) {
           return _ok(FakeFixtures.treasury());
         }
-        if (method == 'GET') return _ok(FakeFixtures.cashLedger());
+        if (method == 'GET') {
+          final before = query?['before']?.toString();
+          if (before != null && before.isNotEmpty && failOlderRemaining > 0) {
+            failOlderRemaining--;
+            _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
+          }
+          return _ok(FakeFixtures.cashLedger(before: before));
+        }
         return _ok({'id': 'ce_new', 'version': 8});
       case 'reports':
         return _ok(FakeFixtures.reports());
+      case 'statements':
+        // Proposed endpoint, pending server confirmation. Fake mode only.
+        _requireAdmin();
+        return _ok({
+          'filename': 'statement.pdf',
+          'contentBase64': 'JVBERi0xLjQK',
+        });
       case 'financial-ledger':
         _requireAdmin();
         return _ok({
@@ -191,7 +290,15 @@ class FakeApiClient implements ApiClient {
           'scopeTotals': {'LYD': 0, 'EGP': 0}
         });
       case 'notifications':
-        if (method == 'GET') return _ok(FakeFixtures.notifications(_unread));
+        if (method == 'GET') {
+          final data = FakeFixtures.notifications(_unread);
+          if (omitUnreadCount) data.remove('unreadCount');
+          return _ok(data);
+        }
+        if (failNotificationWritesRemaining > 0) {
+          failNotificationWritesRemaining--;
+          _fail(500, 'SERVER_ERROR', 'تعذر تحديث الإشعار.');
+        }
         _unread = 0; // fake server state reset (single notification fixture)
         return _ok({});
       case 'notification-preferences':
