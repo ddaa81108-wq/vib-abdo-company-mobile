@@ -44,9 +44,15 @@ void main() {
         find.byKey(HomeShell.sectionKey(SectionKey.reports)),
         findsNothing,
       );
+      final collectionsWrite = tester.widget<TextButton>(
+        find.byKey(HomeShell.writeKey(SectionKey.collections)),
+      );
+      expect(collectionsWrite.enabled, isTrue);
       final badge = tester.widget<Text>(find.byKey(UnreadBadge.badgeKey));
       expect(badge.data, '1');
-      expect(find.textContaining('د.ل'), findsNothing);
+      expect(find.text('2026-10-19'), findsOneWidget);
+      expect(find.textContaining('320 د.ل'), findsWidgets);
+      expect(find.textContaining('250 د.ل'), findsOneWidget);
       expect(find.textContaining('ج.م'), findsNothing);
 
       await tester.tap(find.byKey(HomeShell.logoutKey));
@@ -75,6 +81,25 @@ void main() {
         find.byKey(HomeShell.writeKey(SectionKey.treasury)),
         findsOneWidget,
       );
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(HomeShell.writeKey(SectionKey.treasury)),
+            )
+            .enabled,
+        isTrue,
+      );
+      expect(
+        find.byKey(HomeShell.actionKey(ManagementAction.collectionsDecide)),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          HomeShell.actionKey(ManagementAction.collectionsCashReceived),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('15,000 ج.م'), findsOneWidget);
       expect(
         find.byKey(HomeShell.sectionKey(SectionKey.reports)),
         findsOneWidget,

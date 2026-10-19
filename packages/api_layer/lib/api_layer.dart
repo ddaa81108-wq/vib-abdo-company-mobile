@@ -17,6 +17,7 @@ import 'core/session/token_storage.dart';
 import 'data/repositories/accounts_repository.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/collections_repository.dart';
+import 'data/repositories/home_repository.dart';
 import 'data/repositories/masraweya_repository.dart';
 import 'data/repositories/notifications_repository.dart';
 import 'data/repositories/profile_repository.dart';
@@ -37,6 +38,8 @@ export 'core/security/redactor.dart';
 export 'core/session/session_manager.dart';
 export 'core/session/token_storage.dart';
 export 'data/models/auth_models.dart';
+export 'data/models/collection_models.dart';
+export 'data/models/home_models.dart';
 export 'data/models/profile_models.dart';
 
 class ApiLayer {
@@ -56,6 +59,7 @@ class ApiLayer {
     required this.treasury,
     required this.reports,
     required this.notifications,
+    required this.home,
   });
 
   final ApiClient client;
@@ -73,6 +77,7 @@ class ApiLayer {
   final TreasuryRepository treasury;
   final ReportsRepository reports;
   final NotificationsRepository notifications;
+  final HomeRepository home;
 
   static ApiLayer create({
     ApiConfig? config,
@@ -80,6 +85,7 @@ class ApiLayer {
     PushService push = const NoopPushService(),
     CookieStore? cookieStore,
     TokenStorage? tokenStorage,
+    Duration? fakeLatency,
   }) {
     final cfg = config ?? ApiConfig.fromEnvironment();
     final permissions = PermissionService();
@@ -93,6 +99,7 @@ class ApiLayer {
       },
       cookieStore: cookieStore,
       tokenStorage: tokenStorage,
+      fakeLatency: fakeLatency,
     );
     final api = stack.client;
 
@@ -141,6 +148,7 @@ class ApiLayer {
       treasury: RemoteTreasuryRepository(api),
       reports: RemoteReportsRepository(api),
       notifications: RemoteNotificationsRepository(api),
+      home: RemoteHomeRepository(api),
     );
   }
 

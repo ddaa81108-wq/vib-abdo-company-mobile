@@ -2,115 +2,141 @@ import 'package:flutter/foundation.dart';
 
 import 'permission_codes.dart';
 
-/// Role the server sent, after the only exact string match in the app.
-enum AccountRole { admin, employee, unknown }
-
-/// UI gate built only from the server profile.
+/// Holds permissions RETURNED BY THE SERVER (GET /api/me: `role`, `permissions[]`,
+/// `sectionAccess{}`, and the proposed 🔶 `fullAccess` flag) for UI gating only.
+/// NOT a security boundary: the server enforces every request.
 ///
-/// The role string is matched here and nowhere else. An unknown or missing
-/// role grants nothing. A non-admin is limited to `permissions` plus
-/// `sectionAccess`. A write needs both the write code and section access
-/// `manage`. An admin with a non-empty permission list is limited to that
-/// list; an empty list keeps the unrestricted role flag.
-/// This is not enforcement. The server still rejects every request.
+/// FINAL PM DECISION (contract v0.2.3):
+/// - The server `role` is treated as an explicit server flag ONLY HERE, by EXACT
+///   (case-sensitive, untrimmed) match with the real system's values `"admin"` /
+///   `"employee"` (frontend `role === "admin"`, analysis 01 §4.2 / 01b §1.1).
+///   No role comparison anywhere else (guarded by test/permission_service_test.dart).
+/// - Unknown or missing role grants NOTHING (even if codes are present).
+/// - Precedence: (1) `fullAccess` if the server sends it (true or false);
+///   (2) for an admin, an explicit non-empty `permissions[]` or `sectionAccess{}` applies
+///   (same rules as an employee); (3) admin with both empty -> unrestricted (role flag).
+/// - Disallowed buttons/tiles/sections are HIDDEN, never shown disabled.
+/// - For sections in `sectionAccess` BOTH are required (open question §15, priority):
+///     read  = `<section>.read`  AND sectionAccess != none
+///     write = `<section>.write` AND sectionAccess == manage
+///   Collections (not in `sectionAccess`) use the codes only. Missing/unknown entry = none.
 class PermissionService extends ChangeNotifier {
-  static const roleAdmin = 'admin';
-  static const roleEmployee = 'employee';
-  static const accessView = 'view';
-  static const accessManage = 'manage';
+  /// Exact role values of the real system. Matched ONLY in this class.
+  static const adminRoleValue = 'admin';
+  static const employeeRoleValue = 'employee';
 
   Set<Permission> _granted = const {};
   Set<String> _rawCodes = const {};
-  Map<String, String> _sectionAccess = const {};
-  AccountRole _accountRole = AccountRole.unknown;
-  bool _unrestricted = false;
+  Map<String, SectionAccessLevel> _sectionAccess = const {};
+  bool _fullAccess = false;
+  AccountRole _role = AccountRole.unknown;
   String? _version;
 
   Set<Permission> get granted => _granted;
-  AccountRole get accountRole => _accountRole;
+
+  /// True when everything is allowed (explicit `fullAccess` or the admin role flag).
+  bool get fullAccess => _fullAccess;
+  AccountRole get role => _role;
   String? get version => _version;
 
-  void applyFromServer({
-    required String role,
-    required Iterable<String> permissions,
+  void applyFromServer(
+    Iterable<String> codes, {
+    required String? role,
     Map<String, String> sectionAccess = const {},
+    bool? fullAccess,
     String? version,
   }) {
     _version = version;
-    _accountRole = _matchRole(role);
-    final codes = permissions.where((code) => code.isNotEmpty).toSet();
+    _role = role == adminRoleValue
+        ? AccountRole.admin
+        : (role == employeeRoleValue
+            ? AccountRole.employee
+            : AccountRole.unknown);
+    final rawCodes = codes.where((c) => c.isNotEmpty).toSet();
 
-    if (_accountRole == AccountRole.unknown) {
-      _granted = const {};
-      _rawCodes = const {};
-      _sectionAccess = const {};
-      _unrestricted = false;
-      notifyListeners();
-      return;
+    if (_role == AccountRole.unknown) {
+      _setNothing();
+    } else if (fullAccess != null) {
+      _setLists(rawCodes, sectionAccess,
+          full: fullAccess); // (1) explicit flag wins
+    } else if (_role == AccountRole.admin &&
+        rawCodes.isEmpty &&
+        sectionAccess.isEmpty) {
+      _setLists(const {}, const {}, full: true); // (3) role flag
+    } else {
+      _setLists(rawCodes, sectionAccess,
+          full: false); // (2) explicit lists / employee
     }
-
-    if (_accountRole == AccountRole.admin && codes.isEmpty) {
-      _unrestricted = true;
-      _granted = Permission.values.toSet();
-      _rawCodes = {for (final permission in Permission.values) permission.code};
-      _sectionAccess = {
-        for (final section in SectionKey.values) section.key: accessManage,
-      };
-      notifyListeners();
-      return;
-    }
-
-    _unrestricted = false;
-    _rawCodes = codes;
-    _granted = codes.map(Permission.fromCode).whereType<Permission>().toSet();
-    _sectionAccess = Map<String, String>.unmodifiable(sectionAccess);
     notifyListeners();
   }
 
-  AccountRole _matchRole(String role) {
-    if (role == roleAdmin) return AccountRole.admin;
-    if (role == roleEmployee) return AccountRole.employee;
-    return AccountRole.unknown;
+  void _setNothing() {
+    _rawCodes = const {};
+    _granted = const {};
+    _sectionAccess = const {};
+    _fullAccess = false;
   }
 
-  /// `view` or `manage` from the server. Any other value is no access.
-  String? _level(SectionKey section) {
-    final value = _sectionAccess[section.key];
-    if (value == accessView || value == accessManage) return value;
-    return null;
+  void _setLists(Set<String> rawCodes, Map<String, String> sectionAccess,
+      {required bool full}) {
+    _rawCodes = rawCodes;
+    _granted =
+        rawCodes.map(Permission.fromCode).whereType<Permission>().toSet();
+    _sectionAccess = {
+      for (final e in sectionAccess.entries)
+        e.key: SectionAccessLevel.parse(e.value)
+    };
+    _fullAccess = full;
   }
 
-  bool has(Permission permission) => _granted.contains(permission);
-  bool hasAny(Iterable<Permission> permissions) =>
-      permissions.any(_granted.contains);
-  bool hasRaw(String code) => _rawCodes.contains(code);
+  /// Single code check.
+  bool can(Permission p) => _fullAccess || _granted.contains(p);
+  bool canAny(Iterable<Permission> ps) =>
+      _fullAccess || ps.any(_granted.contains);
+  bool canRaw(String code) => _fullAccess || _rawCodes.contains(code);
 
-  bool canRead(SectionKey section) =>
-      has(section.read) && _level(section) != null;
+  /// Server-reported access level; sections outside `sectionAccess` return null.
+  SectionAccessLevel? accessLevel(SectionKey s) => s.accessKey == null
+      ? null
+      : (_sectionAccess[s.accessKey] ?? SectionAccessLevel.none);
 
-  bool canWrite(SectionKey section) {
-    final write = section.write;
-    if (write == null || !has(write)) return false;
-    return _level(section) == accessManage;
+  bool canRead(SectionKey s) {
+    if (_fullAccess) return true;
+    if (!_granted.contains(s.read)) return false;
+    final level = accessLevel(s);
+    return level == null || level != SectionAccessLevel.none;
   }
 
-  bool canDo(AdminOnlyAction _) => _unrestricted;
+  bool canWrite(SectionKey s) {
+    final w = s.write;
+    if (w == null) {
+      return false; // read-only section (reports), even with full access
+    }
+    if (_fullAccess) return true;
+    if (!_granted.contains(w)) return false;
+    final level = accessLevel(s);
+    return level == null || level == SectionAccessLevel.manage;
+  }
 
-  /// Sections in server menu order that this profile may see.
-  List<SectionKey> get readableSections =>
+  /// Day finalize in purchases: `purchases.finalize` AND purchases write access.
+  bool get canFinalizePurchases =>
+      _fullAccess ||
+      (_granted.contains(Permission.purchasesFinalize) &&
+          canWrite(SectionKey.purchases));
+
+  /// Management actions: explicit (proposed) code, or full access (flag / admin role flag).
+  bool canDo(ManagementAction a) => canRaw(a.proposedCode);
+
+  /// Sections to SHOW (in server menu order). Non-readable sections are hidden, not locked.
+  List<SectionKey> get visibleSections =>
       SectionKey.values.where(canRead).toList(growable: false);
 
-  /// Sections whose write control may be shown.
-  List<SectionKey> get writableSections =>
-      SectionKey.values.where(canWrite).toList(growable: false);
-
-  /// Record-level gate. An explicit server `allowedActions` list wins.
-  /// Otherwise the section write rule applies. The server still decides.
-  bool canOnRecord({
-    required String action,
-    List<String>? allowedActions,
-    required SectionKey section,
-  }) {
+  /// Record-level gate: server `allowedActions` if present (requested), else section write.
+  /// `false` means HIDE the control.
+  bool canOnRecord(
+      {required String action,
+      List<String>? allowedActions,
+      required SectionKey section}) {
     if (allowedActions != null) return allowedActions.contains(action);
     return canWrite(section);
   }
@@ -119,8 +145,8 @@ class PermissionService extends ChangeNotifier {
     _granted = const {};
     _rawCodes = const {};
     _sectionAccess = const {};
-    _accountRole = AccountRole.unknown;
-    _unrestricted = false;
+    _fullAccess = false;
+    _role = AccountRole.unknown;
     _version = null;
     notifyListeners();
   }

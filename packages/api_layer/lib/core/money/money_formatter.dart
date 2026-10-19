@@ -1,3 +1,7 @@
+import 'decimal_string.dart';
+
+export 'decimal_string.dart';
+
 /// THE ONLY place in the app that turns a server money value into text.
 ///
 /// HARD RULE: the app performs NO calculations. The real server returns money as
@@ -47,6 +51,23 @@ class MoneyFormatter {
   /// Scaled integer (e.g. factorMicros with scale 6) to text — still string-only.
   String formatScaled(int scaledValue, int scale) =>
       formatNumber(scaledValue, scale: scale, trimTrailingZeros: true);
+
+  /// Rate/factor text ("9.5" -> "9.5", "12500.25" -> "12,500.25"). String-only, no parsing to a number.
+  String formatDecimal(DecimalString d) {
+    final v = d.value;
+    final negative = v.startsWith('-');
+    final body = negative ? v.substring(1) : v;
+    final dot = body.indexOf('.');
+    final intPart = dot < 0 ? body : body.substring(0, dot);
+    final frac = dot < 0 ? '' : body.substring(dot + 1);
+    final sign = negative ? '-' : '';
+    return frac.isEmpty
+        ? '$sign${_group(intPart)}'
+        : '$sign${_group(intPart)}$decimalSeparator$frac';
+  }
+
+  String formatDecimalOrDash(DecimalString? d) =>
+      d == null ? '—' : formatDecimal(d);
 
   /// Digit-string formatting. No arithmetic is performed on the value.
   String formatNumber(int value,

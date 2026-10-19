@@ -1,5 +1,6 @@
-/// Permission codes the server may return: `<section>.read|write` plus `purchases.finalize`.
-/// Whether a code grants anything is decided only by [PermissionService].
+/// REAL permission codes of the existing system (analysis doc §1.3): `<section>.read|write`
+/// plus `purchases.finalize`. Gating is decided ONLY in PermissionService (codes +
+/// `sectionAccess` + `fullAccess` + the exact server role flag).
 enum Permission {
   debtsRead('debts.read'), // قسم ديون العملاء
   debtsWrite('debts.write'),
@@ -33,33 +34,66 @@ enum Permission {
 
 /// Business sections (analysis doc §1.3), in the server's menu order.
 enum SectionKey {
-  customers('customers', Permission.debtsRead, Permission.debtsWrite),
-  collections(
-      'collections', Permission.collectionsRead, Permission.collectionsWrite),
-  companies('companies', Permission.companiesRead, Permission.companiesWrite),
+  customers('customers', Permission.debtsRead, Permission.debtsWrite,
+      'customerDebts'),
+  // Collections is NOT part of sectionAccess on the server (01b §1.2): gated by codes only.
+  collections('collections', Permission.collectionsRead,
+      Permission.collectionsWrite, null),
+  companies('companies', Permission.companiesRead, Permission.companiesWrite,
+      'companyDebts'),
   libyanDeposits('libyan-deposits', Permission.libyanDepositsRead,
-      Permission.libyanDepositsWrite),
+      Permission.libyanDepositsWrite, 'libyanDeposits'),
   egyptianDeposits('egyptian-deposits', Permission.egyptianDepositsRead,
-      Permission.egyptianDepositsWrite),
-  masraweya('masraweya', Permission.masraweyaRead, Permission.masraweyaWrite),
-  purchases('purchases', Permission.purchasesRead, Permission.purchasesWrite),
-  treasury('treasury', Permission.treasuryRead, Permission.treasuryWrite),
-  reports('reports', Permission.reportsRead, null);
+      Permission.egyptianDepositsWrite, 'egyptianDeposits'),
+  masraweya('masraweya', Permission.masraweyaRead, Permission.masraweyaWrite,
+      'masraweya'),
+  purchases('purchases', Permission.purchasesRead, Permission.purchasesWrite,
+      'purchases'),
+  treasury('treasury', Permission.treasuryRead, Permission.treasuryWrite,
+      'treasury'),
+  reports('reports', Permission.reportsRead, null, 'reports');
 
-  const SectionKey(this.key, this.read, this.write);
+  const SectionKey(this.key, this.read, this.write, this.accessKey);
   final String key;
   final Permission read;
   final Permission? write;
+
+  /// Key inside the server's `sectionAccess` map, or null when the section is not in it.
+  final String? accessKey;
 }
 
-/// Actions with no permission code. [PermissionService.canDo] allows them only when
-/// the server role flag grants unrestricted access.
-enum AdminOnlyAction {
-  collectionsAssign,
-  collectionsDecide,
-  collectionsCashReceived,
-  collectionsCloseDay,
-  payrollManage,
-  customerZeroReview,
-  accountRequestsDecide,
+/// Server `sectionAccess[<key>]` values: observed `none` and `manage`; `read` exists in web code.
+/// Unknown or missing values are treated as [none] (fail closed for UI gating).
+enum SectionAccessLevel {
+  none,
+  read,
+  manage;
+
+  static SectionAccessLevel parse(Object? v) => switch (v) {
+        'manage' => SectionAccessLevel.manage,
+        'read' => SectionAccessLevel.read,
+        _ => SectionAccessLevel.none,
+      };
+}
+
+/// Server role as matched (exactly) by PermissionService. Display/branching elsewhere must use
+/// this enum, never the raw string.
+enum AccountRole { admin, employee, unknown }
+
+/// Management actions that the existing web gates by role name (no fine-grained code observed).
+/// Each action maps to a PROPOSED explicit permission code (🔶 contract §15). Allowed if the
+/// server returns that code, or the user has full access (`fullAccess`, or the admin role flag
+/// with empty lists — see PermissionService precedence).
+enum ManagementAction {
+  collectionsAssign('collections.assign'),
+  collectionsDecide('collections.decide'),
+  collectionsCashReceived('collections.cash_receive'),
+  collectionsCloseDay('collections.close_day'),
+  payrollManage('payroll.manage'),
+  customerZeroReview('debts.zero_review'),
+  accountRequestsDecide('users.manage'),
+  settingsManage('settings.manage');
+
+  const ManagementAction(this.proposedCode);
+  final String proposedCode;
 }

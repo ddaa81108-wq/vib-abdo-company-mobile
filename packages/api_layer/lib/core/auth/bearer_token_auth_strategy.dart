@@ -20,9 +20,23 @@ class BearerTokenAuthStrategy implements AuthStrategy {
   @override
   Future<void> attach(RequestOptions options,
       {required bool authenticated}) async {
-    if (!authenticated) return;
+    _removeHeader(options.headers, 'Cookie');
+    _removeHeader(options.headers, 'X-CSRF-Token');
+    if (!authenticated) {
+      _removeHeader(options.headers, 'Authorization');
+      return;
+    }
     final token = await _tokens.readAccessToken();
-    if (token != null) options.headers['Authorization'] = 'Bearer $token';
+    if (token != null && token.isNotEmpty) {
+      options.headers['Authorization'] = 'Bearer $token';
+    } else {
+      _removeHeader(options.headers, 'Authorization');
+    }
+  }
+
+  static void _removeHeader(Map<String, dynamic> headers, String name) {
+    // Dio's header map is case-insensitive. removeWhere throws on that map.
+    headers.remove(name);
   }
 
   @override

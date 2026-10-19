@@ -18,6 +18,9 @@ abstract final class AppStrings {
   static const roleEmployee = 'موظف';
   static const roleUnknown = 'صلاحية غير معروفة';
   static const writeAction = 'كتابة';
+  static const homeCardsTitle = 'ملخص الخادم';
+  static const oldDebtsTitle = 'ديون قديمة';
+  static const actionsTitle = 'إجراءات متاحة';
   static const sectionsTitle = 'الأقسام المتاحة';
   static const sectionsHint =
       'الشاشات لم تُبنَ بعد. ما يظهر هنا يتبع صلاحيات الخادم فقط.';

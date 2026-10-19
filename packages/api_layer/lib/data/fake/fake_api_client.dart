@@ -1,4 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+
+import '../../core/config/api_config.dart';
+import '../../core/network/wire_json.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/error_mapper.dart';
@@ -6,12 +10,19 @@ import 'fake_fixtures.dart';
 
 /// In-memory fake of the REAL API shapes so the UI can be built with zero contact
 /// with the production system. Same ApiClient interface => Remote*Repository run unchanged.
-/// Password "wrong" -> 401. Usernames pick a canned profile in [FakeFixtures.profileFor].
-/// It only returns canned values; it never computes money.
+/// Fake-only fixture switch by USERNAME (see FakeFixtures.meFor): `admin…` = admin like the real
+/// server today (empty permission list), `limited.admin…`, `flag.admin…`, `guest…`, else employee.
+/// Password "wrong" -> 401. It only returns canned values; it never computes money.
 class FakeApiClient implements ApiClient {
-  FakeApiClient({this.latency = const Duration(milliseconds: 250)});
+  FakeApiClient(
+      {this.latency = const Duration(milliseconds: 250),
+      this.rateWireFormat = RateWireFormat.number});
 
   final Duration latency;
+  final RateWireFormat rateWireFormat;
+
+  /// Last request body exactly as it would go on the wire (for tests).
+  String? lastWireBody;
   bool _loggedIn = false;
   bool _admin = false;
   Map<String, dynamic> _me = FakeFixtures.me(admin: false);
@@ -72,7 +83,10 @@ class FakeApiClient implements ApiClient {
   Future<ApiResponse> _handle(String method, String path, Object? body,
       ApiRequestOptions options) async {
     await Future<void>.delayed(latency);
-    final b = body is Map ? body : const {};
+    // Same serialization as the real client, then decoded like a server would.
+    lastWireBody = body == null ? null : WireJson.encode(body, rateWireFormat);
+    final decoded = lastWireBody == null ? null : jsonDecode(lastWireBody!);
+    final b = decoded is Map ? decoded : const {};
     final seg = path
         .split('/')
         .where((s) => s.isNotEmpty)
@@ -86,8 +100,8 @@ class FakeApiClient implements ApiClient {
       }
       _loggedIn = true;
       final username = '${b['username']}';
-      _admin = username.startsWith('admin');
-      _me = FakeFixtures.profileFor(username);
+      _admin = username.startsWith('admin'); // fake server-side switch only
+      _me = FakeFixtures.meFor(username);
       return _ok({..._me, 'csrfToken': 'fake-csrf'});
     }
     if (path == '/api/auth/csrf') return _ok({'csrfToken': 'fake-csrf'});
@@ -108,6 +122,8 @@ class FakeApiClient implements ApiClient {
     }
 
     switch (head) {
+      case 'home': // 🔶 proposed endpoint, fake only
+        return _ok(FakeFixtures.home(admin: _admin));
       case 'customers':
       case 'companies':
       case 'libyan-deposits':
@@ -149,6 +165,11 @@ class FakeApiClient implements ApiClient {
             (seg.length == 2 && seg[1] == 'unlinked-receipts') ||
             (seg.length > 3 && seg[1] == 'payroll' && seg.last == 'confirm');
         if (!employeeAllowed) _requireAdmin();
+        final needsVersion = seg.isNotEmpty &&
+            (seg.last == 'decision' || seg.last == 'cash-received');
+        if (needsVersion && b['expectedVersion'] == null) {
+          _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
+        }
         return _ok({'id': 'ok', 'version': 1});
       case 'masraweya':
         return _ok(FakeFixtures.masraweyaDay());

@@ -28,10 +28,17 @@ class ApiStack {
     required Future<void> Function(String reason) onForcedLogout,
     CookieStore? cookieStore,
     TokenStorage? tokenStorage,
+    Duration? fakeLatency,
   }) {
     if (config.useFakeApi) {
       return ApiStack._(
-          FakeApiClient(latency: config.fakeLatency), _FakeStrategy(), null);
+        FakeApiClient(
+          rateWireFormat: config.rateWireFormat,
+          latency: fakeLatency ?? const Duration(milliseconds: 250),
+        ),
+        _FakeStrategy(),
+        null,
+      );
     }
 
     final options = DioApiClient.baseOptions(config);
@@ -57,7 +64,8 @@ class ApiStack {
       retry,
       SafeLoggingInterceptor(enabled: config.enableDebugLogging)
     ]);
-    return ApiStack._(DioApiClient(dio), strategy, dio);
+    return ApiStack._(DioApiClient(dio, rateWireFormat: config.rateWireFormat),
+        strategy, dio);
   }
 }
 

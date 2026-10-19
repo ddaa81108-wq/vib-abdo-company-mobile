@@ -40,16 +40,34 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
   @override
   Future<void> attach(RequestOptions options,
       {required bool authenticated}) async {
+    // A reused RequestOptions (401 replay, CSRF retry, re-login) must not keep a
+    // previous bearer header. This strategy never sends Authorization.
+    _removeHeader(options.headers, 'Authorization');
+
     // Cookies are attached to public calls too (login may rotate a pre-session cookie).
     final cookie = await _cookies.cookieHeader();
-    if (cookie != null) options.headers['Cookie'] = cookie;
+    if (cookie != null && cookie.isNotEmpty) {
+      options.headers['Cookie'] = cookie;
+    } else {
+      _removeHeader(options.headers, 'Cookie');
+    }
+
     if (_isUnsafe(options.method)) {
       if (_csrfToken == null && authenticated) await refetchCsrfSingleFlight();
       final token = _csrfToken;
       if (token != null && token.isNotEmpty) {
         options.headers['X-CSRF-Token'] = token;
+      } else {
+        _removeHeader(options.headers, 'X-CSRF-Token');
       }
+    } else {
+      _removeHeader(options.headers, 'X-CSRF-Token');
     }
+  }
+
+  static void _removeHeader(Map<String, dynamic> headers, String name) {
+    // Dio's header map is case-insensitive. removeWhere throws on that map.
+    headers.remove(name);
   }
 
   @override

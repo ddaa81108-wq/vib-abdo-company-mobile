@@ -7,7 +7,7 @@ library;
 
 import '../../core/money/money_formatter.dart';
 
-export '../../core/money/money_formatter.dart' show Currency;
+export '../../core/money/money_formatter.dart' show Currency, DecimalString;
 
 typedef Json = Map<String, dynamic>;
 
@@ -23,10 +23,17 @@ List<String> strList(Object? v) =>
     v is List ? v.map((e) => '$e').toList(growable: false) : const [];
 bool boolOf(Object? v) => v == true;
 
-/// Raw integer from the server (e.g. a *Units field). Non-integers -> null (never coerced).
+/// Raw integer from the server (e.g. a *Units field). Only a JSON integer (or an integer
+/// string) is accepted; any fractional/float value -> null ("—"), never coerced or rounded.
 int? unitsOrNull(Object? v) =>
-    v is int ? v : (v is num && v == v.roundToDouble() ? v.toInt() : null);
-int? intOrNull(Object? v) => v is num ? v.toInt() : int.tryParse('${v ?? ''}');
+    v is int ? v : (v is String ? int.tryParse(v) : null);
+
+/// Rate / factor as decimal TEXT (no double anywhere).
+DecimalString? decimalOrNull(Object? v) => DecimalString.fromJson(v);
+
+/// Counts / versions (not money). Integers only; no float truncation.
+int? intOrNull(Object? v) =>
+    v is int ? v : (v is String ? int.tryParse(v) : null);
 
 /// Server-provided currency if present, else the section's fixed currency.
 Currency currencyOr(Object? serverValue, Currency fallback) =>

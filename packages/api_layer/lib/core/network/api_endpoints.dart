@@ -100,4 +100,6 @@ class ApiEndpoints {
   // 🔶 Do not exist — requested from the server owner (see contract §14).
   static const proposedUnreadCount = '/api/notifications/unread-count';
   static const proposedMobilePushDevices = '/api/mobile-push/devices';
+  static const proposedHome =
+      '/api/home'; // aggregated home screen (contract §5.0)
 }

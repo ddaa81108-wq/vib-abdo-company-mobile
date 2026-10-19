@@ -18,7 +18,7 @@ class TreasurySummaryDto {
   final int? liabilitiesUnits; // LYD — ديون علينا
   final int? activeCashUnits; // LYD — الفلوس النشطة
   final int? egyptianSourceUnits; // EGP — source amount
-  final String? egyptianRate; // display only
+  final DecimalString? egyptianRate; // decimal TEXT, display only
   final int? egyptianConvertedUnits; // LYD — converted BY THE SERVER
   final int? netUnits; // LYD — صافي الخزينة (server)
   final int? version; // -> expectedVersion for cash entries
@@ -35,7 +35,7 @@ class TreasurySummaryDto {
       liabilitiesUnits: unitsOrNull(t['liabilitiesUnits']),
       activeCashUnits: unitsOrNull(t['activeCashUnits']),
       egyptianSourceUnits: unitsOrNull(t['egyptianSourceUnits']),
-      egyptianRate: strOrNull(t['egyptianRate']),
+      egyptianRate: decimalOrNull(t['egyptianRate']),
       egyptianConvertedUnits: unitsOrNull(t['egyptianConvertedUnits']),
       netUnits: unitsOrNull(t['netUnits']),
       version: intOrNull(d['version'] ?? t['version']),

@@ -13,11 +13,8 @@ Future<void> pumpFakeApp(WidgetTester tester) async {
   addTearDown(tester.view.resetDevicePixelRatio);
 
   final layer = ApiLayer.create(
-    config: const ApiConfig(
-      baseUrl: 'https://fake.invalid',
-      useFakeApi: true,
-      fakeLatency: Duration.zero,
-    ),
+    config: const ApiConfig(baseUrl: 'https://fake.invalid', useFakeApi: true),
+    fakeLatency: Duration.zero,
   );
   addTearDown(layer.dispose);
 

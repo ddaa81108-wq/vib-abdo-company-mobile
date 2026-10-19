@@ -34,7 +34,7 @@ abstract interface class AccountsRepository {
 
   Future<ExchangeRateDto> getExchangeRate();
   Future<ExchangeRateDto> updateExchangeRate(
-      String egpPerLyd, MutationMeta meta);
+      DecimalString egpPerLyd, MutationMeta meta);
 }
 
 class RemoteAccountsRepository implements AccountsRepository {
@@ -133,7 +133,7 @@ class RemoteAccountsRepository implements AccountsRepository {
 
   @override
   Future<ExchangeRateDto> updateExchangeRate(
-          String egpPerLyd, MutationMeta meta) async =>
+          DecimalString egpPerLyd, MutationMeta meta) async =>
       ExchangeRateDto.fromData((await _api.patch(
               ApiEndpoints.egyptianExchangeRate,
               body: {...meta.toBody(), 'egpPerLyd': egpPerLyd}))

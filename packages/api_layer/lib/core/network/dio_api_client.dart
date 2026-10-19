@@ -4,15 +4,19 @@ import '../config/api_config.dart';
 import 'api_client.dart';
 import 'api_exception.dart';
 import 'error_mapper.dart';
+import 'wire_json.dart';
 
 /// Dio-based implementation for the REAL envelope:
 ///   success { "ok": true, "data": ... }   error { "ok": false, "error": {...} }
 /// Interceptors (Auth -> GetRetry -> Logging) are attached by ApiStack.
 class DioApiClient implements ApiClient {
-  DioApiClient(this._dio, {ErrorMapper errorMapper = const ErrorMapper()})
+  DioApiClient(this._dio,
+      {ErrorMapper errorMapper = const ErrorMapper(),
+      this.rateWireFormat = RateWireFormat.number})
       : _errorMapper = errorMapper;
 
   final Dio _dio;
+  final RateWireFormat rateWireFormat;
   final ErrorMapper _errorMapper;
 
   Dio get dio => _dio;
@@ -70,7 +74,9 @@ class DioApiClient implements ApiClient {
     try {
       final res = await _dio.request<Object?>(
         path,
-        data: body,
+        data: body == null
+            ? null
+            : WireJson.encode(body, rateWireFormat), // pre-encoded JSON text
         queryParameters: _clean(query),
         options: Options(
           method: method,

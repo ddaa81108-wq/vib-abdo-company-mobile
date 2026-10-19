@@ -11,7 +11,7 @@ class DailyReportRowDto {
     this.egyptianConvertedUnits,
     this.liabilitiesUnits,
     this.netUnits,
-    this.diffFromPreviousUnits,
+    this.netChangeUnits,
     this.status,
     this.note,
   });
@@ -25,7 +25,8 @@ class DailyReportRowDto {
   final int? netUnits; // LYD
 
   /// REQUIRED FROM SERVER (contract §12): web client computes net[i] − net[i+1]; we must not.
-  final int? diffFromPreviousUnits;
+  final int?
+      netChangeUnits; // server-computed (contract §12 #4); hidden when null
   final String?
       status; // normal | needs_review | urgent_review | rate_missing (🔶)
   final String? note;
@@ -40,7 +41,7 @@ class DailyReportRowDto {
         egyptianConvertedUnits: unitsOrNull(j['egyptianConvertedUnits']),
         liabilitiesUnits: unitsOrNull(j['liabilitiesUnits']),
         netUnits: unitsOrNull(j['netUnits']),
-        diffFromPreviousUnits: unitsOrNull(j['diffFromPreviousUnits']),
+        netChangeUnits: unitsOrNull(j['netChangeUnits']),
         status: strOrNull(j['status']),
         note: strOrNull(j['note'] ?? j['systemNote']),
       );

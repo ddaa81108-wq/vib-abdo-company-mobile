@@ -37,21 +37,51 @@ class CollectionAssignmentDto {
       );
 }
 
+/// "ينتظر النقد" status — ➕ SERVER-PROVIDED ONLY (contract §12 #15, 04_ui_spec §3.5).
+/// Proposed wire fields: `cashStatus: "pending"|"received"|"not_applicable"` and/or
+/// `cashPending: bool`. The app NEVER derives it from `status` + `cashReceivedAt`.
+enum CashStatus {
+  pending('pending'),
+  received('received'),
+  notApplicable('not_applicable');
+
+  const CashStatus(this.wire);
+  final String wire;
+
+  /// Uses `cashStatus` if present, else the boolean `cashPending` (true -> pending only).
+  /// Absent -> null (no "awaiting cash" badge, neutral display).
+  static CashStatus? fromServer(Json j) {
+    final s = j['cashStatus'];
+    for (final v in values) {
+      if (v.wire == s) return v;
+    }
+    return j['cashPending'] == true ? CashStatus.pending : null;
+  }
+}
+
 class CollectionSubmissionDto {
   const CollectionSubmissionDto(
       {required this.id,
       required this.mode,
       this.amountUnits,
       required this.status,
-      this.cashReceived = false,
+      this.cashStatus,
+      this.cashReceivedAt,
+      this.version,
       this.submittedByName,
       this.createdAt,
       this.raw = const {}});
   final String id;
   final String mode; // full | partial
   final int? amountUnits;
-  final String status; // pending | approved | rejected (🔶)
-  final bool cashReceived;
+  final String
+      status; // pending | approved | rejected (server value, shown as-is)
+  final CashStatus?
+      cashStatus; // server-provided only (null until the server adds it)
+  final DateTime?
+      cashReceivedAt; // shown as a timestamp only; not used to derive status
+  /// ➕ required from server (QA س-89): sent back as `expectedVersion` on decision / cash-received.
+  final int? version;
   final String? submittedByName;
   final DateTime? createdAt;
   final Json raw;
@@ -60,9 +90,42 @@ class CollectionSubmissionDto {
         mode: str(j['mode']),
         amountUnits: unitsOrNull(j['amountUnits']),
         status: str(j['status']),
-        cashReceived: boolOf(j['cashReceived']) || j['cashReceivedAt'] != null,
+        cashStatus: CashStatus.fromServer(j),
+        cashReceivedAt: dateOrNull(j['cashReceivedAt']),
+        version: intOrNull(j['version']),
         submittedByName: strOrNull(j['submittedByName'] ?? j['employeeName']),
         createdAt: dateOrNull(j['createdAt']),
+        raw: j,
+      );
+}
+
+/// Unlinked receipt (استلام غير مربوط) — same server-only cash status + version rules.
+class UnlinkedReceiptDto {
+  const UnlinkedReceiptDto(
+      {required this.id,
+      required this.customerName,
+      this.amountUnits,
+      required this.status,
+      this.cashStatus,
+      this.cashReceivedAt,
+      this.version,
+      this.raw = const {}});
+  final String id;
+  final String customerName;
+  final int? amountUnits;
+  final String status;
+  final CashStatus? cashStatus;
+  final DateTime? cashReceivedAt;
+  final int? version;
+  final Json raw;
+  factory UnlinkedReceiptDto.fromJson(Json j) => UnlinkedReceiptDto(
+        id: str(j['id']),
+        customerName: str(j['customerName'] ?? j['name']),
+        amountUnits: unitsOrNull(j['amountUnits']),
+        status: str(j['status']),
+        cashStatus: CashStatus.fromServer(j),
+        cashReceivedAt: dateOrNull(j['cashReceivedAt']),
+        version: intOrNull(j['version']),
         raw: j,
       );
 }
@@ -99,7 +162,7 @@ class CollectionsOverviewDto {
   });
   final List<CollectionAssignmentDto> assignments;
   final List<CollectionSubmissionDto> submissions;
-  final List<Json> unlinkedReceipts;
+  final List<UnlinkedReceiptDto> unlinkedReceipts;
   final List<EmployeeTotalDto> employeeTotals;
   final int? collectedUnits; // metrics.collectedUnits
 
@@ -120,7 +183,9 @@ class CollectionsOverviewDto {
       submissions: asJsonList(d['submissions'])
           .map(CollectionSubmissionDto.fromJson)
           .toList(growable: false),
-      unlinkedReceipts: asJsonList(d['unlinkedReceipts']),
+      unlinkedReceipts: asJsonList(d['unlinkedReceipts'])
+          .map(UnlinkedReceiptDto.fromJson)
+          .toList(growable: false),
       employeeTotals: asJsonList(d['employeeTotals'])
           .map(EmployeeTotalDto.fromJson)
           .toList(growable: false),

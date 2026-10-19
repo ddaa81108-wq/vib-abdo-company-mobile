@@ -43,3 +43,11 @@ final homeSummaryProvider = Provider<HomeSummary?>((ref) {
     permissions: permissions,
   );
 });
+
+/// Proposed `GET /api/home`. Values are rendered as returned. A failure leaves
+/// the permission-gated section list in place and shows no invented cards.
+final homeDashboardProvider = FutureProvider<HomeDto?>((ref) async {
+  final session = ref.watch(sessionStateProvider);
+  if (session is! SessionAuthenticated) return null;
+  return ref.read(apiLayerProvider).home.fetch();
+});

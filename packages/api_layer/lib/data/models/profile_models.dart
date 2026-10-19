@@ -1,7 +1,8 @@
 import 'common.dart';
 
-/// GET /api/me user object. Fields are stored as the server sent them.
-/// Access decisions are made only in [PermissionService].
+/// GET /api/me -> { ok:true, data: { user: { id?, username, displayName, role, permissions[],
+///   sectionAccess{ customerDebts: none|read|manage, ... }, mustChangePassword } } }
+/// 🔶 sectionAccess was observed on GET /api/users (01b §1.2); presence on /api/me to confirm.
 class UserProfile {
   const UserProfile({
     required this.id,
@@ -10,6 +11,7 @@ class UserProfile {
     required this.role,
     required this.permissions,
     this.sectionAccess = const {},
+    this.fullAccess,
     required this.mustChangePassword,
   });
 
@@ -17,33 +19,29 @@ class UserProfile {
   final String username;
   final String displayName;
 
-  /// Server role string, uninterpreted. Only [PermissionService] matches it.
-  final String role;
+  /// Server role string, uninterpreted. Matched ONLY in PermissionService (exact value).
+  final String? role;
   final List<String> permissions;
-
-  /// Server map of section key to access level, uninterpreted.
   final Map<String, String> sectionAccess;
   final bool mustChangePassword;
+
+  /// 🔶 PROPOSED explicit server flag (`fullAccess`, alias `isSuperuser`). null = not sent.
+  /// When sent (true/false) it takes precedence over the role (PermissionService).
+  final bool? fullAccess;
 
   factory UserProfile.fromJson(Json j) => UserProfile(
         id: str(j['id'] ?? j['userId']),
         username: str(j['username']),
         displayName: str(j['displayName'] ?? j['username']),
-        role: str(j['role']),
+        role: j['role'] is String ? j['role'] as String : null,
         permissions: strList(j['permissions']),
-        sectionAccess: _sectionAccess(j['sectionAccess']),
+        sectionAccess: {
+          for (final e in asJson(j['sectionAccess']).entries)
+            e.key: '${e.value}'
+        },
+        fullAccess: _boolOrNull(j['fullAccess'] ?? j['isSuperuser']),
         mustChangePassword: boolOf(j['mustChangePassword']),
       );
-}
-
-Map<String, String> _sectionAccess(Object? raw) {
-  if (raw is! Map) return const {};
-  final out = <String, String>{};
-  for (final entry in raw.entries) {
-    final value = entry.value;
-    if (value is String) out['${entry.key}'] = value;
-  }
-  return Map.unmodifiable(out);
 }
 
 class MeResponse {
@@ -55,3 +53,5 @@ class MeResponse {
         user: UserProfile.fromJson(d['user'] is Map ? asJson(d['user']) : d));
   }
 }
+
+bool? _boolOrNull(Object? v) => v is bool ? v : null;

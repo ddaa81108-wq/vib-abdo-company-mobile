@@ -7,6 +7,17 @@ enum AuthStrategyKind {
   bearerToken,
 }
 
+/// How rate/factor values (`DecimalString`) are encoded ON THE WIRE only.
+/// Inside the app they are always decimal text with no operations.
+enum RateWireFormat {
+  /// JSON number literal written from the exact digits (e.g. `9.5`), no float conversion.
+  /// Default: the current server sends/expects JSON numbers (01b §5, `exchangeRate: float`).
+  number,
+
+  /// JSON string (e.g. `"9.5"`) — the contract's target (§2.6, question 13).
+  string,
+}
+
 class ApiConfig {
   const ApiConfig({
     required this.baseUrl,
@@ -17,7 +28,7 @@ class ApiConfig {
     this.authStrategy = AuthStrategyKind.cookieCsrf,
     this.pollingInterval = const Duration(seconds: 4),
     this.moneyUnitScale = 0,
-    this.fakeLatency = const Duration(milliseconds: 250),
+    this.rateWireFormat = RateWireFormat.number,
   });
 
   /// Origin only, e.g. https://host — paths in ApiEndpoints already start with /api.
@@ -35,8 +46,8 @@ class ApiConfig {
   /// uses maximumFractionDigits: 0 -> assumed 0 (whole dinar/pound). 🔶 to confirm.
   final int moneyUnitScale;
 
-  /// Delay inside the in-memory fake client only. Never applied to a real server.
-  final Duration fakeLatency;
+  /// Wire encoding for DecimalString values in request bodies (serialization layer only).
+  final RateWireFormat rateWireFormat;
 
   /// 🔶 Real base URL is intentionally NOT defaulted to production. The app must be
   /// pointed at a staging/test copy explicitly via --dart-define=API_BASE=...
@@ -50,5 +61,8 @@ class ApiConfig {
             : AuthStrategyKind.cookieCsrf,
         moneyUnitScale:
             int.fromEnvironment('MONEY_UNIT_SCALE', defaultValue: 0),
+        rateWireFormat: String.fromEnvironment('RATE_WIRE_FORMAT') == 'string'
+            ? RateWireFormat.string
+            : RateWireFormat.number,
       );
 }

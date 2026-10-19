@@ -40,10 +40,10 @@ void main() {
         config: const ApiConfig(
           baseUrl: 'https://fake.invalid',
           useFakeApi: true,
-          fakeLatency: Duration.zero,
         ),
         cookieStore: stores.cookies,
         tokenStorage: stores.tokens,
+        fakeLatency: Duration.zero,
       );
       addTearDown(layer.dispose);
 

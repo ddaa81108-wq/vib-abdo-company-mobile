@@ -2,13 +2,13 @@
 
 Android client for a debt, trust, and collection system. Two currencies are shown: the Libyan dinar (LYD, د.ل) and the Egyptian pound (EGP, ج.م). This repository is the mobile app only. It does not contain a database or a server.
 
-Feature screens beyond sign-in and an empty home shell are not built yet. The home shell lists the sections the server says the signed-in person may see, and each row is disabled.
+Feature screens beyond sign-in and a home shell are not built yet. The home shell lists the sections the server says the signed-in person may open, and hides every row or control they cannot use. A control is disabled only while a request is in progress.
 
 ## Rules
 
 1. **No financial calculations.** Totals, balances, remaining amounts, debt age, and converted amounts are shown exactly as the server sends them. Fields named `*Units` are raw integers. The only transformation is `MoneyFormatter`, which turns one integer into text and appends that value's own currency symbol. The app does not add, subtract, convert, or mix LYD and EGP.
 2. **No secrets in the repo.** There are no passwords, API keys, tokens, real base URLs, real usernames, or real customer records. The API origin and similar settings come from `--dart-define`. The default origin is the placeholder `https://staging.example.invalid`. Fixtures are obviously fake (`example.invalid`, "تجريبي").
-3. **The server decides permissions.** `PermissionService` is the only place that matches the server `role` string. An unknown or missing role grants nothing. A non-admin sees a section only when `permissions` and `sectionAccess` both allow it, and a write control also needs `sectionAccess` of `manage`. An admin with an empty permission list is unrestricted; a non-empty list replaces that and limits them to the list. Hiding a control is not enforcement.
+3. **The server decides permissions.** `PermissionService` is the only place that matches the server `role` string (`admin` or `employee`, exact). An unknown or missing role grants nothing. If the server sends `fullAccess`, that flag wins. Otherwise an explicit permission list applies even for an admin, and an admin with only `sectionAccess` does not become unrestricted. An admin with both lists empty and no `fullAccess` flag is unrestricted. Section keys in `sectionAccess` are the server keys (`customerDebts`, `companyDebts`, `libyanDeposits`, and the rest). Values are `none`, `read`, or `manage`. Opening a section needs the read code and a level other than `none`; writing needs the write code and `manage`. Collections has no `sectionAccess` entry and is gated by its permission codes only. Management actions (approve, reject, cash receive, and the rest) use those action codes through `can` / `canDo`. Hiding a control is not enforcement.
 4. **Unread count comes from the server.** The badge shows `unreadCount` from the notifications response. The app does not increment or decrement it. A realtime event or a push message, when one exists, is only a signal to fetch that count again.
 
 ## State management
@@ -30,7 +30,7 @@ lib/
   features/
     splash/            Session restore
     login/             Sign-in screen
-    home/              Empty shell, permission-gated section list
+    home/              Home shell: server summary plus permission-gated sections
   ui/                  Theme, Arabic copy, section labels
   notifications/       Unread badge, no-op push, realtime start/stop
   secure_storage/      Cookie jar and token store (flutter_secure_storage)
@@ -66,8 +66,11 @@ flutter run
 Fake sign-in is not an account:
 
 - any password other than `wrong` is accepted
-- a username that starts with `admin` is the admin role
-- any other username is an employee
+- a username that starts with `admin` is an unrestricted admin (empty permission lists)
+- `limited.admin` is an admin limited to an explicit list
+- `flag.admin` is an admin with `fullAccess` false
+- `guest` is an unknown role and sees nothing
+- any other username is a collections employee
 
 Point a build at a real host without committing the host:
 

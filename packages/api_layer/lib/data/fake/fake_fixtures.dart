@@ -10,92 +10,94 @@ class FakeFixtures {
     'debts.read'
   ];
 
-  static Map<String, dynamic> me({required bool admin}) => admin
-      ? _user(
-          id: 'u_1',
-          username: 'admin@example.invalid',
-          displayName: 'مدير تجريبي',
+  /// Proposed management codes (🔶 contract §4) used by the limited-admin fixture.
+  static const limitedAdminPermissions = [
+    'collections.read',
+    'collections.write',
+    'collections.decide',
+    'debts.read'
+  ];
+
+  /// Fixture picked by username (FAKE ONLY):
+  /// - `admin…`          -> like the real server today: role "admin", EMPTY permissions, no
+  ///                        sectionAccess, no fullAccess -> full access via the role flag.
+  /// - `limited.admin…`  -> role "admin" with an explicit list + sectionAccess -> lists apply.
+  /// - `flag.admin…`     -> role "admin", empty lists, explicit `fullAccess: false` -> nothing.
+  /// - `guest…`          -> unknown role -> nothing.
+  /// - anything else     -> collections employee.
+  static Map<String, dynamic> meFor(String username) {
+    if (username.startsWith('limited.admin')) {
+      return _me(
+          id: 'u_2',
+          username: 'limited.admin@example.invalid',
+          name: 'إداري محدود تجريبي',
+          role: 'admin',
+          permissions: limitedAdminPermissions,
+          sectionAccess: const {'customerDebts': 'read'});
+    }
+    if (username.startsWith('flag.admin')) {
+      return _me(
+          id: 'u_3',
+          username: 'flag.admin@example.invalid',
+          name: 'إداري بعلم صريح',
           role: 'admin',
           permissions: const [],
           sectionAccess: const {},
-        )
-      : _user(
+          fullAccess: false);
+    }
+    if (username.startsWith('guest')) {
+      return _me(
+          id: 'u_9',
+          username: 'guest@example.invalid',
+          name: 'دور غير معروف',
+          role: 'guest',
+          permissions: employeePermissions,
+          sectionAccess: const {'customerDebts': 'manage'});
+    }
+    return me(admin: username.startsWith('admin'));
+  }
+
+  static Map<String, dynamic> me({required bool admin}) => admin
+      ? _me(
+          id: 'u_1',
+          username: 'admin@example.invalid',
+          name: 'مدير تجريبي',
+          role: 'admin',
+          permissions: const [],
+          sectionAccess: null)
+      : _me(
           id: 'u_12',
           username: 'employee@example.invalid',
-          displayName: 'موظف استلام تجريبي',
+          name: 'موظف استلام تجريبي',
           role: 'employee',
           permissions: employeePermissions,
           sectionAccess: const {
-            'collections': 'manage',
-            'customers': 'view',
-          },
-        );
+              'customerDebts':
+                  'read', // has debts.read only -> read-only in the app
+              'companyDebts': 'none', 'libyanDeposits': 'none',
+              'egyptianDeposits': 'none',
+              'masraweya': 'none', 'purchases': 'none', 'treasury': 'none',
+              'reports': 'none',
+            });
 
-  /// Fake profiles selected by an obviously fake username. Not accounts.
-  static Map<String, dynamic> profileFor(String username) {
-    if (username.startsWith('limited.admin')) {
-      return _user(
-        id: 'u_limited',
-        username: 'limited.admin@example.invalid',
-        displayName: 'مدير مقيّد تجريبي',
-        role: 'admin',
-        permissions: const ['collections.read'],
-        sectionAccess: const {
-          'collections': 'view',
-          'treasury': 'manage',
-        },
-      );
-    }
-    if (username.startsWith('readonly')) {
-      return _user(
-        id: 'u_readonly',
-        username: 'readonly@example.invalid',
-        displayName: 'موظف قراءة تجريبي',
-        role: 'employee',
-        permissions: const ['debts.read'],
-        sectionAccess: const {'customers': 'view'},
-      );
-    }
-    if (username.startsWith('nosection')) {
-      return _user(
-        id: 'u_nosection',
-        username: 'nosection@example.invalid',
-        displayName: 'موظف بلا قسم تجريبي',
-        role: 'employee',
-        permissions: const ['debts.read', 'treasury.read'],
-        sectionAccess: const {'customers': 'view'},
-      );
-    }
-    if (username.startsWith('unknown')) {
-      return _user(
-        id: 'u_unknown',
-        username: 'unknown@example.invalid',
-        displayName: 'حساب تجريبي',
-        role: 'guest',
-        permissions: const [],
-        sectionAccess: const {},
-      );
-    }
-    if (username.startsWith('admin')) return me(admin: true);
-    return me(admin: false);
-  }
-
-  static Map<String, dynamic> _user({
+  static Map<String, dynamic> _me({
     required String id,
     required String username,
-    required String displayName,
+    required String name,
     required String role,
     required List<String> permissions,
-    required Map<String, String> sectionAccess,
+    required Map<String, String>? sectionAccess,
+    bool? fullAccess,
   }) =>
       {
         'user': {
           'id': id,
           'username': username,
-          'displayName': displayName,
+          'displayName': name,
           'role': role,
           'permissions': permissions,
-          'sectionAccess': sectionAccess,
+          if (sectionAccess != null) 'sectionAccess': sectionAccess,
+          if (fullAccess != null) 'fullAccess': fullAccess,
           'mustChangePassword': false,
         },
       };
@@ -118,9 +120,13 @@ class FakeFixtures {
           },
         ],
         'nextCursor': null,
-        'hasMore': false,
-        'totalDebtUnits': egp ? 15000 : 320,
-        'activeCount': 1,
+        'totalItems': 1,
+        'summary': {
+          'netBalance': egp ? 15000 : 320,
+          'totalDebt': egp ? 15000 : 320,
+          'activeCards': 1,
+          'pendingReviewCount': 0
+        },
       };
 
   static Map<String, dynamic> ledger() => {
@@ -159,6 +165,75 @@ class FakeFixtures {
         'hasMore': false,
       };
 
+  /// Proposed GET /api/home — HARDCODED server-style values (nothing computed), filtered per user.
+  static Map<String, dynamic> home({required bool admin}) => {
+        'businessDate': '2026-10-19',
+        'generatedAt': '2026-10-19T02:00:00+02:00',
+        'summaries': [
+          {
+            'key': 'customers.netBalance',
+            'section': 'customers',
+            'title': 'صافي ديون العملاء',
+            'valueUnits': 320,
+            'currency': 'LYD',
+            'tone': 'negative',
+            'note': 'من ملخص القسم',
+            'updatedAt': '2026-10-19T02:00:00+02:00'
+          },
+          {
+            'key': 'collections.collected',
+            'section': 'collections',
+            'title': 'الاستلامات المعتمدة اليوم',
+            'valueUnits': 250,
+            'currency': 'LYD',
+            'tone': 'neutral',
+            'updatedAt': '2026-10-19T02:00:00+02:00'
+          },
+          if (admin) ...[
+            {
+              'key': 'egyptianDeposits.netBalance',
+              'section': 'egyptian-deposits',
+              'title': 'صافي الأمانات المصرية',
+              'valueUnits': 15000,
+              'currency': 'EGP',
+              'tone': 'positive',
+              'updatedAt': '2026-10-19T02:00:00+02:00'
+            },
+            {
+              'key': 'treasury.activeCash',
+              'section': 'treasury',
+              'title': 'الفلوس النشطة',
+              'valueUnits': 5000,
+              'currency': 'LYD',
+              'tone': 'positive',
+              'updatedAt': '2026-10-19T02:00:00+02:00'
+            },
+            {
+              'key': 'reports.status',
+              'section': 'reports',
+              'title': 'حالة اليوم',
+              'valueUnits': null,
+              'status': 'normal',
+              'note': 'صافي المركز المالي ارتفع مقارنة باليوم السابق',
+              'updatedAt': '2026-10-19T02:00:00+02:00'
+            },
+          ],
+        ],
+        'counters': {'collections': 1, if (admin) 'customers': 1},
+        'oldDebts': [
+          {
+            'id': 'c_55',
+            'section': 'customers',
+            'name': 'عميل تجريبي',
+            'balanceUnits': 320,
+            'currency': 'LYD',
+            'debtAgeDays': 4,
+            'ageStatus': 'warning',
+            'ageStatusLabel': 'منذ 4 أيام'
+          },
+        ],
+      };
+
   static Map<String, dynamic> collections() => {
         'assignments': [
           {
@@ -177,11 +252,34 @@ class FakeFixtures {
             'mode': 'partial',
             'amountUnits': 100,
             'status': 'pending',
+            'version': 1,
+            'cashStatus': 'not_applicable',
             'submittedByName': 'موظف استلام تجريبي',
             'createdAt': '2026-10-18T12:00:00+02:00'
           },
+          {
+            'id': 'sb_2',
+            'mode': 'full',
+            'amountUnits': 250,
+            'status': 'approved',
+            'version': 3,
+            'cashStatus': 'pending',
+            'cashPending': true,
+            'cashReceivedAt': null,
+            'submittedByName': 'موظف استلام تجريبي',
+            'createdAt': '2026-10-18T09:30:00+02:00'
+          },
         ],
-        'unlinkedReceipts': [],
+        'unlinkedReceipts': [
+          {
+            'id': 'ur_1',
+            'customerName': 'اسم غير مربوط تجريبي',
+            'amountUnits': 50,
+            'status': 'pending',
+            'version': 1,
+            'cashStatus': 'not_applicable'
+          },
+        ],
         'employeeTotals': [
           {
             'employeeName': 'موظف استلام تجريبي',
@@ -303,7 +401,7 @@ class FakeFixtures {
             'egyptianConvertedUnits': 10000,
             'liabilitiesUnits': 12000,
             'netUnits': 51000,
-            'diffFromPreviousUnits': 1200,
+            'netChangeUnits': 1200,
             'status': 'normal',
             'note': ''
           },

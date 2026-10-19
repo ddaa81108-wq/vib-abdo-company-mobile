@@ -81,21 +81,53 @@ class AccountCardDto {
       );
 }
 
-/// GET /api/{section}?limit&cursor&q&filter -> items + server totals.
+/// `summary` object of GET /api/{section} (real shape, 01b §2.1 + web Dashboard code):
+/// `data.summary = {netBalance, totalDebt, activeCards, pendingReviewCount}`.
+/// `netBalance`/`totalDebt` are integer money units WITHOUT the `Units` suffix on the wire.
+/// - netBalance: section net (what the web card "صافي إجمالي الديون" actually shows).
+/// - totalDebt:  sum of positive balances only.
+/// All from the server; the app never sums card balances (the web does as a fallback; we don't).
+class AccountsSummaryDto {
+  const AccountsSummaryDto(
+      {this.netBalanceUnits,
+      this.totalDebtUnits,
+      this.activeCards,
+      this.pendingReviewCount,
+      this.tabCounts = const {}});
+  final int? netBalanceUnits;
+  final int? totalDebtUnits;
+  final int? activeCards;
+  final int? pendingReviewCount;
+
+  /// ➕ requested (contract §12 #5): {active, today, debts, paid, pinned, pendingReview}.
+  final Map<String, int> tabCounts;
+
+  factory AccountsSummaryDto.fromJson(Json j) => AccountsSummaryDto(
+        netBalanceUnits: unitsOrNull(j['netBalance'] ?? j['netBalanceUnits']),
+        totalDebtUnits: unitsOrNull(j['totalDebt'] ?? j['totalDebtUnits']),
+        activeCards: intOrNull(j['activeCards']),
+        pendingReviewCount: intOrNull(j['pendingReviewCount']),
+        tabCounts: {
+          for (final e in asJson(j['tabCounts']).entries)
+            if (e.value is int) e.key: e.value as int,
+        },
+      );
+}
+
+/// GET /api/{section}?limit&cursor&q&filter -> `{items[], nextCursor, totalItems, summary{…}}`.
 class AccountsPage {
   const AccountsPage(
-      {required this.page, this.totalDebtUnits, this.activeCount});
+      {required this.page, required this.summary, this.totalItems});
   final Paged<AccountCardDto> page;
-  final int? totalDebtUnits; // "صافي إجمالي الديون" — from server only
-  final int? activeCount; // "عدد الكروت النشطة" — from server only
+  final AccountsSummaryDto summary; // data.summary — server totals
+  final int? totalItems; // data.totalItems (top level, not inside summary)
 
   factory AccountsPage.fromData(Object? data, AccountSection s) {
     final p = Paged.fromData(data, (j) => AccountCardDto.fromJson(j, s));
     return AccountsPage(
       page: p,
-      totalDebtUnits:
-          unitsOrNull(p.raw['totalDebtUnits'] ?? p.raw['totalDebt']),
-      activeCount: intOrNull(p.raw['activeCount'] ?? p.raw['activeAccounts']),
+      summary: AccountsSummaryDto.fromJson(asJson(p.raw['summary'])),
+      totalItems: intOrNull(p.raw['totalItems']),
     );
   }
 }
@@ -226,7 +258,7 @@ class AccountTransactionRequest {
   factory AccountTransactionRequest.debt(
           {required int inputValue,
           CalculationMode mode = CalculationMode.direct,
-          String? factor,
+          DecimalString? factor,
           required DateTime date,
           String? note}) =>
       AccountTransactionRequest._(
@@ -240,7 +272,7 @@ class AccountTransactionRequest {
   factory AccountTransactionRequest.partialPayment(
           {required int inputValue,
           CalculationMode mode = CalculationMode.direct,
-          String? factor,
+          DecimalString? factor,
           required DateTime date,
           String? note}) =>
       AccountTransactionRequest._(
@@ -268,9 +300,9 @@ class AccountTransactionRequest {
   final int inputValue;
   final CalculationMode calculationMode;
 
-  /// Rate as typed by the user (decimal string). Sent as a JSON number because the
-  /// server expects one; parsing is format conversion only. 🔶 ask server to accept string/factorMicros.
-  final String? factor;
+  /// Rate as typed by the user, kept as decimal TEXT (no float). On the wire it is a JSON
+  /// number literal or string per ApiConfig.rateWireFormat (default number; §15 q13).
+  final DecimalString? factor;
   final DateTime date;
   final String? note;
 
@@ -280,7 +312,7 @@ class AccountTransactionRequest {
         'inputValue': inputValue,
         'calculationMode': calculationMode.name,
         if (factor != null && calculationMode != CalculationMode.direct)
-          'factor': num.parse(factor!),
+          'factor': factor, // DecimalString; WireJson encodes it
         'date': date.toIso8601String(),
         if (note != null) 'note': note,
       };
@@ -300,14 +332,14 @@ class AccountSuggestionDto {
 /// GET|PATCH /api/egyptian-deposits/exchange-rate  (`egpPerLyd`)
 class ExchangeRateDto {
   const ExchangeRateDto({this.egpPerLyd, this.version, this.updatedAt});
-  final String?
-      egpPerLyd; // displayed as text; never used to convert anything in the app
+  final DecimalString?
+      egpPerLyd; // decimal TEXT; displayed only, never used to convert anything
   final int? version;
   final DateTime? updatedAt;
   factory ExchangeRateDto.fromData(Object? data) {
     final d = asJson(data);
     return ExchangeRateDto(
-        egpPerLyd: strOrNull(d['egpPerLyd']),
+        egpPerLyd: decimalOrNull(d['egpPerLyd']),
         version: intOrNull(d['version']),
         updatedAt: dateOrNull(d['updatedAt']));
   }

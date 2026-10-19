@@ -34,7 +34,8 @@ class PurchaseEntryDto {
   final String? itemLabel;
   final int? egpValueUnits; // EGP
   final CalculationMode? calculationMode;
-  final String? exchangeRate; // decimal string as returned; display only
+  final DecimalString?
+      exchangeRate; // decimal TEXT; display via formatDecimal only
   final int? resultUnits; // LYD, server-computed
   final int? paidUnits; // LYD
   final int? remainingUnits; // LYD, server-computed
@@ -48,7 +49,7 @@ class PurchaseEntryDto {
         itemLabel: strOrNull(j['itemLabel']),
         egpValueUnits: unitsOrNull(j['egpValueUnits']),
         calculationMode: CalculationMode.fromName(j['calculationMode']),
-        exchangeRate: strOrNull(j['exchangeRate']),
+        exchangeRate: decimalOrNull(j['exchangeRate']),
         resultUnits: unitsOrNull(j['resultUnits']),
         paidUnits: unitsOrNull(j['paidUnits']),
         remainingUnits: unitsOrNull(j['remainingUnits']),
@@ -131,8 +132,8 @@ class PurchaseEntryRequest {
   final String? itemLabel;
   final int? egpValueUnits;
   final CalculationMode? calculationMode;
-  final String?
-      exchangeRate; // decimal string as typed (server stores it as text)
+  final DecimalString?
+      exchangeRate; // decimal text; wire format per ApiConfig.rateWireFormat
   final int? paidUnits;
   final int? vodafoneConsumedUnits;
   Json toJson() => {
@@ -140,7 +141,8 @@ class PurchaseEntryRequest {
         if (itemLabel != null) 'itemLabel': itemLabel,
         if (egpValueUnits != null) 'egpValueUnits': egpValueUnits,
         if (calculationMode != null) 'calculationMode': calculationMode!.name,
-        if (exchangeRate != null) 'exchangeRate': exchangeRate,
+        if (exchangeRate != null)
+          'exchangeRate': exchangeRate, // DecimalString; WireJson encodes it
         if (paidUnits != null) 'paidUnits': paidUnits,
         if (vodafoneConsumedUnits != null)
           'vodafoneConsumedUnits': vodafoneConsumedUnits,
