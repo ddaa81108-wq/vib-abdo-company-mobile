@@ -64,6 +64,8 @@ class AccountCardDto {
 
   /// Server flag. System cards can be opened and have no write controls.
   final bool systemManaged;
+
+  /// Server link key. `systemLinkKey` wins; `systemKind` is only a fallback.
   final String? systemKind;
 
   factory AccountCardDto.fromJson(Json j, AccountSection s) => AccountCardDto(
@@ -85,11 +87,11 @@ class AccountCardDto {
         allowedActions:
             j['allowedActions'] is List ? strList(j['allowedActions']) : null,
         systemManaged: boolOf(j['systemManaged']),
-        systemKind: strOrNull(j['systemKind']),
+        systemKind: strOrNull(j['systemLinkKey'] ?? j['systemKind']),
       );
 }
 
-/// `summary` object of GET /api/{section} (real shape, 01b §2.1 + web Dashboard code):
+/// `summary` object of GET /api/{section} (per API contract):
 /// `data.summary = {netBalance, totalDebt, activeCards, pendingReviewCount}`.
 /// `netBalance`/`totalDebt` are integer money units WITHOUT the `Units` suffix on the wire.
 /// - netBalance: section net (what the web card "صافي إجمالي الديون" actually shows).

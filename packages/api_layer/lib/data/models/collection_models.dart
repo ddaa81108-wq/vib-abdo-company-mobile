@@ -37,7 +37,7 @@ class CollectionAssignmentDto {
       );
 }
 
-/// "ينتظر النقد" status — ➕ SERVER-PROVIDED ONLY (contract §12 #15, 04_ui_spec §3.5).
+/// "ينتظر النقد" status — server-provided only (per API contract).
 /// Proposed wire fields: `cashStatus: "pending"|"received"|"not_applicable"` and/or
 /// `cashPending: bool`. The app NEVER derives it from `status` + `cashReceivedAt`.
 enum CashStatus {
@@ -200,7 +200,8 @@ class CollectionsOverviewDto {
       collectedUnits: unitsOrNull(metrics['collectedUnits']),
       dayTotalUnits:
           unitsOrNull(metrics['dayTotalUnits'] ?? d['dayTotalUnits']),
-      assignedCount: intOrNull(metrics['assignedCount']),
+      // Top-level in data, per API contract; metrics is only a fallback.
+      assignedCount: intOrNull(d['assignedCount'] ?? metrics['assignedCount']),
       pendingCount: intOrNull(metrics['pendingCount']),
       unlinkedPendingCount: intOrNull(metrics['unlinkedPendingCount']),
       cashOutstandingUnits: unitsOrNull(metrics['cashOutstandingUnits']),

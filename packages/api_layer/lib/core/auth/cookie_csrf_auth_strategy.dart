@@ -7,7 +7,7 @@ import '../network/api_exception.dart';
 import 'auth_strategy.dart';
 import 'cookie_store.dart';
 
-/// DEFAULT strategy matching the real system (analysis doc §4.2):
+/// Default strategy matching the server session (per API contract):
 /// - Session = HTTP cookie set by POST /api/auth/login (persisted in [CookieStore]).
 /// - CSRF token is returned as `csrfToken` by POST /api/auth/login and by
 ///   GET /api/auth/csrf, and must be sent as `X-CSRF-Token` on every non-GET request.

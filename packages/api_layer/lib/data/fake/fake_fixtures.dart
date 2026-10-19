@@ -316,11 +316,11 @@ class FakeFixtures {
         'metrics': {
           'collectedUnits': 0,
           'dayTotalUnits': 100,
-          'assignedCount': 1,
           'pendingCount': 1,
           'unlinkedPendingCount': 1,
           'cashOutstandingUnits': 250,
         },
+        'assignedCount': 1,
         'batchId': 'b_1',
       };
 

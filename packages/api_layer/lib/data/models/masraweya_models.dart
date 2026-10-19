@@ -51,7 +51,7 @@ class MasraweyaDayDto {
           .toList(growable: false),
       workTotalUnits: unitsOrNull(day['workTotalUnits']),
       remainingUnits: unitsOrNull(day['remainingUnits'] ??
-          day['finalUnits']), // 01b: server returns finalUnits
+          day['finalUnits']), // per API contract: server returns finalUnits
       historicalAdjustmentUnits: unitsOrNull(day['historicalAdjustmentUnits']),
       status: strOrNull(day['status']),
     );

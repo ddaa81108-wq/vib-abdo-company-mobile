@@ -9,7 +9,7 @@ import 'permission_codes.dart';
 /// FINAL PM DECISION (contract v0.2.3):
 /// - The server `role` is treated as an explicit server flag ONLY HERE, by EXACT
 ///   (case-sensitive, untrimmed) match with the real system's values `"admin"` /
-///   `"employee"` (frontend `role === "admin"`, analysis 01 §4.2 / 01b §1.1).
+///   `"employee"` (exact role values, per API contract).
 ///   No role comparison anywhere else (guarded by test/permission_service_test.dart).
 /// - Unknown or missing role grants NOTHING (even if codes are present).
 /// - Precedence: (1) `fullAccess` if the server sends it (true or false);

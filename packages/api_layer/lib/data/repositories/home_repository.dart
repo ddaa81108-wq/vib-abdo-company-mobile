@@ -2,7 +2,7 @@ import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../models/home_models.dart';
 
-/// Home screen (04_ui_spec §6.2). Uses the PROPOSED aggregated `GET /api/home`
+/// Home screen (per API contract). Uses the proposed aggregated `GET /api/home`
 /// (➕ تحتاج إضافة من الخادم). Until the server adds it the call fails (likely
 /// NotFoundException); the UI then falls back to the existing per-section endpoints
 /// (accounts `summary`, collections `metrics`, treasury, reports) shown as-is with neutral

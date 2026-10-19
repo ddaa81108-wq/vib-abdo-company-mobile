@@ -1,4 +1,4 @@
-/// REAL permission codes of the existing system (analysis doc §1.3): `<section>.read|write`
+/// Permission codes per API contract: `<section>.read|write`
 /// plus `purchases.finalize`. Gating is decided ONLY in PermissionService (codes +
 /// `sectionAccess` + `fullAccess` + the exact server role flag).
 enum Permission {
@@ -32,11 +32,11 @@ enum Permission {
   static Permission? fromCode(String code) => _byCode[code];
 }
 
-/// Business sections (analysis doc §1.3), in the server's menu order.
+/// Business sections per API contract, in the server's menu order.
 enum SectionKey {
   customers('customers', Permission.debtsRead, Permission.debtsWrite,
       'customerDebts'),
-  // Collections is NOT part of sectionAccess on the server (01b §1.2): gated by codes only.
+  // Collections is not part of sectionAccess (per API contract): gated by codes only.
   collections('collections', Permission.collectionsRead,
       Permission.collectionsWrite, null),
   companies('companies', Permission.companiesRead, Permission.companiesWrite,

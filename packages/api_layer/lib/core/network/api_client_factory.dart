@@ -13,7 +13,7 @@ import 'dio_api_client.dart';
 import 'get_retry_interceptor.dart';
 import 'logging_interceptor.dart';
 
-/// Wires the network stack. Interceptor order (doc 04 §6):
+/// Wires the network stack. Interceptor order per API contract:
 ///   [AuthInterceptor, GetRetryInterceptor, SafeLoggingInterceptor]
 class ApiStack {
   ApiStack._(this.client, this.strategy, this.dio);

@@ -1,5 +1,5 @@
-/// REAL paths from the existing system (analysis doc §4.5), extracted from the
-/// public frontend code — NOT called live. Paths still unknown are marked 🔶.
+/// Paths per API contract, taken from the public client. Not called live.
+/// Paths still unknown are marked 🔶.
 /// Changing the backend should only require editing this file + mappers.
 class ApiEndpoints {
   ApiEndpoints._();
