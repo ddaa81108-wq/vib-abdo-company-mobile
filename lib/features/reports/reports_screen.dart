@@ -43,15 +43,20 @@ class ReportsScreen extends ConsumerWidget {
           alignment: AlignmentDirectional.centerStart,
           child: ExportPdfButton(),
         ),
-        reports.when(
-          loading: () => const SkeletonBox(key: Key('reports-loading'), height: 160),
-          error: (error, _) => ErrorPane(
-            message: ref.read(errorHandlerProvider).toFailure(error).message,
-            onRetry: () => ref.invalidate(reportsProvider),
-          ),
-          data: (data) {
-            if (data.rows.isEmpty) return const EmptyPane(message: AppStrings.emptyReports);
-            final showChange = data.rows.any((row) => row.netChangeUnits != null);
+        KeptData<ReportsDto>(
+          value: reports,
+          resetKey: 'reports',
+          onRetry: () => ref.invalidate(reportsProvider),
+          messageOf: (error) =>
+              ref.read(errorHandlerProvider).toFailure(error).message,
+          loading: const SkeletonBox(key: Key('reports-loading'), height: 160),
+          builder: (data) {
+            if (data.rows.isEmpty) {
+              return const EmptyPane(message: AppStrings.emptyReports);
+            }
+            final showChange = data.rows.any(
+              (row) => row.netChangeUnits != null,
+            );
             final current = data.rows.first;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -63,9 +68,12 @@ class ReportsScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(current.date ?? AppStrings.dash),
-                        if (current.note != null && current.note!.isNotEmpty) Text(current.note!),
+                        if (current.note != null && current.note!.isNotEmpty)
+                          Text(current.note!),
                         ReportStatusChip(status: current.status),
-                        MoneyText(money.formatOrDash(current.netUnits, Currency.lyd)),
+                        MoneyText(
+                          money.formatOrDash(current.netUnits, Currency.lyd),
+                        ),
                       ],
                     ),
                   ),
@@ -78,7 +86,10 @@ class ReportsScreen extends ConsumerWidget {
                   _Table(rows: data.rows, money: money, showChange: showChange),
                 if (data.formula != null) ...[
                   const SizedBox(height: AppSpacing.lg),
-                  Text(AppStrings.methodology, style: Theme.of(context).textTheme.titleSmall),
+                  Text(
+                    AppStrings.methodology,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                   Text(data.formula!),
                 ],
                 if (data.methodologyNote != null) Text(data.methodologyNote!),
@@ -92,7 +103,11 @@ class ReportsScreen extends ConsumerWidget {
 }
 
 class _ReportCard extends StatelessWidget {
-  const _ReportCard({required this.row, required this.money, required this.showChange});
+  const _ReportCard({
+    required this.row,
+    required this.money,
+    required this.showChange,
+  });
 
   final DailyReportRowDto row;
   final MoneyFormatter money;
@@ -123,13 +138,25 @@ class _ReportCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('${AppStrings.ourDebts} ${money.formatOrDash(row.receivablesUnits, Currency.lyd)}'),
-          Text('${AppStrings.activeFunds} ${money.formatOrDash(row.activeCashUnits, Currency.lyd)}'),
-          Text('${AppStrings.egyptian} ${money.formatOrDash(row.egyptianUnits, Currency.egp)}'),
-          Text('${AppStrings.egyptianLyd} ${money.formatOrDash(row.egyptianConvertedUnits, Currency.lyd)}'),
-          Text('${AppStrings.owedDebts} ${money.formatOrDash(row.liabilitiesUnits, Currency.lyd)}'),
+          Text(
+            '${AppStrings.ourDebts} ${money.formatOrDash(row.receivablesUnits, Currency.lyd)}',
+          ),
+          Text(
+            '${AppStrings.activeFunds} ${money.formatOrDash(row.activeCashUnits, Currency.lyd)}',
+          ),
+          Text(
+            '${AppStrings.egyptian} ${money.formatOrDash(row.egyptianUnits, Currency.egp)}',
+          ),
+          Text(
+            '${AppStrings.egyptianLyd} ${money.formatOrDash(row.egyptianConvertedUnits, Currency.lyd)}',
+          ),
+          Text(
+            '${AppStrings.owedDebts} ${money.formatOrDash(row.liabilitiesUnits, Currency.lyd)}',
+          ),
           if (showChange)
-            Text('${AppStrings.netChange} ${money.formatOrDash(row.netChangeUnits, Currency.lyd)}'),
+            Text(
+              '${AppStrings.netChange} ${money.formatOrDash(row.netChangeUnits, Currency.lyd)}',
+            ),
           if (row.note != null) Text(row.note!),
           for (final reason in row.reasons)
             Text('${AppStrings.reasons}: ${reasonLine(reason, money)}'),
@@ -140,7 +167,11 @@ class _ReportCard extends StatelessWidget {
 }
 
 class _Table extends StatelessWidget {
-  const _Table({required this.rows, required this.money, required this.showChange});
+  const _Table({
+    required this.rows,
+    required this.money,
+    required this.showChange,
+  });
 
   final List<DailyReportRowDto> rows;
   final MoneyFormatter money;
@@ -201,20 +232,46 @@ class _Table extends StatelessWidget {
                       children: [
                         Text('${row.sequence}'),
                         const SizedBox(width: AppSpacing.md),
-                        MoneyText(money.formatOrDash(row.receivablesUnits, Currency.lyd)),
+                        MoneyText(
+                          money.formatOrDash(
+                            row.receivablesUnits,
+                            Currency.lyd,
+                          ),
+                        ),
                         const SizedBox(width: AppSpacing.md),
-                        MoneyText(money.formatOrDash(row.activeCashUnits, Currency.lyd)),
+                        MoneyText(
+                          money.formatOrDash(row.activeCashUnits, Currency.lyd),
+                        ),
                         const SizedBox(width: AppSpacing.md),
-                        MoneyText(money.formatOrDash(row.egyptianUnits, Currency.egp)),
+                        MoneyText(
+                          money.formatOrDash(row.egyptianUnits, Currency.egp),
+                        ),
                         const SizedBox(width: AppSpacing.md),
-                        MoneyText(money.formatOrDash(row.egyptianConvertedUnits, Currency.lyd)),
+                        MoneyText(
+                          money.formatOrDash(
+                            row.egyptianConvertedUnits,
+                            Currency.lyd,
+                          ),
+                        ),
                         const SizedBox(width: AppSpacing.md),
-                        MoneyText(money.formatOrDash(row.liabilitiesUnits, Currency.lyd)),
+                        MoneyText(
+                          money.formatOrDash(
+                            row.liabilitiesUnits,
+                            Currency.lyd,
+                          ),
+                        ),
                         const SizedBox(width: AppSpacing.md),
-                        MoneyText(money.formatOrDash(row.netUnits, Currency.lyd)),
+                        MoneyText(
+                          money.formatOrDash(row.netUnits, Currency.lyd),
+                        ),
                         if (showChange) ...[
                           const SizedBox(width: AppSpacing.md),
-                          MoneyText(money.formatOrDash(row.netChangeUnits, Currency.lyd)),
+                          MoneyText(
+                            money.formatOrDash(
+                              row.netChangeUnits,
+                              Currency.lyd,
+                            ),
+                          ),
                         ],
                         const SizedBox(width: AppSpacing.md),
                         ReportStatusChip(status: row.status),
@@ -224,7 +281,9 @@ class _Table extends StatelessWidget {
                         Text(
                           row.reasons.isEmpty
                               ? AppStrings.dash
-                              : row.reasons.map((reason) => reasonLine(reason, money)).join(' · '),
+                              : row.reasons
+                                    .map((reason) => reasonLine(reason, money))
+                                    .join(' · '),
                         ),
                       ],
                     ),

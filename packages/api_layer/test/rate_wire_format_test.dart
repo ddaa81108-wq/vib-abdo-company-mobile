@@ -37,13 +37,15 @@ void main() {
         '9.5');
   });
 
-  test('canonical text is a valid JSON number literal', () {
-    expect(DecimalString.tryParse('007.50')!.value, '7.50');
-    expect(DecimalString.tryParse('-00')!.value, '-0');
-    expect(
-        jsonDecode(WireJson.encode(
-            [DecimalString.tryParse('007.50')], RateWireFormat.number)),
-        isA<List>());
+  test('validated text stays verbatim and the wire stays legal JSON', () {
+    expect(DecimalString.tryParse('007.50')!.value, '007.50');
+    expect(DecimalString.tryParse('-00')!.value, '-00');
+    final encoded = WireJson.encode(
+      [DecimalString.tryParse('007.50')],
+      RateWireFormat.number,
+    );
+    expect(encoded, '["007.50"]');
+    expect(jsonDecode(encoded), ['007.50']);
   });
 
   test(
@@ -84,7 +86,9 @@ void main() {
     });
   }
 
-  test('incoming rates keep their exact body text (PreciseJson), doubles rejected', () {
+  test(
+      'incoming rates keep their exact body text (PreciseJson), doubles rejected',
+      () {
     final d = PreciseJson.decode('{"r":9.50}') as Map;
     expect(DecimalString.fromJson(d['r'])!.value, '9.50');
     expect(DecimalString.fromJson('9.50')!.value, '9.50');

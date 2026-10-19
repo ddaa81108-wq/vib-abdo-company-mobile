@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,11 +24,16 @@ import '../features/splash/splash_screen.dart';
 import '../features/treasury/treasury_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final session = ref.watch(apiLayerProvider).session;
+  final layer = ref.watch(apiLayerProvider);
+  final session = layer.session;
+  final permissions = layer.permissions;
+  final refresh = _RouterRefresh(session.listenable, permissions);
+  ref.onDispose(refresh.dispose);
   final router = GoRouter(
     initialLocation: '/splash',
-    refreshListenable: session.listenable,
-    redirect: (context, state) => authRedirect(session.state, state.uri.path),
+    refreshListenable: refresh,
+    redirect: (context, state) =>
+        authRedirect(session.state, state.uri.path, permissions: permissions),
     routes: [
       GoRoute(
         path: '/splash',
@@ -50,7 +56,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state, child) =>
             HomeShell(location: state.uri.path, child: child),
         routes: [
-          GoRoute(path: '/', builder: (context, state) => const HomeDashboard()),
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const HomeDashboard(),
+          ),
           GoRoute(
             path: '/search',
             builder: (context, state) => const SearchScreen(),
@@ -99,6 +108,23 @@ final routerProvider = Provider<GoRouter>((ref) {
   return router;
 });
 
+class _RouterRefresh extends ChangeNotifier {
+  _RouterRefresh(this._session, this._permissions) {
+    _session.addListener(notifyListeners);
+    _permissions.addListener(notifyListeners);
+  }
+
+  final Listenable _session;
+  final Listenable _permissions;
+
+  @override
+  void dispose() {
+    _session.removeListener(notifyListeners);
+    _permissions.removeListener(notifyListeners);
+    super.dispose();
+  }
+}
+
 List<RouteBase> _accountRoutes(AccountSection section) => [
   GoRoute(
     path: '/${section.path}',
@@ -106,10 +132,8 @@ List<RouteBase> _accountRoutes(AccountSection section) => [
     routes: [
       GoRoute(
         path: ':id',
-        builder: (context, state) => LedgerScreen(
-          section: section,
-          id: state.pathParameters['id']!,
-        ),
+        builder: (context, state) =>
+            LedgerScreen(section: section, id: state.pathParameters['id']!),
       ),
     ],
   ),

@@ -57,16 +57,17 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     final home = ref.watch(homeDashboardProvider);
     final width = MediaQuery.sizeOf(context).width;
 
-    return page.when(
-      loading: () => const Padding(
+    return KeptData<AccountsPage>(
+      value: page,
+      resetKey: section,
+      expand: true,
+      onRetry: () => ref.invalidate(accountsProvider(section)),
+      messageOf: _message,
+      loading: const Padding(
         padding: EdgeInsetsDirectional.all(AppSpacing.lg),
         child: SkeletonBox(key: Key('accounts-loading')),
       ),
-      error: (error, _) => ErrorPane(
-        message: _message(error),
-        onRetry: () => ref.invalidate(accountsProvider(section)),
-      ),
-      data: (data) {
+      builder: (data) {
         final cards = [...data.page.items, ..._extra];
         return ListView(
           key: Key('screen-${section.path}'),
@@ -75,7 +76,11 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             ScreenTitle(sectionLabel(section.sectionKey)),
             const SizedBox(height: AppSpacing.md),
             if (_showTicker) _ticker(home, money, width),
-            _SummaryStrip(summary: data.summary, currency: section.currency, money: money),
+            _SummaryStrip(
+              summary: data.summary,
+              currency: section.currency,
+              money: money,
+            ),
             if (section == AccountSection.egyptianDeposits) const _RateCard(),
             const SizedBox(height: AppSpacing.md),
             _Tabs(section: section, summary: data.summary),
@@ -84,7 +89,9 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
               key: const Key('account-search'),
               controller: _search,
               textInputAction: TextInputAction.search,
-              decoration: const InputDecoration(labelText: AppStrings.filterSearch),
+              decoration: const InputDecoration(
+                labelText: AppStrings.filterSearch,
+              ),
               onSubmitted: (value) {
                 setState(_extra.clear);
                 ref.read(accountQueryProvider(section).notifier).state = value;
@@ -129,8 +136,10 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
               LayoutBuilder(
                 builder: (context, constraints) {
                   final columns = AppBreakpoints.cardColumns(width);
-                  final cardWidth = ((constraints.maxWidth - AppSpacing.md * (columns - 1)) / columns)
-                      .clamp(120.0, constraints.maxWidth);
+                  final cardWidth =
+                      ((constraints.maxWidth - AppSpacing.md * (columns - 1)) /
+                              columns)
+                          .clamp(120.0, constraints.maxWidth);
                   return Wrap(
                     spacing: AppSpacing.md,
                     runSpacing: AppSpacing.md,
@@ -146,14 +155,18 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                             canWrite: canWrite && !card.systemManaged,
                             assigning: _assigning,
                             selected: _selected.contains(card.id),
-                            onOpen: () => context.go('/${section.path}/${card.id}'),
+                            onOpen: () =>
+                                context.go('/${section.path}/${card.id}'),
                             onToggle: () => setState(() {
                               _selected.contains(card.id)
                                   ? _selected.remove(card.id)
                                   : _selected.add(card.id);
                             }),
                             onPin: (meta) => _pin(card, meta),
-                            onZero: permissions.canDo(ManagementAction.customerZeroReview) &&
+                            onZero:
+                                permissions.canDo(
+                                      ManagementAction.customerZeroReview,
+                                    ) &&
                                     section == AccountSection.customers
                                 ? (meta) => _zero(card, meta)
                                 : null,
@@ -175,10 +188,12 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   }
 
   bool get _showTicker =>
-      section == AccountSection.customers || section == AccountSection.companies;
+      section == AccountSection.customers ||
+      section == AccountSection.companies;
 
   bool _canAssign(PermissionService permissions) =>
-      (section == AccountSection.customers || section == AccountSection.companies) &&
+      (section == AccountSection.customers ||
+          section == AccountSection.companies) &&
       permissions.canDo(ManagementAction.collectionsAssign);
 
   String get _addLabel => switch (section) {
@@ -187,7 +202,11 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     _ => AppStrings.addDeposit,
   };
 
-  Widget _ticker(AsyncValue<HomeDto?> home, MoneyFormatter money, double width) {
+  Widget _ticker(
+    AsyncValue<HomeDto?> home,
+    MoneyFormatter money,
+    double width,
+  ) {
     final debts = home.asData?.value?.oldDebts;
     if (debts == null) return const SizedBox.shrink();
     final rows = [
@@ -241,12 +260,15 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   Future<void> _more(String cursor) async {
     final query = ref.read(accountQueryProvider(section)).trim();
     final filter = ref.read(accountFilterProvider(section));
-    final next = await ref.read(apiLayerProvider).accounts.list(
-      section,
-      cursor: cursor,
-      q: query.isEmpty ? null : query,
-      filter: filter,
-    );
+    final next = await ref
+        .read(apiLayerProvider)
+        .accounts
+        .list(
+          section,
+          cursor: cursor,
+          q: query.isEmpty ? null : query,
+          filter: filter,
+        );
     if (!mounted) return;
     setState(() => _extra.addAll(next.page.items));
   }
@@ -263,18 +285,18 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
 
   Future<String?> _pin(AccountCardDto card, MutationMeta meta) async {
     try {
-      final ack = await ref.read(apiLayerProvider).accounts.setPinned(
-        section,
-        card.id,
-        !card.pinned,
-        meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .accounts
+          .setPinned(section, card.id, !card.pinned, meta);
       if (!mounted) return null;
       setState(() => _reply = _ack(ack));
       ref.invalidate(accountsProvider(section));
       return null;
     } catch (error) {
-      if (!mounted) return ref.read(errorHandlerProvider).toFailure(error).message;
+      if (!mounted) {
+        return ref.read(errorHandlerProvider).toFailure(error).message;
+      }
       final message = ref.read(errorHandlerProvider).toFailure(error).message;
       setState(() => _reply = message);
       return message;
@@ -283,13 +305,18 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
 
   Future<String?> _zero(AccountCardDto card, MutationMeta meta) async {
     try {
-      final ack = await ref.read(apiLayerProvider).accounts.confirmZeroReview(card.id, meta);
+      final ack = await ref
+          .read(apiLayerProvider)
+          .accounts
+          .confirmZeroReview(card.id, meta);
       if (!mounted) return null;
       setState(() => _reply = _ack(ack));
       ref.invalidate(accountsProvider(section));
       return null;
     } catch (error) {
-      if (!mounted) return ref.read(errorHandlerProvider).toFailure(error).message;
+      if (!mounted) {
+        return ref.read(errorHandlerProvider).toFailure(error).message;
+      }
       final message = ref.read(errorHandlerProvider).toFailure(error).message;
       setState(() => _reply = message);
       ref.invalidate(accountsProvider(section));
@@ -308,7 +335,11 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
 }
 
 class _SummaryStrip extends StatelessWidget {
-  const _SummaryStrip({required this.summary, required this.currency, required this.money});
+  const _SummaryStrip({
+    required this.summary,
+    required this.currency,
+    required this.money,
+  });
 
   final AccountsSummaryDto summary;
   final Currency currency;
@@ -322,10 +353,16 @@ class _SummaryStrip extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(AppStrings.netDebt, style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              AppStrings.netDebt,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
             MoneyText(money.formatOrDash(summary.netBalanceUnits, currency)),
             const SizedBox(height: AppSpacing.xs),
-            Text(AppStrings.totalDebt, style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              AppStrings.totalDebt,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             MoneyText(money.formatOrDash(summary.totalDebtUnits, currency)),
           ],
         ),
@@ -344,7 +381,13 @@ class _Tabs extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final current = ref.watch(accountFilterProvider(section));
     final tabs = <(String?, String, int?)>[
-      (null, section == AccountSection.libyanDeposits ? AppStrings.smartTab : AppStrings.activeTab, summary.activeCards),
+      (
+        null,
+        section == AccountSection.libyanDeposits
+            ? AppStrings.smartTab
+            : AppStrings.activeTab,
+        summary.activeCards,
+      ),
       ('today', AppStrings.todayTab, null),
       ('debts', AppStrings.debtsTab, null),
       ('settled', AppStrings.settledTab, null),
@@ -366,7 +409,8 @@ class _Tabs extends ConsumerWidget {
                 label: Text(tab.$3 == null ? tab.$2 : '${tab.$2} ${tab.$3}'),
                 selected: current == tab.$1,
                 onSelected: (_) {
-                  ref.read(accountFilterProvider(section).notifier).state = tab.$1;
+                  ref.read(accountFilterProvider(section).notifier).state =
+                      tab.$1;
                 },
               ),
             ),
@@ -415,8 +459,12 @@ class _AccountCard extends StatelessWidget {
     );
     final flat = useFlatAgeCard(width, Theme.of(context).brightness);
     final colored = visual.colored;
-    final fg = colored ? colors.onStatus : Theme.of(context).colorScheme.onSurface;
-    final accent = colored ? (visual.accent ?? colors.onStatus) : Theme.of(context).colorScheme.onSurfaceVariant;
+    final fg = colored
+        ? colors.onStatus
+        : Theme.of(context).colorScheme.onSurface;
+    final accent = colored
+        ? (visual.accent ?? colors.onStatus)
+        : Theme.of(context).colorScheme.onSurfaceVariant;
     return Material(
       color: colored
           ? (flat ? visual.flat : colors.neutralCard)
@@ -448,7 +496,8 @@ class _AccountCard extends StatelessWidget {
                   if (visual.label != null)
                     Text(visual.label!, style: cairo(11, 800, color: accent)),
                   Text(card.name, style: cairo(16, 800, color: fg)),
-                  if (card.phone != null) LtrText(card.phone!, style: cairo(12, 500, color: accent)),
+                  if (card.phone != null)
+                    LtrText(card.phone!, style: cairo(12, 500, color: accent)),
                   MoneyText(
                     money.formatOrDash(card.balanceUnits, card.currency),
                     style: context.textExtras.amountLarge.copyWith(color: fg),
@@ -463,13 +512,19 @@ class _AccountCard extends StatelessWidget {
                       style: cairo(11, 600, color: accent),
                     ),
                   if (card.debtAgeDays != null)
-                    Text(sinceDays(card.debtAgeDays), style: cairo(11, 500, color: accent)),
+                    Text(
+                      sinceDays(card.debtAgeDays),
+                      style: cairo(11, 500, color: accent),
+                    ),
                   if (card.systemManaged)
                     Row(
                       children: [
                         Icon(Icons.lock_outline, size: 16, color: fg),
                         const SizedBox(width: AppSpacing.xs),
-                        Text(AppStrings.systemCard, style: cairo(11, 800, color: fg)),
+                        Text(
+                          AppStrings.systemCard,
+                          style: cairo(11, 800, color: fg),
+                        ),
                       ],
                     ),
                   Wrap(
@@ -480,12 +535,18 @@ class _AccountCard extends StatelessWidget {
                       if (canWrite)
                         GuardedMutation(
                           buttonKey: Key('pin-${card.id}'),
-                          inputs: 'pin:${card.id}:${card.pinned}:${card.version}',
+                          inputs:
+                              'pin:${card.id}:${card.pinned}:${card.version}',
                           expectedVersion: card.version,
-                          online: online,
-                          label: card.pinned ? AppStrings.unpin : AppStrings.pin,
-                          tooltip: card.pinned ? AppStrings.unpin : AppStrings.pin,
-                          icon: card.pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                          label: card.pinned
+                              ? AppStrings.unpin
+                              : AppStrings.pin,
+                          tooltip: card.pinned
+                              ? AppStrings.unpin
+                              : AppStrings.pin,
+                          icon: card.pinned
+                              ? Icons.push_pin
+                              : Icons.push_pin_outlined,
                           onSubmit: (meta) => onPin(meta),
                         ),
                       if (onZero != null && !card.systemManaged)
@@ -493,7 +554,6 @@ class _AccountCard extends StatelessWidget {
                           buttonKey: const Key('zero-review'),
                           inputs: 'zero:${card.id}:${card.version}',
                           expectedVersion: card.version,
-                          online: online,
                           label: AppStrings.zeroReview,
                           filled: false,
                           onSubmit: (meta) => onZero!(meta),
@@ -540,7 +600,6 @@ class _RateCardState extends ConsumerState<_RateCard> {
   Widget build(BuildContext context) {
     final rate = ref.watch(exchangeRateProvider);
     final permissions = permissionsOf(ref);
-    final online = ref.watch(onlineProvider);
     final money = ref.watch(apiLayerProvider).money;
     return Card(
       key: const Key('exchange-rate-card'),
@@ -556,7 +615,10 @@ class _RateCardState extends ConsumerState<_RateCard> {
           data: (data) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(AppStrings.rateTitle, style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                AppStrings.rateTitle,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               LtrText(
                 money.formatDecimalOrDash(data.egpPerLyd),
                 style: context.textExtras.amountLarge,
@@ -575,8 +637,9 @@ class _RateCardState extends ConsumerState<_RateCard> {
                   buttonKey: const Key('save-rate'),
                   inputs: _rate.text,
                   expectedVersion: data.version,
-                  online: online,
                   label: AppStrings.save,
+                  confirmText: AppStrings.confirm,
+                  normalizedValue: DecimalString.tryParse(_rate.text)?.value,
                   onSubmit: _save,
                 ),
               ],
@@ -592,14 +655,17 @@ class _RateCardState extends ConsumerState<_RateCard> {
     final parsed = DecimalString.tryParse(_rate.text);
     if (parsed == null) return AppStrings.rateInvalid;
     try {
-      final next = await ref.read(apiLayerProvider).accounts.updateExchangeRate(
-        parsed,
-        meta,
-      );
+      final next = await ref
+          .read(apiLayerProvider)
+          .accounts
+          .updateExchangeRate(parsed, meta);
       ref.invalidate(exchangeRateProvider);
       ref.invalidate(treasuryProvider);
       if (!mounted) return null;
-      setState(() => _message = '${AppStrings.serverReply} ${next.egpPerLyd?.value ?? AppStrings.dash}');
+      setState(
+        () => _message =
+            '${AppStrings.serverReply} ${next.egpPerLyd?.value ?? AppStrings.dash}',
+      );
       return null;
     } catch (error) {
       final message = ref.read(errorHandlerProvider).toFailure(error).message;
@@ -668,7 +734,6 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
           buttonKey: const Key('save-account'),
           inputs: '${_name.text}|${_phone.text}|${_opening.text}',
           label: AppStrings.save,
-          online: ref.watch(onlineProvider),
           onSubmit: _submit,
         ),
       ],
@@ -682,19 +747,26 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
   };
 
   Future<String?> _submit(MutationMeta meta) async {
-    final opening = _opening.text.trim().isEmpty ? null : parseUnits(_opening.text);
+    final opening = _opening.text.trim().isEmpty
+        ? null
+        : parseUnits(_opening.text);
     if (_name.text.trim().isEmpty) return AppStrings.integerOnly;
-    if (_opening.text.trim().isNotEmpty && opening == null) return AppStrings.integerOnly;
+    if (_opening.text.trim().isNotEmpty && opening == null) {
+      return AppStrings.integerOnly;
+    }
     try {
-      final ack = await ref.read(apiLayerProvider).accounts.create(
-        widget.section,
-        CreateAccountRequest(
-          name: _name.text.trim(),
-          phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
-          openingBalance: opening,
-        ),
-        meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .accounts
+          .create(
+            widget.section,
+            CreateAccountRequest(
+              name: _name.text.trim(),
+              phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
+              openingBalance: opening,
+            ),
+            meta,
+          );
       if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -760,7 +832,6 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
               buttonKey: const Key('save-assignment'),
               inputs: '${widget.customerIds.join(",")}|$_assignee',
               label: AppStrings.assign,
-              online: widget.online,
               onSubmit: _submit,
             ),
           ],
@@ -771,14 +842,19 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
 
   Future<String?> _submit(MutationMeta meta) async {
     final assignee = _assignee;
-    if (assignee == null || widget.customerIds.isEmpty) return AppStrings.chooseKind;
+    if (assignee == null || widget.customerIds.isEmpty) {
+      return AppStrings.chooseAssignee;
+    }
     try {
-      final ack = await ref.read(apiLayerProvider).collections.assign(
-        customerIds: widget.customerIds,
-        assigneeUserId: assignee,
-        section: widget.section.path,
-        meta: meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .collections
+          .assign(
+            customerIds: widget.customerIds,
+            assigneeUserId: assignee,
+            section: widget.section.path,
+            meta: meta,
+          );
       if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),

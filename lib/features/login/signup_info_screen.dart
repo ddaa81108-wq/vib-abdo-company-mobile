@@ -17,7 +17,7 @@ class SignupInfoScreen extends StatelessWidget {
         leading: IconButton(
           tooltip: AppStrings.back,
           onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_forward),
+          icon: const Icon(Icons.arrow_back),
         ),
         title: const Text(AppStrings.createEmployee),
       ),

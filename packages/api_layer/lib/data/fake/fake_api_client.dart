@@ -40,6 +40,18 @@ class FakeApiClient implements ApiClient {
   /// The next N account-suggestion reads fail (tests).
   int failSuggestionsRemaining = 0;
 
+  /// The next N proposed home reads fail so the app can use per-section data.
+  int failHomeRemaining = 0;
+
+  /// The next N older-page reads (`before`) fail (tests).
+  int failOlderRemaining = 0;
+
+  /// The next N notification writes fail (tests).
+  int failNotificationWritesRemaining = 0;
+
+  /// Omit `unreadCount` from the notifications page (tests).
+  bool omitUnreadCount = false;
+
   /// When set, account-suggestion reads wait here (tests).
   Completer<void>? pauseSuggestions;
   bool _loggedIn = false;
@@ -89,14 +101,14 @@ class FakeApiClient implements ApiClient {
       ApiReachability.instance.recordTransportFailure();
     }
     throw _err.fromResponse(status, {
-        'ok': false,
-        'error': {
-          'code': code,
-          'message': message,
-          'details': {},
-          'correlationId': 'fake'
-        },
-      });
+      'ok': false,
+      'error': {
+        'code': code,
+        'message': message,
+        'details': {},
+        'correlationId': 'fake'
+      },
+    });
   }
 
   void _requireAdmin() {
@@ -109,8 +121,8 @@ class FakeApiClient implements ApiClient {
     }
   }
 
-  Future<ApiResponse> _handle(String method, String path, Object? body,
-      ApiRequestOptions options,
+  Future<ApiResponse> _handle(
+      String method, String path, Object? body, ApiRequestOptions options,
       {Map<String, dynamic>? query}) async {
     await Future<void>.delayed(latency);
     // Same serialization as the real client, then decoded like a server would.
@@ -160,6 +172,10 @@ class FakeApiClient implements ApiClient {
 
     switch (head) {
       case 'home': // 🔶 proposed endpoint, fake only
+        if (failHomeRemaining > 0) {
+          failHomeRemaining--;
+          _fail(404, 'NOT_FOUND', 'المسار غير موجود');
+        }
         return _ok(FakeFixtures.home(admin: _admin));
       case 'customers':
       case 'companies':
@@ -181,7 +197,12 @@ class FakeApiClient implements ApiClient {
           return _ok({'items': []});
         }
         if (method == 'GET' && seg.length == 3 && seg[2] == 'ledger') {
-          return _ok(FakeFixtures.ledger(before: query?['before']?.toString()));
+          final before = query?['before']?.toString();
+          if (before != null && before.isNotEmpty && failOlderRemaining > 0) {
+            failOlderRemaining--;
+            _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
+          }
+          return _ok(FakeFixtures.ledger(before: before));
         }
         if (method == 'GET' && seg.length == 2) {
           return _ok(
@@ -226,7 +247,9 @@ class FakeApiClient implements ApiClient {
       case 'purchases':
         if (method == 'GET') return _ok(FakeFixtures.purchases());
         final entryWrite = (method == 'POST' && seg.length == 2) ||
-            (seg.length > 3 && seg[2] == 'entries');
+            ((method == 'POST' || method == 'PATCH') &&
+                seg.length > 3 &&
+                seg[2] == 'entries');
         if (entryWrite) {
           try {
             PurchaseItemCodes.require(
@@ -243,7 +266,12 @@ class FakeApiClient implements ApiClient {
           return _ok(FakeFixtures.treasury());
         }
         if (method == 'GET') {
-          return _ok(FakeFixtures.cashLedger(before: query?['before']?.toString()));
+          final before = query?['before']?.toString();
+          if (before != null && before.isNotEmpty && failOlderRemaining > 0) {
+            failOlderRemaining--;
+            _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
+          }
+          return _ok(FakeFixtures.cashLedger(before: before));
         }
         return _ok({'id': 'ce_new', 'version': 8});
       case 'reports':
@@ -262,7 +290,15 @@ class FakeApiClient implements ApiClient {
           'scopeTotals': {'LYD': 0, 'EGP': 0}
         });
       case 'notifications':
-        if (method == 'GET') return _ok(FakeFixtures.notifications(_unread));
+        if (method == 'GET') {
+          final data = FakeFixtures.notifications(_unread);
+          if (omitUnreadCount) data.remove('unreadCount');
+          return _ok(data);
+        }
+        if (failNotificationWritesRemaining > 0) {
+          failNotificationWritesRemaining--;
+          _fail(500, 'SERVER_ERROR', 'تعذر تحديث الإشعار.');
+        }
         _unread = 0; // fake server state reset (single notification fixture)
         return _ok({});
       case 'notification-preferences':

@@ -21,9 +21,13 @@ class WireJson {
     return out.toString();
   }
 
+  /// A JSON number literal. Leading zeros are not legal in that form.
+  static final RegExp _jsonNumber = RegExp(r'^-?(?:0|[1-9]\d*)(?:\.\d+)?$');
+
   static void _write(StringBuffer out, Object? v, RateWireFormat f) {
     if (v is DecimalString) {
-      out.write(f == RateWireFormat.number ? v.value : jsonEncode(v.value));
+      final raw = f == RateWireFormat.number && _jsonNumber.hasMatch(v.value);
+      out.write(raw ? v.value : jsonEncode(v.value));
     } else if (v is Map) {
       out.write('{');
       var first = true;

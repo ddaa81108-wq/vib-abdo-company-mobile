@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../presentation.dart';
 import '../strings.dart';
@@ -91,10 +92,16 @@ class EmptyPane extends StatelessWidget {
       padding: const EdgeInsetsDirectional.all(AppSpacing.xxl),
       child: Column(
         children: [
-          Icon(Icons.inbox_outlined, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          Icon(
+            Icons.inbox_outlined,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(height: AppSpacing.md),
           Text(message, textAlign: TextAlign.center),
-          if (action != null) ...[const SizedBox(height: AppSpacing.lg), action!],
+          if (action != null) ...[
+            const SizedBox(height: AppSpacing.lg),
+            action!,
+          ],
         ],
       ),
     );
@@ -147,11 +154,7 @@ class ServerReplyText extends StatelessWidget {
     if (ack == null) return const SizedBox.shrink();
     final id = ack!.id;
     final version = ack!.version;
-    final parts = <String>[
-      AppStrings.serverReply,
-      ?id,
-      ?version?.toString(),
-    ];
+    final parts = <String>[AppStrings.serverReply, ?id, ?version?.toString()];
     return Text(parts.join(' · '), key: const Key('server-reply'));
   }
 }
@@ -269,10 +272,7 @@ class ReportStatusChip extends StatelessWidget {
         color: colors?.$1,
         borderRadius: BorderRadius.circular(AppRadii.pill),
       ),
-      child: Text(
-        label,
-        style: cairo(11, 800, color: colors?.$2),
-      ),
+      child: Text(label, style: cairo(11, 800, color: colors?.$2)),
     );
   }
 }
@@ -310,10 +310,39 @@ Future<T?> showAppForm<T>(BuildContext context, Widget child) {
 
 /// Parses the minor-unit integer the server stores. The text is not scaled,
 /// rounded, or combined with any other amount.
+///
+/// Arabic-Indic and Persian digits are normalized. ',' and '٬' are thousands
+/// separators only when the groups are valid (1-3 digits, then groups of 3).
+/// A decimal mark rejects the whole value.
 int? parseUnits(String raw) {
-  final text = raw.trim();
+  var text = DecimalString.normalizeDigits(raw.trim());
   if (text.isEmpty) return null;
-  return int.tryParse(text);
+  var negative = false;
+  if (text.startsWith('-')) {
+    negative = true;
+    text = text.substring(1);
+  }
+  if (text.isEmpty) return null;
+  if (text.contains('.') || text.contains('٫')) return null;
+  const comma = ',';
+  const arabicComma = '٬';
+  final hasComma = text.contains(comma);
+  final hasArabic = text.contains(arabicComma);
+  if (hasComma && hasArabic) return null;
+  if (hasComma || hasArabic) {
+    final sep = hasComma ? comma : arabicComma;
+    final parts = text.split(sep);
+    if (parts.length < 2) return null;
+    if (!RegExp(r'^\d{1,3}$').hasMatch(parts.first)) return null;
+    for (final part in parts.skip(1)) {
+      if (!RegExp(r'^\d{3}$').hasMatch(part)) return null;
+    }
+    text = parts.join();
+  }
+  if (!RegExp(r'^\d+$').hasMatch(text)) return null;
+  final value = int.tryParse(text);
+  if (value == null) return null;
+  return negative ? -value : value;
 }
 
 class UnitsField extends StatelessWidget {
@@ -346,5 +375,92 @@ class ScreenTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(title, style: Theme.of(context).textTheme.headlineSmall);
+  }
+}
+
+/// Keeps the last successful value when a later load fails.
+///
+/// The first load still shows [loading] or the error pane. A failed refresh
+/// keeps the last value and adds the error with retry.
+class KeptData<T> extends StatefulWidget {
+  const KeptData({
+    required this.value,
+    required this.builder,
+    required this.onRetry,
+    required this.messageOf,
+    super.key,
+    this.loading,
+    this.resetKey,
+    this.retryKey,
+    this.expand = false,
+  });
+
+  final AsyncValue<T> value;
+  final Widget Function(T data) builder;
+  final VoidCallback? onRetry;
+  final String Function(Object error) messageOf;
+  final Widget? loading;
+  final Object? resetKey;
+  final Key? retryKey;
+
+  /// True when [builder] returns a scrolling view that should fill the body.
+  final bool expand;
+
+  @override
+  State<KeptData<T>> createState() => _KeptDataState<T>();
+}
+
+class _KeptDataState<T> extends State<KeptData<T>> {
+  T? _last;
+  Object? _resetKey;
+  var _hasLast = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = widget.value;
+    if (widget.resetKey != _resetKey) {
+      _resetKey = widget.resetKey;
+      _hasLast = value.hasValue;
+      _last = value.hasValue ? value.value : null;
+    } else if (value.hasValue) {
+      _hasLast = true;
+      _last = value.value;
+    }
+
+    if (value.hasError && _hasLast) {
+      return _withError(widget.builder(_last as T), value.error!);
+    }
+
+    return value.when(
+      skipLoadingOnReload: true,
+      data: widget.builder,
+      loading: () => widget.loading ?? const SkeletonBox(height: 88),
+      error: (error, _) => ErrorPane(
+        message: widget.messageOf(error),
+        onRetry: widget.onRetry,
+        retryKey: widget.retryKey,
+      ),
+    );
+  }
+
+  Widget _withError(Widget body, Object error) {
+    final pane = ErrorPane(
+      message: widget.messageOf(error),
+      onRetry: widget.onRetry,
+      retryKey: widget.retryKey,
+    );
+    if (widget.expand) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          pane,
+          Expanded(child: body),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [pane, body],
+    );
   }
 }

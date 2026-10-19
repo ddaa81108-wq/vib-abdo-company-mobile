@@ -30,7 +30,8 @@ abstract final class AppStrings {
   static const noSections = 'لا توجد أقسام مفعّلة لحسابك — راجع الإدارة';
   static const noSummaries = 'لا توجد ملخصات متاحة لحسابك';
   static const notifications = 'الإشعارات';
-  static const passwordChangeRequired = 'يجب تغيير كلمة المرور قبل متابعة العمل.';
+  static const passwordChangeRequired =
+      'يجب تغيير كلمة المرور قبل متابعة العمل.';
   static const loading = 'جارٍ التحميل…';
   static const genericError = 'تعذر تنفيذ الطلب.';
   static const retry = 'إعادة المحاولة';
@@ -267,6 +268,11 @@ abstract final class AppStrings {
   static const kindBanks = 'بنوك';
   static const chooseKind = 'اختر نوع العملية';
   static const assignee = 'الموظف';
+  static const chooseAssignee = 'اختر الموظف.';
+  static const enterReference = 'أدخل المرجع.';
+  static const edit = 'تعديل';
+  static const delete = 'حذف';
+  static const confirmDelete = 'تأكيد حذف هذا السطر';
   static const confirmPayroll = 'تأكيد حركة المرتب';
   static const link = 'ربط';
   static const batch = 'الدفعة';

@@ -10,19 +10,21 @@ import '../network/precise_json.dart';
 class DecimalString {
   const DecimalString._(this.value);
 
-  /// Canonical text, e.g. "9.5". Only digits, optional leading '-', optional one '.'.
+  /// Validated text, kept verbatim after digit and decimal-separator normalization.
+  /// Only digits, optional leading '-', optional one '.'. Leading zeros stay.
   final String value;
 
   static final RegExp _pattern = RegExp(r'^-?\d+(\.\d+)?$');
 
-  /// USER INPUT. Accepts Arabic-Indic/Persian digits and the Arabic decimal mark '٫'.
-  /// Rejects ',' (ambiguous with a thousands separator: "1,000" must never become 1.000)
-  /// and exponents ("1e5", "1E-2"). Null if invalid.
+  /// USER INPUT. Arabic-Indic and Persian digits are normalized to ASCII.
+  /// At most one of ',' '٫' '.' may appear, and that single mark is the decimal
+  /// separator. Repeated marks, mixed marks, grouping, and exponents are rejected.
+  /// The matched text is stored verbatim (no leading-zero rewrite). Null if invalid.
   static DecimalString? tryParse(String? input) {
     if (input == null) return null;
-    final normalized = _normalizeDigits(input.trim()).replaceAll('٫', '.');
-    if (!_pattern.hasMatch(normalized)) return null;
-    return DecimalString._(_stripLeadingZeros(normalized));
+    final normalized = _normalizeRate(input.trim());
+    if (normalized == null || !_pattern.hasMatch(normalized)) return null;
+    return DecimalString._(normalized);
   }
 
   /// Server value, per API contract. null/missing -> null. Accepted: a JSON string, an int, or
@@ -47,7 +49,7 @@ class DecimalString {
       throw const InvalidServerResponseException(
           message: 'استجابة الخادم غير صالحة (قيمة عشرية بصيغة غير مقبولة)');
     }
-    return DecimalString._(_stripLeadingZeros(text));
+    return DecimalString._(text);
   }
 
   /// Text form. Wire encoding (string vs number) is decided ONLY by WireJson / ApiConfig.rateWireFormat.
@@ -63,16 +65,25 @@ class DecimalString {
   @override
   int get hashCode => value.hashCode;
 
-  /// "007.50" -> "7.50", "-00" -> "-0": text edit only, so the value is a valid JSON number literal.
-  static String _stripLeadingZeros(String s) {
-    final negative = s.startsWith('-');
-    var body = negative ? s.substring(1) : s;
-    final dot = body.indexOf('.');
-    var intPart = dot < 0 ? body : body.substring(0, dot);
-    final rest = dot < 0 ? '' : body.substring(dot);
-    intPart = intPart.replaceFirst(RegExp(r'^0+(?=\d)'), '');
-    body = '$intPart$rest';
-    return negative ? '-$body' : body;
+  /// ASCII digits for user input. Arabic-Indic and Persian digits map to 0-9.
+  static String normalizeDigits(String s) => _normalizeDigits(s);
+
+  /// One decimal mark among comma, Arabic decimal, and dot. Null when mixed,
+  /// repeated, or an exponent is present.
+  static String? _normalizeRate(String raw) {
+    if (raw.isEmpty) return null;
+    if (raw.contains('e') || raw.contains('E')) return null;
+    final text = _normalizeDigits(raw);
+    const marks = [',', '٫', '.'];
+    final used = <String>[];
+    for (final mark in marks) {
+      final count = mark.allMatches(text).length;
+      if (count > 1) return null;
+      if (count == 1) used.add(mark);
+    }
+    if (used.length > 1) return null;
+    if (used.isEmpty) return text;
+    return text.replaceAll(used.single, '.');
   }
 
   static String _normalizeDigits(String s) {

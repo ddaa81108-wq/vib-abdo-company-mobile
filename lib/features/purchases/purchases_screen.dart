@@ -21,7 +21,9 @@ class PurchasesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final permissions = permissionsOf(ref);
-    if (!permissions.canRead(SectionKey.purchases)) return const ForbiddenPane();
+    if (!permissions.canRead(SectionKey.purchases)) {
+      return const ForbiddenPane();
+    }
     final book = ref.watch(purchaseBookProvider);
     final page = ref.watch(purchasesProvider);
     final money = ref.watch(apiLayerProvider).money;
@@ -37,21 +39,28 @@ class PurchasesScreen extends ConsumerWidget {
         const SizedBox(height: AppSpacing.md),
         SegmentedButton<PurchaseBook>(
           segments: const [
-            ButtonSegment(value: PurchaseBook.alBayan, label: Text(AppStrings.alBayan)),
-            ButtonSegment(value: PurchaseBook.simsim, label: Text(AppStrings.simsim)),
+            ButtonSegment(
+              value: PurchaseBook.alBayan,
+              label: Text(AppStrings.alBayan),
+            ),
+            ButtonSegment(
+              value: PurchaseBook.simsim,
+              label: Text(AppStrings.simsim),
+            ),
           ],
           selected: {book},
           onSelectionChanged: (value) =>
               ref.read(purchaseBookProvider.notifier).state = value.first,
         ),
         const SizedBox(height: AppSpacing.md),
-        page.when(
-          loading: () => const SkeletonBox(key: Key('purchases-loading')),
-          error: (error, _) => ErrorPane(
-            message: ref.read(errorHandlerProvider).toFailure(error).message,
-            onRetry: () => ref.invalidate(purchasesProvider),
-          ),
-          data: (data) => Column(
+        KeptData<PurchasesBookPage>(
+          value: page,
+          resetKey: book,
+          onRetry: () => ref.invalidate(purchasesProvider),
+          messageOf: (error) =>
+              ref.read(errorHandlerProvider).toFailure(error).message,
+          loading: const SkeletonBox(key: Key('purchases-loading')),
+          builder: (data) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final day in data.page.items)
@@ -64,10 +73,25 @@ class PurchasesScreen extends ConsumerWidget {
                   book: book,
                 ),
               const SizedBox(height: AppSpacing.md),
-              Text(AppStrings.registerTotals, style: Theme.of(context).textTheme.titleSmall),
-              _LifetimeLine(AppStrings.resultFromServer, data.lifetimeTotals?.resultUnits, money),
-              _LifetimeLine(AppStrings.paid, data.lifetimeTotals?.paidUnits, money),
-              _LifetimeLine(AppStrings.remaining, data.lifetimeTotals?.remainingUnits, money),
+              Text(
+                AppStrings.registerTotals,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              _LifetimeLine(
+                AppStrings.resultFromServer,
+                data.lifetimeTotals?.resultUnits,
+                money,
+              ),
+              _LifetimeLine(
+                AppStrings.paid,
+                data.lifetimeTotals?.paidUnits,
+                money,
+              ),
+              _LifetimeLine(
+                AppStrings.remaining,
+                data.lifetimeTotals?.remainingUnits,
+                money,
+              ),
             ],
           ),
         ),
@@ -120,13 +144,20 @@ class _DayCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${AppStrings.todayTab} ${day.day}', style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              '${AppStrings.todayTab} ${day.day}',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
             Text(dayStatusLabel(day.status)),
             _line(AppStrings.previousDebt, day.previousDebtUnits, Currency.lyd),
             _line(AppStrings.todayResult, day.todayResultUnits, Currency.lyd),
             _line(AppStrings.todayPaid, day.todayPaidUnits, Currency.lyd),
             _line(AppStrings.totalDebt, day.totalDebtUnits, Currency.lyd),
-            _line(AppStrings.vodafoneRemaining, day.vodafoneRemainingUnits, Currency.egp),
+            _line(
+              AppStrings.vodafoneRemaining,
+              day.vodafoneRemainingUnits,
+              Currency.egp,
+            ),
             if (caption != null) Text(caption),
             if (canWrite && editable)
               GatedButton(
@@ -144,12 +175,19 @@ class _DayCard extends ConsumerWidget {
                 buttonKey: const Key('finalize-day'),
                 inputs: 'finalize:${day.day}:${day.version}',
                 expectedVersion: day.version,
-                online: online,
                 label: AppStrings.finalizeDay,
                 confirmText: AppStrings.finalizeConfirm,
                 onSubmit: (meta) => _finalize(context, ref, meta),
               ),
-            for (final entry in day.entries) _Entry(entry: entry, money: money),
+            for (final entry in day.entries)
+              _Entry(
+                entry: entry,
+                money: money,
+                book: book,
+                version: day.version,
+                canWrite: canWrite && editable,
+                online: online,
+              ),
           ],
         ),
       ),
@@ -165,9 +203,16 @@ class _DayCard extends ConsumerWidget {
     );
   }
 
-  Future<String?> _finalize(BuildContext context, WidgetRef ref, MutationMeta meta) async {
+  Future<String?> _finalize(
+    BuildContext context,
+    WidgetRef ref,
+    MutationMeta meta,
+  ) async {
     try {
-      final ack = await ref.read(apiLayerProvider).purchases.finalizeDay(book, meta);
+      final ack = await ref
+          .read(apiLayerProvider)
+          .purchases
+          .finalizeDay(book, meta);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -182,10 +227,11 @@ class _DayCard extends ConsumerWidget {
 }
 
 class _PurchaseForm extends ConsumerStatefulWidget {
-  const _PurchaseForm({required this.book, required this.version});
+  const _PurchaseForm({required this.book, required this.version, this.entry});
 
   final PurchaseBook book;
   final int? version;
+  final PurchaseEntryDto? entry;
 
   @override
   ConsumerState<_PurchaseForm> createState() => _PurchaseFormState();
@@ -213,6 +259,21 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
   @override
   void initState() {
     super.initState();
+    final entry = widget.entry;
+    if (entry != null) {
+      _itemCode = entry.itemCode;
+      final label = entry.itemLabel;
+      if (label != null && label != PurchaseItemCodes.customCaption) {
+        _customLabel.text = label;
+      }
+      if (entry.egpValueUnits != null) _egp.text = '${entry.egpValueUnits}';
+      if (entry.paidUnits != null) _paid.text = '${entry.paidUnits}';
+      if (entry.vodafoneConsumedUnits != null) {
+        _vodafone.text = '${entry.vodafoneConsumedUnits}';
+      }
+      if (entry.exchangeRate != null) _rate.text = entry.exchangeRate!.value;
+      if (entry.calculationMode != null) _mode = entry.calculationMode!;
+    }
     for (final controller in [_egp, _rate, _paid, _vodafone, _customLabel]) {
       controller.addListener(_changed);
     }
@@ -231,7 +292,6 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
 
   @override
   Widget build(BuildContext context) {
-    final online = ref.watch(onlineProvider);
     final custom = _itemCode == PurchaseItemCodes.custom;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -254,17 +314,26 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
           TextField(
             key: const Key('purchase-custom-label'),
             controller: _customLabel,
-            decoration: const InputDecoration(labelText: AppStrings.customItemName),
+            decoration: const InputDecoration(
+              labelText: AppStrings.customItemName,
+            ),
           ),
         UnitsField(controller: _egp, label: AppStrings.egpValue),
         DropdownButton<CalculationMode>(
           value: _mode,
           isExpanded: true,
           items: const [
-            DropdownMenuItem(value: CalculationMode.divide, child: Text(AppStrings.divide)),
-            DropdownMenuItem(value: CalculationMode.multiply, child: Text(AppStrings.multiply)),
+            DropdownMenuItem(
+              value: CalculationMode.divide,
+              child: Text(AppStrings.divide),
+            ),
+            DropdownMenuItem(
+              value: CalculationMode.multiply,
+              child: Text(AppStrings.multiply),
+            ),
           ],
-          onChanged: (value) => setState(() => _mode = value ?? CalculationMode.divide),
+          onChanged: (value) =>
+              setState(() => _mode = value ?? CalculationMode.divide),
         ),
         TextField(
           controller: _rate,
@@ -279,7 +348,6 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
               '$_itemCode|${_customLabel.text}|$_mode|${_egp.text}|${_rate.text}|${_paid.text}|${_vodafone.text}',
           expectedVersion: widget.version,
           label: AppStrings.save,
-          online: online,
           onSubmit: _submit,
         ),
       ],
@@ -288,32 +356,42 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
 
   Future<String?> _submit(MutationMeta meta) async {
     final code = _itemCode;
-    if (code == null || !PurchaseItemCodes.contains(code)) return AppStrings.chooseKind;
+    if (code == null || !PurchaseItemCodes.contains(code)) {
+      return AppStrings.chooseKind;
+    }
     final customLabel = _customLabel.text.trim();
     if (code == PurchaseItemCodes.custom &&
-        (customLabel.isEmpty || customLabel == PurchaseItemCodes.customCaption)) {
+        (customLabel.isEmpty ||
+            customLabel == PurchaseItemCodes.customCaption)) {
       return AppStrings.customItemRequired;
     }
     final value = parseUnits(_egp.text);
     final paidUnits = parseUnits(_paid.text);
-    final consumed = _vodafone.text.trim().isEmpty ? null : parseUnits(_vodafone.text);
+    final consumed = _vodafone.text.trim().isEmpty
+        ? null
+        : parseUnits(_vodafone.text);
     final exchange = DecimalString.tryParse(_rate.text);
-    if (value == null || paidUnits == null || exchange == null) return AppStrings.integerOnly;
-    if (_vodafone.text.trim().isNotEmpty && consumed == null) return AppStrings.integerOnly;
+    if (value == null || paidUnits == null || exchange == null) {
+      return AppStrings.integerOnly;
+    }
+    if (_vodafone.text.trim().isNotEmpty && consumed == null) {
+      return AppStrings.integerOnly;
+    }
+    final request = PurchaseEntryRequest(
+      itemCode: code,
+      itemLabel: code == PurchaseItemCodes.custom ? customLabel : null,
+      egpValueUnits: value,
+      calculationMode: _mode,
+      exchangeRate: exchange,
+      paidUnits: paidUnits,
+      vodafoneConsumedUnits: consumed,
+    );
     try {
-      final ack = await ref.read(apiLayerProvider).purchases.create(
-        widget.book,
-        PurchaseEntryRequest(
-          itemCode: code,
-          itemLabel: code == PurchaseItemCodes.custom ? customLabel : null,
-          egpValueUnits: value,
-          calculationMode: _mode,
-          exchangeRate: exchange,
-          paidUnits: paidUnits,
-          vodafoneConsumedUnits: consumed,
-        ),
-        meta,
-      );
+      final purchases = ref.read(apiLayerProvider).purchases;
+      final existing = widget.entry;
+      final ack = existing == null
+          ? await purchases.create(widget.book, request, meta)
+          : await purchases.update(widget.book, existing.id, request, meta);
       if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -327,29 +405,97 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
   }
 }
 
-class _Entry extends StatelessWidget {
-  const _Entry({required this.entry, required this.money});
+class _Entry extends ConsumerWidget {
+  const _Entry({
+    required this.entry,
+    required this.money,
+    required this.book,
+    required this.version,
+    required this.canWrite,
+    required this.online,
+  });
 
   final PurchaseEntryDto entry;
   final MoneyFormatter money;
+  final PurchaseBook book;
+  final int? version;
+  final bool canWrite;
+  final bool online;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsetsDirectional.only(top: AppSpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(entry.itemLabel ?? AppStrings.dash),
-          Text('${AppStrings.egpValue} ${money.formatOrDash(entry.egpValueUnits, Currency.egp)}'),
+          Text(
+            '${AppStrings.egpValue} ${money.formatOrDash(entry.egpValueUnits, Currency.egp)}',
+          ),
           Text(
             '${calculationLabel(entry.calculationMode)} ${entry.exchangeRate == null ? AppStrings.dash : money.formatDecimal(entry.exchangeRate!)}',
           ),
-          Text('${AppStrings.resultFromServer} ${money.formatOrDash(entry.resultUnits, Currency.lyd)}'),
-          Text('${AppStrings.paid} ${money.formatOrDash(entry.paidUnits, Currency.lyd)}'),
-          Text('${AppStrings.remaining} ${money.formatOrDash(entry.remainingUnits, Currency.lyd)}'),
+          Text(
+            '${AppStrings.resultFromServer} ${money.formatOrDash(entry.resultUnits, Currency.lyd)}',
+          ),
+          Text(
+            '${AppStrings.paid} ${money.formatOrDash(entry.paidUnits, Currency.lyd)}',
+          ),
+          Text(
+            '${AppStrings.remaining} ${money.formatOrDash(entry.remainingUnits, Currency.lyd)}',
+          ),
+          if (canWrite)
+            Wrap(
+              spacing: AppSpacing.sm,
+              children: [
+                GatedButton(
+                  buttonKey: Key('edit-${entry.id}'),
+                  allowed: true,
+                  online: online,
+                  filled: false,
+                  label: AppStrings.edit,
+                  onPressed: () => showAppForm<void>(
+                    context,
+                    _PurchaseForm(book: book, version: version, entry: entry),
+                  ),
+                ),
+                GuardedMutation(
+                  buttonKey: Key('delete-${entry.id}'),
+                  inputs: 'delete:${entry.id}:$version',
+                  expectedVersion: version,
+                  label: AppStrings.delete,
+                  filled: false,
+                  destructive: true,
+                  confirmText: AppStrings.confirmDelete,
+                  onSubmit: (meta) => _delete(context, ref, meta),
+                ),
+              ],
+            ),
         ],
       ),
     );
+  }
+
+  Future<String?> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    MutationMeta meta,
+  ) async {
+    try {
+      final ack = await ref
+          .read(apiLayerProvider)
+          .purchases
+          .delete(book, entry.id, meta);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+        );
+      }
+      ref.invalidate(purchasesProvider);
+      return null;
+    } catch (error) {
+      return ref.read(errorHandlerProvider).toFailure(error).message;
+    }
   }
 }

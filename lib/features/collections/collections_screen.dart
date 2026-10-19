@@ -21,7 +21,9 @@ class CollectionsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final permissions = permissionsOf(ref);
-    if (!permissions.canRead(SectionKey.collections)) return const ForbiddenPane();
+    if (!permissions.canRead(SectionKey.collections)) {
+      return const ForbiddenPane();
+    }
     final overview = ref.watch(collectionsProvider);
     final money = ref.watch(apiLayerProvider).money;
     final online = ref.watch(onlineProvider);
@@ -37,19 +39,23 @@ class CollectionsScreen extends ConsumerWidget {
       children: [
         const ScreenTitle('استلامات الديون'),
         const SizedBox(height: AppSpacing.md),
-        overview.when(
-          loading: () => const SkeletonBox(key: Key('collections-loading')),
-          error: (error, _) => ErrorPane(
-            message: ref.read(errorHandlerProvider).toFailure(error).message,
-            onRetry: () => ref.invalidate(collectionsProvider),
-          ),
-          data: (data) => Column(
+        KeptData<CollectionsOverviewDto>(
+          value: overview,
+          resetKey: 'collections',
+          onRetry: () => ref.invalidate(collectionsProvider),
+          messageOf: (error) =>
+              ref.read(errorHandlerProvider).toFailure(error).message,
+          loading: const SkeletonBox(key: Key('collections-loading')),
+          builder: (data) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (manage) _Metrics(data: data, money: money),
               if (manage && data.employeeTotals.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.md),
-                Text(AppStrings.employeeTotals, style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  AppStrings.employeeTotals,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
                 for (final row in data.employeeTotals)
                   ListTile(
                     title: Text(row.employeeName),
@@ -60,9 +66,16 @@ class CollectionsScreen extends ConsumerWidget {
               ],
               if (write) ...[
                 const SizedBox(height: AppSpacing.md),
-                Text(AppStrings.assignments, style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  AppStrings.assignments,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
                 for (final assignment in data.assignments)
-                  _Assignment(assignment: assignment, money: money, online: online),
+                  _Assignment(
+                    assignment: assignment,
+                    money: money,
+                    online: online,
+                  ),
                 GatedButton(
                   buttonKey: const Key('unlinked-collection'),
                   allowed: true,
@@ -81,7 +94,12 @@ class CollectionsScreen extends ConsumerWidget {
                   online: online,
                 ),
               for (final receipt in data.unlinkedReceipts)
-                _Unlinked(receipt: receipt, money: money, manage: manage, online: online),
+                _Unlinked(
+                  receipt: receipt,
+                  money: money,
+                  manage: manage,
+                  online: online,
+                ),
               if (close && data.batchId != null)
                 GuardedMutation(
                   buttonKey: const Key('close-batch'),
@@ -89,7 +107,6 @@ class CollectionsScreen extends ConsumerWidget {
                   label: AppStrings.closeBatch,
                   confirmText: AppStrings.closeBatchConfirm,
                   destructive: true,
-                  online: online,
                   onSubmit: (meta) => _close(context, ref, data.batchId!, meta),
                 ),
               if (write || payroll) const _PayrollBlock(),
@@ -104,12 +121,17 @@ class CollectionsScreen extends ConsumerWidget {
     return showAppForm<void>(context, const _UnlinkedForm());
   }
 
-  Future<String?> _close(BuildContext context, WidgetRef ref, String batchId, MutationMeta meta) async {
+  Future<String?> _close(
+    BuildContext context,
+    WidgetRef ref,
+    String batchId,
+    MutationMeta meta,
+  ) async {
     try {
-      final ack = await ref.read(apiLayerProvider).collections.closeDay(
-        batchId: batchId,
-        meta: meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .collections
+          .closeDay(batchId: batchId, meta: meta);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -162,12 +184,15 @@ class _UnlinkedFormState extends ConsumerState<_UnlinkedForm> {
           controller: _name,
           decoration: const InputDecoration(labelText: AppStrings.customerName),
         ),
-        UnitsField(key: const Key('unlinked-amount'), controller: _amount, label: AppStrings.amount),
+        UnitsField(
+          key: const Key('unlinked-amount'),
+          controller: _amount,
+          label: AppStrings.amount,
+        ),
         GuardedMutation(
           buttonKey: const Key('save-unlinked'),
           inputs: '${_name.text}|${_amount.text}',
           label: AppStrings.save,
-          online: ref.watch(onlineProvider),
           onSubmit: _submit,
         ),
       ],
@@ -176,13 +201,18 @@ class _UnlinkedFormState extends ConsumerState<_UnlinkedForm> {
 
   Future<String?> _submit(MutationMeta meta) async {
     final units = parseUnits(_amount.text);
-    if (units == null || _name.text.trim().isEmpty) return AppStrings.integerOnly;
+    if (units == null || _name.text.trim().isEmpty) {
+      return AppStrings.integerOnly;
+    }
     try {
-      final ack = await ref.read(apiLayerProvider).collections.createUnlinkedReceipt(
-        customerName: _name.text.trim(),
-        amountUnits: units,
-        meta: meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .collections
+          .createUnlinkedReceipt(
+            customerName: _name.text.trim(),
+            amountUnits: units,
+            meta: meta,
+          );
       if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -205,30 +235,46 @@ class _Metrics extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tiles = [
-      (AppStrings.collected, money.formatOrDash(data.collectedUnits, Currency.lyd)),
-      (AppStrings.assignments, data.assignedCount == null ? AppStrings.dash : '${data.assignedCount}'),
-      (AppStrings.dayTotal, money.formatOrDash(data.dayTotalUnits, Currency.lyd)),
-      (AppStrings.pendingCount, data.pendingCount == null ? AppStrings.dash : '${data.pendingCount}'),
-      (AppStrings.unlinkedCount, data.unlinkedPendingCount == null ? AppStrings.dash : '${data.unlinkedPendingCount}'),
-      (AppStrings.cashOutstanding, money.formatOrDash(data.cashOutstandingUnits, Currency.lyd)),
+      (
+        AppStrings.collected,
+        money.formatOrDash(data.collectedUnits, Currency.lyd),
+      ),
+      (
+        AppStrings.assignments,
+        data.assignedCount == null ? AppStrings.dash : '${data.assignedCount}',
+      ),
+      (
+        AppStrings.dayTotal,
+        money.formatOrDash(data.dayTotalUnits, Currency.lyd),
+      ),
+      (
+        AppStrings.pendingCount,
+        data.pendingCount == null ? AppStrings.dash : '${data.pendingCount}',
+      ),
+      (
+        AppStrings.unlinkedCount,
+        data.unlinkedPendingCount == null
+            ? AppStrings.dash
+            : '${data.unlinkedPendingCount}',
+      ),
+      (
+        AppStrings.cashOutstanding,
+        money.formatOrDash(data.cashOutstandingUnits, Currency.lyd),
+      ),
     ];
-    return Wrap(
-      spacing: AppSpacing.md,
-      runSpacing: AppSpacing.md,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final tile in tiles)
-          SizedBox(
-            width: 160,
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(tile.$1, style: Theme.of(context).textTheme.bodySmall),
-                    Text(tile.$2),
-                  ],
-                ),
+          Card(
+            child: Padding(
+              padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(tile.$1, style: Theme.of(context).textTheme.bodySmall),
+                  Text(tile.$2),
+                ],
               ),
             ),
           ),
@@ -238,7 +284,11 @@ class _Metrics extends StatelessWidget {
 }
 
 class _Assignment extends ConsumerWidget {
-  const _Assignment({required this.assignment, required this.money, required this.online});
+  const _Assignment({
+    required this.assignment,
+    required this.money,
+    required this.online,
+  });
 
   final CollectionAssignmentDto assignment;
   final MoneyFormatter money;
@@ -247,19 +297,29 @@ class _Assignment extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Card(
-      child: ListTile(
-        title: Text(assignment.customerName),
-        subtitle: Text(money.formatOrDash(assignment.balanceUnits, Currency.lyd)),
-        trailing: GatedButton(
-          buttonKey: Key('submit-${assignment.id}'),
-          allowed: true,
-          online: online,
-          label: AppStrings.submitReceipt,
-          onPressed: () => showAppForm<void>(
-            context,
-            _AssignmentForm(assignmentId: assignment.id),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            title: Text(assignment.customerName),
+            subtitle: Text(
+              money.formatOrDash(assignment.balanceUnits, Currency.lyd),
+            ),
           ),
-        ),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: GatedButton(
+              buttonKey: Key('submit-${assignment.id}'),
+              allowed: true,
+              online: online,
+              label: AppStrings.submitReceipt,
+              onPressed: () => showAppForm<void>(
+                context,
+                _AssignmentForm(assignmentId: assignment.id),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -308,7 +368,6 @@ class _AssignmentFormState extends ConsumerState<_AssignmentForm> {
           buttonKey: const Key('save-assignment'),
           inputs: '$_full|${_amount.text}',
           label: AppStrings.save,
-          online: ref.watch(onlineProvider),
           onSubmit: _submit,
         ),
       ],
@@ -319,12 +378,15 @@ class _AssignmentFormState extends ConsumerState<_AssignmentForm> {
     final units = _full ? null : parseUnits(_amount.text);
     if (!_full && units == null) return AppStrings.integerOnly;
     try {
-      final ack = await ref.read(apiLayerProvider).collections.submit(
-        widget.assignmentId,
-        mode: _full ? 'full' : 'partial',
-        amountUnits: units,
-        meta: meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .collections
+          .submit(
+            widget.assignmentId,
+            mode: _full ? 'full' : 'partial',
+            amountUnits: units,
+            meta: meta,
+          );
       if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -365,13 +427,21 @@ class _Submission extends ConsumerWidget {
           children: [
             Text(submission.submittedByName ?? AppStrings.dash),
             MoneyText(money.formatOrDash(submission.amountUnits, Currency.lyd)),
-            Text(submission.mode == 'full' ? AppStrings.modeFull : AppStrings.modePartial),
+            Text(
+              submission.mode == 'full'
+                  ? AppStrings.modeFull
+                  : AppStrings.modePartial,
+            ),
             Text(collectionStatusLabel(submission.status, unlinked: false)),
             if (awaiting)
               Text(
                 AppStrings.awaitingCash,
                 key: const Key('awaiting-cash'),
-                style: cairo(12, 800, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                style: cairo(
+                  12,
+                  800,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             if (manage && submission.status == 'pending')
               Wrap(
@@ -381,8 +451,8 @@ class _Submission extends ConsumerWidget {
                     inputs: 'approve:${submission.id}:${submission.version}',
                     expectedVersion: submission.version,
                     label: AppStrings.approve,
-                    online: online,
-                    onSubmit: (meta) => _decide(context, ref, CollectionDecision.approve, meta),
+                    onSubmit: (meta) =>
+                        _decide(context, ref, CollectionDecision.approve, meta),
                   ),
                   GuardedMutation(
                     buttonKey: Key('reject-${submission.id}'),
@@ -390,8 +460,8 @@ class _Submission extends ConsumerWidget {
                     expectedVersion: submission.version,
                     label: AppStrings.reject,
                     filled: false,
-                    online: online,
-                    onSubmit: (meta) => _decide(context, ref, CollectionDecision.reject, meta),
+                    onSubmit: (meta) =>
+                        _decide(context, ref, CollectionDecision.reject, meta),
                   ),
                 ],
               ),
@@ -401,7 +471,6 @@ class _Submission extends ConsumerWidget {
                 inputs: 'cash:${submission.id}:${submission.version}',
                 expectedVersion: submission.version,
                 label: AppStrings.cashReceived,
-                online: online,
                 onSubmit: (meta) => _cash(context, ref, meta),
               ),
           ],
@@ -417,11 +486,10 @@ class _Submission extends ConsumerWidget {
     MutationMeta meta,
   ) async {
     try {
-      final ack = await ref.read(apiLayerProvider).collections.decide(
-        submission.id,
-        decision,
-        meta: meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .collections
+          .decide(submission.id, decision, meta: meta);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -434,12 +502,16 @@ class _Submission extends ConsumerWidget {
     }
   }
 
-  Future<String?> _cash(BuildContext context, WidgetRef ref, MutationMeta meta) async {
+  Future<String?> _cash(
+    BuildContext context,
+    WidgetRef ref,
+    MutationMeta meta,
+  ) async {
     try {
-      final ack = await ref.read(apiLayerProvider).collections.markCashReceived(
-        submission.id,
-        meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .collections
+          .markCashReceived(submission.id, meta);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -501,8 +573,8 @@ class _Unlinked extends ConsumerWidget {
                     inputs: 'ulink:${receipt.id}:${receipt.version}',
                     expectedVersion: receipt.version,
                     label: AppStrings.approve,
-                    online: online,
-                    onSubmit: (meta) => _decide(context, ref, CollectionDecision.approve, meta),
+                    onSubmit: (meta) =>
+                        _decide(context, ref, CollectionDecision.approve, meta),
                   ),
                   GatedButton(
                     buttonKey: Key('unlinked-link-${receipt.id}'),
@@ -510,10 +582,8 @@ class _Unlinked extends ConsumerWidget {
                     online: online,
                     filled: false,
                     label: AppStrings.link,
-                    onPressed: () => showAppForm<void>(
-                      context,
-                      _LinkForm(receipt: receipt),
-                    ),
+                    onPressed: () =>
+                        showAppForm<void>(context, _LinkForm(receipt: receipt)),
                   ),
                 ],
               ),
@@ -530,11 +600,10 @@ class _Unlinked extends ConsumerWidget {
     MutationMeta meta,
   ) async {
     try {
-      final ack = await ref.read(apiLayerProvider).collections.decideUnlinked(
-        receipt.id,
-        decision: decision,
-        meta: meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .collections
+          .decideUnlinked(receipt.id, decision: decision, meta: meta);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -546,7 +615,6 @@ class _Unlinked extends ConsumerWidget {
       return ref.read(errorHandlerProvider).toFailure(error).message;
     }
   }
-
 }
 
 class _LinkForm extends ConsumerStatefulWidget {
@@ -588,7 +656,6 @@ class _LinkFormState extends ConsumerState<_LinkForm> {
           inputs: 'link:${widget.receipt.id}:${_customer.text}',
           expectedVersion: widget.receipt.version,
           label: AppStrings.link,
-          online: ref.watch(onlineProvider),
           onSubmit: _submit,
         ),
       ],
@@ -597,14 +664,17 @@ class _LinkFormState extends ConsumerState<_LinkForm> {
 
   Future<String?> _submit(MutationMeta meta) async {
     final customerId = _customer.text.trim();
-    if (customerId.isEmpty) return AppStrings.integerOnly;
+    if (customerId.isEmpty) return AppStrings.enterReference;
     try {
-      final ack = await ref.read(apiLayerProvider).collections.decideUnlinked(
-        widget.receipt.id,
-        decision: CollectionDecision.approve,
-        customerId: customerId,
-        meta: meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .collections
+          .decideUnlinked(
+            widget.receipt.id,
+            decision: CollectionDecision.approve,
+            customerId: customerId,
+            meta: meta,
+          );
       if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -631,7 +701,9 @@ class _PayrollBlock extends ConsumerWidget {
       children: [
         const SizedBox(height: AppSpacing.lg),
         Text(
-          permissions.canDo(ManagementAction.payrollManage) ? AppStrings.payroll : AppStrings.myPayroll,
+          permissions.canDo(ManagementAction.payrollManage)
+              ? AppStrings.payroll
+              : AppStrings.myPayroll,
           style: Theme.of(context).textTheme.titleSmall,
         ),
         payroll.when(
@@ -643,7 +715,8 @@ class _PayrollBlock extends ConsumerWidget {
           data: (data) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (data.period != null) Text('${AppStrings.period} ${data.period}'),
+              if (data.period != null)
+                Text('${AppStrings.period} ${data.period}'),
               for (final employee in data.employees)
                 ListTile(
                   title: Text(employee.name),

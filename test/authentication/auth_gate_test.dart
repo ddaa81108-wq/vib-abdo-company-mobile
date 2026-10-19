@@ -58,8 +58,23 @@ void main() {
     expect(authRedirect(session, '/change-password'), isNull);
   });
 
+  test('a forbidden section redirects home', () {
+    final permissions = PermissionService()
+      ..applyFromServer(const [
+        'collections.read',
+        'collections.write',
+      ], role: 'employee');
+    expect(permissionRedirect('/treasury', permissions), '/');
+    expect(permissionRedirect('/collections', permissions), isNull);
+    expect(permissionRedirect('/notifications', permissions), isNull);
+    expect(permissionRedirect('/settings', permissions), '/');
+  });
+
   test('signed-out users can read the signup notice', () {
-    expect(authRedirect(const SessionUnauthenticated(), '/signup-info'), isNull);
+    expect(
+      authRedirect(const SessionUnauthenticated(), '/signup-info'),
+      isNull,
+    );
   });
 
   test('session expiry notice uses the signed-out reason only', () {

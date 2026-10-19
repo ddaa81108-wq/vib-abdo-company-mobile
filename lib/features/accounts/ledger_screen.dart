@@ -30,133 +30,142 @@ class LedgerScreen extends ConsumerWidget {
     final card = ref.watch(accountCardProvider((section, id)));
     final money = ref.watch(apiLayerProvider).money;
     final online = ref.watch(onlineProvider);
-    // Writes stay hidden until the card has loaded and is not system-managed.
-    final loadedCard = card.asData?.value;
-    final canWrite = loadedCard != null &&
-        !loadedCard.systemManaged &&
-        permissions.canWrite(section.sectionKey);
-
-    if (card.hasError) {
-      return Scaffold(
-        key: Key('screen-ledger-${section.path}'),
-        body: ErrorPane(
-          message: ref.read(errorHandlerProvider).toFailure(card.error!).message,
-          onRetry: () {
-            ref.invalidate(accountCardProvider((section, id)));
-            ref.invalidate(ledgerProvider((section, id)));
-          },
-        ),
-      );
-    }
+    String messageOf(Object error) =>
+        ref.read(errorHandlerProvider).toFailure(error).message;
 
     return Scaffold(
       key: Key('screen-ledger-${section.path}'),
-      body: ledger.when(
-        loading: () => const SkeletonBox(key: Key('ledger-loading'), height: 240),
-        error: (error, _) => ErrorPane(
-          message: ref.read(errorHandlerProvider).toFailure(error).message,
-          onRetry: () => ref.invalidate(ledgerProvider((section, id))),
-        ),
-        data: (page) {
-          final showBalance = page.page.items.any((entry) => entry.balanceAfterUnits != null);
-          return ListView(
-            padding: pagePadding(MediaQuery.sizeOf(context).width),
-            children: [
-              Row(
+      body: KeptData<AccountCardDto>(
+        value: card,
+        resetKey: '${section.path}/$id',
+        expand: true,
+        onRetry: () {
+          ref.invalidate(accountCardProvider((section, id)));
+          ref.invalidate(ledgerProvider((section, id)));
+        },
+        messageOf: messageOf,
+        loading: const SkeletonBox(key: Key('ledger-loading'), height: 240),
+        builder: (loadedCard) {
+          // Writes stay hidden until the card has loaded and is not system-managed.
+          final canWrite =
+              !loadedCard.systemManaged &&
+              permissions.canWrite(section.sectionKey);
+          return KeptData<LedgerPage>(
+            value: ledger,
+            resetKey: '${section.path}/$id/ledger',
+            expand: true,
+            onRetry: () => ref.invalidate(ledgerProvider((section, id))),
+            messageOf: messageOf,
+            loading: const SkeletonBox(key: Key('ledger-loading'), height: 240),
+            builder: (page) {
+              final showBalance = page.page.items.any(
+                (entry) => entry.balanceAfterUnits != null,
+              );
+              return ListView(
+                padding: pagePadding(MediaQuery.sizeOf(context).width),
                 children: [
-                  IconButton(
-                    tooltip: AppStrings.back,
-                    onPressed: () => context.go('/${section.path}'),
-                    icon: const Icon(Icons.arrow_back),
+                  Row(
+                    children: [
+                      IconButton(
+                        tooltip: AppStrings.back,
+                        onPressed: () => context.go('/${section.path}'),
+                        icon: const Icon(Icons.arrow_back),
+                      ),
+                      Expanded(
+                        child: _Header(
+                          section: section,
+                          card: loadedCard,
+                          money: money,
+                        ),
+                      ),
+                    ],
                   ),
-                  Expanded(
-                    child: _Header(
+                  if (canWrite)
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      children: [
+                        GatedButton(
+                          buttonKey: const Key('add-debt'),
+                          allowed: true,
+                          online: online,
+                          label: section == AccountSection.libyanDeposits
+                              ? AppStrings.depositIn
+                              : section == AccountSection.egyptianDeposits
+                              ? AppStrings.egpIn
+                              : AppStrings.debtMovement,
+                          onPressed: () =>
+                              _movement(context, ref, type: 'debt'),
+                        ),
+                        GatedButton(
+                          buttonKey: const Key('add-payment'),
+                          allowed: true,
+                          online: online,
+                          label: section == AccountSection.libyanDeposits
+                              ? AppStrings.depositOut
+                              : section == AccountSection.egyptianDeposits
+                              ? AppStrings.egpOut
+                              : AppStrings.paymentMovement,
+                          onPressed: () =>
+                              _movement(context, ref, type: 'payment'),
+                        ),
+                        GuardedMutation(
+                          buttonKey: const Key('full-payment'),
+                          allowed:
+                              section != AccountSection.libyanDeposits &&
+                              section != AccountSection.egyptianDeposits,
+                          filled: false,
+                          inputs: 'full:${card.asData?.value.version}',
+                          expectedVersion: card.asData?.value.version,
+                          label: AppStrings.fullPayment,
+                          onSubmit: (meta) => _full(context, ref, meta),
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: AppSpacing.sm),
+                  const Text(AppStrings.noPreview),
+                  if (!showBalance)
+                    Text(
+                      AppStrings.statementHidden,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  const SizedBox(height: AppSpacing.md),
+                  if (page.page.items.isEmpty)
+                    const EmptyPane(message: AppStrings.emptyLedger)
+                  else
+                    for (final entry in page.page.items)
+                      _EntryTile(
+                        section: section,
+                        entry: entry,
+                        money: money,
+                        showBalance: showBalance,
+                        canWrite: canWrite,
+                        onCancel: (meta) => _cancel(context, ref, entry, meta),
+                      ),
+                  if (page.page.nextCursor != null)
+                    _LoadOlderLedger(
                       section: section,
-                      card: loadedCard,
+                      id: id,
+                      cursor: page.page.nextCursor!,
                       money: money,
+                      showBalance: showBalance,
+                      canWrite: canWrite,
+                      onCancel: (entry, meta) =>
+                          _cancel(context, ref, entry, meta),
                     ),
-                  ),
                 ],
-              ),
-              if (canWrite)
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  children: [
-                    GatedButton(
-                      buttonKey: const Key('add-debt'),
-                      allowed: true,
-                      online: online,
-                      label: section == AccountSection.libyanDeposits
-                          ? AppStrings.depositIn
-                          : section == AccountSection.egyptianDeposits
-                          ? AppStrings.egpIn
-                          : AppStrings.debtMovement,
-                      onPressed: () => _movement(context, ref, type: 'debt'),
-                    ),
-                    GatedButton(
-                      buttonKey: const Key('add-payment'),
-                      allowed: true,
-                      online: online,
-                      label: section == AccountSection.libyanDeposits
-                          ? AppStrings.depositOut
-                          : section == AccountSection.egyptianDeposits
-                          ? AppStrings.egpOut
-                          : AppStrings.paymentMovement,
-                      onPressed: () => _movement(context, ref, type: 'payment'),
-                    ),
-                    GuardedMutation(
-                      buttonKey: const Key('full-payment'),
-                      allowed: section != AccountSection.libyanDeposits &&
-                          section != AccountSection.egyptianDeposits,
-                      online: online,
-                      filled: false,
-                      inputs: 'full:${card.asData?.value.version}',
-                      expectedVersion: card.asData?.value.version,
-                      label: AppStrings.fullPayment,
-                      onSubmit: (meta) => _full(context, ref, meta),
-                    ),
-                  ],
-                ),
-              const SizedBox(height: AppSpacing.sm),
-              const Text(AppStrings.noPreview),
-              if (!showBalance)
-                Text(
-                  AppStrings.statementHidden,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              const SizedBox(height: AppSpacing.md),
-              if (page.page.items.isEmpty)
-                const EmptyPane(message: AppStrings.emptyLedger)
-              else
-                for (final entry in page.page.items)
-                  _EntryTile(
-                    section: section,
-                    entry: entry,
-                    money: money,
-                    showBalance: showBalance,
-                    canWrite: canWrite,
-                    online: online,
-                    onCancel: (meta) => _cancel(context, ref, entry, meta),
-                  ),
-              if (page.page.nextCursor != null)
-                _LoadOlderLedger(
-                  section: section,
-                  id: id,
-                  cursor: page.page.nextCursor!,
-                  money: money,
-                  showBalance: showBalance,
-                  canWrite: canWrite,
-                  online: online,
-                  onCancel: (entry, meta) => _cancel(context, ref, entry, meta),
-                ),
-            ],
+              );
+            },
           );
         },
       ),
     );
   }
 
-  Future<void> _movement(BuildContext context, WidgetRef ref, {required String type}) async {
+  Future<void> _movement(
+    BuildContext context,
+    WidgetRef ref, {
+    required String type,
+  }) async {
     final saved = await showAppForm<bool>(
       context,
       _MovementForm(section: section, id: id, type: type),
@@ -168,14 +177,21 @@ class LedgerScreen extends ConsumerWidget {
     }
   }
 
-  Future<String?> _full(BuildContext context, WidgetRef ref, MutationMeta meta) async {
+  Future<String?> _full(
+    BuildContext context,
+    WidgetRef ref,
+    MutationMeta meta,
+  ) async {
     try {
-      final ack = await ref.read(apiLayerProvider).accounts.addTransaction(
-        section,
-        id,
-        AccountTransactionRequest.fullPayment(date: DateTime.now()),
-        meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .accounts
+          .addTransaction(
+            section,
+            id,
+            AccountTransactionRequest.fullPayment(date: DateTime.now()),
+            meta,
+          );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -196,12 +212,10 @@ class LedgerScreen extends ConsumerWidget {
     MutationMeta meta,
   ) async {
     try {
-      final ack = await ref.read(apiLayerProvider).accounts.cancelTransaction(
-        section,
-        id,
-        entry.id,
-        meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .accounts
+          .cancelTransaction(section, id, entry.id, meta);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -220,7 +234,11 @@ class LedgerScreen extends ConsumerWidget {
 }
 
 class _MovementForm extends ConsumerStatefulWidget {
-  const _MovementForm({required this.section, required this.id, required this.type});
+  const _MovementForm({
+    required this.section,
+    required this.id,
+    required this.type,
+  });
 
   final AccountSection section;
   final String id;
@@ -234,7 +252,9 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
   final _amount = TextEditingController();
   final _factor = TextEditingController();
   final _note = TextEditingController();
-  late final TextEditingController _date = TextEditingController(text: formatIsoDate(DateTime.now()));
+  late final TextEditingController _date = TextEditingController(
+    text: formatIsoDate(DateTime.now()),
+  );
   var _mode = CalculationMode.direct;
 
   @override
@@ -262,7 +282,9 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          widget.type == 'payment' ? AppStrings.paymentMovement : AppStrings.debtMovement,
+          widget.type == 'payment'
+              ? AppStrings.paymentMovement
+              : AppStrings.debtMovement,
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const Text(AppStrings.noPreview),
@@ -277,11 +299,21 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
           value: _mode,
           isExpanded: true,
           items: const [
-            DropdownMenuItem(value: CalculationMode.direct, child: Text(AppStrings.direct)),
-            DropdownMenuItem(value: CalculationMode.divide, child: Text(AppStrings.divide)),
-            DropdownMenuItem(value: CalculationMode.multiply, child: Text(AppStrings.multiply)),
+            DropdownMenuItem(
+              value: CalculationMode.direct,
+              child: Text(AppStrings.direct),
+            ),
+            DropdownMenuItem(
+              value: CalculationMode.divide,
+              child: Text(AppStrings.divide),
+            ),
+            DropdownMenuItem(
+              value: CalculationMode.multiply,
+              child: Text(AppStrings.multiply),
+            ),
           ],
-          onChanged: (value) => setState(() => _mode = value ?? CalculationMode.direct),
+          onChanged: (value) =>
+              setState(() => _mode = value ?? CalculationMode.direct),
         ),
         if (_mode != CalculationMode.direct)
           TextField(
@@ -301,10 +333,14 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
         const SizedBox(height: AppSpacing.md),
         GuardedMutation(
           buttonKey: const Key('save-movement'),
-          inputs: '${widget.type}|$_mode|${_amount.text}|${_factor.text}|${_date.text}|${_note.text}',
-          expectedVersion: ref.watch(accountCardProvider((widget.section, widget.id))).asData?.value.version,
+          inputs:
+              '${widget.type}|$_mode|${_amount.text}|${_factor.text}|${_date.text}|${_note.text}',
+          expectedVersion: ref
+              .watch(accountCardProvider((widget.section, widget.id)))
+              .asData
+              ?.value
+              .version,
           label: AppStrings.save,
-          online: ref.watch(onlineProvider),
           onSubmit: _submit,
         ),
       ],
@@ -337,12 +373,10 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
             note: _note.text.trim().isEmpty ? null : _note.text.trim(),
           );
     try {
-      final ack = await ref.read(apiLayerProvider).accounts.addTransaction(
-        widget.section,
-        widget.id,
-        request,
-        meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .accounts
+          .addTransaction(widget.section, widget.id, request, meta);
       if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -356,7 +390,11 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.section, required this.card, required this.money});
+  const _Header({
+    required this.section,
+    required this.card,
+    required this.money,
+  });
 
   final AccountSection section;
   final AccountCardDto? card;
@@ -380,7 +418,9 @@ class _Header extends StatelessWidget {
         MoneyText(
           money.formatOrDash(value.balanceUnits, value.currency),
           style: context.textExtras.amountLarge.copyWith(
-            color: visual.colored ? null : Theme.of(context).colorScheme.onSurface,
+            color: visual.colored
+                ? null
+                : Theme.of(context).colorScheme.onSurface,
           ),
         ),
         if (visual.label != null) Text(visual.label!),
@@ -402,7 +442,6 @@ class _LoadOlderLedger extends ConsumerStatefulWidget {
     required this.money,
     required this.showBalance,
     required this.canWrite,
-    required this.online,
     required this.onCancel,
   });
 
@@ -412,8 +451,8 @@ class _LoadOlderLedger extends ConsumerStatefulWidget {
   final MoneyFormatter money;
   final bool showBalance;
   final bool canWrite;
-  final bool online;
-  final Future<String?> Function(LedgerEntryDto entry, MutationMeta meta) onCancel;
+  final Future<String?> Function(LedgerEntryDto entry, MutationMeta meta)
+  onCancel;
 
   @override
   ConsumerState<_LoadOlderLedger> createState() => _LoadOlderLedgerState();
@@ -422,6 +461,7 @@ class _LoadOlderLedger extends ConsumerStatefulWidget {
 class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
   final _extra = <LedgerEntryDto>[];
   String? _cursor;
+  String? _error;
   var _busy = false;
 
   @override
@@ -433,21 +473,27 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
   Future<void> _load() async {
     final cursor = _cursor;
     if (cursor == null || _busy) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
-      final page = await ref.read(apiLayerProvider).accounts.ledger(
-        widget.section,
-        widget.id,
-        before: cursor,
-      );
+      final page = await ref
+          .read(apiLayerProvider)
+          .accounts
+          .ledger(widget.section, widget.id, before: cursor);
       if (!mounted) return;
       setState(() {
         _extra.addAll(page.page.items);
         _cursor = page.page.nextCursor;
         _busy = false;
       });
-    } catch (_) {
-      if (mounted) setState(() => _busy = false);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = ref.read(errorHandlerProvider).toFailure(error).message;
+      });
     }
   }
 
@@ -462,9 +508,9 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
             money: widget.money,
             showBalance: widget.showBalance,
             canWrite: widget.canWrite,
-            online: widget.online,
             onCancel: (meta) => widget.onCancel(entry, meta),
           ),
+        if (_error != null) Text(_error!, key: const Key('load-older-error')),
         if (_cursor != null)
           TextButton(
             key: const Key('load-older'),
@@ -475,7 +521,9 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text(AppStrings.loadOlder),
+                : Text(
+                    _error == null ? AppStrings.loadOlder : AppStrings.retry,
+                  ),
           ),
       ],
     );
@@ -489,7 +537,6 @@ class _EntryTile extends StatelessWidget {
     required this.money,
     required this.showBalance,
     required this.canWrite,
-    required this.online,
     required this.onCancel,
   });
 
@@ -498,7 +545,6 @@ class _EntryTile extends StatelessWidget {
   final MoneyFormatter money;
   final bool showBalance;
   final bool canWrite;
-  final bool online;
   final Future<String?> Function(MutationMeta meta) onCancel;
 
   @override
@@ -509,17 +555,26 @@ class _EntryTile extends StatelessWidget {
       decoration: reversed ? TextDecoration.lineThrough : null,
     );
     return Card(
-      color: reversed ? Theme.of(context).colorScheme.surfaceContainerHighest : null,
+      color: reversed
+          ? Theme.of(context).colorScheme.surfaceContainerHighest
+          : null,
       margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
       child: Padding(
         padding: const EdgeInsetsDirectional.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${entry.sequence}', style: style),
+            Text(
+              entry.sequence == null ? AppStrings.dash : '${entry.sequence}',
+              style: style,
+            ),
             Text(formatIsoDate(entry.date), style: style),
             Text(
-              movementLabel(section: section, type: entry.type, paymentMode: entry.paymentMode),
+              movementLabel(
+                section: section,
+                type: entry.type,
+                paymentMode: entry.paymentMode,
+              ),
               style: style,
             ),
             MoneyText(
@@ -537,7 +592,11 @@ class _EntryTile extends StatelessWidget {
             if (entry.note != null) Text(entry.note!, style: style),
             if (entry.createdByName != null)
               Text('${AppStrings.actor}: ${entry.createdByName}', style: style),
-            if (reversed) Text(AppStrings.reversed, style: Theme.of(context).textTheme.labelLarge),
+            if (reversed)
+              Text(
+                AppStrings.reversed,
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
             if (entry.corrected) const Text(AppStrings.corrected),
             if (showBalance && entry.balanceAfterUnits != null)
               Text(
@@ -548,7 +607,6 @@ class _EntryTile extends StatelessWidget {
                 buttonKey: Key('cancel-${entry.id}'),
                 inputs: 'cancel:${entry.id}:${entry.version}',
                 expectedVersion: entry.version,
-                online: online,
                 filled: false,
                 label: AppStrings.cancelMovement,
                 confirmText: AppStrings.confirmCancel,

@@ -23,7 +23,9 @@ void main() {
     expect(badgeLabel(140), '99');
   });
 
-  testWidgets('login is RTL and does not offer an external account', (tester) async {
+  testWidgets('login is RTL and does not offer an external account', (
+    tester,
+  ) async {
     await pumpFakeApp(tester);
     expectRtl(tester);
     expect(find.byKey(LoginScreen.screenKey), findsOneWidget);
@@ -32,7 +34,9 @@ void main() {
     expect(find.byKey(const Key('signup-link')), findsOneWidget);
   });
 
-  testWidgets('home keeps shortcuts when the summary request fails', (tester) async {
+  testWidgets('home keeps shortcuts when the summary request fails', (
+    tester,
+  ) async {
     await pumpFakeApp(
       tester,
       overrides: [
@@ -46,32 +50,38 @@ void main() {
     expect(find.text(AppStrings.homeError), findsOneWidget);
     expect(find.byKey(HomeDashboard.retryKey), findsOneWidget);
     expect(find.text(AppStrings.retry), findsOneWidget);
-    expect(find.byKey(HomeShell.sectionKey(SectionKey.collections)), findsOneWidget);
+    expect(
+      find.byKey(HomeShell.sectionKey(SectionKey.collections)),
+      findsOneWidget,
+    );
     expect(find.byKey(HomeShell.sectionKey(SectionKey.treasury)), findsNothing);
   });
 
-  testWidgets('a phone keeps five tabs and opens the menu from the start edge', (
+  testWidgets(
+    'a phone keeps five tabs and opens the menu from the start edge',
+    (tester) async {
+      await pumpFakeApp(tester, size: const Size(360, 800));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+
+      expectRtl(tester);
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(NavigationRail), findsNothing);
+      final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+      expect(bar.destinations, hasLength(5));
+      expect(find.text(AppStrings.more), findsOneWidget);
+      expect(find.text(AppStrings.settings), findsNothing);
+
+      await tester.tap(find.byKey(HomeShell.menuKey));
+      await settle(tester);
+      final drawer = tester.getRect(find.byType(Drawer));
+      expect(drawer.right, moreOrLessEquals(360, epsilon: 1));
+      expect(find.text(AppStrings.settings), findsOneWidget);
+    },
+  );
+
+  testWidgets('a wide window uses the side list instead of a bottom bar', (
     tester,
   ) async {
-    await pumpFakeApp(tester, size: const Size(360, 800));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-
-    expectRtl(tester);
-    expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.byType(NavigationRail), findsNothing);
-    final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-    expect(bar.destinations, hasLength(5));
-    expect(find.text(AppStrings.more), findsOneWidget);
-    expect(find.text(AppStrings.settings), findsNothing);
-
-    await tester.tap(find.byKey(HomeShell.menuKey));
-    await settle(tester);
-    final drawer = tester.getRect(find.byType(Drawer));
-    expect(drawer.right, moreOrLessEquals(360, epsilon: 1));
-    expect(find.text(AppStrings.settings), findsOneWidget);
-  });
-
-  testWidgets('a wide window uses the side list instead of a bottom bar', (tester) async {
     await pumpFakeApp(tester, size: const Size(1100, 900));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
 
@@ -107,7 +117,10 @@ void main() {
     for (final entry in screens.entries) {
       await go(tester, entry.key);
       expectRtl(tester);
-      expect(Theme.of(tester.element(find.byType(HomeShell))).brightness, Brightness.dark);
+      expect(
+        Theme.of(tester.element(find.byType(HomeShell))).brightness,
+        Brightness.dark,
+      );
       expect(find.byKey(entry.value), findsOneWidget);
     }
 
@@ -170,7 +183,8 @@ void main() {
       '/settings',
     ]) {
       await go(tester, path);
-      expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
+      expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+      expect(find.byKey(ForbiddenPane.paneKey), findsNothing);
     }
 
     expect(find.byKey(const Key('cash-in')), findsNothing);
@@ -190,10 +204,12 @@ void main() {
     await pumpFakeApp(tester, size: const Size(800, 1600));
     await signIn(tester, username: 'guest.demo', password: 'demo-only');
     await go(tester, '/treasury');
-    expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
+    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenPane.paneKey), findsNothing);
     expect(find.byKey(const Key('cash-in')), findsNothing);
     await go(tester, '/collections');
-    expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
+    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenPane.paneKey), findsNothing);
     expect(find.byKey(const Key('submit-as_1')), findsNothing);
   });
 }

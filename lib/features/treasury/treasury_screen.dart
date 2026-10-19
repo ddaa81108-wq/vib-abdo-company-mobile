@@ -35,13 +35,18 @@ class TreasuryScreen extends ConsumerWidget {
       children: [
         const ScreenTitle(AppStrings.treasury),
         const SizedBox(height: AppSpacing.md),
-        summary.when(
-          loading: () => const SkeletonBox(key: Key('treasury-loading'), height: 180),
-          error: (error, _) => ErrorPane(
-            message: ref.read(errorHandlerProvider).toFailure(error).message,
-            onRetry: () => ref.invalidate(treasuryProvider),
+        KeptData<TreasurySummaryDto>(
+          value: summary,
+          resetKey: 'treasury',
+          onRetry: () => ref.invalidate(treasuryProvider),
+          messageOf: (error) =>
+              ref.read(errorHandlerProvider).toFailure(error).message,
+          loading: const SkeletonBox(key: Key('treasury-loading'), height: 180),
+          builder: (data) => _Cards(
+            data: data,
+            money: money,
+            wide: width > AppBreakpoints.phone,
           ),
-          data: (data) => _Cards(data: data, money: money, wide: width > AppBreakpoints.phone),
         ),
         if (canWrite)
           Wrap(
@@ -65,15 +70,17 @@ class TreasuryScreen extends ConsumerWidget {
             ],
           ),
         const SizedBox(height: AppSpacing.lg),
-        ledger.when(
-          loading: () => const SkeletonBox(height: 80),
-          error: (error, _) => ErrorPane(
-            message: ref.read(errorHandlerProvider).toFailure(error).message,
-            onRetry: () => ref.invalidate(cashLedgerProvider),
-          ),
-          data: (page) => Column(
+        KeptData<Paged<CashEntryDto>>(
+          value: ledger,
+          resetKey: 'cash',
+          onRetry: () => ref.invalidate(cashLedgerProvider),
+          messageOf: (error) =>
+              ref.read(errorHandlerProvider).toFailure(error).message,
+          loading: const SkeletonBox(height: 80),
+          builder: (page) => Column(
             children: [
-              for (final entry in page.items) _CashRow(entry: entry, money: money),
+              for (final entry in page.items)
+                _CashRow(entry: entry, money: money),
               if (page.nextCursor != null)
                 _LoadOlderCash(cursor: page.nextCursor!, seed: page.items),
             ],
@@ -83,7 +90,11 @@ class TreasuryScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _entry(BuildContext context, WidgetRef ref, CashDirection direction) {
+  Future<void> _entry(
+    BuildContext context,
+    WidgetRef ref,
+    CashDirection direction,
+  ) {
     final version = ref.read(treasuryProvider).asData?.value.version;
     return showAppForm<void>(
       context,
@@ -129,7 +140,11 @@ class _CashFormState extends ConsumerState<_CashForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(widget.direction == CashDirection.cashIn ? AppStrings.cashIn : AppStrings.cashOut),
+        Text(
+          widget.direction == CashDirection.cashIn
+              ? AppStrings.cashIn
+              : AppStrings.cashOut,
+        ),
         UnitsField(controller: _amount, label: AppStrings.amount),
         TextField(
           controller: _note,
@@ -140,7 +155,8 @@ class _CashFormState extends ConsumerState<_CashForm> {
           inputs: '${widget.direction.name}|${_amount.text}|${_note.text}',
           expectedVersion: widget.version,
           label: AppStrings.save,
-          online: ref.watch(onlineProvider),
+          confirmText: AppStrings.confirm,
+          normalizedValue: parseUnits(_amount.text)?.toString(),
           onSubmit: _submit,
         ),
       ],
@@ -151,14 +167,17 @@ class _CashFormState extends ConsumerState<_CashForm> {
     final units = parseUnits(_amount.text);
     if (units == null) return AppStrings.integerOnly;
     try {
-      final ack = await ref.read(apiLayerProvider).treasury.addCashEntry(
-        CashEntryRequest(
-          direction: widget.direction,
-          amountUnits: units,
-          description: _note.text.trim(),
-        ),
-        meta,
-      );
+      final ack = await ref
+          .read(apiLayerProvider)
+          .treasury
+          .addCashEntry(
+            CashEntryRequest(
+              direction: widget.direction,
+              amountUnits: units,
+              description: _note.text.trim(),
+            ),
+            meta,
+          );
       if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -196,8 +215,18 @@ class _Cards extends StatelessWidget {
       emphasize: true,
     );
     final rest = [
-      _tile(context, AppStrings.receivables, money.formatOrDash(data.receivablesUnits, Currency.lyd), AppStrings.ourDebts),
-      _tile(context, AppStrings.liabilities, money.formatOrDash(data.liabilitiesUnits, Currency.lyd), AppStrings.owedDebts),
+      _tile(
+        context,
+        AppStrings.receivables,
+        money.formatOrDash(data.receivablesUnits, Currency.lyd),
+        AppStrings.ourDebts,
+      ),
+      _tile(
+        context,
+        AppStrings.liabilities,
+        money.formatOrDash(data.liabilitiesUnits, Currency.lyd),
+        AppStrings.owedDebts,
+      ),
       _tile(
         context,
         AppStrings.activeCash,
@@ -213,7 +242,11 @@ class _Cards extends StatelessWidget {
         children: [
           net,
           const SizedBox(height: AppSpacing.md),
-          Wrap(spacing: AppSpacing.md, runSpacing: AppSpacing.md, children: rest),
+          Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.md,
+            children: rest,
+          ),
         ],
       );
     }
@@ -236,7 +269,9 @@ class _Cards extends StatelessWidget {
     return SizedBox(
       width: emphasize ? double.infinity : 220,
       child: Card(
-        key: title == AppStrings.activeCash ? const Key('active-cash-card') : null,
+        key: title == AppStrings.activeCash
+            ? const Key('active-cash-card')
+            : null,
         color: background,
         child: Padding(
           padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
@@ -244,8 +279,14 @@ class _Cards extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title, style: cairo(13, 700, color: foreground)),
-              MoneyText(value, style: context.textExtras.amountLarge.copyWith(color: foreground)),
-              if (caption != null) Text(caption, style: cairo(11, 500, color: foreground)),
+              MoneyText(
+                value,
+                style: context.textExtras.amountLarge.copyWith(
+                  color: foreground,
+                ),
+              ),
+              if (caption != null)
+                Text(caption, style: cairo(11, 500, color: foreground)),
             ],
           ),
         ),
@@ -273,9 +314,15 @@ class _Egyptian extends StatelessWidget {
             children: [
               const Text(AppStrings.egyptianTransfers),
               if (missing) const Text(AppStrings.rateMissing),
-              Text('${AppStrings.egyptianSource} ${missing ? AppStrings.dash : money.formatOrDash(data.egyptianSourceUnits, Currency.egp)}'),
-              Text('${AppStrings.rate} ${money.formatDecimalOrDash(data.egyptianRate)}'),
-              Text('${AppStrings.converted} ${missing ? AppStrings.dash : money.formatOrDash(data.egyptianConvertedUnits, Currency.lyd)}'),
+              Text(
+                '${AppStrings.egyptianSource} ${missing ? AppStrings.dash : money.formatOrDash(data.egyptianSourceUnits, Currency.egp)}',
+              ),
+              Text(
+                '${AppStrings.rate} ${money.formatDecimalOrDash(data.egyptianRate)}',
+              ),
+              Text(
+                '${AppStrings.converted} ${missing ? AppStrings.dash : money.formatOrDash(data.egyptianConvertedUnits, Currency.lyd)}',
+              ),
             ],
           ),
         ),
@@ -297,6 +344,7 @@ class _LoadOlderCash extends ConsumerStatefulWidget {
 class _LoadOlderCashState extends ConsumerState<_LoadOlderCash> {
   final _extra = <CashEntryDto>[];
   String? _cursor;
+  String? _error;
   var _busy = false;
 
   @override
@@ -308,17 +356,27 @@ class _LoadOlderCashState extends ConsumerState<_LoadOlderCash> {
   Future<void> _load() async {
     final cursor = _cursor;
     if (cursor == null || _busy) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
-      final page = await ref.read(apiLayerProvider).treasury.cashLedger(before: cursor);
+      final page = await ref
+          .read(apiLayerProvider)
+          .treasury
+          .cashLedger(before: cursor);
       if (!mounted) return;
       setState(() {
         _extra.addAll(page.items);
         _cursor = page.nextCursor;
         _busy = false;
       });
-    } catch (_) {
-      if (mounted) setState(() => _busy = false);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = ref.read(errorHandlerProvider).toFailure(error).message;
+      });
     }
   }
 
@@ -328,6 +386,7 @@ class _LoadOlderCashState extends ConsumerState<_LoadOlderCash> {
     return Column(
       children: [
         for (final entry in _extra) _CashRow(entry: entry, money: money),
+        if (_error != null) Text(_error!, key: const Key('load-older-error')),
         if (_cursor != null)
           TextButton(
             key: const Key('load-older'),
@@ -338,7 +397,9 @@ class _LoadOlderCashState extends ConsumerState<_LoadOlderCash> {
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text(AppStrings.loadOlder),
+                : Text(
+                    _error == null ? AppStrings.loadOlder : AppStrings.retry,
+                  ),
           ),
       ],
     );
@@ -354,7 +415,9 @@ class _CashRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final incoming = entry.direction == 'in';
-    final color = incoming ? context.statusColors.cashPositive : context.statusColors.cashNegative;
+    final color = incoming
+        ? context.statusColors.cashPositive
+        : context.statusColors.cashNegative;
     return Card(
       margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
       child: ListTile(
@@ -371,7 +434,9 @@ class _CashRow extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             MoneyText(money.formatOrDash(entry.amountUnits, Currency.lyd)),
-            MoneyText(money.formatOrDash(entry.balanceAfterUnits, Currency.lyd)),
+            MoneyText(
+              money.formatOrDash(entry.balanceAfterUnits, Currency.lyd),
+            ),
           ],
         ),
       ),

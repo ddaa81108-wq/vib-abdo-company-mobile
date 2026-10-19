@@ -30,6 +30,28 @@ IconData sectionIcon(SectionKey section) => switch (section) {
 
 String sectionPath(SectionKey section) => '/${section.key}';
 
+/// Route for a notification. Card sections open the entity when an id is present.
+String? notificationPath(String? section, String? entityId) {
+  if (section == null || section.isEmpty) return null;
+  SectionKey? match;
+  for (final key in SectionKey.values) {
+    if (key.key == section || key.name == section) {
+      match = key;
+      break;
+    }
+  }
+  if (match == null) return null;
+  final root = sectionPath(match);
+  final id = entityId?.trim();
+  final opensCard =
+      match == SectionKey.customers ||
+      match == SectionKey.companies ||
+      match == SectionKey.libyanDeposits ||
+      match == SectionKey.egyptianDeposits;
+  if (opensCard && id != null && id.isNotEmpty) return '$root/$id';
+  return root;
+}
+
 /// Label for a management action the permission service already allowed.
 String actionLabel(ManagementAction action) => switch (action) {
   ManagementAction.collectionsAssign => 'إسناد استلام',

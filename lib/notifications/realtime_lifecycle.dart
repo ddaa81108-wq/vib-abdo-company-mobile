@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_providers.dart';
 import '../error_handling/error_handler.dart';
 import '../state/notification_providers.dart';
+import '../state/section_providers.dart';
 import '../state/session_providers.dart';
 
 /// Starts realtime delivery while a session is open and the app is in front.
@@ -63,6 +64,8 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
         // Signal only. Counts and cards are whatever the next fetch returns.
         ref.invalidate(unreadCountProvider);
         ref.invalidate(homeDashboardProvider);
+        ref.invalidate(collectionsProvider);
+        ref.invalidate(ledgerProvider);
       });
       _pushes = layer.push.messages.listen((_) {
         ref.invalidate(unreadCountProvider);

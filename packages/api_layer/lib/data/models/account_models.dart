@@ -168,7 +168,9 @@ class LedgerEntryDto {
   });
 
   final String id;
-  final int sequence;
+
+  /// Absent on the wire stays null. The UI shows a dash; it does not invent 0.
+  final int? sequence;
   final String type; // debt | payment (deposits: in/out wording in UI)
   final String
       status; // posted | draft | finalized | reversed | corrected | deleted
@@ -192,7 +194,7 @@ class LedgerEntryDto {
 
   factory LedgerEntryDto.fromJson(Json j) => LedgerEntryDto(
         id: str(j['id']),
-        sequence: intOrNull(j['sequence']) ?? 0,
+        sequence: intOrNull(j['sequence']),
         type: str(j['type']),
         status: str(j['status']),
         date: dateOrNull(j['date']),

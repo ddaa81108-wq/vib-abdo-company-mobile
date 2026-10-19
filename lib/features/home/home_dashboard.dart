@@ -46,57 +46,74 @@ class HomeDashboard extends ConsumerWidget {
         key: screenKey,
         padding: pagePadding(width),
         children: [
-          if (dashboard.hasError)
-            ErrorPane(
-              message: AppStrings.homeError,
-              onRetry: online
-                  ? () {
-                      ref.invalidate(homeDashboardProvider);
-                    }
-                  : null,
-              retryKey: retryKey,
-            )
-          else if (dashboard.isLoading)
-            const SkeletonBox(key: HomeShell.homeLoadingKey, height: 88)
-          else if (dashboard.asData?.value case final home?) ...[
-            if (home.businessDate != null)
-              Text(home.businessDate!, key: const Key('home-business-date')),
-            const SizedBox(height: AppSpacing.md),
-            Text(AppStrings.homeCardsTitle, style: theme.textTheme.titleMedium),
-            const SizedBox(height: AppSpacing.md),
-            if (_visibleCards(home, permissions).isEmpty && (home.oldDebts == null))
-              const Text(AppStrings.noSummaries)
-            else
-              LayoutBuilder(
-                builder: (context, constraints) => _SummaryGrid(
-                  cards: _visibleCards(home, permissions),
-                  money: money,
-                  width: constraints.maxWidth,
-                  columns: AppBreakpoints.cardColumns(width),
-                ),
-              ),
-            if (home.oldDebts != null &&
-                (permissions.canRead(SectionKey.customers) ||
-                    permissions.canRead(SectionKey.companies))) ...[
-              const SizedBox(height: AppSpacing.lg),
-              Text(AppStrings.oldDebtsTitle, style: theme.textTheme.titleSmall),
-              const SizedBox(height: AppSpacing.sm),
-              if (_visibleDebts(home, permissions).isEmpty)
-                const Text(AppStrings.emptyTicker)
-              else ...[
-                for (final debt in _visibleDebts(home, permissions))
-                  _DebtRow(debt: debt, money: money),
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: TextButton(
-                    key: const Key('show-all-home'),
-                    onPressed: () => context.go('/customers'),
-                    child: const Text(AppStrings.showAll),
+          KeptData<HomeDto?>(
+            value: dashboard,
+            resetKey: 'home',
+            retryKey: retryKey,
+            onRetry: online
+                ? () => ref.invalidate(homeDashboardProvider)
+                : null,
+            messageOf: (_) => AppStrings.homeError,
+            loading: const SkeletonBox(
+              key: HomeShell.homeLoadingKey,
+              height: 88,
+            ),
+            builder: (home) {
+              if (home == null) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (home.businessDate != null)
+                    Text(
+                      home.businessDate!,
+                      key: const Key('home-business-date'),
+                    ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    AppStrings.homeCardsTitle,
+                    style: theme.textTheme.titleMedium,
                   ),
-                ),
-              ],
-            ],
-          ],
+                  const SizedBox(height: AppSpacing.md),
+                  if (_visibleCards(home, permissions).isEmpty &&
+                      (home.oldDebts == null))
+                    const Text(AppStrings.noSummaries)
+                  else
+                    LayoutBuilder(
+                      builder: (context, constraints) => _SummaryGrid(
+                        cards: _visibleCards(home, permissions),
+                        money: money,
+                        width: constraints.maxWidth,
+                        columns: AppBreakpoints.cardColumns(width),
+                      ),
+                    ),
+                  if (home.oldDebts != null &&
+                      (permissions.canRead(SectionKey.customers) ||
+                          permissions.canRead(SectionKey.companies))) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      AppStrings.oldDebtsTitle,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    if (_visibleDebts(home, permissions).isEmpty)
+                      const Text(AppStrings.emptyTicker)
+                    else ...[
+                      for (final debt in _visibleDebts(home, permissions))
+                        _DebtRow(debt: debt, money: money),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: TextButton(
+                          key: const Key('show-all-home'),
+                          onPressed: () => context.go('/customers'),
+                          child: const Text(AppStrings.showAll),
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              );
+            },
+          ),
           const SizedBox(height: AppSpacing.xl),
           if (summary.actions.isNotEmpty) ...[
             Text(AppStrings.actionsTitle, style: theme.textTheme.titleMedium),
@@ -108,7 +125,9 @@ class HomeDashboard extends ConsumerWidget {
                 for (final action in summary.actions)
                   TextButton(
                     key: HomeShell.actionKey(action),
-                    onPressed: online ? () => context.go(actionPath(action)) : null,
+                    onPressed: online
+                        ? () => context.go(actionPath(action))
+                        : null,
                     child: Text(actionLabel(action)),
                   ),
               ],
@@ -129,9 +148,12 @@ class HomeDashboard extends ConsumerWidget {
           else
             LayoutBuilder(
               builder: (context, constraints) {
-                final columns = AppBreakpoints.cardColumns(constraints.maxWidth);
+                final columns = AppBreakpoints.cardColumns(
+                  constraints.maxWidth,
+                );
                 final tileWidth =
-                    ((constraints.maxWidth - AppSpacing.md * (columns - 1)) / columns)
+                    ((constraints.maxWidth - AppSpacing.md * (columns - 1)) /
+                            columns)
                         .clamp(96.0, constraints.maxWidth);
                 return Wrap(
                   spacing: AppSpacing.md,
@@ -151,7 +173,10 @@ class HomeDashboard extends ConsumerWidget {
     );
   }
 
-  List<HomeSummaryDto> _visibleCards(HomeDto home, PermissionService permissions) {
+  List<HomeSummaryDto> _visibleCards(
+    HomeDto home,
+    PermissionService permissions,
+  ) {
     return [
       for (final card in home.summaries)
         if (sectionIsReadable(card.section, permissions)) card,
@@ -171,25 +196,35 @@ class HomeDashboard extends ConsumerWidget {
     HomeSummary summary,
     bool online,
   ) {
+    final writable = summary.writableSections.contains(section);
     return Card(
       margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-      child: ListTile(
-        key: HomeShell.sectionKey(section),
-        visualDensity: VisualDensity.compact,
-        leading: Icon(sectionIcon(section)),
-        title: Text(sectionLabel(section)),
-        onTap: () => context.go(sectionPath(section)),
-        trailing: summary.writableSections.contains(section)
-            ? TextButton(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            key: HomeShell.sectionKey(section),
+            visualDensity: VisualDensity.compact,
+            leading: Icon(sectionIcon(section)),
+            title: Text(sectionLabel(section)),
+            onTap: () => context.go(sectionPath(section)),
+          ),
+          if (writable)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
                 key: HomeShell.writeKey(section),
                 style: TextButton.styleFrom(
                   minimumSize: const Size(48, 48),
                   tapTargetSize: MaterialTapTargetSize.padded,
                 ),
-                onPressed: online ? () => context.go(sectionPath(section)) : null,
+                onPressed: online
+                    ? () => context.go(sectionPath(section))
+                    : null,
                 child: Text(_writeLabel(section)),
-              )
-            : null,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -197,7 +232,8 @@ class HomeDashboard extends ConsumerWidget {
   String _writeLabel(SectionKey section) => switch (section) {
     SectionKey.customers => AppStrings.addCustomer,
     SectionKey.companies => AppStrings.addCompany,
-    SectionKey.libyanDeposits || SectionKey.egyptianDeposits => AppStrings.addDeposit,
+    SectionKey.libyanDeposits ||
+    SectionKey.egyptianDeposits => AppStrings.addDeposit,
     SectionKey.collections => AppStrings.submitReceipt,
     SectionKey.purchases => AppStrings.add,
     SectionKey.treasury => AppStrings.cashIn,
@@ -227,7 +263,10 @@ class _SummaryGrid extends StatelessWidget {
       children: [
         for (final card in cards)
           SizedBox(
-            width: ((width - AppSpacing.md * (columns - 1)) / columns).clamp(96, width),
+            width: ((width - AppSpacing.md * (columns - 1)) / columns).clamp(
+              96,
+              width,
+            ),
             child: _SummaryCard(card: card, money: money),
           ),
       ],
@@ -244,9 +283,9 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tone = toneColor(context.statusColors, card.tone);
-    final value = card.currency == null
-        ? AppStrings.dash
-        : money.formatOrDash(card.valueUnits, card.currency!);
+    final value = card.currency != null
+        ? money.formatOrDash(card.valueUnits, card.currency!)
+        : (card.valueUnits == null ? AppStrings.dash : '${card.valueUnits}');
     final status = reportStatusLabel(card.status);
     return Card(
       key: HomeShell.summaryKey(card.key),
@@ -257,7 +296,10 @@ class _SummaryCard extends StatelessWidget {
           children: [
             Text(card.title, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: AppSpacing.sm),
-            MoneyText(value, style: context.textExtras.amountLarge.copyWith(color: tone)),
+            MoneyText(
+              value,
+              style: context.textExtras.amountLarge.copyWith(color: tone),
+            ),
             if (status != null) ...[
               const SizedBox(height: AppSpacing.sm),
               ReportStatusChip(status: card.status),

@@ -21,7 +21,9 @@ class SubmissionLock {
   bool busy = false;
 
   MutationMeta metaFor(String inputs) {
-    if (_meta == null || _inputs != inputs || _meta!.expectedVersion != expectedVersion) {
+    if (_meta == null ||
+        _inputs != inputs ||
+        _meta!.expectedVersion != expectedVersion) {
       _meta = MutationMeta(expectedVersion: expectedVersion);
       _inputs = inputs;
     }
@@ -47,11 +49,11 @@ class GuardedMutation extends ConsumerStatefulWidget {
     super.key,
     this.expectedVersion,
     this.buttonKey,
-    required this.online,
     this.allowed = true,
     this.filled = true,
     this.destructive = false,
     this.confirmText,
+    this.normalizedValue,
     this.icon,
     this.tooltip,
   });
@@ -65,11 +67,13 @@ class GuardedMutation extends ConsumerStatefulWidget {
   final Future<String?> Function(MutationMeta meta) onSubmit;
   final String label;
   final Key? buttonKey;
-  final bool online;
   final bool allowed;
   final bool filled;
   final bool destructive;
   final String? confirmText;
+
+  /// Normalized amount or rate shown in the confirm dialog, when one is used.
+  final String? normalizedValue;
   final IconData? icon;
   final String? tooltip;
 
@@ -83,11 +87,12 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
 
   @override
   Widget build(BuildContext context) {
+    final online = ref.watch(onlineProvider);
     final button = widget.icon == null
         ? GatedButton(
             buttonKey: widget.buttonKey,
             allowed: widget.allowed,
-            online: widget.online,
+            online: online,
             busy: _lock.busy,
             filled: widget.filled,
             destructive: widget.destructive,
@@ -98,7 +103,7 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
         ? IconButton(
             key: widget.buttonKey,
             tooltip: widget.tooltip ?? widget.label,
-            onPressed: widget.online && !_lock.busy ? _run : null,
+            onPressed: online && !_lock.busy ? _run : null,
             icon: _lock.busy
                 ? const SizedBox(
                     width: 18,
@@ -112,8 +117,7 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         button,
-        if (_error != null)
-          Text(_error!, key: const Key('mutation-error')),
+        if (_error != null) Text(_error!, key: const Key('mutation-error')),
       ],
     );
   }
@@ -137,7 +141,9 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
       }
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = ref.read(errorHandlerProvider).toFailure(error).message);
+      setState(
+        () => _error = ref.read(errorHandlerProvider).toFailure(error).message,
+      );
     } finally {
       if (accepted) _lock.succeed();
       if (mounted) setState(() => _lock.busy = false);
@@ -160,13 +166,25 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
               child: Consumer(
                 builder: (dialogContext, dialogRef, _) {
                   final online = dialogRef.watch(onlineProvider);
+                  final preview = widget.normalizedValue;
                   return AlertDialog(
-                    content: Text(widget.confirmText!),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.confirmText!),
+                        if (preview != null && preview.isNotEmpty)
+                          Text(preview, key: const Key('normalized-value')),
+                      ],
+                    ),
                     actions: [
                       TextButton(
                         onPressed: sending
                             ? null
-                            : () => Navigator.pop(dialogContext, const _DialogResult.cancel()),
+                            : () => Navigator.pop(
+                                dialogContext,
+                                const _DialogResult.cancel(),
+                              ),
                         child: const Text(AppStrings.cancel),
                       ),
                       FilledButton(
@@ -201,7 +219,9 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Text(AppStrings.confirm),
                       ),
