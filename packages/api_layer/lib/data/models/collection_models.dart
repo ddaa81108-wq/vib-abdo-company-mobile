@@ -157,6 +157,10 @@ class CollectionsOverviewDto {
     required this.employeeTotals,
     this.collectedUnits,
     this.dayTotalUnits,
+    this.assignedCount,
+    this.pendingCount,
+    this.unlinkedPendingCount,
+    this.cashOutstandingUnits,
     this.batchId,
     this.raw = const {},
   });
@@ -168,6 +172,10 @@ class CollectionsOverviewDto {
 
   /// REQUIRED FROM SERVER (contract §12): web client sums the PDF day total locally.
   final int? dayTotalUnits;
+  final int? assignedCount;
+  final int? pendingCount;
+  final int? unlinkedPendingCount;
+  final int? cashOutstandingUnits;
   final String? batchId;
   final Json raw;
 
@@ -192,6 +200,10 @@ class CollectionsOverviewDto {
       collectedUnits: unitsOrNull(metrics['collectedUnits']),
       dayTotalUnits:
           unitsOrNull(metrics['dayTotalUnits'] ?? d['dayTotalUnits']),
+      assignedCount: intOrNull(metrics['assignedCount']),
+      pendingCount: intOrNull(metrics['pendingCount']),
+      unlinkedPendingCount: intOrNull(metrics['unlinkedPendingCount']),
+      cashOutstandingUnits: unitsOrNull(metrics['cashOutstandingUnits']),
       batchId: strOrNull(d['batchId'] ?? asJson(d['batch'])['id']),
       raw: d,
     );

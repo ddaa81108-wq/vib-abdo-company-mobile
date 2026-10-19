@@ -14,9 +14,14 @@ String? authRedirect(SessionState session, String location) {
       return atSplash ? null : '/splash';
     case SessionUnauthenticated():
     case SessionOtpRequired():
-      return atLogin ? null : '/login';
-    case SessionAuthenticated():
-      return (atSplash || atLogin) ? '/' : null;
+      if (atLogin || location == '/signup-info') return null;
+      return '/login';
+    case SessionAuthenticated(:final profile):
+      if (profile.mustChangePassword) {
+        return location == '/change-password' ? null : '/change-password';
+      }
+      if (atSplash || atLogin || location == '/change-password') return '/';
+      return null;
   }
 }
 

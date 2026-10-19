@@ -1,224 +1,471 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../api/api_providers.dart';
 import '../../models/home_summary.dart';
 import '../../notifications/unread_badge.dart';
 import '../../state/notification_providers.dart';
 import '../../state/session_providers.dart';
+import '../../state/theme_controller.dart';
 import '../../ui/section_labels.dart';
 import '../../ui/strings.dart';
+import '../../ui/theme.dart';
+import '../../ui/tokens.dart';
+import '../../ui/widgets/common.dart';
 
-class HomeShell extends ConsumerWidget {
-  const HomeShell({super.key});
+class NavItem {
+  const NavItem({required this.id, required this.label, required this.icon, required this.path});
+
+  final String id;
+  final String label;
+  final IconData icon;
+  final String path;
+}
+
+class HomeShell extends ConsumerStatefulWidget {
+  const HomeShell({required this.child, required this.location, super.key});
+
+  final Widget child;
+  final String location;
 
   static const shellKey = Key('home-shell');
   static const logoutKey = Key('logout-button');
   static const roleKey = Key('role-label');
   static const homeLoadingKey = Key('home-loading');
+  static const menuKey = Key('open-menu');
 
   static Key sectionKey(SectionKey section) => Key('section-${section.key}');
   static Key writeKey(SectionKey section) => Key('write-${section.key}');
-  static Key actionKey(ManagementAction action) =>
-      Key('action-${action.proposedCode}');
+  static Key actionKey(ManagementAction action) => Key('action-${action.proposedCode}');
   static Key summaryKey(String cardKey) => Key('summary-$cardKey');
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends ConsumerState<HomeShell> {
+  var _collapsed = false;
+  int? _seenUnread;
+
+  @override
+  Widget build(BuildContext context) {
     final summary = ref.watch(homeSummaryProvider);
     final unread = ref.watch(unreadCountProvider);
-    final dashboard = ref.watch(homeDashboardProvider);
-    final theme = Theme.of(context);
+    final online = ref.watch(onlineProvider);
+    final width = MediaQuery.sizeOf(context).width;
+    final phone = AppBreakpoints.isPhone(width);
+    final rail = AppBreakpoints.isRail(width);
+    final panel = AppBreakpoints.isPanel(width);
+    final dark = ref.watch(themeModeProvider) == ThemeMode.dark;
+
+    ref.listen<AsyncValue<int?>>(unreadCountProvider, (previous, next) {
+      final count = next.asData?.value;
+      if (count == null) return;
+      final seen = _seenUnread;
+      _seenUnread = count;
+      if (seen != null && count > seen && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: Duration(seconds: 8),
+            content: Text(AppStrings.notifications),
+          ),
+        );
+      }
+    });
 
     if (summary == null) {
-      return const Scaffold(body: Center(child: Text(AppStrings.loading)));
+      return const Scaffold(
+        key: HomeShell.shellKey,
+        body: Center(child: Text(AppStrings.loading)),
+      );
     }
 
-    final permissions = ref.watch(apiLayerProvider).permissions;
-    final money = ref.watch(apiLayerProvider).money;
+    final permissions = permissionsOf(ref);
+    final items = _items(summary, permissions);
+    final selected = _selectedIndex(items, widget.location);
+    final showIdentityHere = phone;
 
     return Scaffold(
-      key: shellKey,
+      key: HomeShell.shellKey,
+      drawer: phone
+          ? Drawer(
+              child: _NavList(
+                items: items,
+                selected: selected,
+                summary: summary,
+                showIdentity: false,
+                dark: dark,
+                onSelect: (item) {
+                  Navigator.of(context).pop();
+                  context.go(item.path);
+                },
+              ),
+            )
+          : null,
       appBar: AppBar(
-        title: const Text(AppStrings.homeTitle),
+        leading: phone
+            ? Builder(
+                builder: (barContext) => IconButton(
+                  key: HomeShell.menuKey,
+                  tooltip: AppStrings.menu,
+                  onPressed: () => Scaffold.of(barContext).openDrawer(),
+                  icon: const Icon(Icons.menu),
+                ),
+              )
+            : panel
+            ? IconButton(
+                tooltip: _collapsed ? AppStrings.showSidebar : AppStrings.hideSidebar,
+                onPressed: () => setState(() => _collapsed = !_collapsed),
+                icon: Icon(_collapsed ? Icons.menu_open : Icons.menu),
+              )
+            : const SizedBox.shrink(),
+        title: Text(_title(widget.location)),
         actions: [
-          UnreadBadge(count: unread.asData?.value),
           IconButton(
-            key: logoutKey,
+            tooltip: AppStrings.search,
+            onPressed: () => context.go('/search'),
+            icon: const Icon(Icons.search),
+          ),
+          Icon(
+            Icons.circle,
+            size: 10,
+            color: online ? context.appColors.success : Theme.of(context).colorScheme.error,
+          ),
+          UnreadBadge(
+            count: unread.asData?.value,
+            onPressed: () => context.go('/notifications'),
+          ),
+          IconButton(
+            key: HomeShell.logoutKey,
             tooltip: AppStrings.logout,
             onPressed: () => ref.read(sessionStateProvider.notifier).logout(),
             icon: const Icon(Icons.logout),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(AppStrings.signedInAs, style: theme.textTheme.labelLarge),
-            const SizedBox(height: 4),
-            Text(
-              summary.displayName,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(roleLabel(summary.role), key: roleKey),
-            if (summary.mustChangePassword) ...[
-              const SizedBox(height: 16),
-              const _PasswordChangeBanner(),
-            ],
-            const SizedBox(height: 28),
-            if (dashboard.isLoading)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 16),
-                child: Center(
-                  child: CircularProgressIndicator(key: homeLoadingKey),
-                ),
-              )
-            else if (dashboard.asData?.value case final home?) ...[
-              ..._serverCards(home, permissions, money, theme),
-            ],
-            if (summary.actions.isNotEmpty) ...[
-              Text(AppStrings.actionsTitle, style: theme.textTheme.titleMedium),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final action in summary.actions)
-                    TextButton(
-                      key: actionKey(action),
-                      onPressed: () {},
-                      child: Text(actionLabel(action)),
+      body: Column(
+        children: [
+          ConnectionBanner(online: online),
+          Expanded(
+            child: Row(
+              children: [
+                if (panel && !_collapsed)
+                  SizedBox(
+                    width: width >= AppBreakpoints.wide ? 300 : 260,
+                    child: _NavList(
+                      items: items,
+                      selected: selected,
+                      summary: summary,
+                      showIdentity: true,
+                      dark: dark,
+                      onSelect: (item) => context.go(item.path),
                     ),
-                ],
-              ),
-              const SizedBox(height: 28),
-            ],
-            Text(AppStrings.sectionsTitle, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              AppStrings.sectionsHint,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (summary.sections.isEmpty)
-              const Text(AppStrings.noSections)
-            else
-              for (final section in summary.sections)
-                Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    key: sectionKey(section),
-                    title: Text(sectionLabel(section)),
-                    subtitle: const Text(AppStrings.comingSoon),
-                    trailing: summary.writableSections.contains(section)
-                        ? TextButton(
-                            key: writeKey(section),
-                            onPressed: () {},
-                            child: const Text(AppStrings.writeAction),
-                          )
-                        : null,
+                  )
+                else if (rail)
+                  _Rail(
+                    items: items,
+                    selected: selected,
+                    summary: summary,
+                    dark: dark,
+                    onSelect: (item) => context.go(item.path),
+                  ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      if (showIdentityHere) IdentityBlock(summary: summary),
+                      Expanded(child: widget.child),
+                    ],
                   ),
                 ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: phone ? _BottomBar(items: items, location: widget.location) : null,
+    );
+  }
+
+  List<NavItem> _items(HomeSummary summary, PermissionService permissions) {
+    return [
+      const NavItem(
+        id: 'home',
+        label: AppStrings.homeTitle,
+        icon: Icons.home_outlined,
+        path: '/',
+      ),
+      for (final section in summary.sections)
+        NavItem(
+          id: section.key,
+          label: sectionLabel(section),
+          icon: sectionIcon(section),
+          path: sectionPath(section),
+        ),
+      if (permissions.canDo(ManagementAction.settingsManage))
+        const NavItem(
+          id: 'settings',
+          label: AppStrings.settings,
+          icon: Icons.settings_outlined,
+          path: '/settings',
+        ),
+      const NavItem(
+        id: 'account',
+        label: AppStrings.myAccount,
+        icon: Icons.manage_accounts_outlined,
+        path: '/account',
+      ),
+    ];
+  }
+
+  int _selectedIndex(List<NavItem> items, String location) {
+    for (var i = 0; i < items.length; i++) {
+      if (_matches(items[i].path, location)) return i;
+    }
+    return 0;
+  }
+
+  String _title(String location) {
+    if (location == '/' || location.isEmpty) return AppStrings.homeTitle;
+    if (location.startsWith('/notifications')) return AppStrings.notifications;
+    if (location.startsWith('/settings')) return AppStrings.settings;
+    if (location.startsWith('/account')) return AppStrings.myAccount;
+    if (location.startsWith('/search')) return AppStrings.search;
+    for (final section in SectionKey.values) {
+      if (location.startsWith('/${section.key}')) return sectionLabel(section);
+    }
+    return AppStrings.appTitle;
+  }
+}
+
+bool _matches(String path, String location) {
+  if (path == '/') return location == '/';
+  return location == path || location.startsWith('$path/');
+}
+
+class IdentityBlock extends StatelessWidget {
+  const IdentityBlock({required this.summary, super.key});
+
+  final HomeSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(AppStrings.signedInAs, style: theme.textTheme.labelLarge),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            summary.displayName,
+            style: theme.textTheme.titleMedium,
+          ),
+          Text(roleLabel(summary.role), key: HomeShell.roleKey),
+        ],
+      ),
+    );
+  }
+}
+
+class _Rail extends ConsumerWidget {
+  const _Rail({
+    required this.items,
+    required this.selected,
+    required this.summary,
+    required this.dark,
+    required this.onSelect,
+  });
+
+  final List<NavItem> items;
+  final int selected;
+  final HomeSummary summary;
+  final bool dark;
+  final ValueChanged<NavItem> onSelect;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = context.sidebarPalette;
+    final rail = NavigationRail(
+      extended: MediaQuery.sizeOf(context).width >= 720,
+      minExtendedWidth: 220,
+      selectedIndex: selected,
+      onDestinationSelected: (index) => onSelect(items[index]),
+      leading: Theme(
+        data: Theme.of(context).copyWith(
+          textTheme: Theme.of(context).textTheme.apply(
+            bodyColor: palette.shine,
+            displayColor: palette.shine,
+          ),
+        ),
+        child: IdentityBlock(summary: summary),
+      ),
+      trailing: IconButton(
+        tooltip: dark ? AppStrings.themeLight : AppStrings.themeDark,
+        onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
+        icon: Icon(dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+      ),
+      destinations: [
+        for (final item in items)
+          NavigationRailDestination(
+            icon: Icon(item.icon),
+            label: Text(item.label),
+          ),
+      ],
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: IntrinsicHeight(child: rail),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _NavList extends ConsumerWidget {
+  const _NavList({
+    required this.items,
+    required this.selected,
+    required this.summary,
+    required this.showIdentity,
+    required this.dark,
+    required this.onSelect,
+  });
+
+  final List<NavItem> items;
+  final int selected;
+  final HomeSummary summary;
+  final bool showIdentity;
+  final bool dark;
+  final ValueChanged<NavItem> onSelect;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = context.sidebarPalette;
+    final colors = context.appColors;
+    return Material(
+      color: colors.sidebarBg,
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsetsDirectional.symmetric(vertical: AppSpacing.md),
+          children: [
+            Padding(
+              padding: const EdgeInsetsDirectional.symmetric(horizontal: AppSpacing.lg),
+              child: Text(
+                AppStrings.brandWord,
+                style: cairo(20, 800, color: palette.base),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsetsDirectional.symmetric(horizontal: AppSpacing.lg),
+              child: Text(
+                AppStrings.organization,
+                style: cairo(12, 600, color: colors.sidebarMuted),
+              ),
+            ),
+            if (showIdentity)
+              Theme(
+                data: Theme.of(context).copyWith(
+                  textTheme: Theme.of(context).textTheme.apply(
+                    bodyColor: palette.shine,
+                    displayColor: palette.shine,
+                  ),
+                ),
+                child: IdentityBlock(summary: summary),
+              ),
+            const SizedBox(height: AppSpacing.md),
+            for (var i = 0; i < items.length; i++)
+              ListTile(
+                selected: i == selected,
+                selectedTileColor: palette.glowSoft,
+                iconColor: i == selected ? palette.bright : colors.sidebarMuted,
+                textColor: i == selected ? palette.bright : palette.shine,
+                leading: Icon(items[i].icon),
+                title: Text(items[i].label),
+                onTap: () => onSelect(items[i]),
+              ),
+            ListTile(
+              leading: Icon(
+                dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                color: palette.shine,
+              ),
+              title: Text(
+                dark ? AppStrings.themeLight : AppStrings.themeDark,
+                style: cairo(13, 600, color: palette.shine),
+              ),
+              onTap: () => ref.read(themeModeProvider.notifier).toggle(),
+            ),
           ],
         ),
       ),
     );
   }
-
-  List<Widget> _serverCards(
-    HomeDto home,
-    PermissionService permissions,
-    MoneyFormatter money,
-    ThemeData theme,
-  ) {
-    final cards = [
-      for (final card in home.summaries)
-        if (sectionIsReadable(card.section, permissions)) card,
-    ];
-    final debts = [
-      for (final debt in home.oldDebts ?? const <OldDebtDto>[])
-        if (sectionIsReadable(debt.section, permissions)) debt,
-    ];
-    if (cards.isEmpty && debts.isEmpty && home.businessDate == null) {
-      return const [];
-    }
-    return [
-      Text(AppStrings.homeCardsTitle, style: theme.textTheme.titleMedium),
-      if (home.businessDate != null) ...[
-        const SizedBox(height: 4),
-        Text(home.businessDate!, key: const Key('home-business-date')),
-      ],
-      const SizedBox(height: 8),
-      for (final card in cards)
-        Card(
-          key: summaryKey(card.key),
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            title: Text(card.title),
-            subtitle: Text(_cardDetail(card, money)),
-          ),
-        ),
-      if (debts.isNotEmpty) ...[
-        const SizedBox(height: 8),
-        Text(AppStrings.oldDebtsTitle, style: theme.textTheme.titleSmall),
-        const SizedBox(height: 8),
-        for (final debt in debts)
-          Card(
-            key: Key('old-debt-${debt.id}'),
-            margin: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              title: Text(debt.name),
-              subtitle: Text(_debtDetail(debt, money)),
-            ),
-          ),
-      ],
-      const SizedBox(height: 20),
-    ];
-  }
-
-  String _cardDetail(HomeSummaryDto card, MoneyFormatter money) {
-    final lines = <String>[
-      if (card.currency != null)
-        money.formatOrDash(card.valueUnits, card.currency!),
-      if (card.status != null) card.status!,
-      if (card.note != null) card.note!,
-    ];
-    return lines.isEmpty ? '—' : lines.join('\n');
-  }
-
-  String _debtDetail(OldDebtDto debt, MoneyFormatter money) {
-    final lines = <String>[
-      if (debt.currency != null)
-        money.formatOrDash(debt.balanceUnits, debt.currency!),
-      if (debt.ageStatusLabel != null) debt.ageStatusLabel!,
-    ];
-    return lines.isEmpty ? '—' : lines.join('\n');
-  }
 }
 
-class _PasswordChangeBanner extends StatelessWidget {
-  const _PasswordChangeBanner();
+class _BottomBar extends StatelessWidget {
+  const _BottomBar({required this.items, required this.location});
+
+  final List<NavItem> items;
+  final String location;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Padding(
-        padding: EdgeInsets.all(12),
-        child: Text(AppStrings.passwordChangeRequired),
-      ),
+    final sections = items.where((item) => item.id != 'home' && item.id != 'settings' && item.id != 'account');
+    final head = sections.take(3).toList();
+    final rest = sections.skip(3).toList();
+    final tail = items.where((item) => item.id == 'settings' || item.id == 'account').toList();
+    final tabs = [
+      items.firstWhere((item) => item.id == 'home'),
+      ...head,
+      const NavItem(id: 'more', label: AppStrings.more, icon: Icons.more_horiz, path: ''),
+    ];
+    var selected = tabs.length - 1;
+    for (var i = 0; i < head.length; i++) {
+      if (_matches(head[i].path, location)) selected = i + 1;
+    }
+    if (_matches('/', location)) selected = 0;
+
+    return NavigationBar(
+      selectedIndex: selected,
+      destinations: [
+        for (final tab in tabs)
+          NavigationDestination(icon: Icon(tab.icon), label: tab.label),
+      ],
+      onDestinationSelected: (index) {
+        if (tabs[index].id == 'more') {
+          showModalBottomSheet<void>(
+            context: context,
+            builder: (context) => SafeArea(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final item in [...rest, ...tail])
+                    ListTile(
+                      leading: Icon(item.icon),
+                      title: Text(item.label),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.go(item.path);
+                      },
+                    ),
+                ],
+              ),
+            ),
+          );
+          return;
+        }
+        context.go(tabs[index].path);
+      },
     );
   }
 }

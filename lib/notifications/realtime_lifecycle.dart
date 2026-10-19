@@ -60,8 +60,9 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
     if (shouldRun && !_running) {
       _running = true;
       _signals = layer.realtime.signals.listen((_) {
-        // Signal only. The count is whatever the next fetch returns.
+        // Signal only. Counts and cards are whatever the next fetch returns.
         ref.invalidate(unreadCountProvider);
+        ref.invalidate(homeDashboardProvider);
       });
       _pushes = layer.push.messages.listen((_) {
         ref.invalidate(unreadCountProvider);

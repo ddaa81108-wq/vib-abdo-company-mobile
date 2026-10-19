@@ -39,6 +39,8 @@ class AccountCardDto {
     this.ageStatusLabel,
     this.zeroReview,
     this.allowedActions,
+    this.systemManaged = false,
+    this.systemKind,
   });
 
   final String id;
@@ -60,6 +62,10 @@ class AccountCardDto {
   final Json? zeroReview;
   final List<String>? allowedActions;
 
+  /// Server flag. System cards can be opened and have no write controls.
+  final bool systemManaged;
+  final String? systemKind;
+
   factory AccountCardDto.fromJson(Json j, AccountSection s) => AccountCardDto(
         id: str(j['id']),
         name: str(j['name']),
@@ -78,6 +84,8 @@ class AccountCardDto {
         zeroReview: j['zeroReview'] is Map ? asJson(j['zeroReview']) : null,
         allowedActions:
             j['allowedActions'] is List ? strList(j['allowedActions']) : null,
+        systemManaged: boolOf(j['systemManaged']),
+        systemKind: strOrNull(j['systemKind']),
       );
 }
 
@@ -149,6 +157,7 @@ class LedgerEntryDto {
     this.createdByName,
     this.corrected = false,
     this.version,
+    this.paymentMode,
   });
 
   final String id;
@@ -171,6 +180,9 @@ class LedgerEntryDto {
   final bool corrected;
   final int? version;
 
+  /// Server value `full` / `partial` when present. Never inferred from amounts.
+  final String? paymentMode;
+
   factory LedgerEntryDto.fromJson(Json j) => LedgerEntryDto(
         id: str(j['id']),
         sequence: intOrNull(j['sequence']) ?? 0,
@@ -178,7 +190,7 @@ class LedgerEntryDto {
         status: str(j['status']),
         date: dateOrNull(j['date']),
         recordedAt: dateOrNull(j['createdAt']),
-        note: strOrNull(j['note']),
+        note: strOrNull(j['displayNote'] ?? j['note']),
         amountUnits: unitsOrNull(j['amountUnits']),
         inputValue: unitsOrNull(j['inputValue']),
         calculationMode: CalculationMode.fromName(j['calculationMode']),
@@ -187,6 +199,7 @@ class LedgerEntryDto {
         createdByName: strOrNull(j['createdByName'] ?? j['actorName']),
         corrected: boolOf(j['corrected']) || j['correctedAt'] != null,
         version: intOrNull(j['version']),
+        paymentMode: strOrNull(j['paymentMode']),
       );
 }
 

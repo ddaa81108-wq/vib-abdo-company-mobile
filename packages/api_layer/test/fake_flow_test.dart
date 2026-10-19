@@ -1,5 +1,4 @@
 import 'package:flutter_api_layer/api_layer.dart';
-import 'package:flutter_api_layer/data/models/account_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
