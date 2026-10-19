@@ -1,0 +1,67 @@
+/// REAL permission codes of the existing system (analysis doc §1.3): `<section>.read|write`
+/// plus `purchases.finalize`. Admin is a ROLE (`role == "admin"`) reported by the server
+/// in GET /api/me; the server treats it as full access. UI checks these codes only.
+enum Permission {
+  debtsRead('debts.read'), // قسم ديون العملاء
+  debtsWrite('debts.write'),
+  collectionsRead('collections.read'), // استلامات الديون
+  collectionsWrite('collections.write'),
+  companiesRead('companies.read'), // ديون الشركات
+  companiesWrite('companies.write'),
+  libyanDepositsRead('libyan_deposits.read'), // أمانات ليبية
+  libyanDepositsWrite('libyan_deposits.write'),
+  egyptianDepositsRead('egyptian_deposits.read'), // أمانات مصرية
+  egyptianDepositsWrite('egyptian_deposits.write'),
+  masraweyaRead('masraweya.read'), // المصراوية
+  masraweyaWrite('masraweya.write'),
+  purchasesRead('purchases.read'), // المشتريات
+  purchasesWrite('purchases.write'),
+  purchasesFinalize('purchases.finalize'),
+  treasuryRead('treasury.read'), // الخزينة
+  treasuryWrite('treasury.write'),
+  reportsRead('reports.read'); // التقارير (قراءة فقط)
+
+  const Permission(this.code);
+  final String code;
+
+  static final Map<String, Permission> _byCode = {
+    for (final p in values) p.code: p
+  };
+
+  /// Unknown codes return null and are ignored safely.
+  static Permission? fromCode(String code) => _byCode[code];
+}
+
+/// Business sections (analysis doc §1.3), in the server's menu order.
+enum SectionKey {
+  customers('customers', Permission.debtsRead, Permission.debtsWrite),
+  collections(
+      'collections', Permission.collectionsRead, Permission.collectionsWrite),
+  companies('companies', Permission.companiesRead, Permission.companiesWrite),
+  libyanDeposits('libyan-deposits', Permission.libyanDepositsRead,
+      Permission.libyanDepositsWrite),
+  egyptianDeposits('egyptian-deposits', Permission.egyptianDepositsRead,
+      Permission.egyptianDepositsWrite),
+  masraweya('masraweya', Permission.masraweyaRead, Permission.masraweyaWrite),
+  purchases('purchases', Permission.purchasesRead, Permission.purchasesWrite),
+  treasury('treasury', Permission.treasuryRead, Permission.treasuryWrite),
+  reports('reports', Permission.reportsRead, null);
+
+  const SectionKey(this.key, this.read, this.write);
+  final String key;
+  final Permission read;
+  final Permission? write;
+}
+
+/// Actions the existing system reserves for the admin ROLE (no fine-grained code observed):
+/// collections decisions, cash-received, day close, payroll entries/salary, assignment,
+/// zero-review, account requests. 🔶 to confirm.
+enum AdminOnlyAction {
+  collectionsAssign,
+  collectionsDecide,
+  collectionsCashReceived,
+  collectionsCloseDay,
+  payrollManage,
+  customerZeroReview,
+  accountRequestsDecide,
+}
