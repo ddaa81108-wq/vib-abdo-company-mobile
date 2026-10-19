@@ -6,14 +6,15 @@ import 'fake_fixtures.dart';
 
 /// In-memory fake of the REAL API shapes so the UI can be built with zero contact
 /// with the production system. Same ApiClient interface => Remote*Repository run unchanged.
-/// Login as a username starting with "admin" -> admin role; anything else -> collections employee.
-/// Password "wrong" -> 401. It only returns canned values; it never computes money.
+/// Password "wrong" -> 401. Usernames pick a canned profile in [FakeFixtures.profileFor].
+/// It only returns canned values; it never computes money.
 class FakeApiClient implements ApiClient {
   FakeApiClient({this.latency = const Duration(milliseconds: 250)});
 
   final Duration latency;
   bool _loggedIn = false;
   bool _admin = false;
+  Map<String, dynamic> _me = FakeFixtures.me(admin: false);
   int _unread = 1; // canned server-side state, set (not computed) per action
   static const _err = ErrorMapper();
 
@@ -84,8 +85,10 @@ class FakeApiClient implements ApiClient {
         _fail(401, 'INVALID_CREDENTIALS', 'بيانات الدخول غير صحيحة');
       }
       _loggedIn = true;
-      _admin = '${b['username']}'.startsWith('admin');
-      return _ok({...FakeFixtures.me(admin: _admin), 'csrfToken': 'fake-csrf'});
+      final username = '${b['username']}';
+      _admin = username.startsWith('admin');
+      _me = FakeFixtures.profileFor(username);
+      return _ok({..._me, 'csrfToken': 'fake-csrf'});
     }
     if (path == '/api/auth/csrf') return _ok({'csrfToken': 'fake-csrf'});
     if (options.authenticated && !_loggedIn) {
@@ -96,7 +99,7 @@ class FakeApiClient implements ApiClient {
       return _ok({});
     }
     if (path == '/api/auth/change-password') return _ok({});
-    if (path == '/api/me') return _ok(FakeFixtures.me(admin: _admin));
+    if (path == '/api/me') return _ok(_me);
 
     if (method != 'GET' &&
         head != 'notifications' &&

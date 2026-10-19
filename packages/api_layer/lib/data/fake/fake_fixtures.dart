@@ -10,14 +10,92 @@ class FakeFixtures {
     'debts.read'
   ];
 
-  static Map<String, dynamic> me({required bool admin}) => {
+  static Map<String, dynamic> me({required bool admin}) => admin
+      ? _user(
+          id: 'u_1',
+          username: 'admin@example.invalid',
+          displayName: 'مدير تجريبي',
+          role: 'admin',
+          permissions: const [],
+          sectionAccess: const {},
+        )
+      : _user(
+          id: 'u_12',
+          username: 'employee@example.invalid',
+          displayName: 'موظف استلام تجريبي',
+          role: 'employee',
+          permissions: employeePermissions,
+          sectionAccess: const {
+            'collections': 'manage',
+            'customers': 'view',
+          },
+        );
+
+  /// Fake profiles selected by an obviously fake username. Not accounts.
+  static Map<String, dynamic> profileFor(String username) {
+    if (username.startsWith('limited.admin')) {
+      return _user(
+        id: 'u_limited',
+        username: 'limited.admin@example.invalid',
+        displayName: 'مدير مقيّد تجريبي',
+        role: 'admin',
+        permissions: const ['collections.read'],
+        sectionAccess: const {
+          'collections': 'view',
+          'treasury': 'manage',
+        },
+      );
+    }
+    if (username.startsWith('readonly')) {
+      return _user(
+        id: 'u_readonly',
+        username: 'readonly@example.invalid',
+        displayName: 'موظف قراءة تجريبي',
+        role: 'employee',
+        permissions: const ['debts.read'],
+        sectionAccess: const {'customers': 'view'},
+      );
+    }
+    if (username.startsWith('nosection')) {
+      return _user(
+        id: 'u_nosection',
+        username: 'nosection@example.invalid',
+        displayName: 'موظف بلا قسم تجريبي',
+        role: 'employee',
+        permissions: const ['debts.read', 'treasury.read'],
+        sectionAccess: const {'customers': 'view'},
+      );
+    }
+    if (username.startsWith('unknown')) {
+      return _user(
+        id: 'u_unknown',
+        username: 'unknown@example.invalid',
+        displayName: 'حساب تجريبي',
+        role: 'guest',
+        permissions: const [],
+        sectionAccess: const {},
+      );
+    }
+    if (username.startsWith('admin')) return me(admin: true);
+    return me(admin: false);
+  }
+
+  static Map<String, dynamic> _user({
+    required String id,
+    required String username,
+    required String displayName,
+    required String role,
+    required List<String> permissions,
+    required Map<String, String> sectionAccess,
+  }) =>
+      {
         'user': {
-          'id': admin ? 'u_1' : 'u_12',
-          'username':
-              admin ? 'admin@example.invalid' : 'employee@example.invalid',
-          'displayName': admin ? 'مدير تجريبي' : 'موظف استلام تجريبي',
-          'role': admin ? 'admin' : 'employee',
-          'permissions': admin ? <String>[] : employeePermissions,
+          'id': id,
+          'username': username,
+          'displayName': displayName,
+          'role': role,
+          'permissions': permissions,
+          'sectionAccess': sectionAccess,
           'mustChangePassword': false,
         },
       };

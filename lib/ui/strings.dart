@@ -16,6 +16,8 @@ abstract final class AppStrings {
   static const signedInAs = 'الحساب';
   static const roleAdmin = 'مدير';
   static const roleEmployee = 'موظف';
+  static const roleUnknown = 'صلاحية غير معروفة';
+  static const writeAction = 'كتابة';
   static const sectionsTitle = 'الأقسام المتاحة';
   static const sectionsHint =
       'الشاشات لم تُبنَ بعد. ما يظهر هنا يتبع صلاحيات الخادم فقط.';

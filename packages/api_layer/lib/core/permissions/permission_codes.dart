@@ -1,6 +1,5 @@
-/// REAL permission codes of the existing system (analysis doc §1.3): `<section>.read|write`
-/// plus `purchases.finalize`. Admin is a ROLE (`role == "admin"`) reported by the server
-/// in GET /api/me; the server treats it as full access. UI checks these codes only.
+/// Permission codes the server may return: `<section>.read|write` plus `purchases.finalize`.
+/// Whether a code grants anything is decided only by [PermissionService].
 enum Permission {
   debtsRead('debts.read'), // قسم ديون العملاء
   debtsWrite('debts.write'),
@@ -53,9 +52,8 @@ enum SectionKey {
   final Permission? write;
 }
 
-/// Actions the existing system reserves for the admin ROLE (no fine-grained code observed):
-/// collections decisions, cash-received, day close, payroll entries/salary, assignment,
-/// zero-review, account requests. 🔶 to confirm.
+/// Actions with no permission code. [PermissionService.canDo] allows them only when
+/// the server role flag grants unrestricted access.
 enum AdminOnlyAction {
   collectionsAssign,
   collectionsDecide,

@@ -15,9 +15,9 @@ String sectionLabel(SectionKey section) => switch (section) {
   SectionKey.reports => 'التقارير',
 };
 
-/// Label for the server-reported role string. Unknown roles are shown unchanged.
-String roleLabel(String role) => switch (role) {
-  'admin' => AppStrings.roleAdmin,
-  'employee' => AppStrings.roleEmployee,
-  _ => role,
+/// Label for the role the permission service already classified.
+String roleLabel(AccountRole role) => switch (role) {
+  AccountRole.admin => AppStrings.roleAdmin,
+  AccountRole.employee => AppStrings.roleEmployee,
+  AccountRole.unknown => AppStrings.roleUnknown,
 };

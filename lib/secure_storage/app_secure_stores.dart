@@ -1,5 +1,4 @@
 import 'package:flutter_api_layer/api_layer.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Cookie jar and token store injected into the real API stack.
 ///
@@ -14,7 +13,3 @@ class AppSecureStores {
   final CookieStore cookies;
   final TokenStorage tokens;
 }
-
-final secureStoresProvider = Provider<AppSecureStores>(
-  (ref) => AppSecureStores(),
-);

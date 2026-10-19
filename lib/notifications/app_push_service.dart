@@ -1,5 +1,4 @@
 import 'package:flutter_api_layer/api_layer.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Push boundary for the app.
 ///
@@ -21,5 +20,3 @@ class AppPushService implements PushService {
   @override
   Future<void> deleteToken() => _inner.deleteToken();
 }
-
-final pushServiceProvider = Provider<PushService>((ref) => AppPushService());

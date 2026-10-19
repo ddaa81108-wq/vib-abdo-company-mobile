@@ -1,29 +1,34 @@
 import 'package:flutter_api_layer/api_layer.dart';
 
-/// Fields the home shell may render. Copied from the server profile and the
-/// permission list the server returned. Nothing here is calculated.
+/// Fields the home shell may render. Section visibility and write controls
+/// come from [PermissionService], already decided. Nothing here is calculated.
 class HomeSummary {
   const HomeSummary({
     required this.displayName,
-    required this.role,
+    required this.accountRole,
     required this.mustChangePassword,
     required this.sections,
+    required this.writableSections,
   });
 
   final String displayName;
-  final String role;
+  final AccountRole accountRole;
   final bool mustChangePassword;
   final List<SectionKey> sections;
+  final List<SectionKey> writableSections;
 
   factory HomeSummary.fromServer({
     required UserProfile profile,
-    required List<SectionKey> sections,
+    required PermissionService permissions,
   }) {
     return HomeSummary(
       displayName: profile.displayName,
-      role: profile.role,
+      accountRole: permissions.accountRole,
       mustChangePassword: profile.mustChangePassword,
-      sections: List<SectionKey>.unmodifiable(sections),
+      sections: List<SectionKey>.unmodifiable(permissions.readableSections),
+      writableSections: List<SectionKey>.unmodifiable(
+        permissions.writableSections,
+      ),
     );
   }
 }

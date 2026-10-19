@@ -37,6 +37,9 @@ final startupProvider = FutureProvider<void>((ref) async {
 final homeSummaryProvider = Provider<HomeSummary?>((ref) {
   final session = ref.watch(sessionStateProvider);
   if (session is! SessionAuthenticated) return null;
-  final sections = ref.watch(apiLayerProvider).permissions.readableSections;
-  return HomeSummary.fromServer(profile: session.profile, sections: sections);
+  final permissions = ref.watch(apiLayerProvider).permissions;
+  return HomeSummary.fromServer(
+    profile: session.profile,
+    permissions: permissions,
+  );
 });

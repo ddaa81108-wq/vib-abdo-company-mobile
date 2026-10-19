@@ -16,6 +16,7 @@ class HomeShell extends ConsumerWidget {
   static const roleKey = Key('role-label');
 
   static Key sectionKey(SectionKey section) => Key('section-${section.key}');
+  static Key writeKey(SectionKey section) => Key('write-${section.key}');
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -53,7 +54,7 @@ class HomeShell extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(roleLabel(summary.role), key: roleKey),
+          Text(roleLabel(summary.accountRole), key: roleKey),
           if (summary.mustChangePassword) ...[
             const SizedBox(height: 16),
             const _PasswordChangeBanner(),
@@ -79,7 +80,13 @@ class HomeShell extends ConsumerWidget {
                   enabled: false,
                   title: Text(sectionLabel(section)),
                   subtitle: const Text(AppStrings.comingSoon),
-                  trailing: const Icon(Icons.lock_outline),
+                  trailing: summary.writableSections.contains(section)
+                      ? TextButton(
+                          key: writeKey(section),
+                          onPressed: null,
+                          child: const Text(AppStrings.writeAction),
+                        )
+                      : const Icon(Icons.lock_outline),
                 ),
               ),
         ],

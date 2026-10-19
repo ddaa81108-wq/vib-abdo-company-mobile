@@ -108,7 +108,11 @@ class SessionManager {
 
   Future<void> reloadProfileAndPermissions() async {
     final me = await _profile.fetchMe();
-    _permissions.applyFromServer(me.user.permissions, isAdmin: me.user.isAdmin);
+    _permissions.applyFromServer(
+      role: me.user.role,
+      permissions: me.user.permissions,
+      sectionAccess: me.user.sectionAccess,
+    );
     _emit(SessionAuthenticated(me.user));
   }
 

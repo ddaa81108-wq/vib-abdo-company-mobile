@@ -27,9 +27,16 @@ Optional defines:
 
 - Values named `*Units` are raw integers. Turn one value into text with `MoneyFormatter` and that value's own currency. Do not add, subtract, convert, or mix currencies.
 - Session cookies and bearer tokens, when a real host is used, go through `flutter_secure_storage`. The fake client does not write them.
-- Permissions used to hide or disable controls come from the server payload. The server still enforces every request.
+- Permissions used to hide or disable controls are decided only in `PermissionService` from the server profile. The server still enforces every request.
 - A realtime event or push message is a signal to refetch. Do not display numbers from the event.
 
 ## Fake sign-in
 
-Not an account. Any password other than `wrong` is accepted. A username that starts with `admin` is the admin role; any other username is an employee.
+Not an account. Any password other than `wrong` is accepted. The username picks a canned profile:
+
+- starts with `admin` — role `admin`, empty permission list (unrestricted)
+- starts with `limited.admin` — role `admin` with an explicit permission list
+- starts with `readonly` — employee, one read permission, no write control
+- starts with `nosection` — employee missing `sectionAccess` for one permitted section
+- starts with `unknown` — unrecognized role, no access
+- anything else — employee with the canned collection and customer access
