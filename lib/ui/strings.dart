@@ -101,6 +101,7 @@ abstract final class AppStrings {
   static const changePassword = 'تغيير كلمة المرور';
   static const notificationPrefs = 'تفضيلات الإشعارات';
   static const financialLedger = 'سجل الأستاذ المالي';
+  static const exportPdf = 'تصدير PDF';
   static const employeesTile = 'الموظفون والإداريون';
   static const auditTile = 'سجل التدقيق';
   static const operationsTile = 'مركز التشغيل';

@@ -139,7 +139,7 @@ class FakeFixtures {
             'type': 'debt',
             'status': 'posted',
             'date': '2026-09-01T10:00:00+02:00',
-            'note': 'حركة أقدم',
+            'note': 'دين أقدم',
             'amountUnits': 40,
             'inputValue': 40,
             'calculationMode': 'direct',
@@ -313,7 +313,14 @@ class FakeFixtures {
             'pendingCount': 1
           },
         ],
-        'metrics': {'collectedUnits': 0, 'dayTotalUnits': 100},
+        'metrics': {
+          'collectedUnits': 0,
+          'dayTotalUnits': 100,
+          'assignedCount': 1,
+          'pendingCount': 1,
+          'unlinkedPendingCount': 1,
+          'cashOutstandingUnits': 250,
+        },
         'batchId': 'b_1',
       };
 
@@ -393,11 +400,11 @@ class FakeFixtures {
           'receivablesUnits': 45000,
           'liabilitiesUnits': 12000,
           'activeCashUnits': 8000,
-          'activeCashTone': 'positive',
           'egyptianSourceUnits': 95000,
           'egyptianRate': '9.5',
           'egyptianConvertedUnits': 10000,
-          'netUnits': 51000
+          'netUnits': 51000,
+          'activeCashTone': 'positive'
         },
       };
 
@@ -409,7 +416,7 @@ class FakeFixtures {
             'id': 'ce_old',
             'direction': 'out',
             'amountUnits': 200,
-            'description': 'حركة أقدم',
+            'description': 'خروج أقدم',
             'balanceAfterUnits': 7000,
             'createdAt': '2026-09-01T09:00:00+02:00',
             'createdByName': 'مدير تجريبي'

@@ -1,14 +1,5 @@
 import '../network/api_exception.dart';
-
-/// Original text of a JSON number that is not a plain integer.
-/// Never converted through [double].
-class JsonNumber {
-  const JsonNumber(this.literal);
-  final String literal;
-
-  @override
-  String toString() => literal;
-}
+import '../network/precise_json.dart';
 
 /// A non-money decimal value (exchange rate, multiply/divide factor) kept as TEXT.
 ///
@@ -24,44 +15,39 @@ class DecimalString {
 
   static final RegExp _pattern = RegExp(r'^-?\d+(\.\d+)?$');
 
-  /// User input (Arabic-Indic digits and '٫' as the decimal mark).
-  /// ',' is a thousands separator and is rejected, not treated as a decimal mark.
+  /// USER INPUT. Accepts Arabic-Indic/Persian digits and the Arabic decimal mark '٫'.
+  /// Rejects ',' (ambiguous with a thousands separator: "1,000" must never become 1.000)
+  /// and exponents ("1e5", "1E-2"). Null if invalid.
   static DecimalString? tryParse(String? input) {
     if (input == null) return null;
     final normalized = _normalizeDigits(input.trim()).replaceAll('٫', '.');
-    if (normalized.contains(',') ||
-        normalized.contains('e') ||
-        normalized.contains('E')) {
-      return null;
-    }
     if (!_pattern.hasMatch(normalized)) return null;
     return DecimalString._(_stripLeadingZeros(normalized));
   }
 
-  /// Server value. A JSON string or a [JsonNumber] whose literal was copied from
-  /// the raw body. A [double] is rejected: `num.toString()` would turn `1e-7`
-  /// into a different token. Thousands separators and exponent notation are
-  /// [InvalidServerResponseException].
+  /// SERVER VALUE (contract §2). null/missing -> null. Accepted: a JSON string, an int, or
+  /// a [JsonNumberText] (the EXACT numeric text from the body, preserved by PreciseJson —
+  /// never `toString()` of a double). The text must be plain ASCII `-?digits(.digits)?`:
+  /// comma separators, exponents (1e5, 1E-2), Arabic digits, or a Dart `double` (text
+  /// already lost) => [InvalidServerResponseException].
   static DecimalString? fromJson(Object? v) {
     if (v == null) return null;
-    if (v is JsonNumber) return _fromServerToken(v.literal);
-    if (v is int) return DecimalString._('$v');
-    if (v is String) return _fromServerToken(v);
-    throw const InvalidServerResponseException();
-  }
-
-  static DecimalString _fromServerToken(String raw) {
-    final s = raw.trim();
-    if (s.contains(',') ||
-        s.contains('٬') ||
-        s.contains('e') ||
-        s.contains('E')) {
-      throw const InvalidServerResponseException();
+    final String text;
+    if (v is String) {
+      text = v.trim();
+    } else if (v is int) {
+      text = '$v';
+    } else if (v is JsonNumberText) {
+      text = v.text;
+    } else {
+      throw const InvalidServerResponseException(
+          message: 'استجابة الخادم غير صالحة (قيمة عشرية بنوع غير مدعوم)');
     }
-    if (!_pattern.hasMatch(s)) {
-      throw const InvalidServerResponseException();
+    if (!_pattern.hasMatch(text)) {
+      throw const InvalidServerResponseException(
+          message: 'استجابة الخادم غير صالحة (قيمة عشرية بصيغة غير مقبولة)');
     }
-    return DecimalString._(_stripLeadingZeros(s));
+    return DecimalString._(_stripLeadingZeros(text));
   }
 
   /// Text form. Wire encoding (string vs number) is decided ONLY by WireJson / ApiConfig.rateWireFormat.

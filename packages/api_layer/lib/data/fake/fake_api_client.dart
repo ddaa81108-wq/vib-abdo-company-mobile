@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../../core/config/api_config.dart';
+import '../../core/network/precise_json.dart';
 import '../../core/network/wire_json.dart';
 
 import '../../core/network/api_client.dart';
@@ -24,7 +25,7 @@ class FakeApiClient implements ApiClient {
   /// Last request body exactly as it would go on the wire (for tests).
   String? lastWireBody;
 
-  /// requestId of each business mutation, in send order (tests).
+  /// Request ids of business mutations, in send order (tests).
   final List<String> mutationRequestIds = [];
 
   /// The next N business mutations fail before they change fake state (tests).
@@ -72,7 +73,11 @@ class FakeApiClient implements ApiClient {
       _handle('DELETE', path, body, options);
 
   ApiResponse _ok(Object? data, {int status = 200}) =>
-      ApiResponse(statusCode: status, data: data, correlationId: 'fake');
+      ApiResponse(
+          statusCode: status,
+          // Same decode path as the real client: fixtures -> JSON text -> PreciseJson.
+          data: data == null ? null : PreciseJson.decode(jsonEncode(data)),
+          correlationId: 'fake');
 
   Never _fail(int status, String code, String message) =>
       throw _err.fromResponse(status, {

@@ -38,9 +38,9 @@ export 'core/security/redactor.dart';
 export 'core/session/session_manager.dart';
 export 'core/session/token_storage.dart';
 export 'data/models/account_models.dart';
-export 'data/models/common.dart';
 export 'data/models/auth_models.dart';
 export 'data/models/collection_models.dart';
+export 'data/models/common.dart';
 export 'data/models/home_models.dart';
 export 'data/models/masraweya_models.dart';
 export 'data/models/notification_models.dart';
@@ -153,7 +153,7 @@ class ApiLayer {
       masraweya: RemoteMasraweyaRepository(api),
       purchases: RemotePurchasesRepository(api),
       treasury: RemoteTreasuryRepository(api),
-      reports: RemoteReportsRepository(api, permissions),
+      reports: RemoteReportsRepository(api),
       notifications: RemoteNotificationsRepository(api),
       home: RemoteHomeRepository(api),
     );

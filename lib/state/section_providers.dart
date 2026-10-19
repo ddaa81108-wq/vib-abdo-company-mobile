@@ -88,7 +88,11 @@ final reportsProvider = FutureProvider<ReportsDto>((ref) async {
 
 final financialLedgerProvider = FutureProvider<FinancialLedgerPage>((ref) async {
   ref.watch(sessionStateProvider);
-  return ref.read(apiLayerProvider).reports.financialLedger();
+  final layer = ref.read(apiLayerProvider);
+  if (!layer.permissions.canViewFinancialLedger) {
+    throw const ForbiddenException(code: 'FORBIDDEN', message: 'غير مصرح');
+  }
+  return layer.reports.financialLedger();
 });
 
 final notificationsProvider = FutureProvider<NotificationsPage>((ref) async {

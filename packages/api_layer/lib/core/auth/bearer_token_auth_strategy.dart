@@ -50,7 +50,7 @@ class BearerTokenAuthStrategy implements AuthStrategy {
       await _tokens.saveTokens(
         accessToken: access,
         refreshToken: refresh,
-        expiresInSeconds: (loginData['expiresIn'] as num?)?.toInt(),
+        expiresInSeconds: (loginData['expiresIn'] is int ? loginData['expiresIn'] as int : null),
       );
     }
   }

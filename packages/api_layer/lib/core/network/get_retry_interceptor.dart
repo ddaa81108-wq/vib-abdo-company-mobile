@@ -53,7 +53,7 @@ class GetRetryInterceptor extends Interceptor {
 
     req.extra['retryAttempt'] = attempt + 1;
     try {
-      handler.resolve(await retryDio.fetch<dynamic>(req));
+      handler.resolve(await retryDio.fetch<Object?>(req));
     } on DioException catch (e) {
       handler.next(e);
     }

@@ -43,6 +43,7 @@ class ApiStack {
 
     final options = DioApiClient.baseOptions(config);
     final bareDio = Dio(options); // no interceptors: CSRF fetch only
+    DioApiClient.usePreciseJson(bareDio);
     final dio = Dio(options);
     // TLS pinning hook (optional): configure dio.httpClientAdapter with an
     // IOHttpClientAdapter + SecurityContext / badCertificateCallback using SPKI

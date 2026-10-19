@@ -24,20 +24,17 @@ List<String> strList(Object? v) =>
     v is List ? v.map((e) => '$e').toList(growable: false) : const [];
 bool boolOf(Object? v) => v == true;
 
-/// A `*Units` value. Null stays null (the screen shows "—").
-/// A JSON integer is kept. A string or a non-integer number is
-/// [InvalidServerResponseException] — never displayed as "—".
+/// Raw integer from the server (e.g. a *Units field). Only a JSON integer (or an integer
+/// string) is accepted; any fractional/float value -> null ("—"), never coerced or rounded.
+/// Money in minor units: an INTEGER JSON number only (contract §2, س-105).
+/// null/missing -> null (UI shows '—'). A string, a fractional/exponent number
+/// ([JsonNumberText]), a double, or anything else -> [InvalidServerResponseException];
+/// never a silent null, never truncation.
 int? unitsOrNull(Object? v) {
   if (v == null) return null;
   if (v is int) return v;
-  if (v is JsonNumber) {
-    if (!RegExp(r'^-?(0|[1-9][0-9]*)$').hasMatch(v.literal)) {
-      throw const InvalidServerResponseException();
-    }
-    return int.tryParse(v.literal) ??
-        (throw const InvalidServerResponseException());
-  }
-  throw const InvalidServerResponseException();
+  throw const InvalidServerResponseException(
+      message: 'استجابة الخادم غير صالحة (مبلغ ليس عدداً صحيحاً)');
 }
 
 /// Rate / factor as decimal TEXT (no double anywhere).

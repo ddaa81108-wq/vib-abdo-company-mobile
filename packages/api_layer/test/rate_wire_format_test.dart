@@ -1,7 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter_api_layer/core/config/api_config.dart';
+import 'package:flutter_api_layer/core/network/api_exception.dart';
 import 'package:flutter_api_layer/core/network/idempotency.dart';
+import 'package:flutter_api_layer/core/network/precise_json.dart';
 import 'package:flutter_api_layer/core/network/wire_json.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_api_layer/data/models/account_models.dart';
@@ -82,10 +84,11 @@ void main() {
     });
   }
 
-  test('incoming numbers become text once on arrival', () {
-    final body = decodeWireJson('{"a":9.5,"b":9.50}') as Map;
-    expect(DecimalString.fromJson(body['a'])!.value, '9.5');
-    expect(DecimalString.fromJson(body['b'])!.value, '9.50');
+  test('incoming rates keep their exact body text (PreciseJson), doubles rejected', () {
+    final d = PreciseJson.decode('{"r":9.50}') as Map;
+    expect(DecimalString.fromJson(d['r'])!.value, '9.50');
     expect(DecimalString.fromJson('9.50')!.value, '9.50');
+    expect(() => DecimalString.fromJson(9.5),
+        throwsA(isA<InvalidServerResponseException>()));
   });
 }

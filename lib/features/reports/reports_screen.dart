@@ -9,6 +9,7 @@ import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/export_pdf_button.dart';
 
 class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
@@ -37,6 +38,10 @@ class ReportsScreen extends ConsumerWidget {
               icon: const Icon(Icons.refresh),
             ),
           ],
+        ),
+        const Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: ExportPdfButton(),
         ),
         reports.when(
           loading: () => const SkeletonBox(key: Key('reports-loading'), height: 160),

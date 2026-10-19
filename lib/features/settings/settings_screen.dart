@@ -9,6 +9,7 @@ import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/export_pdf_button.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -19,7 +20,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final permissions = permissionsOf(ref);
     final manage = permissions.canDo(ManagementAction.settingsManage);
-    final ledger = permissions.canReadPrivilegedFinance;
+    final ledger = permissions.canViewFinancialLedger;
     if (!manage && !ledger) return const ForbiddenPane();
     return ListView(
       key: screenKey,
@@ -63,6 +64,9 @@ class _LedgerTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!permissionsOf(ref).canViewFinancialLedger) {
+      return const SizedBox.shrink();
+    }
     final page = ref.watch(financialLedgerProvider);
     final money = ref.watch(apiLayerProvider).money;
     return Card(
@@ -73,6 +77,7 @@ class _LedgerTile extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(AppStrings.financialLedger, style: Theme.of(context).textTheme.titleSmall),
+            const ExportPdfButton(),
             page.when(
               loading: () => const SkeletonBox(height: 48),
               error: (error, _) => ErrorPane(

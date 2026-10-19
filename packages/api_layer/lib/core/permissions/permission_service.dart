@@ -113,25 +113,24 @@ class PermissionService extends ChangeNotifier {
       return false; // read-only section (reports), even with full access
     }
     if (_fullAccess) return true;
-    // Write also requires the section read code and a non-none sectionAccess
-    // (read or manage). manage is still required for the write itself.
-    if (!canRead(s)) return false;
-    if (!_granted.contains(w)) return false;
+    // س-104: write needs the section READ code too (a write code alone never opens writes).
+    if (!_granted.contains(s.read) || !_granted.contains(w)) return false;
     final level = accessLevel(s);
     return level == null || level == SectionAccessLevel.manage;
   }
 
-  /// Day finalize in purchases: `purchases.finalize` AND purchases write access
-  /// (which itself requires purchases read and sectionAccess manage).
+  /// Day finalize in purchases: `purchases.finalize` AND purchases write access.
   bool get canFinalizePurchases =>
       _fullAccess ||
       (_granted.contains(Permission.purchasesFinalize) &&
           canWrite(SectionKey.purchases));
 
-  /// Financial ledger and statement PDF have no permission code yet.
-  /// Only full access (explicit `fullAccess`, or admin with empty lists) may
-  /// open them. `settings.manage` does not grant this.
-  bool get canReadPrivilegedFinance => _fullAccess;
+  /// س-103: the admin financial ledger (`GET /api/financial-ledger`) — FULL ACCESS ONLY
+  /// (`fullAccess=true`, or the admin role flag with empty lists). No permission code opens it.
+  bool get canViewFinancialLedger => _fullAccess;
+
+  /// س-103: PDF export (statements / day sheets) — FULL ACCESS ONLY, same rule.
+  bool get canExportPdf => _fullAccess;
 
   /// Management actions: explicit (proposed) code, or full access (flag / admin role flag).
   bool canDo(ManagementAction a) => canRaw(a.proposedCode);

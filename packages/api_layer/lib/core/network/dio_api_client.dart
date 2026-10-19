@@ -4,6 +4,7 @@ import '../config/api_config.dart';
 import 'api_client.dart';
 import 'api_exception.dart';
 import 'error_mapper.dart';
+import 'precise_json.dart';
 import 'wire_json.dart';
 
 /// Dio-based implementation for the REAL envelope:
@@ -13,7 +14,16 @@ class DioApiClient implements ApiClient {
   DioApiClient(this._dio,
       {ErrorMapper errorMapper = const ErrorMapper(),
       this.rateWireFormat = RateWireFormat.number})
-      : _errorMapper = errorMapper;
+      : _errorMapper = errorMapper {
+    usePreciseJson(_dio);
+  }
+
+  /// Response JSON is decoded by [PreciseJson]: non-integer numbers keep their exact
+  /// text ([JsonNumberText]); no double is ever produced (contract §2).
+  static void usePreciseJson(Dio dio) {
+    dio.transformer = BackgroundTransformer()
+      ..jsonDecodeCallback = PreciseJson.decode;
+  }
 
   final Dio _dio;
   final RateWireFormat rateWireFormat;
@@ -26,7 +36,7 @@ class DioApiClient implements ApiClient {
         baseUrl: config.baseUrl,
         connectTimeout: config.connectTimeout,
         receiveTimeout: config.receiveTimeout,
-        responseType: ResponseType.plain,
+        responseType: ResponseType.json,
         headers: const {
           'Accept': 'application/json',
           'X-Client-Api-Version': '1',
@@ -72,7 +82,7 @@ class DioApiClient implements ApiClient {
     required ApiRequestOptions options,
   }) async {
     try {
-      final res = await _dio.request<dynamic>(
+      final res = await _dio.request<Object?>(
         path,
         data: body == null
             ? null
@@ -102,9 +112,7 @@ class DioApiClient implements ApiClient {
   ApiResponse _normalize(Response<Object?> res) {
     final status = res.statusCode ?? 200;
     final cid = res.headers.value('x-correlation-id');
-    final body = res.data is String && (res.data as String).isNotEmpty
-        ? decodeWireJson(res.data as String)
-        : res.data;
+    final body = res.data;
     if (status == 204 || body == null || (body is String && body.isEmpty)) {
       return ApiResponse(statusCode: status, correlationId: cid);
     }

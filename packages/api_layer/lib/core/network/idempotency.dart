@@ -4,11 +4,10 @@ import 'package:uuid/uuid.dart';
 /// (the real system uses `requestId` + `expectedVersion` in the JSON body, not headers).
 ///
 /// Rules:
-/// - The UI creates one [MutationMeta] when the form or confirm dialog opens.
-/// - A retry of that same attempt reuses the requestId.
-/// - A changed input, a new form, or a successful send gets a new requestId.
-/// - A failed send keeps the requestId. Mutations are not retried automatically
-///   (GetRetryInterceptor only retries GET/HEAD).
+/// - Create ONE [MutationMeta] when the user taps "submit" and keep it in the screen state.
+/// - A MANUAL retry of the same submission reuses the SAME instance (same requestId).
+/// - No automatic retries for mutations (GetRetryInterceptor only retries GET/HEAD).
+/// - After a final server answer (success or non-network error) discard it.
 /// - expectedVersion is the `version` the server returned for the record being changed;
 ///   VERSION_CONFLICT -> refetch and show the server's current state.
 class MutationMeta {

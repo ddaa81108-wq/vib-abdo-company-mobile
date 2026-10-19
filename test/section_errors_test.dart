@@ -201,6 +201,69 @@ void main() {
     expect(find.text(AppStrings.noResults), findsOneWidget);
     expect(find.byKey(const Key('search-retry')), findsNothing);
   });
+
+  testWidgets('a string amount is an invalid server response with retry', (
+    tester,
+  ) async {
+    final gate = _FailGate();
+    await pumpFakeApp(
+      tester,
+      size: const Size(800, 1600),
+      overrides: [
+        accountsProvider.overrideWith((ref, section) async {
+          gate.calls++;
+          if (gate.failing) {
+            return AccountsPage.fromData({
+              'items': [
+                {'id': 'x', 'name': 'عميل', 'balanceUnits': '125000'},
+              ],
+            }, section);
+          }
+          return ref.read(apiLayerProvider).accounts.list(section);
+        }),
+      ],
+    );
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers');
+    expect(find.text(AppStrings.retry), findsOneWidget);
+    expect(find.textContaining('غير صالحة'), findsOneWidget);
+    gate.failing = false;
+    await tester.tap(find.text(AppStrings.retry));
+    await settle(tester);
+    expect(find.byKey(const Key('screen-customers')), findsOneWidget);
+    expect(find.text(AppStrings.retry), findsNothing);
+    expect(gate.calls, greaterThanOrEqualTo(2));
+  });
+
+  testWidgets('full access can export PDF; settings.manage alone cannot', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/reports');
+    expect(find.byKey(const Key('export-pdf')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('export-pdf')));
+    await settle(tester);
+    expect(find.text(AppStrings.savedReply), findsOneWidget);
+    await go(tester, '/settings');
+    expect(find.byKey(const Key('financial-ledger')), findsOneWidget);
+    expect(find.byKey(const Key('export-pdf')), findsOneWidget);
+
+    layer.permissions.applyFromServer(
+      const ['settings.manage', 'reports.read'],
+      role: 'admin',
+      sectionAccess: const {'reports': 'manage'},
+    );
+    await tester.pump();
+    await go(tester, '/reports');
+    expect(find.byKey(const Key('screen-reports')), findsOneWidget);
+    expect(find.byKey(const Key('export-pdf')), findsNothing);
+    await go(tester, '/settings');
+    expect(find.byKey(const Key('screen-settings')), findsOneWidget);
+    expect(find.byKey(const Key('financial-ledger')), findsNothing);
+    expect(find.byKey(const Key('export-pdf')), findsNothing);
+    expect(find.text(AppStrings.employeesTile), findsOneWidget);
+  });
 }
 
 class _FailGate {
