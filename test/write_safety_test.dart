@@ -21,17 +21,13 @@ void main() {
     await settle(tester);
     await tester.enterText(find.byKey(const Key('create-name')), 'عميل');
     await tester.pump();
-    await tester.tap(find.byKey(const Key('save-account')));
-    await tester.pump();
-    await tester.pump();
+    await hold(tester, fake, const Key('save-account'));
 
     expect(find.text('تعذر تنفيذ الطلب.'), findsWidgets);
     expect(find.byKey(const Key('save-account')), findsOneWidget);
     final first = fake.mutationRequestIds.single;
 
-    await tester.tap(find.byKey(const Key('save-account')));
-    await tester.pump();
-    await tester.pump();
+    await hold(tester, fake, const Key('save-account'));
 
     expect(fake.mutationRequestIds, [first, first]);
   });
@@ -48,29 +44,21 @@ void main() {
     await tester.tap(find.byKey(const Key('add-payment')));
     await settle(tester);
     await enterAmount(tester, '100');
-    await tester.tap(find.byKey(const Key('save-movement')));
-    await tester.pump();
-    await tester.pump();
+    await hold(tester, fake, const Key('save-movement'));
     await enterAmount(tester, '180');
-    await tester.tap(find.byKey(const Key('save-movement')));
-    await tester.pump();
-    await tester.pump();
+    await hold(tester, fake, const Key('save-movement'));
 
     expect(fake.mutationRequestIds, hasLength(2));
     expect(fake.mutationRequestIds[0], isNot(fake.mutationRequestIds[1]));
 
     fake.failMutationsRemaining = 0;
-    await tester.tap(find.byKey(const Key('save-movement')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+    await hold(tester, fake, const Key('save-movement'));
     expect(find.byKey(const Key('save-movement')), findsNothing);
 
     await tester.tap(find.byKey(const Key('add-payment')));
     await settle(tester);
     await enterAmount(tester, '180');
-    await tester.tap(find.byKey(const Key('save-movement')));
-    await tester.pump();
-    await tester.pump();
+    await hold(tester, fake, const Key('save-movement'));
 
     expect(fake.mutationRequestIds, hasLength(4));
     expect(fake.mutationRequestIds[3], isNot(fake.mutationRequestIds[1]));
@@ -97,6 +85,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const Key('save-unlinked')));
     await tester.pump();
+    await tester.pump(Duration.zero);
 
     final button = tester.widget<FilledButton>(find.byKey(const Key('save-unlinked')));
     expect(button.onPressed, isNull);
@@ -133,6 +122,7 @@ void main() {
     await enterAmount(tester, '100');
     await tester.tap(find.byKey(const Key('save-movement')));
     await tester.pump();
+    await tester.pump(Duration.zero);
 
     final button = tester.widget<FilledButton>(find.byKey(const Key('save-movement')));
     expect(button.onPressed, isNull);
@@ -170,6 +160,25 @@ Future<void> go(WidgetTester tester, String path) async {
   final context = tester.element(find.byKey(HomeShell.shellKey));
   GoRouter.of(context).go(path);
   await settle(tester);
+}
+
+/// Sends one write and waits until that request has been recorded.
+///
+/// The fake client pauses for the rest of the gesture, then finishes. A
+/// zero-latency reply otherwise re-enables the button before the tap ends.
+Future<void> hold(WidgetTester tester, FakeApiClient fake, Key key) async {
+  final gate = Completer<void>();
+  fake.pauseMutations = gate;
+  await tester.tap(find.byKey(key));
+  await tester.pump();
+  await tester.pump(Duration.zero);
+  gate.complete();
+  fake.pauseMutations = null;
+  await tester.pump();
+  // Route transitions and the success snackbar must finish or the test
+  // ends with a pending timer.
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pump(const Duration(milliseconds: 400));
 }
 
 Future<void> settle(WidgetTester tester) {

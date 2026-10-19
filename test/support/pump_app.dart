@@ -12,6 +12,7 @@ Future<ApiLayer> pumpFakeApp(
   WidgetTester tester, {
   Size size = const Size(800, 1400),
   List<Override> overrides = const [],
+  ConnectivityPort? connectivity,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -26,9 +27,13 @@ Future<ApiLayer> pumpFakeApp(
 
   await tester.pumpWidget(
     ProviderScope(
+      // Failed loads should surface immediately. The app keeps Riverpod's retry.
+      retry: (retryCount, error) => null,
       overrides: [
         apiLayerProvider.overrideWithValue(layer),
-        connectivityPortProvider.overrideWithValue(const FixedConnectivity(true)),
+        connectivityPortProvider.overrideWithValue(
+          connectivity ?? const FixedConnectivity(true),
+        ),
         ...overrides,
       ],
       child: const CompanyApp(),

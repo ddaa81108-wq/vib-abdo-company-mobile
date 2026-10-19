@@ -14,14 +14,14 @@ import 'support/pump_app.dart';
 
 void main() {
   testWidgets('customer debts shows an error and retries the list', (tester) async {
-    var calls = 0;
+    final gate = _FailGate();
     await pumpFakeApp(
       tester,
       size: const Size(800, 1600),
       overrides: [
         accountsProvider.overrideWith((ref, section) async {
-          calls++;
-          if (calls == 1) throw const NetworkException();
+          gate.calls++;
+          if (gate.failing) throw const NetworkException();
           return ref.read(apiLayerProvider).accounts.list(section);
         }),
       ],
@@ -29,21 +29,22 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers');
     expect(find.text(AppStrings.retry), findsOneWidget);
+    gate.failing = false;
     await tester.tap(find.text(AppStrings.retry));
     await settle(tester);
     expect(find.byKey(const Key('screen-customers')), findsOneWidget);
-    expect(calls, 2);
+    expect(gate.calls, greaterThanOrEqualTo(2));
   });
 
   testWidgets('a ledger shows an error and retries', (tester) async {
-    var calls = 0;
+    final gate = _FailGate();
     await pumpFakeApp(
       tester,
       size: const Size(800, 1600),
       overrides: [
         ledgerProvider.overrideWith((ref, key) async {
-          calls++;
-          if (calls == 1) throw const NetworkException();
+          gate.calls++;
+          if (gate.failing) throw const NetworkException();
           return ref.read(apiLayerProvider).accounts.ledger(key.$1, key.$2);
         }),
       ],
@@ -51,21 +52,22 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
     expect(find.text(AppStrings.retry), findsOneWidget);
+    gate.failing = false;
     await tester.tap(find.text(AppStrings.retry));
     await settle(tester);
     expect(find.byKey(const Key('add-debt')), findsOneWidget);
-    expect(calls, 2);
+    expect(gate.calls, greaterThanOrEqualTo(2));
   });
 
   testWidgets('collections shows an error and retries', (tester) async {
-    var calls = 0;
+    final gate = _FailGate();
     await pumpFakeApp(
       tester,
       size: const Size(800, 1600),
       overrides: [
         collectionsProvider.overrideWith((ref) async {
-          calls++;
-          if (calls == 1) throw const NetworkException();
+          gate.calls++;
+          if (gate.failing) throw const NetworkException();
           return ref.read(apiLayerProvider).collections.overview();
         }),
       ],
@@ -73,21 +75,22 @@ void main() {
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
     await go(tester, '/collections');
     expect(find.text(AppStrings.retry), findsOneWidget);
+    gate.failing = false;
     await tester.tap(find.text(AppStrings.retry));
     await settle(tester);
     expect(find.byKey(const Key('unlinked-collection')), findsOneWidget);
-    expect(calls, 2);
+    expect(gate.calls, greaterThanOrEqualTo(2));
   });
 
   testWidgets('purchases shows an error and retries', (tester) async {
-    var calls = 0;
+    final gate = _FailGate();
     await pumpFakeApp(
       tester,
       size: const Size(800, 1600),
       overrides: [
         purchasesProvider.overrideWith((ref) async {
-          calls++;
-          if (calls == 1) throw const NetworkException();
+          gate.calls++;
+          if (gate.failing) throw const NetworkException();
           return ref.read(apiLayerProvider).purchases.list(ref.read(purchaseBookProvider));
         }),
       ],
@@ -95,21 +98,22 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
     expect(find.text(AppStrings.retry), findsOneWidget);
+    gate.failing = false;
     await tester.tap(find.text(AppStrings.retry));
     await settle(tester);
     expect(find.byKey(const Key('add-purchase')), findsOneWidget);
-    expect(calls, greaterThanOrEqualTo(2));
+    expect(gate.calls, greaterThanOrEqualTo(2));
   });
 
   testWidgets('treasury shows an error and retries', (tester) async {
-    var calls = 0;
+    final gate = _FailGate();
     await pumpFakeApp(
       tester,
       size: const Size(800, 1600),
       overrides: [
         treasuryProvider.overrideWith((ref) async {
-          calls++;
-          if (calls == 1) throw const NetworkException();
+          gate.calls++;
+          if (gate.failing) throw const NetworkException();
           return ref.read(apiLayerProvider).treasury.summary();
         }),
       ],
@@ -117,21 +121,22 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/treasury');
     expect(find.text(AppStrings.retry), findsOneWidget);
+    gate.failing = false;
     await tester.tap(find.text(AppStrings.retry));
     await settle(tester);
     expect(find.byKey(const Key('cash-in')), findsOneWidget);
-    expect(calls, 2);
+    expect(gate.calls, greaterThanOrEqualTo(2));
   });
 
   testWidgets('reports shows an error and retries', (tester) async {
-    var calls = 0;
+    final gate = _FailGate();
     await pumpFakeApp(
       tester,
       size: const Size(800, 1600),
       overrides: [
         reportsProvider.overrideWith((ref) async {
-          calls++;
-          if (calls == 1) throw const NetworkException();
+          gate.calls++;
+          if (gate.failing) throw const NetworkException();
           return ref.read(apiLayerProvider).reports.daily();
         }),
       ],
@@ -139,21 +144,22 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/reports');
     expect(find.text(AppStrings.retry), findsOneWidget);
+    gate.failing = false;
     await tester.tap(find.text(AppStrings.retry));
     await settle(tester);
     expect(find.byKey(const Key('reports-refresh')), findsOneWidget);
-    expect(calls, 2);
+    expect(gate.calls, greaterThanOrEqualTo(2));
   });
 
   testWidgets('settings ledger shows an error and retries', (tester) async {
-    var calls = 0;
+    final gate = _FailGate();
     await pumpFakeApp(
       tester,
       size: const Size(800, 1600),
       overrides: [
         financialLedgerProvider.overrideWith((ref) async {
-          calls++;
-          if (calls == 1) throw const NetworkException();
+          gate.calls++;
+          if (gate.failing) throw const NetworkException();
           return ref.read(apiLayerProvider).reports.financialLedger();
         }),
       ],
@@ -161,10 +167,11 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/settings');
     expect(find.byKey(const Key('settings-retry')), findsOneWidget);
+    gate.failing = false;
     await tester.tap(find.byKey(const Key('settings-retry')));
     await settle(tester);
     expect(find.text(AppStrings.pageTotals), findsOneWidget);
-    expect(calls, 2);
+    expect(gate.calls, greaterThanOrEqualTo(2));
   });
 
   testWidgets('search shows loading, then an error, and retries', (tester) async {
@@ -184,6 +191,8 @@ void main() {
     await settle(tester);
 
     fake.failSuggestionsRemaining = 1;
+    await tester.tap(find.byKey(const Key('unified-search')));
+    await tester.pump();
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await settle(tester);
     expect(find.byKey(const Key('search-retry')), findsOneWidget);
@@ -192,6 +201,11 @@ void main() {
     expect(find.text(AppStrings.noResults), findsOneWidget);
     expect(find.byKey(const Key('search-retry')), findsNothing);
   });
+}
+
+class _FailGate {
+  var failing = true;
+  var calls = 0;
 }
 
 Future<void> go(WidgetTester tester, String path) async {

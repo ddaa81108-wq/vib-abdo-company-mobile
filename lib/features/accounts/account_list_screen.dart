@@ -251,16 +251,10 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   }
 
   Future<void> _create(BuildContext context) async {
-    final name = TextEditingController();
-    final phone = TextEditingController();
-    final opening = TextEditingController();
     final saved = await showAppForm<bool>(
       context,
-      _CreateForm(name: name, phone: phone, opening: opening, section: section),
+      _CreateForm(section: section),
     );
-    name.dispose();
-    phone.dispose();
-    opening.dispose();
     if (saved == true) {
       ref.invalidate(accountsProvider(section));
     }
@@ -611,16 +605,8 @@ class _RateCardState extends ConsumerState<_RateCard> {
 }
 
 class _CreateForm extends ConsumerStatefulWidget {
-  const _CreateForm({
-    required this.name,
-    required this.phone,
-    required this.opening,
-    required this.section,
-  });
+  const _CreateForm({required this.section});
 
-  final TextEditingController name;
-  final TextEditingController phone;
-  final TextEditingController opening;
   final AccountSection section;
 
   @override
@@ -628,21 +614,26 @@ class _CreateForm extends ConsumerStatefulWidget {
 }
 
 class _CreateFormState extends ConsumerState<_CreateForm> {
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+  final _opening = TextEditingController();
+
   @override
   void initState() {
     super.initState();
-    widget.name.addListener(_changed);
-    widget.phone.addListener(_changed);
-    widget.opening.addListener(_changed);
+    for (final controller in [_name, _phone, _opening]) {
+      controller.addListener(_changed);
+    }
   }
 
   void _changed() => setState(() {});
 
   @override
   void dispose() {
-    widget.name.removeListener(_changed);
-    widget.phone.removeListener(_changed);
-    widget.opening.removeListener(_changed);
+    for (final controller in [_name, _phone, _opening]) {
+      controller.removeListener(_changed);
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -655,22 +646,22 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
         const SizedBox(height: AppSpacing.md),
         TextField(
           key: const Key('create-name'),
-          controller: widget.name,
+          controller: _name,
           decoration: const InputDecoration(labelText: AppStrings.name),
         ),
         const SizedBox(height: AppSpacing.md),
         TextField(
-          controller: widget.phone,
+          controller: _phone,
           keyboardType: TextInputType.phone,
           textDirection: TextDirection.ltr,
           decoration: const InputDecoration(labelText: AppStrings.phone),
         ),
         const SizedBox(height: AppSpacing.md),
-        UnitsField(controller: widget.opening, label: AppStrings.openingBalance),
+        UnitsField(controller: _opening, label: AppStrings.openingBalance),
         const SizedBox(height: AppSpacing.lg),
         GuardedMutation(
           buttonKey: const Key('save-account'),
-          inputs: '${widget.name.text}|${widget.phone.text}|${widget.opening.text}',
+          inputs: '${_name.text}|${_phone.text}|${_opening.text}',
           label: AppStrings.save,
           onSubmit: _submit,
         ),
@@ -685,15 +676,15 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
   };
 
   Future<String?> _submit(MutationMeta meta) async {
-    final opening = widget.opening.text.trim().isEmpty ? null : parseUnits(widget.opening.text);
-    if (widget.name.text.trim().isEmpty) return AppStrings.integerOnly;
-    if (widget.opening.text.trim().isNotEmpty && opening == null) return AppStrings.integerOnly;
+    final opening = _opening.text.trim().isEmpty ? null : parseUnits(_opening.text);
+    if (_name.text.trim().isEmpty) return AppStrings.integerOnly;
+    if (_opening.text.trim().isNotEmpty && opening == null) return AppStrings.integerOnly;
     try {
       final ack = await ref.read(apiLayerProvider).accounts.create(
         widget.section,
         CreateAccountRequest(
-          name: widget.name.text.trim(),
-          phone: widget.phone.text.trim().isEmpty ? null : widget.phone.text.trim(),
+          name: _name.text.trim(),
+          phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
           openingBalance: opening,
         ),
         meta,

@@ -66,9 +66,7 @@ void main() {
     await pumpFakeApp(
       tester,
       size: const Size(800, 1600),
-      overrides: [
-        connectivityPortProvider.overrideWithValue(link),
-      ],
+      connectivity: link,
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers');
