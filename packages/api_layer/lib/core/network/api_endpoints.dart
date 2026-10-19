@@ -83,6 +83,7 @@ class ApiEndpoints {
   static const treasuryCashEntries = '/api/treasury/cash-entries';
   static const reports = '/api/reports';
   static const financialLedger = '/api/financial-ledger';
+  static const statementPdf = '/api/statements/pdf';
 
   // Admin (only the parts relevant to a mobile client)
   static const accountRequests = '/api/account-requests';

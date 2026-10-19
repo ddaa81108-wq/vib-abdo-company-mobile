@@ -83,7 +83,9 @@ void main() {
   }
 
   test('incoming numbers become text once on arrival', () {
-    expect(DecimalString.fromJson(9.5)!.value, '9.5');
+    final body = decodeWireJson('{"a":9.5,"b":9.50}') as Map;
+    expect(DecimalString.fromJson(body['a'])!.value, '9.5');
+    expect(DecimalString.fromJson(body['b'])!.value, '9.50');
     expect(DecimalString.fromJson('9.50')!.value, '9.50');
   });
 }

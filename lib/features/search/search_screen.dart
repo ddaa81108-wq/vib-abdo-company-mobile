@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_providers.dart';
+import '../../error_handling/error_handler.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/section_labels.dart';
 import '../../ui/strings.dart';
@@ -23,6 +24,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _query = TextEditingController();
   final _results = <SectionKey, List<AccountSuggestionDto>>{};
   var _busy = false;
+  String? _error;
 
   static const _sections = [
     AccountSection.customers,
@@ -51,8 +53,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           decoration: const InputDecoration(labelText: AppStrings.searchHint),
           onSubmitted: (_) => _run(),
         ),
-        if (_busy) const LinearProgressIndicator(),
-        if (!_busy && _query.text.isNotEmpty && _results.values.every((items) => items.isEmpty))
+        if (_busy) const SkeletonBox(key: Key('search-loading'), height: 48),
+        if (_error != null)
+          ErrorPane(
+            message: _error!,
+            onRetry: _run,
+            retryKey: const Key('search-retry'),
+          ),
+        if (!_busy &&
+            _error == null &&
+            _query.text.isNotEmpty &&
+            _results.values.every((items) => items.isEmpty))
           const EmptyPane(message: AppStrings.noResults),
         for (final entry in _results.entries)
           if (entry.value.isNotEmpty) ...[
@@ -73,13 +84,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final query = _query.text.trim();
     setState(() {
       _busy = true;
+      _error = null;
       _results.clear();
     });
-    for (final section in _sections) {
-      if (!permissions.canRead(section.sectionKey)) continue;
-      final items = await ref.read(apiLayerProvider).accounts.suggestions(section, query);
-      _results[section.sectionKey] = items;
+    try {
+      for (final section in _sections) {
+        if (!permissions.canRead(section.sectionKey)) continue;
+        final items = await ref.read(apiLayerProvider).accounts.suggestions(section, query);
+        _results[section.sectionKey] = items;
+      }
+    } catch (error) {
+      if (!mounted) return;
+      _error = ref.read(errorHandlerProvider).toFailure(error).message;
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    if (mounted) setState(() => _busy = false);
   }
 }

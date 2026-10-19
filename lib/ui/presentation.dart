@@ -3,7 +3,6 @@ import 'package:flutter_api_layer/api_layer.dart';
 
 import 'strings.dart';
 import 'theme.dart';
-import 'tokens.dart';
 
 /// Badge text from the server count. 0 draws nothing. 99 and above draw "99".
 String? badgeLabel(int? count) {
@@ -109,10 +108,9 @@ String? _fallbackLabel(String? ageStatus, AccountSection? section) {
   };
 }
 
-bool useFlatAgeCard(double width, Brightness brightness) =>
-    brightness == Brightness.light &&
-    width > AppBreakpoints.phone &&
-    width <= AppBreakpoints.tablet;
+/// Age colours are the same hex at every width. The tablet flat palette is not
+/// substituted for the phone/desktop gradient.
+bool useFlatAgeCard(double width, Brightness brightness) => false;
 
 String movementLabel({
   required AccountSection section,

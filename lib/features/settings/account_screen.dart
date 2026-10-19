@@ -43,22 +43,7 @@ class AccountScreen extends ConsumerWidget {
             message: ref.read(errorHandlerProvider).toFailure(error).message,
             onRetry: () => ref.invalidate(notificationPrefsProvider),
           ),
-          data: (data) => Column(
-            children: [
-              SwitchListTile(
-                key: const Key('sound-switch'),
-                title: const Text(AppStrings.sound),
-                value: data['soundEnabled'] == true,
-                onChanged: (value) => _save(ref, {...data, 'soundEnabled': value}),
-              ),
-              SwitchListTile(
-                key: const Key('speech-switch'),
-                title: const Text(AppStrings.speech),
-                value: data['speechEnabled'] == true,
-                onChanged: (value) => _save(ref, {...data, 'speechEnabled': value}),
-              ),
-            ],
-          ),
+          data: (data) => _PrefSwitches(data: data),
         ),
         const SizedBox(height: AppSpacing.md),
         ListTile(
@@ -76,12 +61,56 @@ class AccountScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _save(WidgetRef ref, Map<String, dynamic> next) async {
+}
+
+class _PrefSwitches extends ConsumerStatefulWidget {
+  const _PrefSwitches({required this.data});
+
+  final Map<String, dynamic> data;
+
+  @override
+  ConsumerState<_PrefSwitches> createState() => _PrefSwitchesState();
+}
+
+class _PrefSwitchesState extends ConsumerState<_PrefSwitches> {
+  var _saving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = widget.data;
+    return Column(
+      children: [
+        SwitchListTile(
+          key: const Key('sound-switch'),
+          title: const Text(AppStrings.sound),
+          value: data['soundEnabled'] == true,
+          onChanged: _saving ? null : (value) => _save({...data, 'soundEnabled': value}),
+        ),
+        SwitchListTile(
+          key: const Key('speech-switch'),
+          title: const Text(AppStrings.speech),
+          value: data['speechEnabled'] == true,
+          onChanged: _saving ? null : (value) => _save({...data, 'speechEnabled': value}),
+        ),
+        if (_saving)
+          const Padding(
+            padding: EdgeInsetsDirectional.only(top: AppSpacing.sm),
+            child: LinearProgressIndicator(),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _save(Map<String, dynamic> next) async {
+    if (_saving) return;
+    setState(() => _saving = true);
     try {
       await ref.read(apiLayerProvider).notifications.updatePreferences(next);
       ref.invalidate(notificationPrefsProvider);
     } catch (error) {
       ref.invalidate(notificationPrefsProvider);
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 }

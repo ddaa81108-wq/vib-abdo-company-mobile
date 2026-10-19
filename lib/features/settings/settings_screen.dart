@@ -18,18 +18,21 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final permissions = permissionsOf(ref);
-    final allowed = permissions.canDo(ManagementAction.settingsManage);
-    if (!allowed) return const ForbiddenPane();
+    final manage = permissions.canDo(ManagementAction.settingsManage);
+    final ledger = permissions.canReadPrivilegedFinance;
+    if (!manage && !ledger) return const ForbiddenPane();
     return ListView(
       key: screenKey,
       padding: pagePadding(MediaQuery.sizeOf(context).width),
       children: [
         const ScreenTitle(AppStrings.settings),
         const SizedBox(height: AppSpacing.md),
-        _Tile(title: AppStrings.employeesTile, body: AppStrings.unavailable),
-        _Tile(title: AppStrings.auditTile, body: AppStrings.unavailable),
-        _Tile(title: AppStrings.operationsTile, body: AppStrings.unavailable),
-        const _LedgerTile(),
+        if (manage) ...[
+          _Tile(title: AppStrings.employeesTile, body: AppStrings.unavailable),
+          _Tile(title: AppStrings.auditTile, body: AppStrings.unavailable),
+          _Tile(title: AppStrings.operationsTile, body: AppStrings.unavailable),
+        ],
+        if (ledger) const _LedgerTile(),
         const SizedBox(height: AppSpacing.lg),
         Text(AppStrings.noLanguage, style: Theme.of(context).textTheme.bodySmall),
       ],
@@ -72,7 +75,11 @@ class _LedgerTile extends ConsumerWidget {
             Text(AppStrings.financialLedger, style: Theme.of(context).textTheme.titleSmall),
             page.when(
               loading: () => const SkeletonBox(height: 48),
-              error: (error, _) => Text(ref.read(errorHandlerProvider).toFailure(error).message),
+              error: (error, _) => ErrorPane(
+                message: ref.read(errorHandlerProvider).toFailure(error).message,
+                onRetry: () => ref.invalidate(financialLedgerProvider),
+                retryKey: const Key('settings-retry'),
+              ),
               data: (data) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

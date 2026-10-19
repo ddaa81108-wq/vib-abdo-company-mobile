@@ -14,6 +14,7 @@ class DailyReportRowDto {
     this.netChangeUnits,
     this.status,
     this.note,
+    this.reasons = const [],
   });
   final int sequence;
   final String? date;
@@ -30,6 +31,7 @@ class DailyReportRowDto {
   final String?
       status; // normal | needs_review | urgent_review | rate_missing (🔶)
   final String? note;
+  final List<ReportReasonDto> reasons;
 
   factory DailyReportRowDto.fromJson(Json j) => DailyReportRowDto(
         sequence: intOrNull(j['sequence']) ?? 0,
@@ -44,6 +46,19 @@ class DailyReportRowDto {
         netChangeUnits: unitsOrNull(j['netChangeUnits']),
         status: strOrNull(j['status']),
         note: strOrNull(j['note'] ?? j['systemNote']),
+        reasons: asJsonList(j['reasons'])
+            .map(ReportReasonDto.fromJson)
+            .toList(growable: false),
+      );
+}
+
+class ReportReasonDto {
+  const ReportReasonDto({this.text, this.changeUnits});
+  final String? text;
+  final int? changeUnits;
+  factory ReportReasonDto.fromJson(Json j) => ReportReasonDto(
+        text: strOrNull(j['text'] ?? j['message'] ?? j['label']),
+        changeUnits: unitsOrNull(j['changeUnits']),
       );
 }
 

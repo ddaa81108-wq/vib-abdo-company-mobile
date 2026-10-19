@@ -1,4 +1,5 @@
 import 'common.dart';
+import 'home_models.dart';
 
 /// GET /api/treasury — the five cards, all server-computed.
 /// Each value is shown with ITS OWN currency; the app never converts or nets them.
@@ -13,6 +14,7 @@ class TreasurySummaryDto {
     this.netUnits,
     this.version,
     this.rateMissing = false,
+    this.activeCashTone,
   });
   final int? receivablesUnits; // LYD — ديون لنا
   final int? liabilitiesUnits; // LYD — ديون علينا
@@ -23,6 +25,9 @@ class TreasurySummaryDto {
   final int? netUnits; // LYD — صافي الخزينة (server)
   final int? version; // -> expectedVersion for cash entries
   final bool rateMissing; // "يلزم سعر تحويل معتمد"
+
+  /// Server colour for the active-cash card. Null stays neutral.
+  final SummaryTone? activeCashTone;
 
   static const Currency lydFields = Currency.lyd;
   static const Currency egyptianSourceCurrency = Currency.egp;
@@ -40,6 +45,8 @@ class TreasurySummaryDto {
       netUnits: unitsOrNull(t['netUnits']),
       version: intOrNull(d['version'] ?? t['version']),
       rateMissing: t['egyptianRate'] == null,
+      activeCashTone: SummaryTone.fromServer(
+          t['activeCashTone'] ?? t['tone'] ?? d['activeCashTone']),
     );
   }
 }

@@ -45,9 +45,10 @@ ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
       color: scheme.surface,
       elevation: 0,
       margin: EdgeInsets.zero,
+      shadowColor: dark ? const Color(0x00000000) : scheme.shadow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.card),
-        side: BorderSide(color: scheme.outlineVariant),
+        side: BorderSide(color: dark ? scheme.outline : scheme.outlineVariant),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -373,6 +374,10 @@ class AppSidebarPalette extends ThemeExtension<AppSidebarPalette> {
       other is AppSidebarPalette && t >= 0.5 ? other : this;
 }
 
+/// CSS `linear-gradient(145deg)` in physical space, so RTL does not mirror it.
+const _statusGradientBegin = Alignment(-0.5736, -0.8192);
+const _statusGradientEnd = Alignment(0.5736, 0.8192);
+
 @immutable
 class AppStatusColors extends ThemeExtension<AppStatusColors> {
   const AppStatusColors({
@@ -407,6 +412,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
     required this.unlinkedApproved,
     required this.dayTones,
     required this.neutralCard,
+    required this.zeroCardBorder,
   });
 
   final Color onStatus;
@@ -441,35 +447,38 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
   final List<Color> dayTones;
   final Color neutralCard;
 
+  /// `.customer-card.zero-balance` border from the web CSS.
+  final Color zeroCardBorder;
+
   static const light = AppStatusColors(
     onStatus: Color(0xFFFFFFFF),
     newDebt: LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomLeft,
+      begin: _statusGradientBegin,
+      end: _statusGradientEnd,
       colors: [Color(0xFF3548FF), Color(0xFF211CAF), Color(0xFF15126F)],
       stops: [0, 0.52, 1],
     ),
     warningDebt: LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomLeft,
+      begin: _statusGradientBegin,
+      end: _statusGradientEnd,
       colors: [Color(0xFFFF9A00), Color(0xFFE36D00), Color(0xFF9F3F00)],
       stops: [0, 0.52, 1],
     ),
     overdueDebt: LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomLeft,
+      begin: _statusGradientBegin,
+      end: _statusGradientEnd,
       colors: [Color(0xFFFF164E), Color(0xFFD30036), Color(0xFF870021)],
       stops: [0, 0.52, 1],
     ),
     zeroBalance: LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomLeft,
+      begin: _statusGradientBegin,
+      end: _statusGradientEnd,
       colors: [Color(0xFF151515), Color(0xFF050505), Color(0xFF000000)],
       stops: [0, 0.58, 1],
     ),
     creditBalance: LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomLeft,
+      begin: _statusGradientBegin,
+      end: _statusGradientEnd,
       colors: [Color(0xFF00C77B), Color(0xFF00965E), Color(0xFF00603E)],
       stops: [0, 0.52, 1],
     ),
@@ -504,33 +513,34 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
       Color(0xFFEEEAF6),
     ],
     neutralCard: Color(0xFFFFFFFF),
+    zeroCardBorder: Color(0xFF737373),
   );
 
   static const dark = AppStatusColors(
     onStatus: Color(0xFFFFFFFF),
     newDebt: LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomLeft,
+      begin: _statusGradientBegin,
+      end: _statusGradientEnd,
       colors: [Color(0xFF294B80), Color(0xFF1A3053)],
     ),
     warningDebt: LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomLeft,
+      begin: _statusGradientBegin,
+      end: _statusGradientEnd,
       colors: [Color(0xFF78551E), Color(0xFF503912)],
     ),
     overdueDebt: LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomLeft,
+      begin: _statusGradientBegin,
+      end: _statusGradientEnd,
       colors: [Color(0xFF813849), Color(0xFF552537)],
     ),
     zeroBalance: LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomLeft,
+      begin: _statusGradientBegin,
+      end: _statusGradientEnd,
       colors: [Color(0xFF24262B), Color(0xFF14161A)],
     ),
     creditBalance: LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomLeft,
+      begin: _statusGradientBegin,
+      end: _statusGradientEnd,
       colors: [Color(0xFF24634F), Color(0xFF193E36)],
     ),
     flatNew: Color(0xFF294B80),
@@ -548,12 +558,12 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
     badgeBg: Color(0xFFDC2626),
     cashPositive: Color(0xFF087A50),
     cashNegative: Color(0xFFB43131),
-    chipNormalBg: Color(0xFF0C1B18),
-    chipNormalFg: Color(0xFF3CCB8A),
-    chipReviewBg: Color(0xFF29210E),
-    chipReviewFg: Color(0xFFFFF0C4),
-    chipCriticalBg: Color(0xFF2A1417),
-    chipCriticalFg: Color(0xFFFFB1B7),
+    chipNormalBg: Color(0xFFE7F7F1),
+    chipNormalFg: Color(0xFF08795C),
+    chipReviewBg: Color(0xFFFFF0C4),
+    chipReviewFg: Color(0xFF91600D),
+    chipCriticalBg: Color(0xFFFDE1E5),
+    chipCriticalFg: Color(0xFFB32635),
     unlinkedPending: Color(0xFF4F5F73),
     unlinkedApproved: Color(0xFF178447),
     dayTones: [
@@ -564,6 +574,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
       Color(0xFF241E30),
     ],
     neutralCard: Color(0xFF172333),
+    zeroCardBorder: Color(0xFF737373),
   );
 
   @override

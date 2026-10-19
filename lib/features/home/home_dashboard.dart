@@ -72,7 +72,7 @@ class HomeDashboard extends ConsumerWidget {
                   cards: _visibleCards(home, permissions),
                   money: money,
                   width: constraints.maxWidth,
-                  columns: AppBreakpoints.cardColumns(width).clamp(1, 4),
+                  columns: AppBreakpoints.cardColumns(width),
                 ),
               ),
             if (home.oldDebts != null &&
@@ -83,9 +83,18 @@ class HomeDashboard extends ConsumerWidget {
               const SizedBox(height: AppSpacing.sm),
               if (_visibleDebts(home, permissions).isEmpty)
                 const Text(AppStrings.emptyTicker)
-              else
+              else ...[
                 for (final debt in _visibleDebts(home, permissions))
                   _DebtRow(debt: debt, money: money),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton(
+                    key: const Key('show-all-home'),
+                    onPressed: () => context.go('/customers'),
+                    child: const Text(AppStrings.showAll),
+                  ),
+                ),
+              ],
             ],
           ],
           const SizedBox(height: AppSpacing.xl),
@@ -120,17 +129,19 @@ class HomeDashboard extends ConsumerWidget {
           else
             LayoutBuilder(
               builder: (context, constraints) {
-                final tiles = [
-                  for (final section in summary.sections) _sectionTile(context, section, summary, online),
-                ];
-                if (constraints.maxWidth < 520) {
-                  return Column(children: tiles);
-                }
-                final tileWidth = (constraints.maxWidth - AppSpacing.md) / 2;
+                final columns = AppBreakpoints.cardColumns(constraints.maxWidth);
+                final tileWidth =
+                    ((constraints.maxWidth - AppSpacing.md * (columns - 1)) / columns)
+                        .clamp(96.0, constraints.maxWidth);
                 return Wrap(
                   spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.md,
                   children: [
-                    for (final tile in tiles) SizedBox(width: tileWidth, child: tile),
+                    for (final section in summary.sections)
+                      SizedBox(
+                        width: tileWidth,
+                        child: _sectionTile(context, section, summary, online),
+                      ),
                   ],
                 );
               },
@@ -172,8 +183,8 @@ class HomeDashboard extends ConsumerWidget {
             ? TextButton(
                 key: HomeShell.writeKey(section),
                 style: TextButton.styleFrom(
-                  minimumSize: const Size(48, 36),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  minimumSize: const Size(48, 48),
+                  tapTargetSize: MaterialTapTargetSize.padded,
                 ),
                 onPressed: online ? () => context.go(sectionPath(section)) : null,
                 child: Text(_writeLabel(section)),

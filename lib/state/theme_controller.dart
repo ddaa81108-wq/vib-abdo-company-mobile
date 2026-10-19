@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_providers.dart';
+import 'connectivity.dart';
 
 class ThemeModeController extends Notifier<ThemeMode> {
   static const _key = 'app-theme';
@@ -39,7 +40,14 @@ final themeModeProvider = NotifierProvider<ThemeModeController, ThemeMode>(
 
 class OnlineController extends Notifier<bool> {
   @override
-  bool build() => true;
+  bool build() {
+    final port = ref.watch(connectivityPortProvider);
+    final sub = port.watch().listen((online) {
+      if (ref.mounted) state = online;
+    });
+    ref.onDispose(sub.cancel);
+    return true;
+  }
 
   void setOnline(bool value) => state = value;
 }

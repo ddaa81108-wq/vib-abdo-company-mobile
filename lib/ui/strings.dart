@@ -83,6 +83,8 @@ abstract final class AppStrings {
   static const noNotifications = 'لا توجد إشعارات';
   static const refresh = 'تحديث';
   static const integerOnly = 'أدخل عددًا صحيحًا كما هو، بلا كسور.';
+  static const unitsHint =
+      'عدد صحيح بالوحدة الصغرى التي يخزّنها الخادم. بلا فواصل وبلا كسور. التطبيق لا يحوّل هذا الرقم ولا يحسبه.';
   static const rateInvalid = 'أدخل السعر نصًا كما هو.';
   static const noPreview = 'الناتج يظهر من الخادم بعد الحفظ فقط.';
   static const reversed = 'ملغاة';
@@ -254,6 +256,14 @@ abstract final class AppStrings {
   static const alBayan = 'البيان';
   static const simsim = 'سمسم';
   static const otherKind = 'نوع آخر';
+  static const kindVodafone = 'فودافون';
+  static const kindKafr = 'كفر الشيخ';
+  static const kindCairo = 'القاهرة';
+  static const kindMansoura = 'المنصورة';
+  static const kindFawry = 'فوري';
+  static const kindBanks = 'بنوك';
+  static const chooseKind = 'اختر نوع العملية';
+  static const assignee = 'الموظف';
   static const confirmPayroll = 'تأكيد حركة المرتب';
   static const link = 'ربط';
   static const batch = 'الدفعة';

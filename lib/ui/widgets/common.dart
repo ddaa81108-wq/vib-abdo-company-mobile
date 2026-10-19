@@ -7,11 +7,10 @@ import '../theme.dart';
 import '../tokens.dart';
 
 class MoneyText extends StatelessWidget {
-  const MoneyText(this.text, {super.key, this.style, this.maxLines = 1});
+  const MoneyText(this.text, {super.key, this.style});
 
   final String text;
   final TextStyle? style;
-  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +19,6 @@ class MoneyText extends StatelessWidget {
       textDirection: TextDirection.ltr,
       child: Text(
         text,
-        maxLines: maxLines,
         softWrap: true,
         style: (style ?? extras.amount).copyWith(fontFamily: 'JetBrainsMono'),
       ),
@@ -310,6 +308,8 @@ Future<T?> showAppForm<T>(BuildContext context, Widget child) {
   );
 }
 
+/// Parses the minor-unit integer the server stores. The text is not scaled,
+/// rounded, or combined with any other amount.
 int? parseUnits(String raw) {
   final text = raw.trim();
   if (text.isEmpty) return null;
@@ -329,7 +329,11 @@ class UnitsField extends StatelessWidget {
       keyboardType: TextInputType.number,
       textDirection: TextDirection.ltr,
       textAlign: TextAlign.start,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(
+        labelText: label,
+        helperText: AppStrings.unitsHint,
+        helperMaxLines: 3,
+      ),
     );
   }
 }

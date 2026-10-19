@@ -2,7 +2,11 @@
 
 Android client for a debt, trust, and collection system. Two currencies are shown: the Libyan dinar (LYD, د.ل) and the Egyptian pound (EGP, ج.م). This repository is the mobile app only. It does not contain a database or a server.
 
-Feature screens beyond sign-in and a home shell are not built yet. The home shell lists the sections the server says the signed-in person may open, and hides every row or control they cannot use. A control is disabled only while a request is in progress.
+The home shell lists the sections the server says the signed-in person may open, and hides every row or control they cannot use. A write control is disabled, with a progress indicator, only while that send is in progress.
+
+Customer debts, company debts, Libyan deposits, and Egyptian deposits are the same two screens. `AccountListScreen` renders the card list for all four, and `LedgerScreen` renders one card's movements. The `AccountSection` argument chooses the repository path, the currency, and the Arabic labels. Collections, purchases, treasury, reports, settings, and notifications each have their own screen.
+
+A form creates one `requestId` when it opens. A retry of the same inputs reuses that id. Changing an input, opening a new form, or a successful send starts a new id.
 
 ## Rules
 
@@ -31,6 +35,7 @@ lib/
     splash/            Session restore
     login/             Sign-in screen
     home/              Home shell: server summary plus permission-gated sections
+    accounts/          Shared list and ledger for customers, companies, and both deposit sections
   ui/                  Theme, Arabic copy, section labels
   notifications/       Unread badge, no-op push, realtime start/stop
   secure_storage/      Cookie jar and token store (flutter_secure_storage)

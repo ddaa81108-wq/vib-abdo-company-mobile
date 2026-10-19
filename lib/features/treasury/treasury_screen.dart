@@ -11,6 +11,7 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/mutation_form.dart';
 
 class TreasuryScreen extends ConsumerWidget {
   const TreasuryScreen({super.key});
@@ -74,7 +75,7 @@ class TreasuryScreen extends ConsumerWidget {
             children: [
               for (final entry in page.items) _CashRow(entry: entry, money: money),
               if (page.nextCursor != null)
-                const TextButton(onPressed: null, child: Text(AppStrings.loadOlder)),
+                _LoadOlderCash(cursor: page.nextCursor!, seed: page.items),
             ],
           ),
         ),
@@ -82,50 +83,92 @@ class TreasuryScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _entry(BuildContext context, WidgetRef ref, CashDirection direction) async {
-    final amount = TextEditingController();
-    final note = TextEditingController();
+  Future<void> _entry(BuildContext context, WidgetRef ref, CashDirection direction) {
     final version = ref.read(treasuryProvider).asData?.value.version;
-    await showAppForm<void>(
+    return showAppForm<void>(
       context,
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(direction == CashDirection.cashIn ? AppStrings.cashIn : AppStrings.cashOut),
-          UnitsField(controller: amount, label: AppStrings.amount),
-          TextField(controller: note, decoration: const InputDecoration(labelText: AppStrings.description)),
-          FilledButton(
-            onPressed: () async {
-              final units = parseUnits(amount.text);
-              if (units == null) return;
-              try {
-                final ack = await ref.read(apiLayerProvider).treasury.addCashEntry(
-                  CashEntryRequest(
-                    direction: direction,
-                    amountUnits: units,
-                    description: note.text.trim(),
-                  ),
-                  MutationMeta(expectedVersion: version),
-                );
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-                );
-                ref.invalidate(treasuryProvider);
-                ref.invalidate(cashLedgerProvider);
-                Navigator.of(context).pop();
-              } catch (error) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(ref.read(errorHandlerProvider).toFailure(error).message)),
-                );
-              }
-            },
-            child: const Text(AppStrings.save),
-          ),
-        ],
-      ),
+      _CashForm(direction: direction, version: version),
     );
+  }
+}
+
+class _CashForm extends ConsumerStatefulWidget {
+  const _CashForm({required this.direction, required this.version});
+
+  final CashDirection direction;
+  final int? version;
+
+  @override
+  ConsumerState<_CashForm> createState() => _CashFormState();
+}
+
+class _CashFormState extends ConsumerState<_CashForm> {
+  final _amount = TextEditingController();
+  final _note = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _amount.addListener(_changed);
+    _note.addListener(_changed);
+  }
+
+  void _changed() => setState(() {});
+
+  @override
+  void dispose() {
+    _amount.removeListener(_changed);
+    _note.removeListener(_changed);
+    _amount.dispose();
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(widget.direction == CashDirection.cashIn ? AppStrings.cashIn : AppStrings.cashOut),
+        UnitsField(controller: _amount, label: AppStrings.amount),
+        TextField(
+          controller: _note,
+          decoration: const InputDecoration(labelText: AppStrings.description),
+        ),
+        GuardedMutation(
+          buttonKey: const Key('save-cash'),
+          inputs: '${widget.direction.name}|${_amount.text}|${_note.text}',
+          expectedVersion: widget.version,
+          label: AppStrings.save,
+          onSubmit: _submit,
+        ),
+      ],
+    );
+  }
+
+  Future<String?> _submit(MutationMeta meta) async {
+    final units = parseUnits(_amount.text);
+    if (units == null) return AppStrings.integerOnly;
+    try {
+      final ack = await ref.read(apiLayerProvider).treasury.addCashEntry(
+        CashEntryRequest(
+          direction: widget.direction,
+          amountUnits: units,
+          description: _note.text.trim(),
+        ),
+        meta,
+      );
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+      );
+      ref.invalidate(treasuryProvider);
+      ref.invalidate(cashLedgerProvider);
+      Navigator.of(context).pop();
+      return null;
+    } catch (error) {
+      return ref.read(errorHandlerProvider).toFailure(error).message;
+    }
   }
 }
 
@@ -139,13 +182,11 @@ class _Cards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.statusColors;
-    final cashColor = data.activeCashUnits == null
-        ? null
-        : data.activeCashUnits! > 0
-        ? colors.cashPositive
-        : data.activeCashUnits! < 0
-        ? colors.cashNegative
-        : null;
+    final cashColor = switch (data.activeCashTone) {
+      SummaryTone.positive => colors.cashPositive,
+      SummaryTone.negative => colors.cashNegative,
+      _ => null,
+    };
     final net = _tile(
       context,
       AppStrings.netTreasury,
@@ -237,6 +278,67 @@ class _Egyptian extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _LoadOlderCash extends ConsumerStatefulWidget {
+  const _LoadOlderCash({required this.cursor, required this.seed});
+
+  final String cursor;
+  final List<CashEntryDto> seed;
+
+  @override
+  ConsumerState<_LoadOlderCash> createState() => _LoadOlderCashState();
+}
+
+class _LoadOlderCashState extends ConsumerState<_LoadOlderCash> {
+  final _extra = <CashEntryDto>[];
+  String? _cursor;
+  var _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cursor = widget.cursor;
+  }
+
+  Future<void> _load() async {
+    final cursor = _cursor;
+    if (cursor == null || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final page = await ref.read(apiLayerProvider).treasury.cashLedger(before: cursor);
+      if (!mounted) return;
+      setState(() {
+        _extra.addAll(page.items);
+        _cursor = page.nextCursor;
+        _busy = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final money = ref.watch(apiLayerProvider).money;
+    return Column(
+      children: [
+        for (final entry in _extra) _CashRow(entry: entry, money: money),
+        if (_cursor != null)
+          TextButton(
+            key: const Key('load-older'),
+            onPressed: _busy ? null : _load,
+            child: _busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text(AppStrings.loadOlder),
+          ),
+      ],
     );
   }
 }

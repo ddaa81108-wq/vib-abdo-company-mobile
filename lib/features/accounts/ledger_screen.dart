@@ -12,7 +12,10 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/mutation_form.dart';
 
+/// Ledger for one card. Customers, companies, Libyan deposits, and Egyptian
+/// deposits all use this screen; [section] selects the repository and the labels.
 class LedgerScreen extends ConsumerWidget {
   const LedgerScreen({required this.section, required this.id, super.key});
 
@@ -79,14 +82,16 @@ class LedgerScreen extends ConsumerWidget {
                           : AppStrings.paymentMovement,
                       onPressed: () => _movement(context, ref, type: 'payment'),
                     ),
-                    GatedButton(
+                    GuardedMutation(
                       buttonKey: const Key('full-payment'),
                       allowed: section != AccountSection.libyanDeposits &&
                           section != AccountSection.egyptianDeposits,
                       online: online,
                       filled: false,
+                      inputs: 'full:${card.asData?.value.version}',
+                      expectedVersion: card.asData?.value.version,
                       label: AppStrings.fullPayment,
-                      onPressed: () => _full(context, ref, card.asData?.value.version),
+                      onSubmit: (meta) => _full(context, ref, meta),
                     ),
                   ],
                 ),
@@ -109,12 +114,18 @@ class LedgerScreen extends ConsumerWidget {
                     showBalance: showBalance,
                     canWrite: canWrite,
                     online: online,
-                    onCancel: () => _cancel(context, ref, entry),
+                    onCancel: (meta) => _cancel(context, ref, entry, meta),
                   ),
-              if (page.page.hasMore)
-                TextButton(
-                  onPressed: () => ref.invalidate(ledgerProvider((section, id))),
-                  child: const Text(AppStrings.loadOlder),
+              if (page.page.nextCursor != null)
+                _LoadOlderLedger(
+                  section: section,
+                  id: id,
+                  cursor: page.page.nextCursor!,
+                  money: money,
+                  showBalance: showBalance,
+                  canWrite: canWrite,
+                  online: online,
+                  onCancel: (entry, meta) => _cancel(context, ref, entry, meta),
                 ),
             ],
           );
@@ -124,102 +135,9 @@ class LedgerScreen extends ConsumerWidget {
   }
 
   Future<void> _movement(BuildContext context, WidgetRef ref, {required String type}) async {
-    final amount = TextEditingController();
-    final factor = TextEditingController();
-    final note = TextEditingController();
-    final date = TextEditingController(text: formatIsoDate(DateTime.now()));
-    var mode = CalculationMode.direct;
     final saved = await showAppForm<bool>(
       context,
-      StatefulBuilder(
-        builder: (context, setLocal) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              type == 'payment' ? AppStrings.paymentMovement : AppStrings.debtMovement,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const Text(AppStrings.noPreview),
-            const SizedBox(height: AppSpacing.md),
-            UnitsField(controller: amount, label: AppStrings.amount),
-            const SizedBox(height: AppSpacing.md),
-            DropdownButton<CalculationMode>(
-              value: mode,
-              isExpanded: true,
-              items: const [
-                DropdownMenuItem(value: CalculationMode.direct, child: Text(AppStrings.direct)),
-                DropdownMenuItem(value: CalculationMode.divide, child: Text(AppStrings.divide)),
-                DropdownMenuItem(value: CalculationMode.multiply, child: Text(AppStrings.multiply)),
-              ],
-              onChanged: (value) => setLocal(() => mode = value ?? CalculationMode.direct),
-            ),
-            if (mode != CalculationMode.direct)
-              TextField(
-                controller: factor,
-                textDirection: TextDirection.ltr,
-                decoration: const InputDecoration(labelText: AppStrings.factor),
-              ),
-            TextField(
-              controller: date,
-              textDirection: TextDirection.ltr,
-              decoration: const InputDecoration(labelText: AppStrings.date),
-            ),
-            TextField(
-              controller: note,
-              decoration: const InputDecoration(labelText: AppStrings.note),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            FilledButton(
-              onPressed: () async {
-                final units = parseUnits(amount.text);
-                if (units == null) return;
-                final parsedDate = DateTime.tryParse(date.text);
-                if (parsedDate == null) return;
-                DecimalString? factorValue;
-                if (mode != CalculationMode.direct) {
-                  factorValue = DecimalString.tryParse(factor.text);
-                  if (factorValue == null) return;
-                }
-                final cardVersion = ref.read(accountCardProvider((section, id))).asData?.value.version;
-                final request = type == 'payment'
-                    ? AccountTransactionRequest.partialPayment(
-                        inputValue: units,
-                        mode: mode,
-                        factor: factorValue,
-                        date: parsedDate,
-                        note: note.text.trim().isEmpty ? null : note.text.trim(),
-                      )
-                    : AccountTransactionRequest.debt(
-                        inputValue: units,
-                        mode: mode,
-                        factor: factorValue,
-                        date: parsedDate,
-                        note: note.text.trim().isEmpty ? null : note.text.trim(),
-                      );
-                try {
-                  final ack = await ref.read(apiLayerProvider).accounts.addTransaction(
-                    section,
-                    id,
-                    request,
-                    MutationMeta(expectedVersion: cardVersion),
-                  );
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-                  );
-                  Navigator.of(context).pop(true);
-                } catch (error) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(ref.read(errorHandlerProvider).toFailure(error).message)),
-                  );
-                }
-              },
-              child: const Text(AppStrings.save),
-            ),
-          ],
-        ),
-      ),
+      _MovementForm(section: section, id: id, type: type),
     );
     if (saved == true) {
       ref.invalidate(ledgerProvider((section, id)));
@@ -228,59 +146,188 @@ class LedgerScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _full(BuildContext context, WidgetRef ref, int? version) async {
+  Future<String?> _full(BuildContext context, WidgetRef ref, MutationMeta meta) async {
     try {
       final ack = await ref.read(apiLayerProvider).accounts.addTransaction(
         section,
         id,
         AccountTransactionRequest.fullPayment(date: DateTime.now()),
-        MutationMeta(expectedVersion: version),
+        meta,
       );
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+        );
+      }
       ref.invalidate(ledgerProvider((section, id)));
       ref.invalidate(accountsProvider(section));
+      return null;
     } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ref.read(errorHandlerProvider).toFailure(error).message)),
-      );
+      return ref.read(errorHandlerProvider).toFailure(error).message;
     }
   }
 
-  Future<void> _cancel(BuildContext context, WidgetRef ref, LedgerEntryDto entry) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        content: const Text(AppStrings.confirmCancel),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text(AppStrings.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text(AppStrings.confirm)),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
+  Future<String?> _cancel(
+    BuildContext context,
+    WidgetRef ref,
+    LedgerEntryDto entry,
+    MutationMeta meta,
+  ) async {
     try {
       final ack = await ref.read(apiLayerProvider).accounts.cancelTransaction(
         section,
         id,
         entry.id,
-        MutationMeta(expectedVersion: entry.version),
+        meta,
       );
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+        );
+      }
       ref.invalidate(ledgerProvider((section, id)));
+      return null;
     } catch (error) {
-      if (!context.mounted) return;
       final failure = ref.read(errorHandlerProvider).toFailure(error);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(failure.message)));
       if (failure.code == 'VERSION_CONFLICT') {
         ref.invalidate(ledgerProvider((section, id)));
       }
+      return failure.message;
+    }
+  }
+}
+
+class _MovementForm extends ConsumerStatefulWidget {
+  const _MovementForm({required this.section, required this.id, required this.type});
+
+  final AccountSection section;
+  final String id;
+  final String type;
+
+  @override
+  ConsumerState<_MovementForm> createState() => _MovementFormState();
+}
+
+class _MovementFormState extends ConsumerState<_MovementForm> {
+  final _amount = TextEditingController();
+  final _factor = TextEditingController();
+  final _note = TextEditingController();
+  late final TextEditingController _date = TextEditingController(text: formatIsoDate(DateTime.now()));
+  var _mode = CalculationMode.direct;
+
+  @override
+  void initState() {
+    super.initState();
+    for (final controller in [_amount, _factor, _note, _date]) {
+      controller.addListener(_changed);
+    }
+  }
+
+  void _changed() => setState(() {});
+
+  @override
+  void dispose() {
+    for (final controller in [_amount, _factor, _note, _date]) {
+      controller.removeListener(_changed);
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          widget.type == 'payment' ? AppStrings.paymentMovement : AppStrings.debtMovement,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const Text(AppStrings.noPreview),
+        const SizedBox(height: AppSpacing.md),
+        UnitsField(
+          key: const Key('movement-amount'),
+          controller: _amount,
+          label: AppStrings.amount,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        DropdownButton<CalculationMode>(
+          value: _mode,
+          isExpanded: true,
+          items: const [
+            DropdownMenuItem(value: CalculationMode.direct, child: Text(AppStrings.direct)),
+            DropdownMenuItem(value: CalculationMode.divide, child: Text(AppStrings.divide)),
+            DropdownMenuItem(value: CalculationMode.multiply, child: Text(AppStrings.multiply)),
+          ],
+          onChanged: (value) => setState(() => _mode = value ?? CalculationMode.direct),
+        ),
+        if (_mode != CalculationMode.direct)
+          TextField(
+            controller: _factor,
+            textDirection: TextDirection.ltr,
+            decoration: const InputDecoration(labelText: AppStrings.factor),
+          ),
+        TextField(
+          controller: _date,
+          textDirection: TextDirection.ltr,
+          decoration: const InputDecoration(labelText: AppStrings.date),
+        ),
+        TextField(
+          controller: _note,
+          decoration: const InputDecoration(labelText: AppStrings.note),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        GuardedMutation(
+          buttonKey: const Key('save-movement'),
+          inputs: '${widget.type}|$_mode|${_amount.text}|${_factor.text}|${_date.text}|${_note.text}',
+          expectedVersion: ref.watch(accountCardProvider((widget.section, widget.id))).asData?.value.version,
+          label: AppStrings.save,
+          onSubmit: _submit,
+        ),
+      ],
+    );
+  }
+
+  Future<String?> _submit(MutationMeta meta) async {
+    final units = parseUnits(_amount.text);
+    if (units == null) return AppStrings.integerOnly;
+    final parsedDate = DateTime.tryParse(_date.text);
+    if (parsedDate == null) return AppStrings.integerOnly;
+    DecimalString? factorValue;
+    if (_mode != CalculationMode.direct) {
+      factorValue = DecimalString.tryParse(_factor.text);
+      if (factorValue == null) return AppStrings.rateInvalid;
+    }
+    final request = widget.type == 'payment'
+        ? AccountTransactionRequest.partialPayment(
+            inputValue: units,
+            mode: _mode,
+            factor: factorValue,
+            date: parsedDate,
+            note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+          )
+        : AccountTransactionRequest.debt(
+            inputValue: units,
+            mode: _mode,
+            factor: factorValue,
+            date: parsedDate,
+            note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+          );
+    try {
+      final ack = await ref.read(apiLayerProvider).accounts.addTransaction(
+        widget.section,
+        widget.id,
+        request,
+        meta,
+      );
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+      );
+      Navigator.of(context).pop(true);
+      return null;
+    } catch (error) {
+      return ref.read(errorHandlerProvider).toFailure(error).message;
     }
   }
 }
@@ -324,6 +371,94 @@ class _Header extends StatelessWidget {
   }
 }
 
+class _LoadOlderLedger extends ConsumerStatefulWidget {
+  const _LoadOlderLedger({
+    required this.section,
+    required this.id,
+    required this.cursor,
+    required this.money,
+    required this.showBalance,
+    required this.canWrite,
+    required this.online,
+    required this.onCancel,
+  });
+
+  final AccountSection section;
+  final String id;
+  final String cursor;
+  final MoneyFormatter money;
+  final bool showBalance;
+  final bool canWrite;
+  final bool online;
+  final Future<String?> Function(LedgerEntryDto entry, MutationMeta meta) onCancel;
+
+  @override
+  ConsumerState<_LoadOlderLedger> createState() => _LoadOlderLedgerState();
+}
+
+class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
+  final _extra = <LedgerEntryDto>[];
+  String? _cursor;
+  var _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cursor = widget.cursor;
+  }
+
+  Future<void> _load() async {
+    final cursor = _cursor;
+    if (cursor == null || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final page = await ref.read(apiLayerProvider).accounts.ledger(
+        widget.section,
+        widget.id,
+        before: cursor,
+      );
+      if (!mounted) return;
+      setState(() {
+        _extra.addAll(page.page.items);
+        _cursor = page.page.nextCursor;
+        _busy = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (final entry in _extra)
+          _EntryTile(
+            section: widget.section,
+            entry: entry,
+            money: widget.money,
+            showBalance: widget.showBalance,
+            canWrite: widget.canWrite,
+            online: widget.online,
+            onCancel: (meta) => widget.onCancel(entry, meta),
+          ),
+        if (_cursor != null)
+          TextButton(
+            key: const Key('load-older'),
+            onPressed: _busy ? null : _load,
+            child: _busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text(AppStrings.loadOlder),
+          ),
+      ],
+    );
+  }
+}
+
 class _EntryTile extends StatelessWidget {
   const _EntryTile({
     required this.section,
@@ -341,7 +476,7 @@ class _EntryTile extends StatelessWidget {
   final bool showBalance;
   final bool canWrite;
   final bool online;
-  final VoidCallback onCancel;
+  final Future<String?> Function(MutationMeta meta) onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -386,13 +521,15 @@ class _EntryTile extends StatelessWidget {
                 '${AppStrings.balanceAfter} ${money.format(entry.balanceAfterUnits!, section.currency)}',
               ),
             if (canWrite && !reversed)
-              GatedButton(
+              GuardedMutation(
                 buttonKey: Key('cancel-${entry.id}'),
-                allowed: true,
+                inputs: 'cancel:${entry.id}:${entry.version}',
+                expectedVersion: entry.version,
                 online: online,
                 filled: false,
                 label: AppStrings.cancelMovement,
-                onPressed: onCancel,
+                confirmText: AppStrings.confirmCancel,
+                onSubmit: onCancel,
               ),
           ],
         ),

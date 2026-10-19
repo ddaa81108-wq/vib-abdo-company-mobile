@@ -1,8 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_api_layer/core/network/api_exception.dart';
 import 'package:flutter_api_layer/core/permissions/permission_codes.dart';
 import 'package:flutter_api_layer/core/permissions/permission_service.dart';
+import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
+import 'package:flutter_api_layer/data/repositories/reports_repository.dart';
 
 void main() {
   test(
@@ -38,8 +41,8 @@ void main() {
     expect(p.canRead(SectionKey.companies), isTrue);
     expect(p.canWrite(SectionKey.companies), isFalse);
     expect(p.canRead(SectionKey.treasury), isFalse);
-    expect(p.canWrite(SectionKey.masraweya), isTrue);
     expect(p.canRead(SectionKey.masraweya), isFalse);
+    expect(p.canWrite(SectionKey.masraweya), isFalse); // write without read
     expect(p.canRead(SectionKey.reports), isFalse);
     expect(p.canWrite(SectionKey.collections),
         isTrue); // not in sectionAccess: codes only
@@ -136,6 +139,60 @@ void main() {
       ..applyFromServer(['debts.read', 'debts.write', 'collections.read'],
           role: 'employee');
     expect(p.visibleSections, [SectionKey.collections]);
+  });
+
+  test('write requires the section read code as well as manage', () {
+    final writeOnly = PermissionService()
+      ..applyFromServer(
+        ['debts.write'],
+        role: 'employee',
+        sectionAccess: {'customerDebts': 'manage'},
+      );
+    expect(writeOnly.canRead(SectionKey.customers), isFalse);
+    expect(writeOnly.canWrite(SectionKey.customers), isFalse);
+
+    final both = PermissionService()
+      ..applyFromServer(
+        ['debts.read', 'debts.write'],
+        role: 'employee',
+        sectionAccess: {'customerDebts': 'manage'},
+      );
+    expect(both.canWrite(SectionKey.customers), isTrue);
+
+    final readLevel = PermissionService()
+      ..applyFromServer(
+        ['debts.read', 'debts.write'],
+        role: 'employee',
+        sectionAccess: {'customerDebts': 'read'},
+      );
+    expect(readLevel.canRead(SectionKey.customers), isTrue);
+    expect(readLevel.canWrite(SectionKey.customers), isFalse);
+  });
+
+  test('financial ledger and statement PDF are full-access only', () async {
+    final settingsOnly = PermissionService()
+      ..applyFromServer(
+        ['settings.manage', 'reports.read'],
+        role: 'admin',
+        sectionAccess: {'reports': 'manage'},
+      );
+    expect(settingsOnly.fullAccess, isFalse);
+    expect(settingsOnly.canDo(ManagementAction.settingsManage), isTrue);
+    expect(settingsOnly.canReadPrivilegedFinance, isFalse);
+    final blocked = RemoteReportsRepository(
+      FakeApiClient(latency: Duration.zero),
+      settingsOnly,
+    );
+    expect(blocked.financialLedger(), throwsA(isA<ForbiddenException>()));
+    expect(blocked.statementPdf(), throwsA(isA<ForbiddenException>()));
+
+    final full = PermissionService()..applyFromServer(const [], role: 'admin');
+    expect(full.canReadPrivilegedFinance, isTrue);
+    expect(
+      PermissionService()
+          .canReadPrivilegedFinance,
+      isFalse,
+    );
   });
 
   test(

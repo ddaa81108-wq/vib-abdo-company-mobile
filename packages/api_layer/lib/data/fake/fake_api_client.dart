@@ -23,6 +23,21 @@ class FakeApiClient implements ApiClient {
 
   /// Last request body exactly as it would go on the wire (for tests).
   String? lastWireBody;
+
+  /// requestId of each business mutation, in send order (tests).
+  final List<String> mutationRequestIds = [];
+
+  /// The next N business mutations fail before they change fake state (tests).
+  int failMutationsRemaining = 0;
+
+  /// When set, business mutations wait here after their requestId is recorded (tests).
+  Completer<void>? pauseMutations;
+
+  /// The next N account-suggestion reads fail (tests).
+  int failSuggestionsRemaining = 0;
+
+  /// When set, account-suggestion reads wait here (tests).
+  Completer<void>? pauseSuggestions;
   bool _loggedIn = false;
   bool _admin = false;
   Map<String, dynamic> _me = FakeFixtures.me(admin: false);
@@ -33,7 +48,7 @@ class FakeApiClient implements ApiClient {
   Future<ApiResponse> get(String path,
           {Map<String, dynamic>? query,
           ApiRequestOptions options = const ApiRequestOptions()}) =>
-      _handle('GET', path, null, options);
+      _handle('GET', path, null, options, query: query);
   @override
   Future<ApiResponse> post(String path,
           {Object? body,
@@ -81,7 +96,8 @@ class FakeApiClient implements ApiClient {
   }
 
   Future<ApiResponse> _handle(String method, String path, Object? body,
-      ApiRequestOptions options) async {
+      ApiRequestOptions options,
+      {Map<String, dynamic>? query}) async {
     await Future<void>.delayed(latency);
     // Same serialization as the real client, then decoded like a server would.
     lastWireBody = body == null ? null : WireJson.encode(body, rateWireFormat);
@@ -119,6 +135,13 @@ class FakeApiClient implements ApiClient {
         head != 'notifications' &&
         head != 'notification-preferences') {
       _requireMutationMeta(b);
+      mutationRequestIds.add('${b['requestId']}');
+      final paused = pauseMutations;
+      if (paused != null) await paused.future;
+      if (failMutationsRemaining > 0) {
+        failMutationsRemaining--;
+        _fail(400, 'MUTATION_FAILED', 'تعذر تنفيذ الطلب.');
+      }
     }
 
     switch (head) {
@@ -135,10 +158,16 @@ class FakeApiClient implements ApiClient {
           return _ok(FakeFixtures.accounts(egp: head == 'egyptian-deposits'));
         }
         if (method == 'GET' && seg.length > 1 && seg[1] == 'suggestions') {
+          final paused = pauseSuggestions;
+          if (paused != null) await paused.future;
+          if (failSuggestionsRemaining > 0) {
+            failSuggestionsRemaining--;
+            _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر البحث.');
+          }
           return _ok({'items': []});
         }
         if (method == 'GET' && seg.length == 3 && seg[2] == 'ledger') {
-          return _ok(FakeFixtures.ledger());
+          return _ok(FakeFixtures.ledger(before: query?['before']?.toString()));
         }
         if (method == 'GET' && seg.length == 2) {
           return _ok(
@@ -157,6 +186,13 @@ class FakeApiClient implements ApiClient {
         }
         if (method == 'GET' && seg.length > 1 && seg[1] == 'payroll') {
           return _ok(FakeFixtures.payroll());
+        }
+        if (method == 'GET' && seg.length > 1 && seg[1] == 'assignees') {
+          return _ok({
+            'items': [
+              {'id': 'u_12', 'displayName': 'موظف استلام تجريبي'}
+            ]
+          });
         }
         if (method == 'GET') return _ok({'items': []});
         final employeeAllowed = (seg.length > 2 &&
@@ -180,10 +216,15 @@ class FakeApiClient implements ApiClient {
         if (method == 'GET' && seg.length == 1) {
           return _ok(FakeFixtures.treasury());
         }
-        if (method == 'GET') return _ok(FakeFixtures.cashLedger());
+        if (method == 'GET') {
+          return _ok(FakeFixtures.cashLedger(before: query?['before']?.toString()));
+        }
         return _ok({'id': 'ce_new', 'version': 8});
       case 'reports':
         return _ok(FakeFixtures.reports());
+      case 'statements':
+        _requireAdmin();
+        return _ok({'ready': true});
       case 'financial-ledger':
         _requireAdmin();
         return _ok({

@@ -93,6 +93,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   }
 
   Future<void> _submit() async {
+    if (_busy) return;
     if (_next.text.length < 10) {
       setState(() => _message = AppStrings.passwordTooShort);
       return;

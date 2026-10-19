@@ -1,3 +1,15 @@
+import '../network/api_exception.dart';
+
+/// Original text of a JSON number that is not a plain integer.
+/// Never converted through [double].
+class JsonNumber {
+  const JsonNumber(this.literal);
+  final String literal;
+
+  @override
+  String toString() => literal;
+}
+
 /// A non-money decimal value (exchange rate, multiply/divide factor) kept as TEXT.
 ///
 /// HARD RULE: no `double`/`num`/float for any monetary value or rate in the app.
@@ -12,27 +24,44 @@ class DecimalString {
 
   static final RegExp _pattern = RegExp(r'^-?\d+(\.\d+)?$');
 
-  /// User input (accepts Arabic-Indic digits and ',' / '٫' as decimal mark). Null if invalid.
+  /// User input (Arabic-Indic digits and '٫' as the decimal mark).
+  /// ',' is a thousands separator and is rejected, not treated as a decimal mark.
   static DecimalString? tryParse(String? input) {
     if (input == null) return null;
-    final normalized = _normalizeDigits(input.trim())
-        .replaceAll('٫', '.')
-        .replaceAll(',', '.');
+    final normalized = _normalizeDigits(input.trim()).replaceAll('٫', '.');
+    if (normalized.contains(',') ||
+        normalized.contains('e') ||
+        normalized.contains('E')) {
+      return null;
+    }
     if (!_pattern.hasMatch(normalized)) return null;
     return DecimalString._(_stripLeadingZeros(normalized));
   }
 
-  /// Server value. Contract: a JSON STRING. Transitional (🔶 contract §15): the current
-  /// server still sends JSON numbers for `exchangeRate`/`egpPerLyd`; the JSON decoder has
-  /// already produced a Dart number, so it is turned into text right here, once, with no
-  /// arithmetic, and never stored as a number. Remove when the server sends strings.
+  /// Server value. A JSON string or a [JsonNumber] whose literal was copied from
+  /// the raw body. A [double] is rejected: `num.toString()` would turn `1e-7`
+  /// into a different token. Thousands separators and exponent notation are
+  /// [InvalidServerResponseException].
   static DecimalString? fromJson(Object? v) {
-    if (v is String) return tryParse(v);
+    if (v == null) return null;
+    if (v is JsonNumber) return _fromServerToken(v.literal);
     if (v is int) return DecimalString._('$v');
-    if (v is num) {
-      return tryParse(v.toString()); // transitional text conversion only
+    if (v is String) return _fromServerToken(v);
+    throw const InvalidServerResponseException();
+  }
+
+  static DecimalString _fromServerToken(String raw) {
+    final s = raw.trim();
+    if (s.contains(',') ||
+        s.contains('٬') ||
+        s.contains('e') ||
+        s.contains('E')) {
+      throw const InvalidServerResponseException();
     }
-    return null;
+    if (!_pattern.hasMatch(s)) {
+      throw const InvalidServerResponseException();
+    }
+    return DecimalString._(_stripLeadingZeros(s));
   }
 
   /// Text form. Wire encoding (string vs number) is decided ONLY by WireJson / ApiConfig.rateWireFormat.

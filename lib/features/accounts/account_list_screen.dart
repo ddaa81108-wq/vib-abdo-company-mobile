@@ -14,7 +14,11 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/mutation_form.dart';
 
+/// Customers, companies, Libyan deposits, and Egyptian deposits share this
+/// screen. [section] selects the repository path, currency, and labels.
+/// The ledger for a card is [LedgerScreen] with the same section.
 class AccountListScreen extends ConsumerStatefulWidget {
   const AccountListScreen({required this.section, super.key});
 
@@ -28,6 +32,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   final _search = TextEditingController();
   final _extra = <AccountCardDto>[];
   var _assigning = false;
+  var _showAllDebts = false;
   final _selected = <String>{};
   String? _reply;
 
@@ -107,6 +112,12 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                 ),
               ],
             ),
+            if (_assigning)
+              _AssignSubmit(
+                section: section,
+                customerIds: _selected.toList(growable: false),
+                online: online,
+              ),
             if (_reply != null) ...[
               const SizedBox(height: AppSpacing.sm),
               Text(_reply!, key: const Key('server-reply')),
@@ -140,10 +151,10 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                                   ? _selected.remove(card.id)
                                   : _selected.add(card.id);
                             }),
-                            onPin: () => _pin(card),
+                            onPin: (meta) => _pin(card, meta),
                             onZero: permissions.canDo(ManagementAction.customerZeroReview) &&
                                     section == AccountSection.customers
-                                ? () => _zero(card)
+                                ? (meta) => _zero(card, meta)
                                 : null,
                           ),
                         ),
@@ -196,13 +207,14 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                 ),
             ],
           );
-    if (width <= AppBreakpoints.phone) {
+    if (width <= AppBreakpoints.phone && !_showAllDebts) {
       return ExpansionTile(
         title: const Text(AppStrings.oldDebtsTitle),
         children: [
           body,
           TextButton(
-            onPressed: () {},
+            key: const Key('show-all-debts'),
+            onPressed: () => setState(() => _showAllDebts = true),
             child: const Text(AppStrings.showAll),
           ),
         ],
@@ -246,13 +258,15 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       context,
       _CreateForm(name: name, phone: phone, opening: opening, section: section),
     );
+    name.dispose();
+    phone.dispose();
+    opening.dispose();
     if (saved == true) {
       ref.invalidate(accountsProvider(section));
     }
   }
 
-  Future<void> _pin(AccountCardDto card) async {
-    final meta = MutationMeta(expectedVersion: card.version);
+  Future<String?> _pin(AccountCardDto card, MutationMeta meta) async {
     try {
       final ack = await ref.read(apiLayerProvider).accounts.setPinned(
         section,
@@ -260,26 +274,31 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
         !card.pinned,
         meta,
       );
-      if (!mounted) return;
+      if (!mounted) return null;
       setState(() => _reply = _ack(ack));
       ref.invalidate(accountsProvider(section));
+      return null;
     } catch (error) {
-      if (!mounted) return;
-      setState(() => _reply = ref.read(errorHandlerProvider).toFailure(error).message);
+      if (!mounted) return ref.read(errorHandlerProvider).toFailure(error).message;
+      final message = ref.read(errorHandlerProvider).toFailure(error).message;
+      setState(() => _reply = message);
+      return message;
     }
   }
 
-  Future<void> _zero(AccountCardDto card) async {
-    final meta = MutationMeta(expectedVersion: card.version);
+  Future<String?> _zero(AccountCardDto card, MutationMeta meta) async {
     try {
       final ack = await ref.read(apiLayerProvider).accounts.confirmZeroReview(card.id, meta);
-      if (!mounted) return;
+      if (!mounted) return null;
       setState(() => _reply = _ack(ack));
       ref.invalidate(accountsProvider(section));
+      return null;
     } catch (error) {
-      if (!mounted) return;
-      setState(() => _reply = ref.read(errorHandlerProvider).toFailure(error).message);
+      if (!mounted) return ref.read(errorHandlerProvider).toFailure(error).message;
+      final message = ref.read(errorHandlerProvider).toFailure(error).message;
+      setState(() => _reply = message);
       ref.invalidate(accountsProvider(section));
+      return message;
     }
   }
 
@@ -384,8 +403,8 @@ class _AccountCard extends StatelessWidget {
   final bool selected;
   final VoidCallback onOpen;
   final VoidCallback onToggle;
-  final VoidCallback onPin;
-  final VoidCallback? onZero;
+  final Future<String?> Function(MutationMeta meta) onPin;
+  final Future<String?> Function(MutationMeta meta)? onZero;
 
   @override
   Widget build(BuildContext context) {
@@ -413,7 +432,11 @@ class _AccountCard extends StatelessWidget {
           color: colored && flat ? visual.flat : null,
           borderRadius: BorderRadius.circular(AppRadii.card),
           border: Border.all(
-            color: colored ? colors.onStatus.withValues(alpha: 0.2) : Theme.of(context).colorScheme.outlineVariant,
+            color: card.ageStatus == 'zero'
+                ? colors.zeroCardBorder
+                : colored
+                ? colors.onStatus.withValues(alpha: 0.2)
+                : Theme.of(context).colorScheme.outline,
           ),
         ),
         child: InkWell(
@@ -458,21 +481,23 @@ class _AccountCard extends StatelessWidget {
                       if (assigning)
                         Checkbox(value: selected, onChanged: (_) => onToggle()),
                       if (canWrite)
-                        IconButton(
-                          key: Key('pin-${card.id}'),
+                        GuardedMutation(
+                          buttonKey: Key('pin-${card.id}'),
+                          inputs: 'pin:${card.id}:${card.pinned}:${card.version}',
+                          expectedVersion: card.version,
+                          label: card.pinned ? AppStrings.unpin : AppStrings.pin,
                           tooltip: card.pinned ? AppStrings.unpin : AppStrings.pin,
-                          onPressed: onPin,
-                          icon: Icon(card.pinned ? Icons.push_pin : Icons.push_pin_outlined, color: fg),
+                          icon: card.pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                          onSubmit: (meta) => onPin(meta),
                         ),
                       if (onZero != null && !card.systemManaged)
-                        TextButton(
-                          key: const Key('zero-review'),
-                          style: TextButton.styleFrom(
-                            minimumSize: const Size(48, 36),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          onPressed: onZero,
-                          child: Text(AppStrings.zeroReview, style: cairo(12, 700, color: fg)),
+                        GuardedMutation(
+                          buttonKey: const Key('zero-review'),
+                          inputs: 'zero:${card.id}:${card.version}',
+                          expectedVersion: card.version,
+                          label: AppStrings.zeroReview,
+                          filled: false,
+                          onSubmit: (meta) => onZero!(meta),
                         ),
                     ],
                   ),
@@ -496,10 +521,18 @@ class _RateCard extends ConsumerStatefulWidget {
 class _RateCardState extends ConsumerState<_RateCard> {
   final _rate = TextEditingController();
   String? _message;
-  var _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _rate.addListener(_changed);
+  }
+
+  void _changed() => setState(() {});
 
   @override
   void dispose() {
+    _rate.removeListener(_changed);
     _rate.dispose();
     super.dispose();
   }
@@ -539,13 +572,13 @@ class _RateCardState extends ConsumerState<_RateCard> {
                   decoration: const InputDecoration(labelText: AppStrings.rate),
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                GatedButton(
+                GuardedMutation(
                   buttonKey: const Key('save-rate'),
-                  allowed: true,
+                  inputs: _rate.text,
+                  expectedVersion: data.version,
                   online: online,
-                  busy: _busy,
                   label: AppStrings.save,
-                  onPressed: () => _save(data.version),
+                  onSubmit: _save,
                 ),
               ],
               if (_message != null) Text(_message!),
@@ -556,27 +589,23 @@ class _RateCardState extends ConsumerState<_RateCard> {
     );
   }
 
-  Future<void> _save(int? version) async {
+  Future<String?> _save(MutationMeta meta) async {
     final parsed = DecimalString.tryParse(_rate.text);
-    if (parsed == null) {
-      setState(() => _message = AppStrings.rateInvalid);
-      return;
-    }
-    setState(() => _busy = true);
+    if (parsed == null) return AppStrings.rateInvalid;
     try {
       final next = await ref.read(apiLayerProvider).accounts.updateExchangeRate(
         parsed,
-        MutationMeta(expectedVersion: version),
+        meta,
       );
       ref.invalidate(exchangeRateProvider);
       ref.invalidate(treasuryProvider);
-      if (!mounted) return;
+      if (!mounted) return null;
       setState(() => _message = '${AppStrings.serverReply} ${next.egpPerLyd?.value ?? AppStrings.dash}');
+      return null;
     } catch (error) {
-      if (!mounted) return;
-      setState(() => _message = ref.read(errorHandlerProvider).toFailure(error).message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      final message = ref.read(errorHandlerProvider).toFailure(error).message;
+      if (mounted) setState(() => _message = message);
+      return message;
     }
   }
 }
@@ -599,8 +628,23 @@ class _CreateForm extends ConsumerStatefulWidget {
 }
 
 class _CreateFormState extends ConsumerState<_CreateForm> {
-  var _busy = false;
-  String? _error;
+  @override
+  void initState() {
+    super.initState();
+    widget.name.addListener(_changed);
+    widget.phone.addListener(_changed);
+    widget.opening.addListener(_changed);
+  }
+
+  void _changed() => setState(() {});
+
+  @override
+  void dispose() {
+    widget.name.removeListener(_changed);
+    widget.phone.removeListener(_changed);
+    widget.opening.removeListener(_changed);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -610,6 +654,7 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
         Text(_title, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppSpacing.md),
         TextField(
+          key: const Key('create-name'),
           controller: widget.name,
           decoration: const InputDecoration(labelText: AppStrings.name),
         ),
@@ -622,11 +667,12 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
         ),
         const SizedBox(height: AppSpacing.md),
         UnitsField(controller: widget.opening, label: AppStrings.openingBalance),
-        if (_error != null) Text(_error!),
         const SizedBox(height: AppSpacing.lg),
-        FilledButton(
-          onPressed: _busy ? null : _submit,
-          child: const Text(AppStrings.save),
+        GuardedMutation(
+          buttonKey: const Key('save-account'),
+          inputs: '${widget.name.text}|${widget.phone.text}|${widget.opening.text}',
+          label: AppStrings.save,
+          onSubmit: _submit,
         ),
       ],
     );
@@ -638,13 +684,10 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
     _ => AppStrings.addDeposit,
   };
 
-  Future<void> _submit() async {
+  Future<String?> _submit(MutationMeta meta) async {
     final opening = widget.opening.text.trim().isEmpty ? null : parseUnits(widget.opening.text);
-    if (widget.opening.text.trim().isNotEmpty && opening == null) {
-      setState(() => _error = AppStrings.integerOnly);
-      return;
-    }
-    setState(() => _busy = true);
+    if (widget.name.text.trim().isEmpty) return AppStrings.integerOnly;
+    if (widget.opening.text.trim().isNotEmpty && opening == null) return AppStrings.integerOnly;
     try {
       final ack = await ref.read(apiLayerProvider).accounts.create(
         widget.section,
@@ -653,18 +696,100 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
           phone: widget.phone.text.trim().isEmpty ? null : widget.phone.text.trim(),
           openingBalance: opening,
         ),
-        MutationMeta(),
+        meta,
       );
-      if (!mounted) return;
+      if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
       );
       Navigator.of(context).pop(true);
+      return null;
     } catch (error) {
-      if (!mounted) return;
-      setState(() => _error = ref.read(errorHandlerProvider).toFailure(error).message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      return ref.read(errorHandlerProvider).toFailure(error).message;
+    }
+  }
+}
+
+class _AssignSubmit extends ConsumerStatefulWidget {
+  const _AssignSubmit({
+    required this.section,
+    required this.customerIds,
+    required this.online,
+  });
+
+  final AccountSection section;
+  final List<String> customerIds;
+  final bool online;
+
+  @override
+  ConsumerState<_AssignSubmit> createState() => _AssignSubmitState();
+}
+
+class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
+  String? _assignee;
+
+  @override
+  Widget build(BuildContext context) {
+    final people = ref.watch(assigneesProvider);
+    return people.when(
+      loading: () => const SkeletonBox(height: 48),
+      error: (error, _) => ErrorPane(
+        message: ref.read(errorHandlerProvider).toFailure(error).message,
+        onRetry: () => ref.invalidate(assigneesProvider),
+      ),
+      data: (rows) {
+        final ids = [
+          for (final row in rows)
+            if (row['id'] != null) '${row['id']}',
+        ];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DropdownButton<String>(
+              key: const Key('assignee-field'),
+              isExpanded: true,
+              hint: const Text(AppStrings.assignee),
+              value: ids.contains(_assignee) ? _assignee : null,
+              items: [
+                for (final row in rows)
+                  DropdownMenuItem(
+                    value: '${row['id']}',
+                    child: Text('${row['displayName'] ?? row['id']}'),
+                  ),
+              ],
+              onChanged: (value) => setState(() => _assignee = value),
+            ),
+            GuardedMutation(
+              buttonKey: const Key('save-assignment'),
+              inputs: '${widget.customerIds.join(",")}|$_assignee',
+              label: AppStrings.assign,
+              online: widget.online,
+              onSubmit: _submit,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<String?> _submit(MutationMeta meta) async {
+    final assignee = _assignee;
+    if (assignee == null || widget.customerIds.isEmpty) return AppStrings.chooseKind;
+    try {
+      final ack = await ref.read(apiLayerProvider).collections.assign(
+        customerIds: widget.customerIds,
+        assigneeUserId: assignee,
+        section: widget.section.path,
+        meta: meta,
+      );
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+      );
+      ref.invalidate(accountsProvider(widget.section));
+      return null;
+    } catch (error) {
+      return ref.read(errorHandlerProvider).toFailure(error).message;
     }
   }
 }

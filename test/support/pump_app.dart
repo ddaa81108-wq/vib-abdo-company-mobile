@@ -5,9 +5,10 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/app.dart';
+import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 
 /// Pumps the app with an injected fake [ApiLayer]. The provider does not build one.
-Future<void> pumpFakeApp(
+Future<ApiLayer> pumpFakeApp(
   WidgetTester tester, {
   Size size = const Size(800, 1400),
   List<Override> overrides = const [],
@@ -25,7 +26,11 @@ Future<void> pumpFakeApp(
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [apiLayerProvider.overrideWithValue(layer), ...overrides],
+      overrides: [
+        apiLayerProvider.overrideWithValue(layer),
+        connectivityPortProvider.overrideWithValue(const FixedConnectivity(true)),
+        ...overrides,
+      ],
       child: const CompanyApp(),
     ),
   );
@@ -34,6 +39,7 @@ Future<void> pumpFakeApp(
     EnginePhase.sendSemanticsUpdate,
     const Duration(seconds: 20),
   );
+  return layer;
 }
 
 Future<void> signIn(

@@ -153,7 +153,7 @@ class ApiLayer {
       masraweya: RemoteMasraweyaRepository(api),
       purchases: RemotePurchasesRepository(api),
       treasury: RemoteTreasuryRepository(api),
-      reports: RemoteReportsRepository(api),
+      reports: RemoteReportsRepository(api, permissions),
       notifications: RemoteNotificationsRepository(api),
       home: RemoteHomeRepository(api),
     );

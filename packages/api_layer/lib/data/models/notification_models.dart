@@ -41,7 +41,8 @@ class NotificationsPage {
   const NotificationsPage(
       {required this.items, required this.unreadCount, this.nextBefore});
   final List<NotificationDto> items;
-  final int unreadCount;
+  /// Null when the server omits `unreadCount`. That is unknown, not zero.
+  final int? unreadCount;
   final String? nextBefore;
   factory NotificationsPage.fromData(Object? data) {
     final d = asJson(data);
@@ -50,7 +51,7 @@ class NotificationsPage {
         .toList(growable: false);
     return NotificationsPage(
       items: items,
-      unreadCount: intOrNull(d['unreadCount']) ?? 0,
+      unreadCount: d.containsKey('unreadCount') ? intOrNull(d['unreadCount']) : null,
       nextBefore: strOrNull(d['nextBefore'] ?? d['nextCursor']),
     );
   }

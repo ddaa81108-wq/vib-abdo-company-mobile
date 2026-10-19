@@ -113,16 +113,25 @@ class PermissionService extends ChangeNotifier {
       return false; // read-only section (reports), even with full access
     }
     if (_fullAccess) return true;
+    // Write also requires the section read code and a non-none sectionAccess
+    // (read or manage). manage is still required for the write itself.
+    if (!canRead(s)) return false;
     if (!_granted.contains(w)) return false;
     final level = accessLevel(s);
     return level == null || level == SectionAccessLevel.manage;
   }
 
-  /// Day finalize in purchases: `purchases.finalize` AND purchases write access.
+  /// Day finalize in purchases: `purchases.finalize` AND purchases write access
+  /// (which itself requires purchases read and sectionAccess manage).
   bool get canFinalizePurchases =>
       _fullAccess ||
       (_granted.contains(Permission.purchasesFinalize) &&
           canWrite(SectionKey.purchases));
+
+  /// Financial ledger and statement PDF have no permission code yet.
+  /// Only full access (explicit `fullAccess`, or admin with empty lists) may
+  /// open them. `settings.manage` does not grant this.
+  bool get canReadPrivilegedFinance => _fullAccess;
 
   /// Management actions: explicit (proposed) code, or full access (flag / admin role flag).
   bool canDo(ManagementAction a) => canRaw(a.proposedCode);

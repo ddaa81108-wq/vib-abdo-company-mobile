@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_providers.dart';
@@ -9,6 +10,7 @@ import '../../ui/presentation.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/mutation_form.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
@@ -35,10 +37,11 @@ class NotificationsScreen extends ConsumerWidget {
             child: Text(AppStrings.insight),
           ),
         ),
-        FilledButton(
-          key: const Key('mark-all-read'),
-          onPressed: (count ?? 0) == 0 ? null : () => _all(ref),
-          child: const Text(AppStrings.markAllRead),
+        BusyAction(
+          buttonKey: const Key('mark-all-read'),
+          enabled: (count ?? 0) > 0,
+          label: AppStrings.markAllRead,
+          onSubmit: () => _all(ref),
         ),
         const SizedBox(height: AppSpacing.md),
         page.when(
@@ -52,20 +55,9 @@ class NotificationsScreen extends ConsumerWidget {
             return Column(
               children: [
                 for (final item in data.items)
-                  ListTile(
-                    key: Key('notice-${item.id}'),
-                    title: Text(
-                      (item.title != null && item.title!.isNotEmpty)
-                          ? item.title!
-                          : notificationFallback(item.action),
-                    ),
-                    subtitle: Text(
-                      [
-                        if (item.body != null && item.body!.isNotEmpty) item.body!,
-                        formatIsoDate(item.createdAt),
-                      ].join(' · '),
-                    ),
-                    onTap: () => _read(ref, item.id),
+                  _NoticeTile(
+                    item: item,
+                    onRead: () => _read(ref, item.id),
                   ),
               ],
             );
@@ -85,5 +77,55 @@ class NotificationsScreen extends ConsumerWidget {
     await ref.read(apiLayerProvider).notifications.markAllRead();
     ref.invalidate(notificationsProvider);
     ref.invalidate(unreadCountProvider);
+  }
+}
+
+class _NoticeTile extends StatefulWidget {
+  const _NoticeTile({required this.item, required this.onRead});
+
+  final NotificationDto item;
+  final Future<void> Function() onRead;
+
+  @override
+  State<_NoticeTile> createState() => _NoticeTileState();
+}
+
+class _NoticeTileState extends State<_NoticeTile> {
+  var _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      key: Key('notice-${widget.item.id}'),
+      title: Text(
+        (widget.item.title != null && widget.item.title!.isNotEmpty)
+            ? widget.item.title!
+            : notificationFallback(widget.item.action),
+      ),
+      subtitle: Text(
+        [
+          if (widget.item.body != null && widget.item.body!.isNotEmpty) widget.item.body!,
+          formatIsoDate(widget.item.createdAt),
+        ].join(' · '),
+      ),
+      trailing: _busy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : null,
+      onTap: _busy ? null : _run,
+    );
+  }
+
+  Future<void> _run() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await widget.onRead();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 }

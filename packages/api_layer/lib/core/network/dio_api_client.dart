@@ -26,7 +26,7 @@ class DioApiClient implements ApiClient {
         baseUrl: config.baseUrl,
         connectTimeout: config.connectTimeout,
         receiveTimeout: config.receiveTimeout,
-        responseType: ResponseType.json,
+        responseType: ResponseType.plain,
         headers: const {
           'Accept': 'application/json',
           'X-Client-Api-Version': '1',
@@ -72,7 +72,7 @@ class DioApiClient implements ApiClient {
     required ApiRequestOptions options,
   }) async {
     try {
-      final res = await _dio.request<Object?>(
+      final res = await _dio.request<dynamic>(
         path,
         data: body == null
             ? null
@@ -102,7 +102,9 @@ class DioApiClient implements ApiClient {
   ApiResponse _normalize(Response<Object?> res) {
     final status = res.statusCode ?? 200;
     final cid = res.headers.value('x-correlation-id');
-    final body = res.data;
+    final body = res.data is String && (res.data as String).isNotEmpty
+        ? decodeWireJson(res.data as String)
+        : res.data;
     if (status == 204 || body == null || (body is String && body.isEmpty)) {
       return ApiResponse(statusCode: status, correlationId: cid);
     }

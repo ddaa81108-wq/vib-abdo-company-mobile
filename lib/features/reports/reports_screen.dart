@@ -126,6 +126,11 @@ class _ReportCard extends StatelessWidget {
           if (showChange)
             Text('${AppStrings.netChange} ${money.formatOrDash(row.netChangeUnits, Currency.lyd)}'),
           if (row.note != null) Text(row.note!),
+          for (final reason in row.reasons)
+            Text(
+              '${AppStrings.reasons}: ${reason.text ?? AppStrings.dash}'
+              '${reason.changeUnits == null ? '' : ' ${money.formatOrDash(reason.changeUnits, Currency.lyd)}'}',
+            ),
         ],
       ),
     );
@@ -157,10 +162,34 @@ class _Table extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(
+                SizedBox(
                   height: 36,
-                  child: Text(
-                    '${AppStrings.sequence}  ${AppStrings.ourDebts}  ${AppStrings.activeFunds}  ${AppStrings.egyptian}  ${AppStrings.egyptianLyd}  ${AppStrings.owedDebts}  ${AppStrings.net}  ${AppStrings.status}',
+                  child: Row(
+                    children: [
+                      const Text(AppStrings.sequence),
+                      const SizedBox(width: AppSpacing.md),
+                      const Text(AppStrings.ourDebts),
+                      const SizedBox(width: AppSpacing.md),
+                      const Text(AppStrings.activeFunds),
+                      const SizedBox(width: AppSpacing.md),
+                      const Text(AppStrings.egyptian),
+                      const SizedBox(width: AppSpacing.md),
+                      const Text(AppStrings.egyptianLyd),
+                      const SizedBox(width: AppSpacing.md),
+                      const Text(AppStrings.owedDebts),
+                      const SizedBox(width: AppSpacing.md),
+                      const Text(AppStrings.net),
+                      if (showChange) ...[
+                        const SizedBox(width: AppSpacing.md),
+                        const Text(AppStrings.netChange),
+                      ],
+                      const SizedBox(width: AppSpacing.md),
+                      const Text(AppStrings.status),
+                      const SizedBox(width: AppSpacing.md),
+                      const Text(AppStrings.systemNote),
+                      const SizedBox(width: AppSpacing.md),
+                      const Text(AppStrings.reasons),
+                    ],
                   ),
                 ),
                 for (final row in rows)
@@ -187,6 +216,15 @@ class _Table extends StatelessWidget {
                         ],
                         const SizedBox(width: AppSpacing.md),
                         ReportStatusChip(status: row.status),
+                        const SizedBox(width: AppSpacing.md),
+                        Text(row.note ?? AppStrings.dash),
+                        const SizedBox(width: AppSpacing.md),
+                        Text(
+                          row.reasons
+                              .map((reason) => reason.text)
+                              .whereType<String>()
+                              .join(' · '),
+                        ),
                       ],
                     ),
                   ),
