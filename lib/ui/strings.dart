@@ -89,7 +89,7 @@ abstract final class AppStrings {
   static const noPreview = 'الناتج يظهر من الخادم بعد الحفظ فقط.';
   static const reversed = 'ملغاة';
   static const corrected = 'معدّل';
-  static const awaitingCash = 'نقدية لم تُسلّم بعد';
+  static const awaitingCash = 'ينتظر النقد';
   static const closeBatch = 'إغلاق ومسح الدفعة';
   static const closeBatchConfirm = 'تأكيد إغلاق الدفعة ومسحها؟';
   static const finalizeDay = 'ترحيل اليوم';
@@ -257,6 +257,8 @@ abstract final class AppStrings {
   static const alBayan = 'البيان';
   static const simsim = 'سمسم';
   static const otherKind = 'نوع آخر';
+  static const customItemName = 'اسم النوع';
+  static const customItemRequired = 'أدخل اسم النوع.';
   static const kindVodafone = 'فودافون';
   static const kindKafr = 'كفر الشيخ';
   static const kindCairo = 'القاهرة';

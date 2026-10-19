@@ -26,7 +26,8 @@ class TreasurySummaryDto {
   final int? version; // -> expectedVersion for cash entries
   final bool rateMissing; // "يلزم سعر تحويل معتمد"
 
-  /// Server colour for the active-cash card. Null stays neutral.
+  /// Proposed field, pending server confirmation. Absent or unknown stays
+  /// null, and the card stays neutral.
   final SummaryTone? activeCashTone;
 
   static const Currency lydFields = Currency.lyd;

@@ -38,7 +38,7 @@ void main() {
     expect(p.canRead(SectionKey.companies), isTrue);
     expect(p.canWrite(SectionKey.companies), isFalse);
     expect(p.canRead(SectionKey.treasury), isFalse);
-    expect(p.canWrite(SectionKey.masraweya), isFalse); // س-104: write code without the read code
+    expect(p.canWrite(SectionKey.masraweya), isFalse); // write code without the read code, per API contract
     expect(p.canRead(SectionKey.masraweya), isFalse);
     expect(p.canRead(SectionKey.reports), isFalse);
     expect(p.canWrite(SectionKey.collections),

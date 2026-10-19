@@ -29,6 +29,7 @@ export 'core/auth/cookie_store.dart';
 export 'core/config/api_config.dart';
 export 'core/money/money_formatter.dart';
 export 'core/network/api_exception.dart';
+export 'core/network/reachability.dart';
 export 'core/network/idempotency.dart';
 export 'core/permissions/permission_codes.dart';
 export 'core/permissions/permission_service.dart';
@@ -67,6 +68,7 @@ class ApiLayer {
     required this.reports,
     required this.notifications,
     required this.home,
+    required this.useFakeApi,
   });
 
   final ApiClient client;
@@ -85,6 +87,9 @@ class ApiLayer {
   final ReportsRepository reports;
   final NotificationsRepository notifications;
   final HomeRepository home;
+
+  /// True only for the in-memory client. Real mode never calls proposed paths.
+  final bool useFakeApi;
 
   static ApiLayer create({
     ApiConfig? config,
@@ -156,6 +161,7 @@ class ApiLayer {
       reports: RemoteReportsRepository(api),
       notifications: RemoteNotificationsRepository(api),
       home: RemoteHomeRepository(api),
+      useFakeApi: cfg.useFakeApi,
     );
   }
 

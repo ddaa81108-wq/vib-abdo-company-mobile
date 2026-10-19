@@ -14,7 +14,7 @@ enum RateWireFormat {
   /// Default: the current server sends and expects JSON numbers for rates (per API contract).
   number,
 
-  /// JSON string (e.g. `"9.5"`) — the contract's target (§2.6, question 13).
+  /// JSON string (e.g. `"9.5"`) — per API contract, the target wire form.
   string,
 }
 

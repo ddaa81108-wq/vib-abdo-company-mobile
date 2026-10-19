@@ -6,7 +6,10 @@ import '../../core/network/precise_json.dart';
 import '../../core/network/wire_json.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/network/error_mapper.dart';
+import '../../core/network/reachability.dart';
+import '../models/purchase_models.dart';
 import 'fake_fixtures.dart';
 
 /// In-memory fake of the REAL API shapes so the UI can be built with zero contact
@@ -72,15 +75,20 @@ class FakeApiClient implements ApiClient {
           ApiRequestOptions options = const ApiRequestOptions()}) =>
       _handle('DELETE', path, body, options);
 
-  ApiResponse _ok(Object? data, {int status = 200}) =>
-      ApiResponse(
-          statusCode: status,
-          // Same decode path as the real client: fixtures -> JSON text -> PreciseJson.
-          data: data == null ? null : PreciseJson.decode(jsonEncode(data)),
-          correlationId: 'fake');
+  ApiResponse _ok(Object? data, {int status = 200}) {
+    ApiReachability.instance.recordSuccess();
+    return ApiResponse(
+        statusCode: status,
+        // Same decode path as the real client: fixtures -> JSON text -> PreciseJson.
+        data: data == null ? null : PreciseJson.decode(jsonEncode(data)),
+        correlationId: 'fake');
+  }
 
-  Never _fail(int status, String code, String message) =>
-      throw _err.fromResponse(status, {
+  Never _fail(int status, String code, String message) {
+    if (code == 'NETWORK_UNAVAILABLE' || code == 'TIMEOUT') {
+      ApiReachability.instance.recordTransportFailure();
+    }
+    throw _err.fromResponse(status, {
         'ok': false,
         'error': {
           'code': code,
@@ -89,6 +97,7 @@ class FakeApiClient implements ApiClient {
           'correlationId': 'fake'
         },
       });
+  }
 
   void _requireAdmin() {
     if (!_admin) _fail(403, 'FORBIDDEN', 'هذا الإجراء للإدارة فقط');
@@ -216,6 +225,18 @@ class FakeApiClient implements ApiClient {
         return _ok(FakeFixtures.masraweyaDay());
       case 'purchases':
         if (method == 'GET') return _ok(FakeFixtures.purchases());
+        final entryWrite = (method == 'POST' && seg.length == 2) ||
+            (seg.length > 3 && seg[2] == 'entries');
+        if (entryWrite) {
+          try {
+            PurchaseItemCodes.require(
+              b['itemCode']?.toString(),
+              b['itemLabel']?.toString(),
+            );
+          } on BadRequestException catch (error) {
+            _fail(400, error.code, error.message);
+          }
+        }
         return _ok({'id': 'pe_new', 'version': 4});
       case 'treasury':
         if (method == 'GET' && seg.length == 1) {
@@ -228,8 +249,12 @@ class FakeApiClient implements ApiClient {
       case 'reports':
         return _ok(FakeFixtures.reports());
       case 'statements':
+        // Proposed endpoint, pending server confirmation. Fake mode only.
         _requireAdmin();
-        return _ok({'ready': true});
+        return _ok({
+          'filename': 'statement.pdf',
+          'contentBase64': 'JVBERi0xLjQK',
+        });
       case 'financial-ledger':
         _requireAdmin();
         return _ok({

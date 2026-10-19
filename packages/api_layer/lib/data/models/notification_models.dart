@@ -2,7 +2,7 @@ import 'common.dart';
 
 /// GET /api/notifications?before -> { items: [...], unreadCount }
 /// The web client builds the notification TEXT locally from `action` + `details`.
-/// We request server-provided `title`/`body` (contract §12); until then the app shows
+/// We request server-provided `title`/`body`, per API contract; until then the app shows
 /// a static label per `action` and NEVER renders numbers from `details`.
 class NotificationDto {
   const NotificationDto(

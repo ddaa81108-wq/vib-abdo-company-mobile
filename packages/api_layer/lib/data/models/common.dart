@@ -24,11 +24,9 @@ List<String> strList(Object? v) =>
     v is List ? v.map((e) => '$e').toList(growable: false) : const [];
 bool boolOf(Object? v) => v == true;
 
-/// Raw integer from the server (e.g. a *Units field). Only a JSON integer (or an integer
-/// string) is accepted; any fractional/float value -> null ("—"), never coerced or rounded.
-/// Money in minor units: an INTEGER JSON number only (contract §2, س-105).
+/// Money in minor units: an INTEGER JSON number only, per API contract.
 /// null/missing -> null (UI shows '—'). A string, a fractional/exponent number
-/// ([JsonNumberText]), a double, or anything else -> [InvalidServerResponseException];
+/// ([JsonNumberText]), or anything else -> [InvalidServerResponseException];
 /// never a silent null, never truncation.
 int? unitsOrNull(Object? v) {
   if (v == null) return null;

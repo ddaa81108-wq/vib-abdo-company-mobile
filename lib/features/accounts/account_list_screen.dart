@@ -142,6 +142,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                             section: section,
                             card: card,
                             money: money,
+                            online: online,
                             canWrite: canWrite && !card.systemManaged,
                             assigning: _assigning,
                             selected: _selected.contains(card.id),
@@ -380,6 +381,7 @@ class _AccountCard extends StatelessWidget {
     required this.section,
     required this.card,
     required this.money,
+    required this.online,
     required this.canWrite,
     required this.assigning,
     required this.selected,
@@ -392,6 +394,7 @@ class _AccountCard extends StatelessWidget {
   final AccountSection section;
   final AccountCardDto card;
   final MoneyFormatter money;
+  final bool online;
   final bool canWrite;
   final bool assigning;
   final bool selected;
@@ -479,6 +482,7 @@ class _AccountCard extends StatelessWidget {
                           buttonKey: Key('pin-${card.id}'),
                           inputs: 'pin:${card.id}:${card.pinned}:${card.version}',
                           expectedVersion: card.version,
+                          online: online,
                           label: card.pinned ? AppStrings.unpin : AppStrings.pin,
                           tooltip: card.pinned ? AppStrings.unpin : AppStrings.pin,
                           icon: card.pinned ? Icons.push_pin : Icons.push_pin_outlined,
@@ -489,6 +493,7 @@ class _AccountCard extends StatelessWidget {
                           buttonKey: const Key('zero-review'),
                           inputs: 'zero:${card.id}:${card.version}',
                           expectedVersion: card.version,
+                          online: online,
                           label: AppStrings.zeroReview,
                           filled: false,
                           onSubmit: (meta) => onZero!(meta),
@@ -663,6 +668,7 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
           buttonKey: const Key('save-account'),
           inputs: '${_name.text}|${_phone.text}|${_opening.text}',
           label: AppStrings.save,
+          online: ref.watch(onlineProvider),
           onSubmit: _submit,
         ),
       ],

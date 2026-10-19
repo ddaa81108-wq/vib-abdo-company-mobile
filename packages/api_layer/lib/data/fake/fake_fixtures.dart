@@ -10,7 +10,7 @@ class FakeFixtures {
     'debts.read'
   ];
 
-  /// Proposed management codes (🔶 contract §4) used by the limited-admin fixture.
+  /// Proposed management codes, per API contract, used by the limited-admin fixture.
   static const limitedAdminPermissions = [
     'collections.read',
     'collections.write',

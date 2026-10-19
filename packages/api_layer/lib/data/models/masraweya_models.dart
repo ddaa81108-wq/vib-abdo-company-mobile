@@ -30,7 +30,7 @@ class MasraweyaDayDto {
   final int? purchasesUnits;
   final List<MasraweyaEntryDto> entries;
 
-  /// REQUIRED FROM SERVER (contract §12): the web client computes both locally.
+  /// Required from the server, per API contract. The app does not compute these.
   final int? workTotalUnits;
   final int? remainingUnits;
   final int? historicalAdjustmentUnits;

@@ -1,3 +1,4 @@
+import '../../core/network/api_exception.dart';
 import 'common.dart';
 
 /// Purchases: two books. Values: egpValueUnits (EGP) -> resultUnits/paidUnits/remainingUnits (LYD).
@@ -12,6 +13,54 @@ enum PurchaseBook {
 
 /// 🔶 Currency of Vodafone fields is not explicit in the frontend; assumed EGP until confirmed.
 const Currency vodafoneCurrencyAssumption = Currency.egp;
+
+/// Purchase `itemCode` values, per API contract.
+///
+/// `custom` is the only code that carries a free-text `itemLabel`. The chip
+/// caption «نوع آخر» is not a server label and must not be sent.
+abstract final class PurchaseItemCodes {
+  static const vodafoneCash = 'vodafone_cash';
+  static const kafrElSheikh = 'kafr_el_sheikh';
+  static const cairo = 'cairo';
+  static const mansoura = 'mansoura';
+  static const fawry = 'fawry';
+  static const banks = 'banks';
+  static const custom = 'custom';
+
+  /// Display caption for [custom]. Never a valid `itemLabel`.
+  static const customCaption = 'نوع آخر';
+
+  static const values = <String>[
+    vodafoneCash,
+    kafrElSheikh,
+    cairo,
+    mansoura,
+    fawry,
+    banks,
+    custom,
+  ];
+
+  static bool contains(String? code) => code != null && values.contains(code);
+
+  /// Rejects a code outside [values], and a custom row whose label is missing
+  /// or equal to [customCaption].
+  static void require(String? itemCode, String? itemLabel) {
+    if (!contains(itemCode)) {
+      throw const BadRequestException(
+        code: 'VALIDATION_ERROR',
+        message: 'نوع العملية غير معروف',
+      );
+    }
+    if (itemCode != custom) return;
+    final label = itemLabel?.trim() ?? '';
+    if (label.isEmpty || label == customCaption) {
+      throw const BadRequestException(
+        code: 'VALIDATION_ERROR',
+        message: 'أدخل اسم النوع',
+      );
+    }
+  }
+}
 
 class PurchaseEntryDto {
   const PurchaseEntryDto({
@@ -103,17 +152,29 @@ class PurchaseDayDto {
 
 /// GET /api/purchases/{book}?limit=100&before
 class PurchasesBookPage {
-  const PurchasesBookPage({required this.page, this.lifetimeTotals = const {}});
+  const PurchasesBookPage({
+    required this.page,
+    this.lifetimeTotals = const {},
+  });
   final Paged<PurchaseDayDto> page;
 
-  /// "إجماليات السجل من البداية" exactly as returned (raw *Units ints).
-  final Json lifetimeTotals;
+  /// "إجماليات السجل من البداية". Every value is parsed with [unitsOrNull].
+  /// One invalid value rejects the whole response.
+  final Map<String, int?> lifetimeTotals;
 
   factory PurchasesBookPage.fromData(Object? data) {
     final p = Paged.fromData(data, PurchaseDayDto.fromJson, itemsKey: 'days');
-    return PurchasesBookPage(
-        page: p,
-        lifetimeTotals: asJson(p.raw['lifetimeTotals'] ?? p.raw['totals']));
+    final raw = p.raw['lifetimeTotals'] ?? p.raw['totals'];
+    if (raw != null && raw is! Map) {
+      throw const InvalidServerResponseException(
+        message: 'استجابة الخادم غير صالحة',
+      );
+    }
+    final totals = <String, int?>{};
+    for (final entry in asJson(raw).entries) {
+      totals[entry.key] = unitsOrNull(entry.value);
+    }
+    return PurchasesBookPage(page: p, lifetimeTotals: totals);
   }
 }
 

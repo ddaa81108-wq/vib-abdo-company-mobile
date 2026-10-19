@@ -13,7 +13,7 @@ import 'package:flutter_api_layer/core/network/get_retry_interceptor.dart';
 import 'package:flutter_api_layer/core/session/token_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// G-17: a GET retried after 502/503 goes back through the FULL chain, so the auth
+/// A GET retried after 502/503 goes back through the full chain, so the auth
 /// strategy re-attaches headers: no stale Authorization (cookie) / the CURRENT token (bearer).
 /// Local adapter only — no network.
 class _Adapter implements HttpClientAdapter {

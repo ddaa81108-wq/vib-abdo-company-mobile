@@ -140,6 +140,7 @@ class _CashFormState extends ConsumerState<_CashForm> {
           inputs: '${widget.direction.name}|${_amount.text}|${_note.text}',
           expectedVersion: widget.version,
           label: AppStrings.save,
+          online: ref.watch(onlineProvider),
           onSubmit: _submit,
         ),
       ],
@@ -235,6 +236,7 @@ class _Cards extends StatelessWidget {
     return SizedBox(
       width: emphasize ? double.infinity : 220,
       child: Card(
+        key: title == AppStrings.activeCash ? const Key('active-cash-card') : null,
         color: background,
         child: Padding(
           padding: const EdgeInsetsDirectional.all(AppSpacing.lg),

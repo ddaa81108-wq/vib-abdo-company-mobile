@@ -21,7 +21,7 @@ class JsonNumberText {
   int get hashCode => text.hashCode;
 }
 
-/// Strict RFC 8259 JSON decoder that preserves numeric text (contract §2, money/rates).
+/// Strict RFC 8259 JSON decoder that preserves numeric text, per API contract.
 /// Output types: Map<String, dynamic>, List<dynamic>, String, bool, null,
 /// int (integer literals that fit), JsonNumberText (everything else). No double, ever.
 /// Throws [FormatException] on malformed input.

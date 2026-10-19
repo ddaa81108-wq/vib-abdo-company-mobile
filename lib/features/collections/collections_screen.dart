@@ -167,6 +167,7 @@ class _UnlinkedFormState extends ConsumerState<_UnlinkedForm> {
           buttonKey: const Key('save-unlinked'),
           inputs: '${_name.text}|${_amount.text}',
           label: AppStrings.save,
+          online: ref.watch(onlineProvider),
           onSubmit: _submit,
         ),
       ],
@@ -307,6 +308,7 @@ class _AssignmentFormState extends ConsumerState<_AssignmentForm> {
           buttonKey: const Key('save-assignment'),
           inputs: '$_full|${_amount.text}',
           label: AppStrings.save,
+          online: ref.watch(onlineProvider),
           onSubmit: _submit,
         ),
       ],
@@ -369,7 +371,7 @@ class _Submission extends ConsumerWidget {
               Text(
                 AppStrings.awaitingCash,
                 key: const Key('awaiting-cash'),
-                style: cairo(12, 800, color: context.statusColors.unlinkedPending),
+                style: cairo(12, 800, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             if (manage && submission.status == 'pending')
               Wrap(
@@ -487,6 +489,7 @@ class _Unlinked extends ConsumerWidget {
             if (awaiting)
               Text(
                 AppStrings.awaitingCash,
+                key: Key('awaiting-cash-${receipt.id}'),
                 style: cairo(12, 800, color: context.statusColors.onStatus),
               ),
             if (manage && receipt.status == 'pending')
@@ -585,6 +588,7 @@ class _LinkFormState extends ConsumerState<_LinkForm> {
           inputs: 'link:${widget.receipt.id}:${_customer.text}',
           expectedVersion: widget.receipt.version,
           label: AppStrings.link,
+          online: ref.watch(onlineProvider),
           onSubmit: _submit,
         ),
       ],

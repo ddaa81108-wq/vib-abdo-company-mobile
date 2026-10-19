@@ -66,8 +66,9 @@ class PurchasesScreen extends ConsumerWidget {
               const SizedBox(height: AppSpacing.md),
               Text(AppStrings.registerTotals, style: Theme.of(context).textTheme.titleSmall),
               for (final entry in data.lifetimeTotals.entries)
-                if (entry.value is int)
-                  Text('${entry.key} ${money.formatNumber(entry.value as int)}'),
+                Text(
+                  '${entry.key} ${entry.value == null ? AppStrings.dash : money.formatNumber(entry.value!)}',
+                ),
             ],
           ),
         ),
@@ -183,23 +184,24 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
   final _rate = TextEditingController();
   final _paid = TextEditingController();
   final _vodafone = TextEditingController();
+  final _customLabel = TextEditingController();
   var _mode = CalculationMode.divide;
   String? _itemCode;
 
   static const _kinds = <(String, String)>[
-    ('vodafone', AppStrings.kindVodafone),
-    ('kafr_el_sheikh', AppStrings.kindKafr),
-    ('cairo', AppStrings.kindCairo),
-    ('mansoura', AppStrings.kindMansoura),
-    ('fawry', AppStrings.kindFawry),
-    ('banks', AppStrings.kindBanks),
-    ('other', AppStrings.otherKind),
+    (PurchaseItemCodes.vodafoneCash, AppStrings.kindVodafone),
+    (PurchaseItemCodes.kafrElSheikh, AppStrings.kindKafr),
+    (PurchaseItemCodes.cairo, AppStrings.kindCairo),
+    (PurchaseItemCodes.mansoura, AppStrings.kindMansoura),
+    (PurchaseItemCodes.fawry, AppStrings.kindFawry),
+    (PurchaseItemCodes.banks, AppStrings.kindBanks),
+    (PurchaseItemCodes.custom, AppStrings.otherKind),
   ];
 
   @override
   void initState() {
     super.initState();
-    for (final controller in [_egp, _rate, _paid, _vodafone]) {
+    for (final controller in [_egp, _rate, _paid, _vodafone, _customLabel]) {
       controller.addListener(_changed);
     }
   }
@@ -208,7 +210,7 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
 
   @override
   void dispose() {
-    for (final controller in [_egp, _rate, _paid, _vodafone]) {
+    for (final controller in [_egp, _rate, _paid, _vodafone, _customLabel]) {
       controller.removeListener(_changed);
       controller.dispose();
     }
@@ -217,6 +219,8 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
 
   @override
   Widget build(BuildContext context) {
+    final online = ref.watch(onlineProvider);
+    final custom = _itemCode == PurchaseItemCodes.custom;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -234,6 +238,12 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
               ),
           ],
         ),
+        if (custom)
+          TextField(
+            key: const Key('purchase-custom-label'),
+            controller: _customLabel,
+            decoration: const InputDecoration(labelText: AppStrings.customItemName),
+          ),
         UnitsField(controller: _egp, label: AppStrings.egpValue),
         DropdownButton<CalculationMode>(
           value: _mode,
@@ -253,9 +263,11 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
         UnitsField(controller: _vodafone, label: AppStrings.vodafoneConsumed),
         GuardedMutation(
           buttonKey: const Key('save-purchase'),
-          inputs: '$_itemCode|$_mode|${_egp.text}|${_rate.text}|${_paid.text}|${_vodafone.text}',
+          inputs:
+              '$_itemCode|${_customLabel.text}|$_mode|${_egp.text}|${_rate.text}|${_paid.text}|${_vodafone.text}',
           expectedVersion: widget.version,
           label: AppStrings.save,
+          online: online,
           onSubmit: _submit,
         ),
       ],
@@ -264,7 +276,12 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
 
   Future<String?> _submit(MutationMeta meta) async {
     final code = _itemCode;
-    if (code == null) return AppStrings.chooseKind;
+    if (code == null || !PurchaseItemCodes.contains(code)) return AppStrings.chooseKind;
+    final customLabel = _customLabel.text.trim();
+    if (code == PurchaseItemCodes.custom &&
+        (customLabel.isEmpty || customLabel == PurchaseItemCodes.customCaption)) {
+      return AppStrings.customItemRequired;
+    }
     final value = parseUnits(_egp.text);
     final paidUnits = parseUnits(_paid.text);
     final consumed = _vodafone.text.trim().isEmpty ? null : parseUnits(_vodafone.text);
@@ -276,7 +293,7 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
         widget.book,
         PurchaseEntryRequest(
           itemCode: code,
-          itemLabel: _kinds.firstWhere((kind) => kind.$1 == code).$2,
+          itemLabel: code == PurchaseItemCodes.custom ? customLabel : null,
           egpValueUnits: value,
           calculationMode: _mode,
           exchangeRate: exchange,

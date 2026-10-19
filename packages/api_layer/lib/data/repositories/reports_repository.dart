@@ -8,8 +8,9 @@ abstract interface class ReportsRepository {
   Future<FinancialLedgerPage> financialLedger(
       {String? before, String? section, String? currency, String? q});
 
-  /// GET /api/statements/pdf. The UI shows this only when PDF export is allowed.
-  Future<void> statementPdf({String? section, String? accountId});
+  /// Proposed GET /api/statements/pdf. The server has no PDF export.
+  /// Callers must use this only when the client is the fake API.
+  Future<StatementFile> statementPdf({String? section, String? accountId});
 }
 
 class RemoteReportsRepository implements ReportsRepository {
@@ -36,10 +37,12 @@ class RemoteReportsRepository implements ReportsRepository {
           .data);
 
   @override
-  Future<void> statementPdf({String? section, String? accountId}) async {
-    await _api.get(ApiEndpoints.statementPdf, query: {
+  Future<StatementFile> statementPdf({String? section, String? accountId}) async {
+    final data = (await _api.get(ApiEndpoints.statementPdf, query: {
       if (section != null) 'section': section,
       if (accountId != null) 'accountId': accountId,
-    });
+    }))
+        .data;
+    return StatementFile.fromData(data);
   }
 }

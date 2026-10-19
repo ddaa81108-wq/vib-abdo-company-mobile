@@ -5,6 +5,7 @@ import 'api_client.dart';
 import 'api_exception.dart';
 import 'error_mapper.dart';
 import 'precise_json.dart';
+import 'reachability.dart';
 import 'wire_json.dart';
 
 /// Dio-based implementation for the REAL envelope:
@@ -19,7 +20,7 @@ class DioApiClient implements ApiClient {
   }
 
   /// Response JSON is decoded by [PreciseJson]: non-integer numbers keep their exact
-  /// text ([JsonNumberText]); no double is ever produced (contract §2).
+  /// text ([JsonNumberText]); no double is ever produced, per API contract.
   static void usePreciseJson(Dio dio) {
     dio.transformer = BackgroundTransformer()
       ..jsonDecodeCallback = PreciseJson.decode;
@@ -100,11 +101,20 @@ class DioApiClient implements ApiClient {
           },
         ),
       );
-      return _normalize(res);
-    } on ApiException {
+      final normalized = _normalize(res);
+      ApiReachability.instance.recordSuccess();
+      return normalized;
+    } on ApiException catch (error) {
+      if (error is NetworkException || error is TimeoutApiException) {
+        ApiReachability.instance.recordTransportFailure();
+      }
       rethrow;
     } catch (e) {
-      throw _errorMapper.map(e);
+      final mapped = _errorMapper.map(e);
+      if (mapped is NetworkException || mapped is TimeoutApiException) {
+        ApiReachability.instance.recordTransportFailure();
+      }
+      throw mapped;
     }
   }
 

@@ -6,37 +6,55 @@ import '../../error_handling/error_handler.dart';
 import '../../state/theme_controller.dart';
 import '../strings.dart';
 
-/// Shown only for full access. Hidden for every other account, including
-/// settings.manage.
-class ExportPdfButton extends ConsumerWidget {
+/// Proposed PDF control. Shown only for full access while the fake client is
+/// in use. Real mode hides it and never calls GET /api/statements/pdf.
+class ExportPdfButton extends ConsumerStatefulWidget {
   const ExportPdfButton({super.key});
 
   static const buttonKey = Key('export-pdf');
+  static const busyKey = Key('export-pdf-busy');
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (!permissionsOf(ref).canExportPdf) return const SizedBox.shrink();
+  ConsumerState<ExportPdfButton> createState() => _ExportPdfButtonState();
+}
+
+class _ExportPdfButtonState extends ConsumerState<ExportPdfButton> {
+  var _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final layer = ref.watch(apiLayerProvider);
+    if (!layer.useFakeApi || !permissionsOf(ref).canExportPdf) {
+      return const SizedBox.shrink();
+    }
     return TextButton(
-      key: buttonKey,
-      onPressed: () => _export(context, ref),
-      child: const Text(AppStrings.exportPdf),
+      key: ExportPdfButton.buttonKey,
+      onPressed: _busy ? null : _export,
+      child: _busy
+          ? const SizedBox(
+              key: ExportPdfButton.busyKey,
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Text(AppStrings.exportPdf),
     );
   }
 
-  Future<void> _export(BuildContext context, WidgetRef ref) async {
+  Future<void> _export() async {
+    final layer = ref.read(apiLayerProvider);
+    if (!layer.useFakeApi || _busy) return;
+    setState(() => _busy = true);
     try {
-      await ref.read(apiLayerProvider).reports.statementPdf();
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppStrings.savedReply)),
-      );
+      // Proposed endpoint. Fake mode only; there is no file to save or share.
+      await layer.reports.statementPdf();
     } catch (error) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       final message = ref.read(errorHandlerProvider).toFailure(error).message;
       ref.read(errorHandlerProvider).report(error);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 }

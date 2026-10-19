@@ -19,11 +19,11 @@ abstract interface class CollectionsRepository {
   Future<MutationAck> submit(String assignmentId,
       {required String mode, int? amountUnits, required MutationMeta meta});
 
-  /// [meta] MUST carry `expectedVersion` = the submission's `version` (QA س-89, contract §6/§12).
+  /// [meta] MUST carry `expectedVersion` = the submission's `version`, per API contract.
   Future<MutationAck> decide(String submissionId, CollectionDecision decision,
       {String? note, required MutationMeta meta});
 
-  /// [meta] MUST carry `expectedVersion` (QA س-89).
+  /// [meta] MUST carry `expectedVersion`, per API contract.
   Future<MutationAck> markCashReceived(String submissionId, MutationMeta meta);
 
   Future<MutationAck> createUnlinkedReceipt(
@@ -32,7 +32,7 @@ abstract interface class CollectionsRepository {
       required MutationMeta meta});
   Future<List<Json>> linkCandidates(String q);
 
-  /// [meta] MUST carry `expectedVersion` (QA س-89).
+  /// [meta] MUST carry `expectedVersion`, per API contract.
   Future<MutationAck> decideUnlinked(String receiptId,
       {required CollectionDecision decision,
       String? customerId,
@@ -41,7 +41,7 @@ abstract interface class CollectionsRepository {
       String? newAccountKind,
       required MutationMeta meta});
 
-  /// [meta] MUST carry `expectedVersion` (QA س-89).
+  /// [meta] MUST carry `expectedVersion`, per API contract.
   Future<MutationAck> markUnlinkedCashReceived(
       String receiptId, MutationMeta meta);
   Future<MutationAck> closeDay(
@@ -66,12 +66,12 @@ class RemoteCollectionsRepository implements CollectionsRepository {
   Future<MutationAck> _post(String path, Json body) async =>
       MutationAck.fromData((await _api.post(path, body: body)).data);
 
-  /// Approval / cash-receipt endpoints require optimistic locking (QA س-89). Refuse to send
-  /// without a version so two concurrent decisions cannot both pass silently.
+  /// Approval / cash-receipt endpoints require optimistic locking, per API contract.
+  /// Refuse to send without a version so two concurrent decisions cannot both pass silently.
   static Json _versioned(MutationMeta meta) {
     if (meta.expectedVersion == null) {
       throw ArgumentError(
-          'expectedVersion is required for approval / cash-receipt endpoints (س-89)');
+          'expectedVersion is required for approval / cash-receipt endpoints, per API contract');
     }
     return meta.toBody();
   }

@@ -80,7 +80,7 @@ class CollectionSubmissionDto {
       cashStatus; // server-provided only (null until the server adds it)
   final DateTime?
       cashReceivedAt; // shown as a timestamp only; not used to derive status
-  /// ➕ required from server (QA س-89): sent back as `expectedVersion` on decision / cash-received.
+  /// Required from the server, per API contract: sent back as `expectedVersion` on decision / cash-received.
   final int? version;
   final String? submittedByName;
   final DateTime? createdAt;
@@ -170,7 +170,7 @@ class CollectionsOverviewDto {
   final List<EmployeeTotalDto> employeeTotals;
   final int? collectedUnits; // metrics.collectedUnits
 
-  /// REQUIRED FROM SERVER (contract §12): web client sums the PDF day total locally.
+  /// Required from the server, per API contract: the day total is not summed on the device.
   final int? dayTotalUnits;
   final int? assignedCount;
   final int? pendingCount;

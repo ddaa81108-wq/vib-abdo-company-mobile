@@ -83,7 +83,6 @@ class ApiEndpoints {
   static const treasuryCashEntries = '/api/treasury/cash-entries';
   static const reports = '/api/reports';
   static const financialLedger = '/api/financial-ledger';
-  static const statementPdf = '/api/statements/pdf';
 
   // Admin (only the parts relevant to a mobile client)
   static const accountRequests = '/api/account-requests';
@@ -98,9 +97,12 @@ class ApiEndpoints {
   static const notificationsReadAll = '/api/notifications/read-all';
   static const notificationPreferences = '/api/notification-preferences';
 
-  // 🔶 Do not exist — requested from the server owner (see contract §14).
+  // Proposed paths. The server does not implement these yet.
   static const proposedUnreadCount = '/api/notifications/unread-count';
   static const proposedMobilePushDevices = '/api/mobile-push/devices';
-  static const proposedHome =
-      '/api/home'; // aggregated home screen (contract §5.0)
+  static const proposedHome = '/api/home';
+
+  /// Proposed endpoint, pending server confirmation. The server has no PDF
+  /// export. The app calls this only while the fake client is in use.
+  static const statementPdf = '/api/statements/pdf';
 }

@@ -4,7 +4,7 @@ import '../network/precise_json.dart';
 /// A non-money decimal value (exchange rate, multiply/divide factor) kept as TEXT.
 ///
 /// HARD RULE: no `double`/`num`/float for any monetary value or rate in the app.
-/// The contract requires the server to send/accept rates as decimal STRINGS
+/// Per API contract, the server sends and accepts rates as decimal STRINGS
 /// (e.g. `"9.5"`, `"0.105263"`). This type validates the text and never converts it
 /// to a number; display uses MoneyFormatter.formatDecimal (string grouping only).
 class DecimalString {
@@ -25,7 +25,7 @@ class DecimalString {
     return DecimalString._(_stripLeadingZeros(normalized));
   }
 
-  /// SERVER VALUE (contract §2). null/missing -> null. Accepted: a JSON string, an int, or
+  /// Server value, per API contract. null/missing -> null. Accepted: a JSON string, an int, or
   /// a [JsonNumberText] (the EXACT numeric text from the body, preserved by PreciseJson —
   /// never `toString()` of a double). The text must be plain ASCII `-?digits(.digits)?`:
   /// comma separators, exponents (1e5, 1E-2), Arabic digits, or a Dart `double` (text

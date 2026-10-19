@@ -81,7 +81,7 @@ enum SectionAccessLevel {
 enum AccountRole { admin, employee, unknown }
 
 /// Management actions that the existing web gates by role name (no fine-grained code observed).
-/// Each action maps to a PROPOSED explicit permission code (🔶 contract §15). Allowed if the
+/// Each action maps to a proposed explicit permission code, per API contract. Allowed if the
 /// server returns that code, or the user has full access (`fullAccess`, or the admin role flag
 /// with empty lists — see PermissionService precedence).
 enum ManagementAction {

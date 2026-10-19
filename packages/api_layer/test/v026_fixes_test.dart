@@ -28,7 +28,7 @@ class _Adapter implements HttpClientAdapter {
 }
 
 void main() {
-  group('س-104 canWrite needs the read code too', () {
+  group('canWrite needs the read code too, per API contract', () {
     PermissionService emp(List<String> codes, Map<String, String> access) =>
         PermissionService()..applyFromServer(codes, role: 'employee', sectionAccess: access);
 
@@ -57,7 +57,7 @@ void main() {
     });
   });
 
-  group('س-103 financial ledger / PDF export: full access only', () {
+  group('financial ledger / PDF export: full access only, per API contract', () {
     test('admin role flag (empty lists) and fullAccess=true => allowed', () {
       final a = PermissionService()..applyFromServer(const [], role: 'admin');
       final f = PermissionService()..applyFromServer(const [], role: 'employee', fullAccess: true);
@@ -81,7 +81,7 @@ void main() {
     });
   });
 
-  group('س-105 unitsOrNull', () {
+  group('unitsOrNull, per API contract', () {
     test('int passes; null/missing stays null (UI dash)', () {
       expect(unitsOrNull(150000), 150000);
       expect(unitsOrNull(null), isNull);

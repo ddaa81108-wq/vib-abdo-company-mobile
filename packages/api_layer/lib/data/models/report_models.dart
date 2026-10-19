@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import '../../core/network/api_exception.dart';
 import 'common.dart';
 
 /// GET /api/reports?limit=30 — daily rows auto-generated from treasury totals.
@@ -25,9 +29,8 @@ class DailyReportRowDto {
   final int? liabilitiesUnits; // LYD
   final int? netUnits; // LYD
 
-  /// REQUIRED FROM SERVER (contract §12): web client computes net[i] − net[i+1]; we must not.
-  final int?
-      netChangeUnits; // server-computed (contract §12 #4); hidden when null
+  /// Required from the server, per API contract. Hidden when null.
+  final int? netChangeUnits;
   final String?
       status; // normal | needs_review | urgent_review | rate_missing (🔶)
   final String? note;
@@ -55,6 +58,9 @@ class DailyReportRowDto {
 class ReportReasonDto {
   const ReportReasonDto({this.text, this.changeUnits});
   final String? text;
+
+  /// Proposed field, pending server confirmation. Absent stays null; the UI
+  /// shows '—' and does not treat that as an error.
   final int? changeUnits;
   factory ReportReasonDto.fromJson(Json j) => ReportReasonDto(
         text: strOrNull(j['text'] ?? j['message'] ?? j['label']),
@@ -112,7 +118,7 @@ class FinancialLedgerPage {
   const FinancialLedgerPage({required this.page, this.pageTotals = const {}});
   final Paged<FinancialLedgerEntryDto> page;
 
-  /// REQUIRED FROM SERVER (contract §12): net per currency for the displayed scope,
+  /// Required from the server, per API contract: net per currency for the displayed scope,
   /// e.g. {"LYD": 123, "EGP": 456}. The app never accumulates pageTotals across pages.
   final Map<String, int> pageTotals;
 
@@ -124,5 +130,40 @@ class FinancialLedgerPage {
       if (u != null) totals[k] = u;
     });
     return FinancialLedgerPage(page: p, pageTotals: totals);
+  }
+}
+
+/// Bytes of a proposed statement PDF. The server has no PDF export; this
+/// shape is used only by the fake client.
+class StatementFile {
+  const StatementFile({required this.filename, required this.bytes});
+
+  final String filename;
+  final Uint8List bytes;
+
+  factory StatementFile.fromData(Object? data) {
+    final map = asJson(data);
+    final encoded = map['contentBase64'];
+    if (encoded is! String || encoded.isEmpty) {
+      throw const InvalidServerResponseException(
+        message: 'استجابة الخادم غير صالحة',
+      );
+    }
+    try {
+      final bytes = base64Decode(encoded);
+      if (bytes.isEmpty) {
+        throw const InvalidServerResponseException(
+          message: 'استجابة الخادم غير صالحة',
+        );
+      }
+      return StatementFile(
+        filename: strOrNull(map['filename']) ?? 'statement.pdf',
+        bytes: bytes,
+      );
+    } on FormatException {
+      throw const InvalidServerResponseException(
+        message: 'استجابة الخادم غير صالحة',
+      );
+    }
   }
 }

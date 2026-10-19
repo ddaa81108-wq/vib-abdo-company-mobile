@@ -3,6 +3,7 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../error_handling/error_handler.dart';
+import '../../state/theme_controller.dart';
 import '../strings.dart';
 import 'common.dart';
 
@@ -46,7 +47,7 @@ class GuardedMutation extends ConsumerStatefulWidget {
     super.key,
     this.expectedVersion,
     this.buttonKey,
-    this.online = true,
+    required this.online,
     this.allowed = true,
     this.filled = true,
     this.destructive = false,
@@ -149,49 +150,65 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
   Future<String?> _confirm(MutationMeta meta) async {
     final result = await showDialog<_DialogResult>(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) {
         var sending = false;
         return StatefulBuilder(
           builder: (dialogContext, setLocal) {
-            return AlertDialog(
-              content: Text(widget.confirmText!),
-              actions: [
-                TextButton(
-                  onPressed: sending ? null : () => Navigator.pop(dialogContext, const _DialogResult.cancel()),
-                  child: const Text(AppStrings.cancel),
-                ),
-                FilledButton(
-                  key: const Key('confirm-mutation'),
-                  onPressed: sending
-                      ? null
-                      : () async {
-                          setLocal(() => sending = true);
-                          try {
-                            final error = await widget.onSubmit(meta);
-                            if (!dialogContext.mounted) return;
-                            Navigator.pop(
-                              dialogContext,
-                              error == null ? const _DialogResult.ok() : _DialogResult.fail(error),
-                            );
-                          } catch (error) {
-                            if (!dialogContext.mounted) return;
-                            Navigator.pop(
-                              dialogContext,
-                              _DialogResult.fail(
-                                ref.read(errorHandlerProvider).toFailure(error).message,
-                              ),
-                            );
-                          }
-                        },
-                  child: sending
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text(AppStrings.confirm),
-                ),
-              ],
+            return PopScope(
+              canPop: !sending,
+              child: Consumer(
+                builder: (dialogContext, dialogRef, _) {
+                  final online = dialogRef.watch(onlineProvider);
+                  return AlertDialog(
+                    content: Text(widget.confirmText!),
+                    actions: [
+                      TextButton(
+                        onPressed: sending
+                            ? null
+                            : () => Navigator.pop(dialogContext, const _DialogResult.cancel()),
+                        child: const Text(AppStrings.cancel),
+                      ),
+                      FilledButton(
+                        key: const Key('confirm-mutation'),
+                        onPressed: sending || !online
+                            ? null
+                            : () async {
+                                setLocal(() => sending = true);
+                                try {
+                                  final error = await widget.onSubmit(meta);
+                                  if (!dialogContext.mounted) return;
+                                  Navigator.pop(
+                                    dialogContext,
+                                    error == null
+                                        ? const _DialogResult.ok()
+                                        : _DialogResult.fail(error),
+                                  );
+                                } catch (error) {
+                                  if (!dialogContext.mounted) return;
+                                  Navigator.pop(
+                                    dialogContext,
+                                    _DialogResult.fail(
+                                      dialogRef
+                                          .read(errorHandlerProvider)
+                                          .toFailure(error)
+                                          .message,
+                                    ),
+                                  );
+                                }
+                              },
+                        child: sending
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text(AppStrings.confirm),
+                      ),
+                    ],
+                  );
+                },
+              ),
             );
           },
         );

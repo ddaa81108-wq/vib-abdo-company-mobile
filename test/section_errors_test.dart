@@ -244,7 +244,8 @@ void main() {
     expect(find.byKey(const Key('export-pdf')), findsOneWidget);
     await tester.tap(find.byKey(const Key('export-pdf')));
     await settle(tester);
-    expect(find.text(AppStrings.savedReply), findsOneWidget);
+    expect(find.text(AppStrings.savedReply), findsNothing);
+    expect(find.byKey(const Key('export-pdf')), findsOneWidget);
     await go(tester, '/settings');
     expect(find.byKey(const Key('financial-ledger')), findsOneWidget);
     expect(find.byKey(const Key('export-pdf')), findsOneWidget);

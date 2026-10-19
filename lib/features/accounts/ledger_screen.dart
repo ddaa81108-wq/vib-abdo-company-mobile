@@ -30,8 +30,24 @@ class LedgerScreen extends ConsumerWidget {
     final card = ref.watch(accountCardProvider((section, id)));
     final money = ref.watch(apiLayerProvider).money;
     final online = ref.watch(onlineProvider);
-    final system = card.asData?.value.systemManaged ?? false;
-    final canWrite = permissions.canWrite(section.sectionKey) && !system;
+    // Writes stay hidden until the card has loaded and is not system-managed.
+    final loadedCard = card.asData?.value;
+    final canWrite = loadedCard != null &&
+        !loadedCard.systemManaged &&
+        permissions.canWrite(section.sectionKey);
+
+    if (card.hasError) {
+      return Scaffold(
+        key: Key('screen-ledger-${section.path}'),
+        body: ErrorPane(
+          message: ref.read(errorHandlerProvider).toFailure(card.error!).message,
+          onRetry: () {
+            ref.invalidate(accountCardProvider((section, id)));
+            ref.invalidate(ledgerProvider((section, id)));
+          },
+        ),
+      );
+    }
 
     return Scaffold(
       key: Key('screen-ledger-${section.path}'),
@@ -53,7 +69,13 @@ class LedgerScreen extends ConsumerWidget {
                     onPressed: () => context.go('/${section.path}'),
                     icon: const Icon(Icons.arrow_back),
                   ),
-                  Expanded(child: _Header(section: section, card: card, money: money)),
+                  Expanded(
+                    child: _Header(
+                      section: section,
+                      card: loadedCard,
+                      money: money,
+                    ),
+                  ),
                 ],
               ),
               if (canWrite)
@@ -282,6 +304,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
           inputs: '${widget.type}|$_mode|${_amount.text}|${_factor.text}|${_date.text}|${_note.text}',
           expectedVersion: ref.watch(accountCardProvider((widget.section, widget.id))).asData?.value.version,
           label: AppStrings.save,
+          online: ref.watch(onlineProvider),
           onSubmit: _submit,
         ),
       ],
@@ -336,37 +359,35 @@ class _Header extends StatelessWidget {
   const _Header({required this.section, required this.card, required this.money});
 
   final AccountSection section;
-  final AsyncValue<AccountCardDto> card;
+  final AccountCardDto? card;
   final MoneyFormatter money;
 
   @override
   Widget build(BuildContext context) {
-    return card.when(
-      loading: () => const SkeletonBox(height: 48),
-      error: (_, _) => const SizedBox.shrink(),
-      data: (value) {
-        final visual = ageVisual(
-          colors: context.statusColors,
-          ageStatus: value.ageStatus,
-          section: section,
-          serverLabel: value.ageStatusLabel,
-        );
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value.name, style: Theme.of(context).textTheme.titleLarge),
-            if (value.phone != null) LtrText(value.phone!),
-            MoneyText(
-              money.formatOrDash(value.balanceUnits, value.currency),
-              style: context.textExtras.amountLarge.copyWith(
-                color: visual.colored ? null : Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            if (visual.label != null) Text(visual.label!),
-            if (value.systemManaged) const Text(AppStrings.systemCard),
-          ],
-        );
-      },
+    final value = card;
+    if (value == null) return const SkeletonBox(height: 48);
+    final visual = ageVisual(
+      colors: context.statusColors,
+      ageStatus: value.ageStatus,
+      section: section,
+      serverLabel: value.ageStatusLabel,
+    );
+    final link = value.resolvedSystemLink;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(value.name, style: Theme.of(context).textTheme.titleLarge),
+        if (value.phone != null) LtrText(value.phone!),
+        MoneyText(
+          money.formatOrDash(value.balanceUnits, value.currency),
+          style: context.textExtras.amountLarge.copyWith(
+            color: visual.colored ? null : Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        if (visual.label != null) Text(visual.label!),
+        if (value.systemManaged)
+          Text(AppStrings.systemCard, key: ValueKey('system-${link ?? 'managed'}')),
+      ],
     );
   }
 }

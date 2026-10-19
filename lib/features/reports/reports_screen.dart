@@ -132,10 +132,7 @@ class _ReportCard extends StatelessWidget {
             Text('${AppStrings.netChange} ${money.formatOrDash(row.netChangeUnits, Currency.lyd)}'),
           if (row.note != null) Text(row.note!),
           for (final reason in row.reasons)
-            Text(
-              '${AppStrings.reasons}: ${reason.text ?? AppStrings.dash}'
-              '${reason.changeUnits == null ? '' : ' ${money.formatOrDash(reason.changeUnits, Currency.lyd)}'}',
-            ),
+            Text('${AppStrings.reasons}: ${reasonLine(reason, money)}'),
         ],
       ),
     );
@@ -225,10 +222,9 @@ class _Table extends StatelessWidget {
                         Text(row.note ?? AppStrings.dash),
                         const SizedBox(width: AppSpacing.md),
                         Text(
-                          row.reasons
-                              .map((reason) => reason.text)
-                              .whereType<String>()
-                              .join(' · '),
+                          row.reasons.isEmpty
+                              ? AppStrings.dash
+                              : row.reasons.map((reason) => reasonLine(reason, money)).join(' · '),
                         ),
                       ],
                     ),
@@ -240,4 +236,10 @@ class _Table extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Reason text plus the proposed change amount. A missing amount is '—'.
+String reasonLine(ReportReasonDto reason, MoneyFormatter money) {
+  final text = reason.text ?? AppStrings.dash;
+  return '$text ${money.formatOrDash(reason.changeUnits, Currency.lyd)}';
 }

@@ -7,22 +7,28 @@ final _invalid = throwsA(isA<InvalidServerResponseException>());
 
 void main() {
   group('AccountCardDto system fields', () {
-    test('systemLinkKey wins; systemKind is only a fallback', () {
+    test('systemLinkKey and systemKind stay separate; logic falls back', () {
       final c = AccountCardDto.fromJson(
           _j('{"id":"system-egp-masraweya:org-default","name":"x","balanceUnits":5,'
               '"systemManaged":true,"systemKind":"legacy","systemLinkKey":"masraweya_remainder"}'),
           AccountSection.egyptianDeposits);
       expect(c.systemManaged, isTrue);
-      expect(c.systemKind, 'masraweya_remainder');
+      expect(c.systemLinkKey, 'masraweya_remainder');
+      expect(c.systemKind, 'legacy');
+      expect(c.resolvedSystemLink, 'masraweya_remainder');
       final fallback = AccountCardDto.fromJson(
           _j('{"id":"2","name":"z","balanceUnits":0,"systemKind":"legacy"}'),
           AccountSection.customers);
       expect(fallback.systemManaged, isFalse);
+      expect(fallback.systemLinkKey, isNull);
       expect(fallback.systemKind, 'legacy');
+      expect(fallback.resolvedSystemLink, 'legacy');
       final d = AccountCardDto.fromJson(
           _j('{"id":"1","name":"y","balanceUnits":0}'), AccountSection.customers);
       expect(d.systemManaged, isFalse);
+      expect(d.systemLinkKey, isNull);
       expect(d.systemKind, isNull);
+      expect(d.resolvedSystemLink, isNull);
     });
   });
 
@@ -61,6 +67,52 @@ void main() {
       expect(() => CollectionsOverviewDto.fromData(_j('{"metrics":{"cashOutstandingUnits":"450"}}')), _invalid);
       expect(() => CollectionsOverviewDto.fromData(_j('{"metrics":{"cashOutstandingUnits":4.5e2}}')), _invalid);
     });
+  });
+
+  test('one corrupt lifetimeTotals value rejects the whole purchases response', () {
+    expect(
+      () => PurchasesBookPage.fromData({
+        'days': [],
+        'lifetimeTotals': {'resultUnits': 1, 'paidUnits': '2'},
+      }),
+      _invalid,
+    );
+    expect(
+      () => PurchasesBookPage.fromData({
+        'days': [],
+        'lifetimeTotals': {'resultUnits': 1.5},
+      }),
+      _invalid,
+    );
+    expect(
+      () => PurchasesBookPage.fromData({
+        'days': [],
+        'lifetimeTotals': ['50000'],
+      }),
+      _invalid,
+    );
+    final page = PurchasesBookPage.fromData({
+      'days': [],
+      'lifetimeTotals': {'resultUnits': 50000, 'paidUnits': null},
+    });
+    expect(page.lifetimeTotals, {'resultUnits': 50000, 'paidUnits': null});
+  });
+
+  test('proposed changeUnits and activeCashTone stay null when absent', () {
+    final reason = ReportReasonDto.fromJson(_j('{"text":"سبب"}'));
+    expect(reason.changeUnits, isNull);
+    expect(
+      () => ReportReasonDto.fromJson(_j('{"text":"سبب","changeUnits":"1200"}')),
+      _invalid,
+    );
+    final treasury = TreasurySummaryDto.fromData({
+      'totals': {'activeCashUnits': 10, 'netUnits': 10},
+    });
+    expect(treasury.activeCashTone, isNull);
+    final unknown = TreasurySummaryDto.fromData({
+      'totals': {'activeCashUnits': 10, 'activeCashTone': 'vivid'},
+    });
+    expect(unknown.activeCashTone, isNull);
   });
 
   test('extra model exports are reachable from api_layer.dart', () {

@@ -6,7 +6,7 @@ import 'permission_codes.dart';
 /// `sectionAccess{}`, and the proposed 🔶 `fullAccess` flag) for UI gating only.
 /// NOT a security boundary: the server enforces every request.
 ///
-/// FINAL PM DECISION (contract v0.2.3):
+/// Permission rules, per API contract:
 /// - The server `role` is treated as an explicit server flag ONLY HERE, by EXACT
 ///   (case-sensitive, untrimmed) match with the real system's values `"admin"` /
 ///   `"employee"` (exact role values, per API contract).
@@ -16,7 +16,7 @@ import 'permission_codes.dart';
 ///   (2) for an admin, an explicit non-empty `permissions[]` or `sectionAccess{}` applies
 ///   (same rules as an employee); (3) admin with both empty -> unrestricted (role flag).
 /// - Disallowed buttons/tiles/sections are HIDDEN, never shown disabled.
-/// - For sections in `sectionAccess` BOTH are required (open question §15, priority):
+/// - For sections in `sectionAccess` BOTH are required, per API contract:
 ///     read  = `<section>.read`  AND sectionAccess != none
 ///     write = `<section>.write` AND sectionAccess == manage
 ///   Collections (not in `sectionAccess`) use the codes only. Missing/unknown entry = none.
@@ -113,7 +113,7 @@ class PermissionService extends ChangeNotifier {
       return false; // read-only section (reports), even with full access
     }
     if (_fullAccess) return true;
-    // س-104: write needs the section READ code too (a write code alone never opens writes).
+    // Write needs the section read code too, per API contract.
     if (!_granted.contains(s.read) || !_granted.contains(w)) return false;
     final level = accessLevel(s);
     return level == null || level == SectionAccessLevel.manage;
@@ -125,11 +125,11 @@ class PermissionService extends ChangeNotifier {
       (_granted.contains(Permission.purchasesFinalize) &&
           canWrite(SectionKey.purchases));
 
-  /// س-103: the admin financial ledger (`GET /api/financial-ledger`) — FULL ACCESS ONLY
-  /// (`fullAccess=true`, or the admin role flag with empty lists). No permission code opens it.
+  /// The admin financial ledger (`GET /api/financial-ledger`) — FULL ACCESS ONLY,
+  /// per API contract. No permission code opens it.
   bool get canViewFinancialLedger => _fullAccess;
 
-  /// س-103: PDF export (statements / day sheets) — FULL ACCESS ONLY, same rule.
+  /// PDF export — FULL ACCESS ONLY, per API contract.
   bool get canExportPdf => _fullAccess;
 
   /// Management actions: explicit (proposed) code, or full access (flag / admin role flag).

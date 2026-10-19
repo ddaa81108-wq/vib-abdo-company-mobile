@@ -47,7 +47,7 @@ class ApiStack {
     final dio = Dio(options);
     // TLS pinning hook (optional): configure dio.httpClientAdapter with an
     // IOHttpClientAdapter + SecurityContext / badCertificateCallback using SPKI
-    // pins supplied by the server owner (contract §13). 🔶
+    // pins supplied by the server owner, per API contract.
 
     final AuthStrategy strategy = switch (config.authStrategy) {
       AuthStrategyKind.cookieCsrf => CookieCsrfAuthStrategy(

@@ -40,6 +40,7 @@ class AccountCardDto {
     this.zeroReview,
     this.allowedActions,
     this.systemManaged = false,
+    this.systemLinkKey,
     this.systemKind,
   });
 
@@ -56,7 +57,7 @@ class AccountCardDto {
   final int?
       debtAgeDays; // display only; the app does NOT apply 3/7-day thresholds
 
-  /// REQUIRED FROM SERVER (contract §12): new | warning | overdue | zero | credit + label.
+  /// Required from the server, per API contract: new | warning | overdue | zero | credit + label.
   final String? ageStatus;
   final String? ageStatusLabel;
   final Json? zeroReview;
@@ -65,8 +66,15 @@ class AccountCardDto {
   /// Server flag. System cards can be opened and have no write controls.
   final bool systemManaged;
 
-  /// Server link key. `systemLinkKey` wins; `systemKind` is only a fallback.
+  /// Raw `systemLinkKey` from the server. Not copied from [systemKind].
+  final String? systemLinkKey;
+
+  /// Raw `systemKind` from the server. Not overwritten by [systemLinkKey].
   final String? systemKind;
+
+  /// Link used by callers, per API contract. [systemLinkKey] when the server
+  /// sent it; otherwise the raw [systemKind]. The two fields stay separate.
+  String? get resolvedSystemLink => systemLinkKey ?? systemKind;
 
   factory AccountCardDto.fromJson(Json j, AccountSection s) => AccountCardDto(
         id: str(j['id']),
@@ -87,7 +95,8 @@ class AccountCardDto {
         allowedActions:
             j['allowedActions'] is List ? strList(j['allowedActions']) : null,
         systemManaged: boolOf(j['systemManaged']),
-        systemKind: strOrNull(j['systemLinkKey'] ?? j['systemKind']),
+        systemLinkKey: strOrNull(j['systemLinkKey']),
+        systemKind: strOrNull(j['systemKind']),
       );
 }
 
@@ -109,7 +118,7 @@ class AccountsSummaryDto {
   final int? activeCards;
   final int? pendingReviewCount;
 
-  /// ➕ requested (contract §12 #5): {active, today, debts, paid, pinned, pendingReview}.
+  /// Requested from the server, per API contract: {active, today, debts, paid, pinned, pendingReview}.
   final Map<String, int> tabCounts;
 
   factory AccountsSummaryDto.fromJson(Json j) => AccountsSummaryDto(
@@ -176,7 +185,7 @@ class LedgerEntryDto {
   final int?
       factorMicros; // rate × 1e6, display via MoneyFormatter.formatScaled(…, 6)
 
-  /// REQUIRED FROM SERVER (contract §12): the web client computes this locally; we must not.
+  /// Required from the server, per API contract. The app does not compute this.
   final int? balanceAfterUnits;
   final String? createdByName;
   final bool corrected;
@@ -258,7 +267,7 @@ enum PaymentMode { partial, full }
 
 /// POST /api/{section}/{id}/transactions
 /// {requestId, expectedVersion, type: debt|payment, paymentMode?, inputValue, calculationMode, factor?, date, note}
-/// The SERVER computes the final amount. The app shows no preview (requested server preview, §12).
+/// The server computes the final amount. The app shows no preview, per API contract.
 class AccountTransactionRequest {
   const AccountTransactionRequest._({
     required this.type,
@@ -316,7 +325,7 @@ class AccountTransactionRequest {
   final CalculationMode calculationMode;
 
   /// Rate as typed by the user, kept as decimal TEXT (no float). On the wire it is a JSON
-  /// number literal or string per ApiConfig.rateWireFormat (default number; §15 q13).
+  /// number literal or string per ApiConfig.rateWireFormat (default number), per API contract.
   final DecimalString? factor;
   final DateTime date;
   final String? note;
