@@ -33,7 +33,9 @@ The flutter-args are the arguments you would pass to flutter, for example:
   run -d emulator-5554
   build apk --debug
 
-Extra --dart-define flags are forwarded after --dart-define-from-file.
+Extra --dart-define flags are forwarded. Flutter gives them precedence over the file.
+The script appends --dart-define-from-file after those arguments.
+Flutter 3.47 accepts that flag on the subcommand (run, test, build apk), not before the subcommand.
 EOF
 }
 
@@ -194,4 +196,6 @@ rel="${defines_file#"$root"/}"
 echo "Environment: $env_name"
 echo "dart-define file: $rel"
 
-exec flutter --dart-define-from-file="$defines_file" "$@"
+# Flutter 3.47 accepts --dart-define-from-file on the subcommand only.
+# Command-line --dart-define still overrides the same key from the file.
+exec flutter "$@" --dart-define-from-file="$defines_file"

@@ -129,7 +129,7 @@ tool/flutter_env.sh fake run -d emulator-5554
 tool/flutter_env.sh staging build apk --debug
 ```
 
-`--dart-define` on the command line overrides the same key from `--dart-define-from-file` when it is passed as a Flutter tool argument (the script places the file flag first). Prefer editing the gitignored JSON when you want a value to stick. Do not rely on a command-line override to point fake mode at a real server: the script rejects a fake file whose `USE_FAKE_API` is false, but a later `--dart-define=USE_FAKE_API=false` is ordinary Flutter and will be compiled in. Use `staging` for that.
+A command-line `--dart-define` overrides the same key from `--dart-define-from-file`. Flutter applies that precedence itself. The script appends the file flag after the arguments you pass, because Flutter 3.47 accepts `--dart-define-from-file` on the subcommand (`run`, `test`, `build apk`) and not in front of it. Prefer editing the gitignored JSON when you want a value to stick. Do not rely on a command-line override to point fake mode at a real server: the script rejects a fake file whose `USE_FAKE_API` is false, but an extra `--dart-define=USE_FAKE_API=false` is ordinary Flutter and will be compiled in. Use `staging` for that.
 
 `flutter analyze`, `flutter test`, and `tool/check.sh` must be run **without** a define file. `packages/api_layer/test/api_config_test.dart` asserts the compile-time defaults (fake client, placeholder origin, scale 0, rate wire format `number`). Loading `staging.json` into that test run would fail the test on purpose.
 
