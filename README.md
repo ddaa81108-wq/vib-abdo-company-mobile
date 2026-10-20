@@ -91,4 +91,4 @@ The application id is the placeholder `com.example.vib_abdo_company_mobile` on e
 
 Debug and profile builds use the debug keystore. A release build uses the upload key when `android/key.properties` or the `ANDROID_KEYSTORE_*` variables are complete. When that material is absent, release signing falls back to the debug keystore so local and pull-request builds still run. Keep a debug-signed release build off Play. Partial signing material fails the build.
 
-`.github/workflows/ci.yml` runs analyze, test, and a debug APK build. `.github/workflows/android-release.yml` builds a signed AAB and APK when the repository secrets are present. Branch protection for `main` is described in `docs/BRANCH_PROTECTION.md` and is not enabled from this repository.
+`.github/workflows/ci.yml` has one job, `Analyze, test, and debug APK` (`analyze-test-apk`): analyze, test, and a debug APK. `.github/workflows/android-release.yml` builds a signed AAB and APK when the repository secrets are present. Branch protection for `main` is described in `docs/BRANCH_PROTECTION.md` and is not enabled from this repository.

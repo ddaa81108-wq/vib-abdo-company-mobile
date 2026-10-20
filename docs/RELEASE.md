@@ -253,6 +253,6 @@ After the change, search the repo for `com.example.vib_abdo_company_mobile`. Uni
 
 ## What CI checks
 
-`.github/workflows/ci.yml` runs on pull requests and on `main`. It has three jobs: `analyze`, `test`, and `build`. `build` is `flutter build apk --debug`. It does not need signing secrets and does not produce a Play artifact. `test` also runs `tool/android_release_preflight_test.sh`.
+`.github/workflows/ci.yml` (workflow name `CI`) has one job. Its id is `analyze-test-apk` and its check name is `Analyze, test, and debug APK`. On pull requests and on `main` it runs `flutter analyze` and `flutter test` for the app and for `packages/api_layer`, then `flutter build apk --debug`. It does not need signing secrets. The debug APK is not a Play artifact.
 
-`tool/check.sh` runs analyze, test, and that preflight script locally.
+`tool/check.sh` runs analyze, test, and `tool/android_release_preflight_test.sh` locally. The CI job does not run that preflight script.

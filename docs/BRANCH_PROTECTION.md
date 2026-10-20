@@ -20,17 +20,19 @@ CODEOWNERS is not in the repo. Add “require review from Code Owners” only af
 
 ## Status checks
 
-Require the three jobs from `.github/workflows/ci.yml`:
+`.github/workflows/ci.yml` defines one job. Require that check:
 
-| Check | What it runs |
+| | |
 | --- | --- |
-| `analyze` | `flutter analyze` in the app and in `packages/api_layer` |
-| `test` | `flutter test` in the app and in `packages/api_layer`, plus `tool/android_release_preflight_test.sh` |
-| `build` | `flutter build apk --debug` |
+| Workflow `name` | `CI` |
+| Job id | `analyze-test-apk` |
+| Check name (the job's `name`) | `Analyze, test, and debug APK` |
 
-In the picker they may be shown as `analyze`, `test`, and `build`, or as `CI / analyze` and so on. Select those three. Also require the branch to be up to date before merging, so a pull request cannot land on a `main` whose checks it never saw.
+The check run recorded on a commit is `Analyze, test, and debug APK`. In a ruleset or branch-protection picker it may be listed as `CI / Analyze, test, and debug APK`. Select that one check. It runs `flutter analyze` and `flutter test` for the app and for `packages/api_layer`, then `flutter build apk --debug`.
 
-`build` produces a debug APK. It is a compile check. Keep it off Play.
+Also require the branch to be up to date before merging, so a pull request cannot land on a `main` whose checks it never saw.
+
+The debug APK is a compile check. Keep it off Play.
 
 ## Force pushes and deletion
 
@@ -50,7 +52,7 @@ Linear history rejects merge commits. In Settings → General → Pull Requests,
 - [ ] Pull request required
 - [ ] At least one approval required
 - [ ] Stale reviews dismissed
-- [ ] Required checks: `analyze`, `test`, `build`
+- [ ] Required check: `Analyze, test, and debug APK` (job id `analyze-test-apk`)
 - [ ] Branch must be up to date before merging
 - [ ] Force pushes blocked
 - [ ] Deletion of `main` blocked
