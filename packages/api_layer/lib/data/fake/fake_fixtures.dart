@@ -623,36 +623,42 @@ class FakeFixtures {
     };
   }
 
-  /// Proposed GET /api/home — HARDCODED server-style values (nothing computed), filtered per user.
-  static Map<String, dynamic> home({required bool admin}) => {
-    'businessDate': '2026-10-19',
-    'generatedAt': '2026-10-19T02:00:00+02:00',
-    'summaries': [
-      {
-        'key': 'customers.netBalance',
-        'section': 'customers',
-        'title': 'صافي ديون العملاء',
-        'valueUnits': 320,
-        'currency': 'LYD',
-        'tone': 'negative',
-        'note': 'من ملخص القسم',
-        'updatedAt': '2026-10-19T02:00:00+02:00',
-      },
-      {
-        'key': 'collections.collected',
-        'section': 'collections',
-        'title': 'الاستلامات المعتمدة اليوم',
-        'valueUnits': 250,
-        'currency': 'LYD',
-        'tone': 'neutral',
-        'updatedAt': '2026-10-19T02:00:00+02:00',
-      },
-      if (admin) ...[
+  /// Proposed GET /api/home. Each amount and counter is a field already stored
+  /// on the matching section fixture. This method does not add card balances.
+  /// [FakeApiClient] drops any section the signed-in profile cannot read.
+  static Map<String, dynamic> home() {
+    final customers = _summaryOf('customers');
+    final egyptian = _summaryOf('egyptian-deposits');
+    final treasuryTotals = treasury()['totals'] as Map;
+    final collectionMetrics = collections()['metrics'] as Map;
+    return {
+      'businessDate': '2026-10-19',
+      'generatedAt': '2026-10-19T02:00:00+02:00',
+      'summaries': [
+        {
+          'key': 'customers.netBalance',
+          'section': 'customers',
+          'title': 'صافي ديون العملاء',
+          'valueUnits': customers['netBalance'],
+          'currency': 'LYD',
+          'tone': 'negative',
+          'note': 'من ملخص القسم',
+          'updatedAt': '2026-10-19T02:00:00+02:00',
+        },
+        {
+          'key': 'collections.collected',
+          'section': 'collections',
+          'title': 'الاستلامات المعتمدة اليوم',
+          'valueUnits': collectionMetrics['collectedUnits'],
+          'currency': 'LYD',
+          'tone': 'neutral',
+          'updatedAt': '2026-10-19T02:00:00+02:00',
+        },
         {
           'key': 'egyptianDeposits.netBalance',
           'section': 'egyptian-deposits',
           'title': 'صافي الأمانات المصرية',
-          'valueUnits': 15000,
+          'valueUnits': egyptian['netBalance'],
           'currency': 'EGP',
           'tone': 'positive',
           'updatedAt': '2026-10-19T02:00:00+02:00',
@@ -661,9 +667,9 @@ class FakeFixtures {
           'key': 'treasury.activeCash',
           'section': 'treasury',
           'title': 'الفلوس النشطة',
-          'valueUnits': 5000,
+          'valueUnits': treasuryTotals['activeCashUnits'],
           'currency': 'LYD',
-          'tone': 'positive',
+          'tone': treasuryTotals['activeCashTone'],
           'updatedAt': '2026-10-19T02:00:00+02:00',
         },
         {
@@ -676,10 +682,16 @@ class FakeFixtures {
           'updatedAt': '2026-10-19T02:00:00+02:00',
         },
       ],
-    ],
-    'counters': {'collections': 1, if (admin) 'customers': 1},
-    'oldDebts': [_oldDebt(cardById('customers', 'c_55'))],
-  };
+      'counters': {
+        'collections': collections()['assignedCount'],
+        'customers': customers['activeCards'],
+      },
+      'oldDebts': [_oldDebt(cardById('customers', 'c_55'))],
+    };
+  }
+
+  static Map<String, dynamic> _summaryOf(String section) =>
+      Map<String, dynamic>.from(accountsFor(section)['summary'] as Map);
 
   static Map<String, dynamic> collections() => {
     'assignments': [

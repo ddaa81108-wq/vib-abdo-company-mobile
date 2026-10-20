@@ -183,6 +183,41 @@ class FakeApiClient implements ApiClient {
     _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
   }
 
+  /// Home publishes the full fixture catalog, then drops every summary, counter,
+  /// and old-debt row whose section this profile cannot read. An unknown section
+  /// name is dropped as well.
+  Map<String, dynamic> _homeForSignedInUser() {
+    final source = FakeFixtures.home();
+    final summaries = <Map<String, dynamic>>[
+      for (final raw in source['summaries'] as List)
+        if (_mayReadSection((raw as Map)['section']))
+          Map<String, dynamic>.from(raw),
+    ];
+    final counters = <String, Object?>{
+      for (final entry in (source['counters'] as Map).entries)
+        if (_mayReadSection(entry.key)) '${entry.key}': entry.value,
+    };
+    final debts = <Map<String, dynamic>>[
+      for (final raw in source['oldDebts'] as List)
+        if (_mayReadSection((raw as Map)['section']))
+          Map<String, dynamic>.from(raw),
+    ];
+    return {
+      'businessDate': source['businessDate'],
+      'generatedAt': source['generatedAt'],
+      'summaries': summaries,
+      'counters': counters,
+      if (debts.isNotEmpty) 'oldDebts': debts,
+    };
+  }
+
+  bool _mayReadSection(Object? name) {
+    for (final section in SectionKey.values) {
+      if (section.key == name) return _access.canRead(section);
+    }
+    return false;
+  }
+
   Map<String, dynamic>? _cardOrNull(String head, String id) {
     final card = FakeFixtures.cardById(head, id);
     return card.isEmpty ? null : card;
@@ -311,7 +346,7 @@ class FakeApiClient implements ApiClient {
           failHomeRemaining--;
           _fail(404, 'NOT_FOUND', 'المسار غير موجود');
         }
-        return _ok(FakeFixtures.home(admin: _access.fullAccess));
+        return _ok(_homeForSignedInUser());
       case 'customers':
       case 'companies':
       case 'libyan-deposits':

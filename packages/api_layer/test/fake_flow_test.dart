@@ -68,7 +68,12 @@ void main() {
     );
     expect(egp.currency, Currency.egp);
     expect(egp.tone, SummaryTone.positive);
-    expect(api.money.formatOrDash(egp.valueUnits, egp.currency!), '15,000 ج.م');
+    expect(api.money.formatOrDash(egp.valueUnits, egp.currency!), '23,750 ج.م');
+    final customers = home.summaries.firstWhere(
+      (s) => s.section == 'customers',
+    );
+    expect(customers.valueUnits, 10635);
+    expect(home.counters['customers'], 10);
     expect(
       home.summaries.firstWhere((s) => s.section == 'reports').valueUnits,
       isNull,

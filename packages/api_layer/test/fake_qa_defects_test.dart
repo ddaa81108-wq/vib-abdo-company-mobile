@@ -243,8 +243,7 @@ void main() {
       expect(demo['ageStatusLabel'], 'منذ 4 أيام');
       expect(demo['systemManaged'], isNull);
 
-      final bulletin =
-          (FakeFixtures.home(admin: true)['oldDebts'] as List).single as Map;
+      final bulletin = (FakeFixtures.home()['oldDebts'] as List).single as Map;
       expect(bulletin['id'], 'c_55');
       expect(bulletin['debtAgeDays'], demo['debtAgeDays']);
       expect(bulletin['ageStatus'], demo['ageStatus']);
@@ -261,6 +260,84 @@ void main() {
         FakeFixtures.cardById('egyptian-deposits', 'c_55')['balanceUnits'],
         15000,
       );
+    },
+  );
+
+  test(
+    'home copies section fixtures and withholds sections the profile cannot read',
+    () async {
+      final catalog = FakeFixtures.home();
+      final customersPage = FakeFixtures.accountsFor('customers');
+      final egyptianPage = FakeFixtures.accountsFor('egyptian-deposits');
+      final customerSummary = customersPage['summary'] as Map;
+      final egyptianSummary = egyptianPage['summary'] as Map;
+
+      Map<String, dynamic> card(String section) => Map<String, dynamic>.from(
+            (catalog['summaries'] as List).cast<Map>().firstWhere(
+                  (item) => item['section'] == section,
+                ),
+          );
+
+      expect(card('customers')['valueUnits'], customerSummary['netBalance']);
+      expect(card('customers')['valueUnits'], 10635);
+      expect(catalog['counters']['customers'], customerSummary['activeCards']);
+      expect(catalog['counters']['customers'], customersPage['totalItems']);
+      expect(
+        card('egyptian-deposits')['valueUnits'],
+        egyptianSummary['netBalance'],
+      );
+      expect(card('egyptian-deposits')['valueUnits'], 23750);
+      expect(
+        card('treasury')['valueUnits'],
+        (FakeFixtures.treasury()['totals'] as Map)['activeCashUnits'],
+      );
+      expect(
+        card('collections')['valueUnits'],
+        (FakeFixtures.collections()['metrics'] as Map)['collectedUnits'],
+      );
+      expect(card('reports')['valueUnits'], isNull);
+
+      final guest = FakeApiClient(latency: Duration.zero);
+      await _login(guest, 'guest.demo');
+      final guestHome = (await guest.get('/api/home')).data as Map;
+      expect(guestHome['summaries'], isEmpty);
+      expect(guestHome.containsKey('oldDebts'), isFalse);
+      expect(
+        (guestHome['counters'] as Map).containsKey('customers'),
+        isFalse,
+      );
+      expect(
+        (guestHome['counters'] as Map).containsKey('collections'),
+        isFalse,
+      );
+
+      final employee = FakeApiClient(latency: Duration.zero);
+      await _login(employee, 'employee.demo');
+      final employeeHome = (await employee.get('/api/home')).data as Map;
+      expect(
+        (employeeHome['summaries'] as List).map(
+          (item) => (item as Map)['section'],
+        ),
+        ['customers', 'collections'],
+      );
+      final employeeCustomers = (employeeHome['summaries'] as List)
+          .cast<Map>()
+          .firstWhere((item) => item['section'] == 'customers');
+      expect(employeeCustomers['valueUnits'], 10635);
+      expect(employeeHome['counters']['customers'], 10);
+      expect((employeeHome['oldDebts'] as List).single['id'], 'c_55');
+      expect(
+        (employeeHome['summaries'] as List).any(
+          (item) => (item as Map)['section'] == 'egyptian-deposits',
+        ),
+        isFalse,
+      );
+
+      final flag = FakeApiClient(latency: Duration.zero);
+      await _login(flag, 'flag.admin.demo');
+      final flagHome = (await flag.get('/api/home')).data as Map;
+      expect(flagHome['summaries'], isEmpty);
+      expect(flagHome.containsKey('oldDebts'), isFalse);
     },
   );
 }
