@@ -11,6 +11,7 @@ class SignupInfoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       key: screenKey,
       appBar: AppBar(
@@ -21,9 +22,21 @@ class SignupInfoScreen extends StatelessWidget {
         ),
         title: const Text(AppStrings.createEmployee),
       ),
-      body: const Padding(
-        padding: EdgeInsetsDirectional.all(AppSpacing.xxl),
-        child: Text(AppStrings.createEmployeeBody),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsetsDirectional.all(AppSpacing.xxl),
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+                child: Text(
+                  AppStrings.createEmployeeBody,
+                  style: theme.textTheme.bodyLarge,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

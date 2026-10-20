@@ -81,22 +81,43 @@ class ErrorPane extends StatelessWidget {
 }
 
 class EmptyPane extends StatelessWidget {
-  const EmptyPane({required this.message, super.key, this.action});
+  const EmptyPane({
+    required this.message,
+    super.key,
+    this.title,
+    this.icon = Icons.inbox_outlined,
+    this.action,
+  });
 
   final String message;
+
+  /// Optional heading. Existing callers that pass only [message] stay the same.
+  final String? title;
+  final IconData icon;
   final Widget? action;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsetsDirectional.all(AppSpacing.xxl),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.inbox_outlined,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            icon,
+            size: title == null ? 24 : 40,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: AppSpacing.md),
+          if (title != null) ...[
+            Text(
+              title!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           Text(message, textAlign: TextAlign.center),
           if (action != null) ...[
             const SizedBox(height: AppSpacing.lg),

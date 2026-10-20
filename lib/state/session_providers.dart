@@ -47,10 +47,27 @@ final homeSummaryProvider = Provider<HomeSummary?>((ref) {
   );
 });
 
+/// Whether the latest home read used per-section data instead of `GET /api/home`.
+///
+/// The flag is written by [homeDashboardProvider] before that future completes.
+/// Widgets read it on the rebuild the future causes. [HomeDto] itself is unchanged.
+class HomeLoadMeta {
+  bool fromFallback = false;
+}
+
+final homeLoadMetaProvider = Provider<HomeLoadMeta>((ref) => HomeLoadMeta());
+
 /// Proposed `GET /api/home`. When that call fails, per-section fields are shown
 /// as returned, with no totals combined across sections.
 final homeDashboardProvider = FutureProvider<HomeDto?>((ref) async {
   final session = ref.watch(sessionStateProvider);
-  if (session is! SessionAuthenticated) return null;
-  return loadHome(ref.read(apiLayerProvider));
+  final meta = ref.read(homeLoadMetaProvider);
+  if (session is! SessionAuthenticated) {
+    meta.fromFallback = false;
+    return null;
+  }
+  meta.fromFallback = false;
+  final result = await loadHomeDetailed(ref.read(apiLayerProvider));
+  meta.fromFallback = result.fromFallback;
+  return result.home;
 });

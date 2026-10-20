@@ -245,6 +245,19 @@ abstract final class AppStrings {
   static const prefsFailed = 'تعذر حفظ التفضيل. أُعيدت قيمة الخادم.';
   static const unreadFull = 'غير المقروء';
   static const homeError = 'تعذر تحميل الرئيسية.';
+  static const homeFallbackNote =
+      'تعذر مسار ملخص الرئيسية. الأرقام أدناه من أقسام الخادم كما هي، دون جمع أو تحويل.';
+  static const updatedAt = 'آخر تحديث';
+  static const serverCount = 'العدد من الخادم';
+  static const appearance = 'المظهر';
+  static const employeesEmpty =
+      'لا تتوفر قائمة الموظفين والإداريين من الخادم في تطبيق الجوال. لا يمكن إضافة حساب أو تعديل صلاحية من هنا.';
+  static const auditEmpty =
+      'لا تتوفر أحداث سجل التدقيق من الخادم في تطبيق الجوال. لا تُعرض سجلات من هذا الجهاز.';
+  static const operationsEmpty =
+      'لا تتوفر حالة مركز التشغيل من الخادم في تطبيق الجوال. لا توجد إجراءات تشغيل من هنا.';
+  static const readLabel = 'مقروء';
+  static const unreadLabel = 'غير مقروء';
   static const filterSearch = 'بحث بالاسم أو الهاتف';
   static const openingBalance = 'رصيد أول المدة';
   static const calculation = 'طريقة الحساب';

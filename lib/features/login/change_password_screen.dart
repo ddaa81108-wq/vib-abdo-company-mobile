@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
+import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 
 class ChangePasswordScreen extends ConsumerStatefulWidget {
@@ -18,7 +20,8 @@ class ChangePasswordScreen extends ConsumerStatefulWidget {
   static const submitKey = Key('change-password-button');
 
   @override
-  ConsumerState<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
+  ConsumerState<ChangePasswordScreen> createState() =>
+      _ChangePasswordScreenState();
 }
 
 class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
@@ -26,7 +29,9 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   final _next = TextEditingController();
   final _confirm = TextEditingController();
   String? _message;
+  var _saved = false;
   var _busy = false;
+  var _obscure = true;
 
   @override
   void dispose() {
@@ -38,6 +43,10 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final online = ref.watch(onlineProvider);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final enabled = online && !_busy;
     return Scaffold(
       key: ChangePasswordScreen.screenKey,
       appBar: AppBar(title: const Text(AppStrings.changePassword)),
@@ -45,44 +54,92 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
         child: ListView(
           padding: const EdgeInsetsDirectional.all(AppSpacing.xxl),
           children: [
-            if (widget.blocking) const Text(AppStrings.passwordChangeRequired),
+            if (widget.blocking)
+              Text(
+                AppStrings.passwordChangeRequired,
+                style: theme.textTheme.bodyLarge,
+              ),
             const SizedBox(height: AppSpacing.lg),
             TextField(
               key: ChangePasswordScreen.currentKey,
               controller: _current,
-              obscureText: true,
+              enabled: enabled,
+              obscureText: _obscure,
               textDirection: TextDirection.ltr,
-              decoration: const InputDecoration(labelText: AppStrings.passwordCurrent),
+              textAlign: TextAlign.start,
+              decoration: InputDecoration(
+                labelText: AppStrings.passwordCurrent,
+                isDense: false,
+                suffixIcon: IconButton(
+                  tooltip: _obscure
+                      ? AppStrings.showPassword
+                      : AppStrings.hidePassword,
+                  onPressed: () => setState(() => _obscure = !_obscure),
+                  icon: Icon(
+                    _obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: AppSpacing.md),
             TextField(
               key: ChangePasswordScreen.nextKey,
               controller: _next,
-              obscureText: true,
+              enabled: enabled,
+              obscureText: _obscure,
               textDirection: TextDirection.ltr,
-              decoration: const InputDecoration(labelText: AppStrings.passwordNew),
+              textAlign: TextAlign.start,
+              decoration: const InputDecoration(
+                labelText: AppStrings.passwordNew,
+                isDense: false,
+              ),
             ),
             const SizedBox(height: AppSpacing.md),
             TextField(
               key: ChangePasswordScreen.confirmKey,
               controller: _confirm,
-              obscureText: true,
+              enabled: enabled,
+              obscureText: _obscure,
               textDirection: TextDirection.ltr,
-              decoration: const InputDecoration(labelText: AppStrings.passwordConfirm),
+              textAlign: TextAlign.start,
+              decoration: const InputDecoration(
+                labelText: AppStrings.passwordConfirm,
+                isDense: false,
+              ),
             ),
+            if (!online) ...[
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                AppStrings.offline,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.error,
+                ),
+              ),
+            ],
             if (_message != null) ...[
               const SizedBox(height: AppSpacing.lg),
-              Text(_message!, key: const Key('change-password-message')),
+              Text(
+                _message!,
+                key: const Key('change-password-message'),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: _saved ? context.appColors.success : scheme.error,
+                ),
+              ),
             ],
             const SizedBox(height: AppSpacing.xl),
             FilledButton(
               key: ChangePasswordScreen.submitKey,
-              onPressed: _busy ? null : _submit,
+              onPressed: enabled ? _submit : null,
               child: _busy
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 22,
                       height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: scheme.onPrimary,
+                      ),
                     )
                   : const Text(AppStrings.save),
             ),
@@ -93,30 +150,48 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   }
 
   Future<void> _submit() async {
-    if (_busy) return;
+    if (_busy || !ref.read(onlineProvider)) return;
     if (_next.text.length < 10) {
-      setState(() => _message = AppStrings.passwordTooShort);
+      setState(() {
+        _saved = false;
+        _message = AppStrings.passwordTooShort;
+      });
       return;
     }
     if (_next.text != _confirm.text) {
-      setState(() => _message = AppStrings.passwordMismatch);
+      setState(() {
+        _saved = false;
+        _message = AppStrings.passwordMismatch;
+      });
       return;
     }
     setState(() {
       _busy = true;
+      _saved = false;
       _message = null;
     });
     try {
-      await ref.read(apiLayerProvider).session.changePassword(
-        currentPassword: _current.text,
-        newPassword: _next.text,
-      );
+      await ref
+          .read(apiLayerProvider)
+          .session
+          .changePassword(
+            currentPassword: _current.text,
+            newPassword: _next.text,
+          );
       if (!mounted) return;
-      setState(() => _message = AppStrings.savedReply);
-      if (!widget.blocking && context.mounted) Navigator.of(context).maybePop();
+      setState(() {
+        _saved = true;
+        _message = AppStrings.savedReply;
+      });
+      if (!widget.blocking && context.mounted) {
+        Navigator.of(context).maybePop();
+      }
     } catch (error) {
       if (!mounted) return;
-      setState(() => _message = ref.read(errorHandlerProvider).toFailure(error).message);
+      setState(() {
+        _saved = false;
+        _message = ref.read(errorHandlerProvider).toFailure(error).message;
+      });
     } finally {
       if (mounted) setState(() => _busy = false);
     }

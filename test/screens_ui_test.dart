@@ -64,10 +64,10 @@ void main() {
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
 
       expectRtl(tester);
-      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(PhoneBottomNav), findsOneWidget);
       expect(find.byType(NavigationRail), findsNothing);
-      final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-      expect(bar.destinations, hasLength(5));
+      final bar = tester.widget<PhoneBottomNav>(find.byType(PhoneBottomNav));
+      expect(bar.tabs, hasLength(5));
       expect(find.text(AppStrings.more), findsOneWidget);
       expect(find.text(AppStrings.settings), findsNothing);
 
@@ -86,7 +86,9 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
 
     expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(PhoneBottomNav), findsNothing);
     expect(find.byType(NavigationRail), findsNothing);
+    expect(find.byKey(HomeShell.panelKey), findsOneWidget);
     expect(find.text(AppStrings.organization), findsOneWidget);
     expect(find.text('مدير تجريبي'), findsOneWidget);
   });

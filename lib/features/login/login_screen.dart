@@ -51,13 +51,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final busy = login.isLoading;
     final theme = Theme.of(context);
     final dark = ref.watch(themeModeProvider) == ThemeMode.dark;
+    final scheme = theme.colorScheme;
+    final width = MediaQuery.sizeOf(context).width;
+    final pad = width <= 360 ? AppSpacing.lg : AppSpacing.xxl;
 
     return Scaffold(
       key: LoginScreen.screenKey,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsetsDirectional.all(AppSpacing.xxl),
+            padding: EdgeInsetsDirectional.fromSTEB(
+              pad,
+              AppSpacing.lg,
+              pad,
+              pad + MediaQuery.viewInsetsOf(context).bottom,
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
@@ -67,9 +75,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     alignment: AlignmentDirectional.centerEnd,
                     child: IconButton(
                       key: LoginScreen.themeKey,
-                      tooltip: dark ? AppStrings.themeLight : AppStrings.themeDark,
-                      onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
-                      icon: Icon(dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+                      tooltip: dark
+                          ? AppStrings.themeLight
+                          : AppStrings.themeDark,
+                      onPressed: () =>
+                          ref.read(themeModeProvider.notifier).toggle(),
+                      icon: Icon(
+                        dark
+                            ? Icons.light_mode_outlined
+                            : Icons.dark_mode_outlined,
+                      ),
                     ),
                   ),
                   Text(
@@ -89,70 +104,112 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     style: theme.textTheme.titleMedium,
                   ),
                   const SizedBox(height: AppSpacing.xxl),
-                  TextField(
-                    key: LoginScreen.usernameKey,
-                    controller: _username,
-                    enabled: !busy && online,
-                    keyboardType: TextInputType.emailAddress,
-                    textDirection: TextDirection.ltr,
-                    textAlign: TextAlign.start,
-                    textInputAction: TextInputAction.next,
-                    autofillHints: const [AutofillHints.username],
-                    decoration: const InputDecoration(labelText: AppStrings.username),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  TextField(
-                    key: LoginScreen.passwordKey,
-                    controller: _password,
-                    enabled: !busy && online,
-                    obscureText: _obscure,
-                    textDirection: TextDirection.ltr,
-                    textAlign: TextAlign.start,
-                    autofillHints: const [AutofillHints.password],
-                    onSubmitted: (_) => _submit(),
-                    decoration: InputDecoration(
-                      labelText: AppStrings.password,
-                      suffixIcon: IconButton(
-                        tooltip: _obscure ? AppStrings.showPassword : AppStrings.hidePassword,
-                        onPressed: busy ? null : () => setState(() => _obscure = !_obscure),
-                        icon: Icon(
-                          _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+                      child: AutofillGroup(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              AppStrings.loginTitle,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            TextField(
+                              key: LoginScreen.usernameKey,
+                              controller: _username,
+                              enabled: !busy && online,
+                              keyboardType: TextInputType.emailAddress,
+                              textDirection: TextDirection.ltr,
+                              textAlign: TextAlign.start,
+                              textInputAction: TextInputAction.next,
+                              autofillHints: const [AutofillHints.username],
+                              decoration: const InputDecoration(
+                                labelText: AppStrings.username,
+                                isDense: false,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            TextField(
+                              key: LoginScreen.passwordKey,
+                              controller: _password,
+                              enabled: !busy && online,
+                              obscureText: _obscure,
+                              textDirection: TextDirection.ltr,
+                              textAlign: TextAlign.start,
+                              autofillHints: const [AutofillHints.password],
+                              onSubmitted: (_) => _submit(),
+                              decoration: InputDecoration(
+                                labelText: AppStrings.password,
+                                isDense: false,
+                                suffixIcon: IconButton(
+                                  tooltip: _obscure
+                                      ? AppStrings.showPassword
+                                      : AppStrings.hidePassword,
+                                  onPressed: busy
+                                      ? null
+                                      : () => setState(
+                                          () => _obscure = !_obscure,
+                                        ),
+                                  icon: Icon(
+                                    _obscure
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (message != null) ...[
+                              const SizedBox(height: AppSpacing.lg),
+                              Text(
+                                message,
+                                key: LoginScreen.errorKey,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: scheme.error,
+                                ),
+                              ),
+                            ],
+                            if (!online) ...[
+                              const SizedBox(height: AppSpacing.md),
+                              Text(
+                                AppStrings.offline,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: scheme.error,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: AppSpacing.xl),
+                            FilledButton(
+                              key: LoginScreen.submitKey,
+                              onPressed: busy || !online ? null : _submit,
+                              child: busy
+                                  ? SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: scheme.onPrimary,
+                                      ),
+                                    )
+                                  : const Text(AppStrings.signIn),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ),
-                  if (message != null) ...[
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      message,
-                      key: LoginScreen.errorKey,
-                      style: TextStyle(color: theme.colorScheme.error),
-                    ),
-                  ],
-                  if (!online) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Text(AppStrings.offline, style: TextStyle(color: theme.colorScheme.error)),
-                  ],
-                  const SizedBox(height: AppSpacing.xl),
-                  FilledButton(
-                    key: LoginScreen.submitKey,
-                    onPressed: busy || !online ? null : _submit,
-                    child: busy
-                        ? SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: theme.colorScheme.onPrimary,
-                            ),
-                          )
-                        : const Text(AppStrings.signIn),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   TextButton(
                     key: LoginScreen.signupKey,
                     onPressed: () => context.push('/signup-info'),
                     child: const Text(AppStrings.createEmployee),
+                  ),
+                  Text(
+                    AppStrings.noLanguage,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall,
                   ),
                 ],
               ),
@@ -164,6 +221,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _submit() {
-    ref.read(loginControllerProvider.notifier).submit(_username.text, _password.text);
+    ref
+        .read(loginControllerProvider.notifier)
+        .submit(_username.text, _password.text);
   }
 }
