@@ -1,0 +1,155 @@
+# Analyze, test, and build a debug APK.
+#
+# Triggers on pull requests and on pushes to main. A new run for the same
+# ref cancels the previous one.
+#
+# The app and packages/api_layer are both analyzed and tested, matching
+# tool/check.sh. Tests and the APK pass USE_FAKE_API=true explicitly. That is
+# already the default (see ApiConfig.fromEnvironment). No API host and no
+# secrets are configured.
+#
+# Flutter is pinned to 3.47.7, the stable release recorded in .metadata
+# (revision abaf9c523780a608bd46686fd5e53740a07077f8) and named in the README.
+# That SDK ships Dart 3.13.5, which satisfies the root pubspec constraint
+# sdk: ^3.13.5.
+#
+# Java is Temurin 17. AGP 9.1's minimum JDK is 17, Gradle 9.3.1 runs on
+# JVM 17+, and android/app/build.gradle.kts compiles with Java 17.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  analyze-test-apk:
+    name: Analyze, test, and debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            **/*.gradle*
+            **/gradle.properties
+            **/gradle-wrapper.properties
+            **/pubspec.lock
+
+      - name: Set up Flutter 3.47.7
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          flutter-version: "3.47.7"
+          cache: true
+          pub-cache: true
+
+      - name: Verify Flutter and Dart versions
+        run: |
+          flutter --version
+          flutter --version | grep -q 'Flutter 3.47.7'
+          dart --version
+          dart --version | grep -q '3.13.5'
+          java -version
+
+      - name: Resolve packages
+        id: resolve
+        run: |
+          flutter pub get
+          flutter pub get --directory packages/api_layer
+
+      - name: Analyze app
+        id: analyze_app
+        if: steps.resolve.outcome == 'success'
+        run: |
+          set -o pipefail
+          flutter analyze | tee "$RUNNER_TEMP/analyze-app.log"
+
+      - name: Analyze API package
+        id: analyze_api
+        if: steps.resolve.outcome == 'success'
+        working-directory: packages/api_layer
+        run: |
+          set -o pipefail
+          flutter analyze | tee "$RUNNER_TEMP/analyze-api.log"
+
+      - name: Test app
+        id: test_app
+        if: steps.resolve.outcome == 'success'
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded --dart-define=USE_FAKE_API=true | tee "$RUNNER_TEMP/test-app.log"
+
+      - name: Test API package
+        id: test_api
+        if: steps.resolve.outcome == 'success'
+        working-directory: packages/api_layer
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded --dart-define=USE_FAKE_API=true | tee "$RUNNER_TEMP/test-api.log"
+
+      - name: Write check summary
+        if: always() && steps.resolve.outcome == 'success'
+        env:
+          ANALYZE_APP_OUTCOME: ${{ steps.analyze_app.outcome }}
+          ANALYZE_API_OUTCOME: ${{ steps.analyze_api.outcome }}
+          TEST_APP_OUTCOME: ${{ steps.test_app.outcome }}
+          TEST_API_OUTCOME: ${{ steps.test_api.outcome }}
+        run: |
+          python3 .github/scripts/job_summary.py checks \
+            --analyze-app-outcome "$ANALYZE_APP_OUTCOME" \
+            --analyze-api-outcome "$ANALYZE_API_OUTCOME" \
+            --test-app-outcome "$TEST_APP_OUTCOME" \
+            --test-api-outcome "$TEST_API_OUTCOME" \
+            --analyze-app-log "$RUNNER_TEMP/analyze-app.log" \
+            --analyze-api-log "$RUNNER_TEMP/analyze-api.log" \
+            --test-app-log "$RUNNER_TEMP/test-app.log" \
+            --test-api-log "$RUNNER_TEMP/test-api.log"
+
+      - name: Build debug APK
+        if: success()
+        run: |
+          # Runner-only. The committed gradle.properties keeps the local 8G heap.
+          # An 8G heap plus a 4G metaspace cap is tight beside Flutter on a
+          # 16 GB GitHub-hosted runner, so this job lowers the daemon heap here.
+          python3 - << 'PY'
+          from pathlib import Path
+          path = Path("android/gradle.properties")
+          text = path.read_text(encoding="utf-8")
+          old = "org.gradle.jvmargs=-Xmx8G -XX:MaxMetaspaceSize=4G -XX:ReservedCodeCacheSize=512m -XX:+HeapDumpOnOutOfMemoryError"
+          new = "org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=512m -XX:+HeapDumpOnOutOfMemoryError"
+          if old not in text:
+              raise SystemExit("android/gradle.properties jvmargs changed; update the CI heap override")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+          flutter build apk --debug --dart-define=USE_FAKE_API=true
+
+      - name: Record APK size
+        if: success()
+        run: python3 .github/scripts/job_summary.py apk --apk build/app/outputs/flutter-apk/app-debug.apk
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: app-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
