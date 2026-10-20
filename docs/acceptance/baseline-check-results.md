@@ -122,6 +122,23 @@ warning • Unused import: 'package:flutter_riverpod/flutter_riverpod.dart'. Try
 
 اختبارات القبول الأربعة في `test/acceptance/` ليست على هذا الفرع، لذلك العدد 72 هنا يطابق مجموعة `main` لا مجموعة فرع القبول (76). هذا لا يغيّر حكم DEF-001.
 
+## إعادة اختبار Fake API على PR #17
+
+التاريخ: 2026-10-20. الفرع: `cursor/fake-api-qa-defects-566d`. الالتزام: `350e051`. الطلب: https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/17
+
+الأمر: `bash tool/check.sh` من جذر المستودع، مع Flutter 3.47.7 / Dart 3.13.5 على `PATH`.
+
+**رمز الخروج: 0.**
+
+| الخطوة داخل السكربت | النتيجة الفعلية |
+|---|---|
+| `flutter analyze` للتطبيق | `No issues found! (ran in 7.7s)` |
+| `flutter test` للتطبيق | `+74: All tests passed!` — **74 ناجح، 0 فاشل** |
+| `flutter analyze` في `packages/api_layer` | `No issues found! (ran in 3.3s)` |
+| `flutter test` في `packages/api_layer` | `+56: All tests passed!` — **56 ناجح، 0 فاشل** |
+
+الـ 74 تشمل اختباري الودجت في `test/fake_server_defects_test.dart`. الـ 56 تشمل اختبارات `packages/api_layer/test/fake_qa_defects_test.dart`. أحكام العيوب: DEF-006 وDEF-008 وDEF-009 وDEF-011 كلها **Verified**. DEF-002 إلى DEF-005 بقيت مفتوحة. التفاصيل في `defects.md`.
+
 ## خلاصة خط الأساس
 
 | البند | القيمة |
@@ -135,3 +152,4 @@ warning • Unused import: 'package:flutter_riverpod/flutter_riverpod.dart'. Try
 | اختبارات `packages/api_layer` يدويًا | 52 ناجح / 0 فاشل |
 | Flutter / Dart | 3.47.7 / 3.13.5 |
 | DEF-001 على PR #15 (`56156a8`) | Fixed in #15 — verified. `tool/check.sh` خروج 0: تحليل التطبيق والحزمة بلا مشكلات، 72 و52 اختبارًا ناجحة |
+| PR #17 (`350e051`) | `tool/check.sh` خروج 0: تحليل التطبيق والحزمة بلا مشكلات، 74 و56 اختبارًا ناجحة. DEF-006 وDEF-008 وDEF-009 وDEF-011: Verified |
