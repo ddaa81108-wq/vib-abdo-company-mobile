@@ -136,6 +136,7 @@ void main() {
             ),
             TextDirection.rtl,
           );
+          expectAppBarTitleFits(tester, width);
           await scrollEntireList(tester);
           await expectFits(tester, const Key('submit-as_1'), width);
           await expectFits(tester, const Key('approve-sb_1'), width);
@@ -284,20 +285,7 @@ void main() {
 
   testWidgets('screenshots of light and dark at 360 and 430', (tester) async {
     await pumpFakeApp(tester, size: const Size(360, 844));
-    await tester.runAsync(() async {
-      await ui.loadFontFromList(
-        await File('assets/fonts/Cairo-Variable.ttf').readAsBytes(),
-        fontFamily: 'Cairo',
-      );
-      await ui.loadFontFromList(
-        await File('assets/fonts/JetBrainsMono-Bold.ttf').readAsBytes(),
-        fontFamily: 'JetBrainsMono',
-      );
-      await ui.loadFontFromList(
-        await File('assets/fonts/JetBrainsMono-ExtraBold.ttf').readAsBytes(),
-        fontFamily: 'JetBrainsMono',
-      );
-    });
+    await tester.runAsync(loadScreenshotFonts);
     await tester.pump();
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
@@ -392,6 +380,30 @@ Future<void> expectFits(WidgetTester tester, Key key, double width) async {
   expect(tester.takeException(), isNull);
 }
 
+void expectAppBarTitleFits(WidgetTester tester, double width) {
+  const titleText = 'استلامات الديون';
+  final title = find.descendant(
+    of: find.byType(AppBar),
+    matching: find.text(titleText),
+  );
+  expect(title, findsOneWidget);
+  final paragraph = tester.renderObject<RenderParagraph>(title);
+  expect(paragraph.didExceedMaxLines, isFalse);
+  expect(paragraph.text.toPlainText(), titleText);
+  final fitted = tester.renderObject<RenderFittedBox>(
+    find.ancestor(of: title, matching: find.byType(FittedBox)),
+  );
+  final rect = tester.getRect(
+    find.ancestor(of: title, matching: find.byType(FittedBox)),
+  );
+  expect(rect.left, greaterThanOrEqualTo(-1));
+  expect(rect.right, lessThanOrEqualTo(width + 1));
+  expect(rect.width, greaterThan(24));
+  expect(fitted.size.width, lessThanOrEqualTo(width));
+  expect(find.byKey(HomeShell.logoutKey), findsOneWidget);
+  expect(find.byTooltip(AppStrings.search), findsOneWidget);
+}
+
 void expectFitsBox(WidgetTester tester, Key key, double width) {
   final rect = tester.getRect(find.byKey(key));
   expect(rect.width, greaterThan(0));
@@ -451,6 +463,35 @@ Future<void> settle(WidgetTester tester) {
     EnginePhase.sendSemanticsUpdate,
     const Duration(seconds: 20),
   );
+}
+
+Future<void> loadScreenshotFonts() async {
+  await _loadFont('assets/fonts/Cairo-Variable.ttf', 'Cairo');
+  await _loadFont('assets/fonts/JetBrainsMono-Bold.ttf', 'JetBrainsMono');
+  await _loadFont('assets/fonts/JetBrainsMono-ExtraBold.ttf', 'JetBrainsMono');
+  final icons = _materialIconsFile();
+  if (icons != null) {
+    await ui.loadFontFromList(
+      await icons.readAsBytes(),
+      fontFamily: 'MaterialIcons',
+    );
+  }
+}
+
+Future<void> _loadFont(String path, String family) async {
+  final file = File(path);
+  if (!file.existsSync()) return;
+  await ui.loadFontFromList(await file.readAsBytes(), fontFamily: family);
+}
+
+File? _materialIconsFile() {
+  // flutter_tester is bin/cache/artifacts/engine/<arch>/flutter_tester.
+  final artifacts = File(Platform.resolvedExecutable).parent.parent.parent;
+  final candidate = File(
+    '${artifacts.path}/material_fonts/MaterialIcons-Regular.otf',
+  );
+  if (candidate.existsSync()) return candidate;
+  return null;
 }
 
 Future<void> capture(WidgetTester tester, String name) async {
