@@ -84,7 +84,8 @@ class ApiEndpoints {
   static const reports = '/api/reports';
   static const financialLedger = '/api/financial-ledger';
 
-  // Admin (only the parts relevant to a mobile client)
+  // Admin (only the parts relevant to a mobile client).
+  // Paths only. The JSON body is 🔶 proposed — see AccountRequestDto.
   static const accountRequests = '/api/account-requests';
   static String accountRequestDecision(String id) =>
       '/api/account-requests/$id/decision';

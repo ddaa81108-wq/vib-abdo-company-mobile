@@ -14,6 +14,7 @@ import 'core/realtime/resilient_realtime_service.dart';
 import 'core/realtime/sse_realtime_service.dart';
 import 'core/session/session_manager.dart';
 import 'core/session/token_storage.dart';
+import 'data/repositories/account_requests_repository.dart';
 import 'data/repositories/accounts_repository.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/collections_repository.dart';
@@ -39,6 +40,7 @@ export 'core/security/redactor.dart';
 export 'core/session/session_manager.dart';
 export 'core/session/token_storage.dart';
 export 'data/models/account_models.dart';
+export 'data/models/account_request_models.dart';
 export 'data/models/auth_models.dart';
 export 'data/models/collection_models.dart';
 export 'data/models/common.dart';
@@ -67,6 +69,7 @@ class ApiLayer {
     required this.treasury,
     required this.reports,
     required this.notifications,
+    required this.accountRequests,
     required this.home,
     required this.useFakeApi,
   });
@@ -86,6 +89,7 @@ class ApiLayer {
   final TreasuryRepository treasury;
   final ReportsRepository reports;
   final NotificationsRepository notifications;
+  final AccountRequestsRepository accountRequests;
   final HomeRepository home;
 
   /// True only for the in-memory client. Real mode never calls proposed paths.
@@ -160,6 +164,7 @@ class ApiLayer {
       treasury: RemoteTreasuryRepository(api),
       reports: RemoteReportsRepository(api),
       notifications: RemoteNotificationsRepository(api),
+      accountRequests: RemoteAccountRequestsRepository(api),
       home: RemoteHomeRepository(api),
       useFakeApi: cfg.useFakeApi,
     );

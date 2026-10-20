@@ -19,6 +19,11 @@ class Redactor {
     'customername',
     'phone',
     'note',
+    // 🔶 Account-request aliases. username / displayName / phone / note above
+    // already cover the canonical keys.
+    'decisionnote',
+    'applicantname',
+    'requestedusername',
     'description',
     'reason',
     'details',

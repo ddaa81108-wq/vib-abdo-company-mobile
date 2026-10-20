@@ -54,6 +54,16 @@ class FakeApiClient implements ApiClient {
 
   /// When set, account-suggestion reads wait here (tests).
   Completer<void>? pauseSuggestions;
+
+  /// Mutable copy of [FakeFixtures.accountRequests]. Decisions update it.
+  /// 🔶 Status transitions are proposed; the fake never computes money.
+  List<Map<String, dynamic>>? _accountRequests;
+
+  /// Successful account-request decisions, keyed by `requestId`, so a retry of
+  /// the same submission does not apply twice. 🔶 The real server is assumed
+  /// to honour `requestId` the same way; failed attempts are not remembered.
+  final Map<String, Map<String, dynamic>> _accountRequestAcks = {};
+
   bool _loggedIn = false;
   bool _admin = false;
   Map<String, dynamic> _me = FakeFixtures.me(admin: false);
@@ -283,6 +293,17 @@ class FakeApiClient implements ApiClient {
           'filename': 'statement.pdf',
           'contentBase64': 'JVBERi0xLjQK',
         });
+      case 'account-requests':
+        // Admin role flag, like the web today (role name, no fine-grained code).
+        // `users.manage` is 🔶 proposed and is not what this fake checks.
+        _requireAdmin();
+        if (method == 'GET' && seg.length == 1) {
+          return _ok(_accountRequestsPage(query));
+        }
+        if (method == 'POST' && seg.length == 3 && seg[2] == 'decision') {
+          return _ok(_decideAccountRequest(seg[1], b));
+        }
+        return _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
       case 'financial-ledger':
         _requireAdmin();
         return _ok({
@@ -307,5 +328,103 @@ class FakeApiClient implements ApiClient {
         return _ok({'events': [], 'latest': 0, 'fullResync': false});
     }
     _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
+  }
+
+  List<Map<String, dynamic>> _accountRequestItems() {
+    final existing = _accountRequests;
+    if (existing != null) return existing;
+    final raw = FakeFixtures.accountRequests()['items'];
+    final copy = <Map<String, dynamic>>[];
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is Map) copy.add(Map<String, dynamic>.from(item));
+      }
+    }
+    return _accountRequests = copy;
+  }
+
+  Map<String, dynamic> _accountRequestsPage(Map<String, dynamic>? query) {
+    var items = _accountRequestItems();
+    final status = query?['status']?.toString();
+    if (status != null && status.isNotEmpty) {
+      items = [
+        for (final item in items)
+          if (item['status'] == status) item,
+      ];
+    }
+    final cursor = query?['cursor']?.toString();
+    if (cursor != null && cursor.isNotEmpty) {
+      final index = items.indexWhere((item) => item['id'] == cursor);
+      // 🔶 Unknown cursor -> empty page, not an error.
+      items = index < 0 ? <Map<String, dynamic>>[] : items.sublist(index + 1);
+    }
+    final limit = _pageLimit(query?['limit']);
+    final hasMore = limit != null && items.length > limit;
+    final page = hasMore ? items.sublist(0, limit) : items;
+    return {
+      'items': [
+        for (final item in page) Map<String, dynamic>.from(item),
+      ],
+      'nextCursor': hasMore ? page.last['id'] : null,
+      'hasMore': hasMore,
+    };
+  }
+
+  /// Null when the caller did not ask for a page size (return the whole list).
+  int? _pageLimit(Object? raw) {
+    if (raw == null || '$raw'.isEmpty) return null;
+    final limit = raw is int ? raw : int.tryParse('$raw');
+    if (limit == null || limit < 1) {
+      _fail(400, 'VALIDATION_ERROR', 'حد الصفحة غير صالح');
+    }
+    return limit;
+  }
+
+  Map<String, dynamic> _decideAccountRequest(
+      String id, Map<dynamic, dynamic> body) {
+    final requestId = '${body['requestId']}';
+    final prior = _accountRequestAcks[requestId];
+    if (prior != null) return prior;
+
+    if (body['expectedVersion'] == null) {
+      _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
+    }
+    final index =
+        _accountRequestItems().indexWhere((item) => item['id'] == id);
+    if (index < 0) {
+      _fail(404, 'NOT_FOUND', 'العنصر غير موجود');
+    }
+    final item = _accountRequestItems()[index];
+    if (body['expectedVersion'] != item['version']) {
+      _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
+    }
+    // 🔶 A second decision on a request that is not pending.
+    if (item['status'] != 'pending') {
+      _fail(409, 'ALREADY_DECIDED', 'تم البت في هذا الطلب');
+    }
+    final status = switch (body['decision']) {
+      'approve' => 'approved',
+      'reject' => 'rejected',
+      _ => null,
+    };
+    if (status == null) {
+      _fail(400, 'VALIDATION_ERROR', 'القرار غير صالح');
+    }
+    final current = item['version'];
+    final nextVersion = current is int ? current + 1 : 1;
+    item['status'] = status;
+    item['version'] = nextVersion;
+    item['decidedAt'] = '2026-10-20T12:00:00+02:00';
+    final note = body['note'];
+    if (note != null && '$note'.isNotEmpty) item['decisionNote'] = note;
+    // 🔶 Once decided, the server no longer offers approve/reject.
+    item.remove('allowedActions');
+    final ack = <String, dynamic>{
+      'id': id,
+      'version': nextVersion,
+      'status': status,
+    };
+    _accountRequestAcks[requestId] = ack;
+    return ack;
   }
 }

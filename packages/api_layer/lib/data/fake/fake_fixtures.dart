@@ -468,6 +468,39 @@ class FakeFixtures {
         },
       };
 
+  /// 🔶 Proposed shape for `GET /api/account-requests`. Invented fixture values
+  /// only (`example.invalid`, "تجريبي"). Status names and the version used as
+  /// `expectedVersion` are not confirmed by the backend.
+  static Map<String, dynamic> accountRequests() => {
+        'items': [
+          {
+            'id': 'ar_1',
+            'status': 'pending',
+            'version': 2,
+            'createdAt': '2026-10-19T09:00:00+02:00',
+            'username': 'new.employee@example.invalid',
+            'displayName': 'موظف جديد تجريبي',
+            'phone': '0910000001',
+            'requestedRole': 'employee',
+            'note': 'طلب تجريبي',
+            'allowedActions': ['approve', 'reject'],
+          },
+          {
+            'id': 'ar_2',
+            'status': 'approved',
+            'version': 4,
+            'createdAt': '2026-10-18T09:00:00+02:00',
+            'decidedAt': '2026-10-18T11:00:00+02:00',
+            'username': 'approved.employee@example.invalid',
+            'displayName': 'موظف معتمد تجريبي',
+            'requestedRole': 'employee',
+            'decisionNote': 'اعتماد تجريبي',
+          },
+        ],
+        'nextCursor': null,
+        'hasMore': false,
+      };
+
   static Map<String, dynamic> notifications(int unread) => {
         'items': [
           {
