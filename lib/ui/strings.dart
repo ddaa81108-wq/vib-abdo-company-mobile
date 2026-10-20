@@ -134,7 +134,11 @@ abstract final class AppStrings {
   static const phone = 'الهاتف';
   static const factor = 'المعامل';
   static const sinceDays = 'منذ';
+  static const dayOne = 'يوم';
+  static const dayTwo = 'يومان';
   static const days = 'أيام';
+  static const dayMany = 'يومًا';
+  static const clearSearch = 'مسح البحث';
   static const activeTab = 'نشطة';
   static const smartTab = 'الذكية';
   static const todayTab = 'اليوم';

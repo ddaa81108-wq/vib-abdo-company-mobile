@@ -346,10 +346,18 @@ int? parseUnits(String raw) {
 }
 
 class UnitsField extends StatelessWidget {
-  const UnitsField({required this.controller, required this.label, super.key});
+  const UnitsField({
+    required this.controller,
+    required this.label,
+    super.key,
+    this.dense,
+  });
 
   final TextEditingController controller;
   final String label;
+
+  /// Overrides the theme density. Null keeps the theme value.
+  final bool? dense;
 
   @override
   Widget build(BuildContext context) {
@@ -362,6 +370,7 @@ class UnitsField extends StatelessWidget {
         labelText: label,
         helperText: AppStrings.unitsHint,
         helperMaxLines: 3,
+        isDense: dense,
       ),
     );
   }
