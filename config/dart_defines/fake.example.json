@@ -1,0 +1,8 @@
+{
+  "USE_FAKE_API": true,
+  "API_BASE": "https://staging.example.invalid",
+  "API_DEBUG_LOG": false,
+  "AUTH_BEARER": false,
+  "MONEY_UNIT_SCALE": 0,
+  "RATE_WIRE_FORMAT": "number"
+}

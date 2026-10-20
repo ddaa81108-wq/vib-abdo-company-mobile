@@ -53,3 +53,8 @@ packages/**/build/
 .env.*
 *.jks
 *.keystore
+
+# Local dart-define files. Real origins stay out of the repo.
+# Commit only the *.example.json placeholders in config/dart_defines/.
+/config/dart_defines/*.json
+!/config/dart_defines/*.example.json
