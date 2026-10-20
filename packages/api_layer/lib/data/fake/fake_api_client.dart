@@ -31,6 +31,12 @@ class FakeApiClient implements ApiClient {
   /// Request ids of business mutations, in send order (tests).
   final List<String> mutationRequestIds = [];
 
+  /// Paths of those mutations, in the same order (tests).
+  final List<String> mutationPaths = [];
+
+  /// Wire bodies of those mutations, in the same order (tests).
+  final List<String> mutationBodies = [];
+
   /// The next N business mutations fail before they change fake state (tests).
   int failMutationsRemaining = 0;
 
@@ -162,6 +168,8 @@ class FakeApiClient implements ApiClient {
         head != 'notification-preferences') {
       _requireMutationMeta(b);
       mutationRequestIds.add('${b['requestId']}');
+      mutationPaths.add(path);
+      if (lastWireBody != null) mutationBodies.add(lastWireBody!);
       final paused = pauseMutations;
       if (paused != null) await paused.future;
       if (failMutationsRemaining > 0) {

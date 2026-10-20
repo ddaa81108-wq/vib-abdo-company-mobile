@@ -277,4 +277,8 @@ abstract final class AppStrings {
   static const link = 'ربط';
   static const batch = 'الدفعة';
   static const toneNeutral = 'محايد';
+  static const correctTransaction = 'تصحيح الحركة';
+  static const confirmCorrect =
+      'تأكيد إرسال تصحيح هذه الحركة؟ المبلغ والرصيد بعد الحفظ يظهران من الخادم فقط.';
+  static const currentServerAmount = 'المبلغ الحالي من الخادم';
 }
