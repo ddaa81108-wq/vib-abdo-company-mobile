@@ -1,7 +1,11 @@
-/// Screenshot / app-switcher protection for sensitive screens
-/// (ledger, treasury, totals, reports, login).
-/// Implement with a platform channel or a package such as `screen_protector`
-/// (Android FLAG_SECURE, iOS secure overlay on inactive). Chosen package TBD.
+/// Screenshot and recents protection.
+///
+/// Android enforces this with `FLAG_SECURE` on the activity window
+/// (`MainActivity`, channel `app/screen_security`). The flag is process-wide:
+/// it blocks screenshots and blanks the recents thumbnail for every route,
+/// including login, ledgers, treasury, and reports. [disable] must not clear
+/// it. [NoopScreenSecurity] is the fallback for tests and for targets that
+/// do not have the channel.
 abstract interface class ScreenSecurity {
   Future<void> enable();
   Future<void> disable();

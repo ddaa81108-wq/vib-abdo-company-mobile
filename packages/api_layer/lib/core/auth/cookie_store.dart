@@ -18,66 +18,116 @@ class _StoredCookie {
   final String name;
   final String value;
   final DateTime?
-      expiresAt; // null = session cookie (kept until logout/expiry on server)
+  expiresAt; // null = session cookie (kept until logout/expiry on server)
 
   bool get isExpired =>
       expiresAt != null && DateTime.now().toUtc().isAfter(expiresAt!);
 
-  Map<String, dynamic> toJson() =>
-      {'n': name, 'v': value, 'e': expiresAt?.toIso8601String()};
+  Map<String, dynamic> toJson() => {
+    'n': name,
+    'v': value,
+    'e': expiresAt?.toIso8601String(),
+  };
   static _StoredCookie fromJson(Map<String, dynamic> j) => _StoredCookie(
-      '${j['n']}',
-      '${j['v']}',
-      j['e'] == null ? null : DateTime.tryParse('${j['e']}'));
+    '${j['n']}',
+    '${j['v']}',
+    j['e'] == null ? null : DateTime.tryParse('${j['e']}'),
+  );
 }
 
-class SecureCookieStore implements CookieStore {
-  SecureCookieStore([FlutterSecureStorage? storage])
-      : _s = storage ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
-              iOptions: IOSOptions(
-                  accessibility:
-                      KeychainAccessibility.first_unlock_this_device),
-            );
+/// Small key/value surface so tests can exercise the cookie jar without the
+/// platform keystore. Production uses [FlutterSecureStorage].
+abstract interface class SecureKeyValue {
+  Future<String?> read(String key);
+  Future<void> write(String key, String value);
+  Future<void> delete(String key);
+}
 
-  final FlutterSecureStorage _s;
+class _FlutterSecureKeyValue implements SecureKeyValue {
+  _FlutterSecureKeyValue(this._storage);
+  final FlutterSecureStorage _storage;
+
+  @override
+  Future<String?> read(String key) => _storage.read(key: key);
+
+  @override
+  Future<void> write(String key, String value) =>
+      _storage.write(key: key, value: value);
+
+  @override
+  Future<void> delete(String key) => _storage.delete(key: key);
+}
+
+FlutterSecureStorage _defaultSecureStorage() => const FlutterSecureStorage(
+  aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  iOptions: IOSOptions(
+    accessibility: KeychainAccessibility.first_unlock_this_device,
+  ),
+);
+
+class SecureCookieStore implements CookieStore {
+  SecureCookieStore({FlutterSecureStorage? storage, SecureKeyValue? keys})
+    : _keys =
+          keys ?? _FlutterSecureKeyValue(storage ?? _defaultSecureStorage());
+
+  final SecureKeyValue _keys;
   static const _key = 'session.cookies.v1';
   Map<String, _StoredCookie>? _cache;
 
   Future<Map<String, _StoredCookie>> _load() async {
     final cached = _cache;
     if (cached != null) return cached;
-    final raw = await _s.read(key: _key);
+    final raw = await _keys.read(_key);
     final map = <String, _StoredCookie>{};
+    var dropped = false;
     if (raw != null) {
       try {
-        for (final e in (jsonDecode(raw) as List)) {
-          final c = _StoredCookie.fromJson((e as Map).cast<String, dynamic>());
-          if (!c.isExpired) map[c.name] = c;
+        final decoded = jsonDecode(raw);
+        if (decoded is! List) {
+          dropped = true;
+        } else {
+          for (final e in decoded) {
+            if (e is! Map) {
+              dropped = true;
+              continue;
+            }
+            final c = _StoredCookie.fromJson(Map<String, dynamic>.from(e));
+            if (c.isExpired) {
+              dropped = true;
+              continue;
+            }
+            map[c.name] = c;
+          }
         }
       } catch (_) {
         // Corrupt store -> start clean.
+        dropped = true;
       }
     }
-    return _cache = map;
+    _cache = map;
+    // Expired or corrupt entries must not stay in the encrypted jar.
+    if (dropped) await _persist(map);
+    return map;
   }
 
   Future<void> _persist(Map<String, _StoredCookie> map) async {
     _cache = map;
     if (map.isEmpty) {
-      await _s.delete(key: _key);
+      await _keys.delete(_key);
     } else {
-      await _s.write(
-          key: _key,
-          value: jsonEncode(map.values.map((c) => c.toJson()).toList()));
+      await _keys.write(
+        _key,
+        jsonEncode(map.values.map((c) => c.toJson()).toList()),
+      );
     }
   }
 
   @override
   Future<String?> cookieHeader() async {
     final map = await _load();
+    final before = map.length;
     map.removeWhere((_, c) => c.isExpired);
+    if (map.length != before) await _persist(map);
     if (map.isEmpty) return null;
     return map.values.map((c) => '${c.name}=${c.value}').join('; ');
   }
@@ -92,7 +142,8 @@ class SecureCookieStore implements CookieStore {
         final DateTime? exp = c.maxAge != null
             ? DateTime.now().toUtc().add(Duration(seconds: c.maxAge!))
             : c.expires?.toUtc();
-        final deleted = c.value.isEmpty ||
+        final deleted =
+            c.value.isEmpty ||
             (c.maxAge != null && c.maxAge! <= 0) ||
             (exp != null && DateTime.now().toUtc().isAfter(exp));
         if (deleted) {
@@ -113,7 +164,7 @@ class SecureCookieStore implements CookieStore {
   @override
   Future<void> clear() async {
     _cache = <String, _StoredCookie>{};
-    await _s.delete(key: _key);
+    await _keys.delete(_key);
   }
 }
 

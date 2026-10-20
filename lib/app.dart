@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'notifications/realtime_lifecycle.dart';
+import 'security/screen_protection.dart';
 import 'state/router_provider.dart';
 import 'state/session_providers.dart';
 import 'state/theme_controller.dart';
@@ -31,8 +32,9 @@ class CompanyApp extends ConsumerWidget {
       darkTheme: buildAppTheme(Brightness.dark),
       themeMode: themeMode,
       routerConfig: router,
-      builder: (context, child) =>
-          RealtimeLifecycle(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => ScreenProtection(
+        child: RealtimeLifecycle(child: child ?? const SizedBox.shrink()),
+      ),
     );
   }
 }

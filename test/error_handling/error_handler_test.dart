@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/authentication/login_form_error.dart';
@@ -34,13 +35,68 @@ void main() {
   test('structured values are redacted before logging', () {
     final redacted = handler.redact({
       'password': 'not-a-real-secret',
+      'current_password': 'also-secret',
+      'createdByName': 'Person',
+      'displayNote': 'private',
       'correlationId': 'corr-1',
       'balanceUnits': 320,
     });
     expect(redacted, {
       'password': '***',
+      'current_password': '***',
+      'createdByName': '***',
+      'displayNote': '***',
       'correlationId': 'corr-1',
       'balanceUnits': '***',
     });
+  });
+
+  test(
+    'a bearer token in the server message is removed, Arabic text stays',
+    () {
+      const error = BadRequestException(
+        code: 'BAD_REQUEST',
+        message: 'Bearer leak-token — بيانات غير مقبولة',
+        correlationId: 'cid-9',
+      );
+      final failure = handler.toFailure(error);
+      expect(failure.message, isNot(contains('leak-token')));
+      expect(failure.message, contains('بيانات غير مقبولة'));
+      expect(failure.diagnostic, 'code=BAD_REQUEST correlationId=cid-9');
+    },
+  );
+
+  test('report and framework hooks do not dump the raw exception', () {
+    final logs = <String>[];
+    final previousPrint = debugPrint;
+    final previousFlutter = FlutterError.onError;
+    final previousPlatform = PlatformDispatcher.instance.onError;
+    debugPrint = (String? message, {int? wrapWidth}) {
+      logs.add(message ?? '');
+    };
+    addTearDown(() {
+      debugPrint = previousPrint;
+      FlutterError.onError = previousFlutter;
+      PlatformDispatcher.instance.onError = previousPlatform;
+    });
+
+    const leaked =
+        'password=super-secret Bearer leak-token session=leak-cookie';
+    handler.report(StateError(leaked));
+    installErrorHooks(handler);
+    FlutterError.reportError(
+      FlutterErrorDetails(exception: StateError(leaked), library: 'test'),
+    );
+    final handled = PlatformDispatcher.instance.onError!(
+      StateError(leaked),
+      StackTrace.empty,
+    );
+    expect(handled, isTrue);
+
+    final text = logs.join('\n');
+    expect(text, contains('code=REQUEST_FAILED'));
+    expect(text, isNot(contains('super-secret')));
+    expect(text, isNot(contains('leak-token')));
+    expect(text, isNot(contains('leak-cookie')));
   });
 }
