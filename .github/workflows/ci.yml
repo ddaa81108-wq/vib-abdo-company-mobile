@@ -77,14 +77,14 @@ jobs:
 
       - name: Analyze app
         id: analyze_app
-        if: steps.resolve.outcome == 'success'
+        if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
         run: |
           set -o pipefail
           flutter analyze | tee "$RUNNER_TEMP/analyze-app.log"
 
       - name: Analyze API package
         id: analyze_api
-        if: steps.resolve.outcome == 'success'
+        if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
         working-directory: packages/api_layer
         run: |
           set -o pipefail
@@ -92,21 +92,21 @@ jobs:
 
       - name: Test app
         id: test_app
-        if: steps.resolve.outcome == 'success'
+        if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
         run: |
           set -o pipefail
           flutter test --reporter expanded --dart-define=USE_FAKE_API=true | tee "$RUNNER_TEMP/test-app.log"
 
       - name: Test API package
         id: test_api
-        if: steps.resolve.outcome == 'success'
+        if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
         working-directory: packages/api_layer
         run: |
           set -o pipefail
           flutter test --reporter expanded --dart-define=USE_FAKE_API=true | tee "$RUNNER_TEMP/test-api.log"
 
       - name: Write check summary
-        if: always() && steps.resolve.outcome == 'success'
+        if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
         env:
           ANALYZE_APP_OUTCOME: ${{ steps.analyze_app.outcome }}
           ANALYZE_API_OUTCOME: ${{ steps.analyze_api.outcome }}
