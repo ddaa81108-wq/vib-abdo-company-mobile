@@ -13,4 +13,6 @@ RULE: no business calculations anywhere. `*Units` are raw ints; rates are `Decim
 Permissions (final PM rule): server `role` matched EXACTLY (`"admin"`/`"employee"`) ONLY inside PermissionService; precedence (permission_service.dart L50-69): unknown/missing role = nothing; else fullAccess if sent; else admin with BOTH lists empty = full; else lists (write needs code AND manage; reports never writable; collections by codes only); disallowed controls are HIDDEN.
 - `--dart-define=RATE_WIRE_FORMAT=string` (default `number`): wire encoding of rates only; inside the app they are DecimalString text.
 
+Named environments (`fake`, `staging`, and a reserved `prod` placeholder) are JSON files under `config/dart_defines/` at the repository root, passed with `--dart-define-from-file`. See `../../docs/ENVIRONMENTS.md`. The defines above are unchanged.
+
 Verified on the box: `flutter analyze --no-pub` -> No issues; `flutter test --no-pub` -> 46 passed (offline).

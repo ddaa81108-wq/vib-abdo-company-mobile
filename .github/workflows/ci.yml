@@ -4,9 +4,11 @@
 # ref cancels the previous one.
 #
 # The app and packages/api_layer are both analyzed and tested, matching
-# tool/check.sh. Tests and the APK pass USE_FAKE_API=true explicitly. That is
-# already the default (see ApiConfig.fromEnvironment). No API host and no
-# secrets are configured.
+# tool/check.sh. Tests pass USE_FAKE_API=true explicitly. That is already the
+# default (see ApiConfig.fromEnvironment). The debug APK is built with
+# tool/flutter_env.sh fake, which loads the committed
+# config/dart_defines/fake.example.json (fake client, placeholder origin).
+# No API host and no secrets are configured.
 #
 # Flutter is pinned to 3.47.7, the stable release recorded in .metadata
 # (revision abaf9c523780a608bd46686fd5e53740a07077f8) and named in the README.
@@ -139,7 +141,7 @@ jobs:
               raise SystemExit("android/gradle.properties jvmargs changed; update the CI heap override")
           path.write_text(text.replace(old, new, 1), encoding="utf-8")
           PY
-          flutter build apk --debug --dart-define=USE_FAKE_API=true
+          tool/flutter_env.sh fake build apk --debug
 
       - name: Record APK size
         if: success()
