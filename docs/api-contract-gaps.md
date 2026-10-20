@@ -3,9 +3,9 @@
 جرد ما يفترضه تطبيق الجوال ولم يؤكّده الخادم. هذا المستند مخرج المرحلة 0 من تحليل المستودع: كل حقل أو كود أو مسار موسوم بـ `proposed` / «مقترح» / 🔶 / `pending server confirmation` / `assumed` / `to confirm` / `STUB`، مع أثر الاختلاف وبديل مؤقت والسؤال الحرفي لمالك الخادم.
 
 - **لا يغيّر هذا المستند سلوك التطبيق.** لا مسارات جديدة، ولا تعديل على الطلبات.
-- **أساس الأسطر:** الفرع `main` عند `fea12dd`. الأسطر تشير إلى الملفات كما هي في هذا الجرد.
-- **النطاق:** `packages/api_layer/lib/core/network/api_endpoints.dart`، و`packages/api_layer/lib/core/permissions/permission_codes.dart`، وكل `*_models.dart`، ثم العلامات المماثلة في بقية المستودع.
-- **ما لم يُدرَج:** مسارات وكودات يصفها التعليق بأنها من العقد القائم (مثل `debts.read` و`POST /api/auth/login` و`GET /api/events`). صيغة السعر `RATE_WIRE_FORMAT` موثّقة في الكود كعقد: الافتراضي `number` لأن الخادم الحالي يتوقع عدد JSON، والهدف `string`. علامة 🔶 على `API_BASE` في `api_config.dart` قيد أمان (لا عنوان إنتاج افتراضي) وليست حقلًا غير مؤكد. مسارا `GET /api/account-requests` و`/api/notification-preferences` موجودان في الملف بلا وسم «مقترح»؛ نقصهما في الواجهة خارج هذا الجرد.
+- **أساس الأسطر:** الفرع `main` عند `fea12dd`، ما لم يُذكر فرع آخر. بنود أُضيفت من طلبات دمج لم تُدمَج بعد تذكر الفرع: PR #3 `cursor/unlinked-receipt-actions-30bd`، PR #7 `cursor/ledger-transaction-correction-7e25`، PR #9 `cursor/staging-api-ready-8c4a`، PR #10 `cursor/edit-account-card-ae82`.
+- **النطاق:** `packages/api_layer/lib/core/network/api_endpoints.dart`، و`packages/api_layer/lib/core/permissions/permission_codes.dart`، وكل `*_models.dart`، ثم العلامات المماثلة في بقية المستودع، ثم أسئلة مالك الخادم المفتوحة في تلك الطلبات.
+- **ما لم يُدرَج:** مسارات وكودات يصفها التعليق بأنها من العقد القائم (مثل `debts.read` و`POST /api/auth/login` و`GET /api/events`). علامة 🔶 على `API_BASE` في `api_config.dart` قيد أمان (لا عنوان إنتاج افتراضي) وليست حقلًا غير مؤكد؛ سؤال وجود بيئة staging نفسها هو البند 34. مسارا `GET /api/account-requests` و`/api/notification-preferences` موجودان في الملف بلا وسم «مقترح»؛ نقصهما في الواجهة خارج هذا الجرد. صيغة السعر لم تعد خارج الجرد: التعليقات تتعارض، وهي البند 40.
 
 كل بند أدناه يحمل الرقم نفسه في [قائمة الأسئلة](#قائمة-الأسئلة-لمالك-الخادم).
 
@@ -41,9 +41,16 @@
 | 28 | `activeCashTone` | `treasury_models.dart:29-31` |
 | 29 | `MONEY_UNIT_SCALE` | `api_config.dart:45-46` |
 | 30 | أكواد انتهاء الجلسة | `error_mapper.dart:12-17` |
-| 31 | كود خطأ CSRF | `error_mapper.dart:20-22` |
+| 31 | حالة وكود خطأ CSRF، ومنها `419` العاري | `error_mapper.dart:20-22` |
 | 32 | أي 401 آخر = انتهاء جلسة | `error_mapper.dart:119-120` |
-| 33 | شكل `error.details` | `error_mapper.dart:199-200` |
+| 33 | حالة التحقق وشكل `error.details` | `error_mapper.dart:103-109` و`:147-156` |
+| 34 | أصل staging وحسابات الاختبار | `docs/staging.md` على PR #9 |
+| 35 | شكل `GET /api/auth/csrf` ودخول بلا رمز | `cookie_csrf_auth_strategy.dart:12-13` |
+| 36 | هل التصحيح قيد عكسي | `transaction_correction_form.dart` على PR #7 |
+| 37 | `expectedVersion` للتصحيح: سطر أم كارت | المستودع نفسه على PR #7 |
+| 38 | رمز `allowedActions` للتعديل = `edit` | `edit_account_card_screen.dart` على PR #10 |
+| 39 | `phone: ""` لمسح الهاتف | `UpdateAccountRequest` وPR #10 |
+| 40 | الأسعار: عدد JSON أم نص | `api_config.dart:12-18` |
 
 آلية الصلاحيات المشتركة للبنود 05–12: التعليق في `permission_codes.dart:83-86` يقول إن الويب الحالي يتحكم بهذه الإجراءات **باسم الدور** (`admin`) بلا كود دقيق، وكل `ManagementAction` يقابل كودًا مقترحًا. `PermissionService.canDo` يسمح بالإجراء إذا وُجد الكود في `permissions[]`، أو إذا كانت الصلاحية كاملة: `fullAccess == true`، أو الدور `admin` وقائمتا `permissions` و`sectionAccess` فارغتان (`permission_service.dart:135-136`). غياب الكود يخفي الزر عن غير المدير الكامل. الإخفاء في الواجهة ليس حماية؛ الخادم يفرض الصلاحية على الطلب نفسه.
 
@@ -91,19 +98,19 @@
 
 ## 06 — `collections.decide`
 
-- **الملف والسطر:** `packages/api_layer/lib/core/permissions/permission_codes.dart:89`. الاستدعاء: `lib/features/collections/collections_screen.dart:30`. يخفي المؤشرات وإجماليات الموظفين وأزرار الاعتماد والرفض وربط الاستلام غير المربوط. المساران: `POST /api/collections/submissions/{id}/decision` و`POST /api/collections/unlinked-receipts/{id}/decision`.
-- **ما هو مفترض:** كود صريح مقترح.
-- **الأثر إذا رفض الخادم أو اختلف:** موظف التحصيل لا يرى أزرار القرار حتى لو سمح الخادم بالطلب. المدير الكامل يراها. قرار متزامن بلا `expectedVersion` يرفضه التطبيق محليًا قبل الإرسال (`collections_repository.dart` يشترط الإصدار).
-- **البديل المقترح:** قصر أزرار القرار على الصلاحية الكاملة، والإبقاء على `expectedVersion` كما هو.
-- **السؤال:** هل سيُرجع `GET /api/me` الكود `collections.decide` داخل `permissions[]`؟ إن لم يُرجعه، هل تبقى قرارات الاعتماد والرفض والربط (`POST /api/collections/submissions/{id}/decision` و`POST /api/collections/unlinked-receipts/{id}/decision`) ومؤشرات الشاشة للمدير الكامل فقط؟
+- **الملف والسطر:** `packages/api_layer/lib/core/permissions/permission_codes.dart:89`. الاستدعاء على `main`: `lib/features/collections/collections_screen.dart:30`. يخفي المؤشرات وإجماليات الموظفين وأزرار الاعتماد والرفض وربط الاستلام غير المربوط. المساران: `POST /api/collections/submissions/{id}/decision` و`POST /api/collections/unlinked-receipts/{id}/decision`. على فرع PR #3 غير المدموج (`cursor/unlinked-receipt-actions-30bd`) زر رفض الاستلام غير المربوط يستخدم الكود نفسه: `lib/features/collections/unlinked_receipt_actions.dart:30-32` و`:75-78`، ويظهر فقط عندما `status == pending`.
+- **ما هو مفترض:** الكود ما زال مقترحًا. الويب يفتح الاعتماد والرفض باسم الدور لا بهذا النص. سؤال المهندس («هل الكود مؤكد؟») هو هذا البند نفسه، لا بندًا جديدًا. ظهور زر النقد للاستلام غير المربوط في البند 13، وكود `collections.cash_receive` في البند 07.
+- **الأثر إذا رفض الخادم أو اختلف:** موظف التحصيل لا يرى أزرار القرار حتى لو سمح الخادم بالطلب. مدير بقائمة صلاحيات صريحة لا تحتوي `collections.decide` لا يراها أيضًا، حتى لو كان دوره `admin`. المدير ذو القوائم الفارغة يراها. قرار متزامن بلا `expectedVersion` يرفضه التطبيق محليًا قبل الإرسال (`collections_repository.dart` يشترط الإصدار).
+- **البديل المقترح:** قصر أزرار القرار، بما فيها رفض الاستلام غير المربوط، على الصلاحية الكاملة إلى أن يُرجع الخادم الكود. الإبقاء على `expectedVersion` من `version` الإيصال.
+- **السؤال:** هل كود `collections.decide` مؤكد ويُرجع داخل `permissions[]` في `GET /api/me`، أم ما زال مقترحًا والويب يفتح الاعتماد والرفض باسم الدور فقط؟ إن لم يُرجَع، هل تبقى `POST /api/collections/submissions/{id}/decision` و`POST /api/collections/unlinked-receipts/{id}/decision` (بما فيها رفض الاستلام غير المربوط) ومؤشرات الشاشة للمدير الكامل فقط؟
 
 ## 07 — `collections.cash_receive`
 
-- **الملف والسطر:** `packages/api_layer/lib/core/permissions/permission_codes.dart:90`. الاستدعاء: `lib/features/collections/collections_screen.dart:31` و`:468`. المساران: `POST /api/collections/submissions/{id}/cash-received` و`POST /api/collections/unlinked-receipts/{id}/cash-received`.
-- **ما هو مفترض:** كود صريح مقترح. الزر يحتاج أيضًا `cashStatus == pending` (البند 13).
-- **الأثر إذا رفض الخادم أو اختلف:** الزر مخفي عن غير المدير الكامل. المدير الكامل لا يراه هو الآخر إذا لم تكن حالة النقد `pending`. رفض المسار يظهر كخطأ بعد الضغط.
+- **الملف والسطر:** `packages/api_layer/lib/core/permissions/permission_codes.dart:90`. الاستدعاء على `main`: `lib/features/collections/collections_screen.dart:31` و`:468` (استلام مربوط). المساران: `POST /api/collections/submissions/{id}/cash-received` و`POST /api/collections/unlinked-receipts/{id}/cash-received`. على فرع PR #3 زر نقد الاستلام غير المربوط يستخدم الكود نفسه: `lib/features/collections/unlinked_receipt_actions.dart:33-35` و`:94`.
+- **ما هو مفترض:** الكود ما زال مقترحًا، كـ `collections.decide`. الزر يحتاج أيضًا `cashStatus == pending` (البند 13). تأكيد الكود سؤال هذا البند؛ توقيت الزر بعد الرفض سؤال البند 13.
+- **الأثر إذا رفض الخادم أو اختلف:** الزر مخفي عن غير المدير الكامل، وعن مدير بقائمة صريحة لا تحتوي الكود. المدير الكامل لا يراه هو الآخر إذا لم تكن حالة النقد `pending`. رفض المسار يظهر كخطأ بعد الضغط.
 - **البديل المقترح:** إبقاء الزر مشروطًا بالصلاحية الكاملة وبقيمة `pending` القادمة من الخادم، وعدم اشتقاق «ينتظر النقد» من `status` أو `cashReceivedAt`.
-- **السؤال:** هل سيُرجع `GET /api/me` الكود `collections.cash_receive` داخل `permissions[]`؟ إن لم يُرجعه، هل يبقى `POST /api/collections/submissions/{id}/cash-received` و`POST /api/collections/unlinked-receipts/{id}/cash-received` للمدير الكامل فقط؟
+- **السؤال:** هل كود `collections.cash_receive` مؤكد ويُرجع داخل `permissions[]` في `GET /api/me`، أم ما زال مقترحًا؟ إن لم يُرجَع، هل يبقى `POST /api/collections/submissions/{id}/cash-received` و`POST /api/collections/unlinked-receipts/{id}/cash-received` للمدير الكامل فقط؟ ظهور الزر ما زال مشروطًا أيضًا بـ `cashStatus = pending` (البند 13).
 
 ## 08 — `collections.close_day`
 
@@ -147,11 +154,11 @@
 
 ## 13 — `cashStatus` / `cashPending`
 
-- **الملف والسطر:** `packages/api_layer/lib/data/models/collection_models.dart:40-59` (الحقول في `:79-80` و`:117`). الواجهة: `lib/features/collections/collections_screen.dart:420` و`:468` و`:543`.
-- **ما هو مفترض:** حقول مقترحة. `cashStatus` إحدى `pending` أو `received` أو `not_applicable`. إن غاب النص يُقرأ `cashPending == true` كـ `pending` فقط. الغياب يعيد `null`. التطبيق لا يشتق الحالة من `status` ولا من `cashReceivedAt`.
-- **الأثر إذا رفض الخادم أو اختلف:** شارة «ينتظر النقد» وزر «استلام نقدي» لا يظهران إلا عند قيمة تُفسَّر `pending`. نص مختلف (مثل `awaiting` أو `waiting_cash`) يُخفي الزر حتى عن المدير الكامل الذي يملك `collections.cash_receive`. `cashPending: false` لا يعني `received`؛ يبقى العرض بلا شارة.
-- **البديل المقترح:** إبقاء الزر مخفيًا عند الغياب أو عند قيمة غير معروفة. عرض `cashReceivedAt` كوقت فقط إن وُجد، بلا تحويله إلى حالة.
-- **السؤال:** هل يرسل الخادم على الاستلام وعلى الاستلام غير المربوط الحقل `cashStatus` بالقيم `pending` أو `received` أو `not_applicable`، أو الحقل `cashPending: true`؟ ما النص الحرفي إن اختلف؟ بدون قيمة تُقرأ كـ `pending` لا يظهر شارة «ينتظر النقد» ولا زر تأكيد استلام النقد.
+- **الملف والسطر:** `packages/api_layer/lib/data/models/collection_models.dart:40-59` (الحقول في `:79-80` و`:117`). الواجهة على `main`: `lib/features/collections/collections_screen.dart:420` و`:468` للاستلام المربوط، و`:543-565` شارة «ينتظر النقد» على الاستلام غير المربوط بلا زر نقد. على فرع PR #3، `lib/features/collections/unlinked_receipt_actions.dart:16-21` و`:33-35`: زر النقد يظهر عندما `cashStatus == pending`، بما في ذلك بعد الرفض، والتعليق ينهى عن استنتاجه من `status == rejected`. بيانات الـ Fake على ذلك الفرع تضع `cashStatus: pending` على إيصال مرفوض (`fake_fixtures.dart`، الإيصال `ur_2`).
+- **ما هو مفترض:** حقول مقترحة. `cashStatus` إحدى `pending` أو `received` أو `not_applicable`. إن غاب النص يُقرأ `cashPending == true` كـ `pending` فقط. الغياب يعيد `null`. التطبيق لا يشتق الحالة من `status` ولا من `cashReceivedAt`. لم يُؤكد أن الإيصال غير المربوط المرفوض يعود أصلًا بهذا الحقل.
+- **الأثر إذا رفض الخادم أو اختلف:** شارة «ينتظر النقد» وزر «استلام نقدي» لا يظهران إلا عند قيمة تُفسَّر `pending`. نص مختلف (مثل `awaiting` أو `waiting_cash`) يُخفي الزر حتى عن المدير الكامل الذي يملك `collections.cash_receive`. إذا كان الخادم يضع `cashStatus: pending` على المرفوض فقط، الزر الحالي يظهر أيضًا على إيصال معتمد أو معلّق ما دامت القيمة `pending`. إذا كان المرفوض بلا الحقل، زر نقد الرفض لا يظهر أبدًا. `cashPending: false` لا يعني `received`.
+- **البديل المقترح:** إبقاء الزر مخفيًا عند الغياب أو عند قيمة غير معروفة، وعدم ربطه بـ `status == rejected` إلى جواب المالك. عرض `cashReceivedAt` كوقت فقط إن وُجد.
+- **السؤال:** هل يرسل الخادم على الاستلام المربوط وعلى الاستلام غير المربوط الحقل `cashStatus` بالقيم `pending` أو `received` أو `not_applicable`، أو `cashPending: true`، وهل يُرسل ذلك أيضًا عندما تكون حالة الاستلام غير المربوط `rejected`؟ وهل يجب أن يظهر زر تأكيد النقد كلما كانت القيمة `pending`، أم فقط بعد الرفض؟ التطبيق (وفرع PR #3) يظهر الزر عند `pending` ولا يشترطه بعد الرفض، ولا يشتقه من `status`.
 
 ## 14 — شكل استجابة `GET /api/collections`
 
@@ -291,19 +298,19 @@
 
 ## 30 — أكواد انتهاء الجلسة
 
-- **الملف والسطر:** `packages/api_layer/lib/core/network/error_mapper.dart:12-17`.
-- **ما هو مفترض:** `AUTH_REQUIRED` هو الكود الملاحظ. `SESSION_EXPIRED` و`SESSION_REVOKED` تخمين دفاعي. أي منها ينتج `SessionExpiredException`. على طلب مصادق، استراتيجية الكوكي تُجبر الخروج (`cookie_csrf_auth_strategy.dart:109-110`).
-- **الأثر إذا رفض الخادم أو اختلف:** كود انتهاء حقيقي بغير هذه الثلاثة وبغير حالة 401 (انظر البند 32) لا يُخرج المستخدم؛ الطلب يفشل والجلسة تبقى. كود التخمين على حالة ليست 401، إن استُخدم لمعنى آخر، يُخرج المستخدم من الجلسة.
-- **البديل المقترح:** معاملة `AUTH_REQUIRED` كخروج إجباري، وإضافة أي كود آخر حرفيًا بعد جواب المالك دون توسيع التخمين.
-- **السؤال:** ما أكواد انتهاء الجلسة غير `AUTH_REQUIRED`؟ التطبيق يخمن أيضًا `SESSION_EXPIRED` و`SESSION_REVOKED`. أي كود منها على حالة غير 401 يُجبر تسجيل الخروج.
+- **الملف والسطر:** على `main`: `packages/api_layer/lib/core/network/error_mapper.dart:12-17` (`AUTH_REQUIRED` و`SESSION_EXPIRED` و`SESSION_REVOKED`). الخروج: `cookie_csrf_auth_strategy.dart:109-110`. على فرع PR #9 غير المدموج (`cursor/staging-api-ready-8c4a`): `error_mapper.dart:12-20` يضيف `PAGE_EXPIRED`، و`:121-127` يجعل حالة `419` انتهاء جلسة إلا إذا سبقها تصنيف CSRF (البند 31). `docs/staging.md:88` على ذلك الفرع يسأل المالك عن الحالة والكود.
+- **ما هو مفترض:** `AUTH_REQUIRED` هو الكود الملاحظ. البقية تخمين. أي منها ينتج `SessionExpiredException` ويُخرج الجلسة على طلب مصادق. حالة `419` العارية سؤال البند 31 لا سؤالًا مكررًا هنا.
+- **الأثر إذا رفض الخادم أو اختلف:** كود انتهاء حقيقي بغير هذه القائمة وبغير حالة 401 (البند 32) لا يُخرج المستخدم على `main`؛ الطلب يفشل والجلسة تبقى. كود التخمين بمعنى آخر يُخرج المستخدم. بعد دمج PR #9، `PAGE_EXPIRED` أو `419` بلا CSRF يُخرجان الجلسة أيضًا.
+- **البديل المقترح:** معاملة `AUTH_REQUIRED` على الطلب المصادق كخروج إجباري، وإضافة أي كود أو حالة أخرى حرفيًا بعد جواب المالك.
+- **السؤال:** ما أكواد انتهاء الجلسة غير `AUTH_REQUIRED`؟ على `main` التطبيق يخمن `SESSION_EXPIRED` و`SESSION_REVOKED`. فرع PR #9 يضيف التخمين `PAGE_EXPIRED`. أي كود منها على حالة غير 401 يُجبر تسجيل الخروج. حالة `419` العارية مذكورة في البند 31.
 
-## 31 — كود خطأ CSRF
+## 31 — حالة وكود خطأ CSRF
 
-- **الملف والسطر:** `packages/api_layer/lib/core/network/error_mapper.dart:20-22`. إعادة المحاولة: `cookie_csrf_auth_strategy.dart:100-107` عبر `GET /api/auth/csrf` مرة واحدة.
-- **ما هو مفترض:** الكود الحقيقي غير ظاهر في واجهة الويب. أي كود يحتوي المقطع `CSRF` (مثل `CSRF_INVALID`) يُعدّ خطأ CSRF.
-- **الأثر إذا رفض الخادم أو اختلف:** كود بلا المقطع `CSRF` لا يُعاد جلب الرمز من أجله. الطلب يفشل بحالة HTTP (غالبًا 403) ويرى المستخدم «لا تملك صلاحية» أو رسالة الخادم، بلا إعادة محاولة. مقطع `CSRF` داخل كود بمعنى آخر يعيد المحاولة مرة ثم يمرّر الخطأ.
-- **البديل المقترح:** الإبقاء على المطابقة بالمقطع إلى أن يصل الكود الحرفي، ثم حصر المطابقة فيه.
-- **السؤال:** ما الكود الحرفي لخطأ CSRF؟ التطبيق يعدّ أي كود يحتوي المقطع `CSRF` خطأ CSRF ويعيد جلب `GET /api/auth/csrf` مرة واحدة. كود بلا هذا المقطع لا يُعاد المحاولة عليه.
+- **الملف والسطر:** على `main`: `packages/api_layer/lib/core/network/error_mapper.dart:20-22`. إعادة المحاولة: `cookie_csrf_auth_strategy.dart:100-107` عبر `GET /api/auth/csrf` مرة واحدة. `419` على `main` ليس حالة خاصة في `error_mapper.dart` فيسقط إلى خطأ غير معروف ولا يُخرج الجلسة. على فرع PR #9: `error_mapper.dart:22-28` و`:101-108` يعدّ الكود أو الرسالة التي تحتوي `CSRF` خطأ CSRF ويتقدّم على `419`؛ و`:121-127` و`cookie_csrf_auth_strategy.dart:126` يعاملان `419` بلا ذلك المقطع كإنتهاء جلسة. السؤال في `docs/staging.md:89`.
+- **ما هو مفترض:** الكود الحقيقي غير ظاهر في واجهة الويب. المطابقة الحالية بالمقطع `CSRF` (مثل `CSRF_INVALID`). لم يُؤكد أن الفشل يصل كـ `419` عارٍ بلا كود.
+- **الأثر إذا رفض الخادم أو اختلف:** على `main`، كود بلا المقطع `CSRF` لا يُعاد جلب الرمز من أجله. `419` عارٍ لا يُخرج المستخدم ولا يعيد المحاولة، فيبقى الطلب فاشلًا والجلسة قائمة. بعد دمج PR #9، `419` عارٍ يمسح الكوكي ورمز CSRF ويرسل المستخدم إلى `/login`. مقطع `CSRF` داخل كود أو رسالة بمعنى آخر يعيد المحاولة مرة ثم يمرّر الخطأ.
+- **البديل المقترح:** إعادة الجلب مرة واحدة فقط عندما يطابق الكود النص الذي يثبّته المالك. عدم معاملة `419` العاري كخروج إلى أن يُؤكد أنه انتهاء جلسة لا فشل CSRF.
+- **السؤال:** ما حالة HTTP والكود الحرفي لخطأ CSRF؟ هل يصل أحيانًا كـ `419` عارٍ بلا كود يحتوي `CSRF`؟ على `main` أي كود يحتوي المقطع `CSRF` يعيد جلب `GET /api/auth/csrf` مرة واحدة، و`419` العاري لا يُعاد جلب الرمز من أجله ولا يُخرج الجلسة. فرع PR #9 يعامل الرسالة التي تحتوي `CSRF` كخطأ CSRF، ويعامل `419` بلا ذلك المقطع كإنتهاء جلسة.
 
 ## 32 — أي 401 آخر يعني انتهاء الجلسة
 
@@ -313,13 +320,71 @@
 - **البديل المقترح:** إبقاء الخروج الإجباري لـ `AUTH_REQUIRED` على الطلبات المصادَقة، وتصنيف شاشة الدخول حسب الكود الحرفي لرفض كلمة المرور بعد جواب المالك.
 - **السؤال:** هل كل استجابة 401 ليست خطأ دخول (الكود لا يحتوي `CREDENTIALS` ولا `LOGIN`) تعني انتهاء الجلسة حتى لو اختلف الكود عن `AUTH_REQUIRED`؟ ما كود رفض كلمة المرور الحرفي في `POST /api/auth/login`؟
 
-## 33 — شكل `error.details`
+على فرع PR #9 (`error_mapper.dart:110-119`) كل `401` على طلب غير مصادق، ومنها الدخول، يُصنَّف بيانات خاطئة مهما كان الكود، ولا يمسح الجلسة. ذلك لا يغيّر سؤال هذا البند؛ هو السلوك المقترح إلى أن يصل الكود الحرفي.
 
-- **الملف والسطر:** `packages/api_layer/lib/core/network/error_mapper.dart:199-210`. يُستخدم مع حالة 422.
-- **ما هو مفترض:** `details` كائن على الخادم وشكله غير معروف. التطبيق يقبل أحد ثلاثة: `{ "fields": { "name": "msg" } }`، أو `{ "name": "msg" }` حيث القيمة نص، أو قائمة `[{field, code, message}]`.
-- **الأثر إذا رفض الخادم أو اختلف:** شكل آخر (مثل `{errors: [...]}` أو رسالة ليست نصًا) يُسقط أخطاء الحقول. المستخدم يرى `error.message` العامة فقط، والنموذج لا يعلّم الحقل.
-- **البديل المقترح:** الإبقاء على الرسالة العامة عند شكل غير معروف، وربط أخطاء الحقول بعد تثبيت شكل واحد.
-- **السؤال:** ما شكل `error.details` في أخطاء التحقق؟ التطبيق يقبل `{fields: {name: msg}}` أو خريطة `{name: msg}` أو قائمة `[{field, code, message}]`. شكل آخر يُسقط أخطاء الحقول ويُبقي الرسالة العامة فقط.
+## 33 — حالة التحقق وشكل `error.details`
+
+- **الملف والسطر:** على `main`: `packages/api_layer/lib/core/network/error_mapper.dart:103-109` (`400` → `BadRequestException` دائمًا) و`:147-156` (`422` → `ValidationException`) و`:199-210` لشكل `details`. على فرع PR #9: `error_mapper.dart:139-156` يحوّل `400` إلى `ValidationException` فقط عندما يُستخرج من `details` حقل واحد على الأقل، و`:200-208` تُبقي `422` تحققًا دائمًا. `docs/staging.md:64` و`:91`.
+- **ما هو مفترض:** شكل `details` غير معروف. التطبيق يقبل أحد ثلاثة: `{ "fields": { "name": "msg" } }`، أو `{ "name": "msg" }` حيث القيمة نص، أو قائمة `[{field, code, message}]`. حالة HTTP للتحقق مفترضة `422` على `main`؛ `400` لا تُقرأ كأخطاء حقول حتى لو حملت `details`.
+- **الأثر إذا رفض الخادم أو اختلف:** تحقق على `400` فقط، على `main`، يظهر كرسالة عامة بلا تعليم الحقل. شكل `details` غير الأشكال الثلاثة يُسقط أخطاء الحقول في الحالتين ويُبقي `error.message`. بعد دمج PR #9، `400` الذي يحمل أحد الأشكال الثلاثة يعلّم الحقول، و`400` بلاها يبقى طلبًا مرفوضًا.
+- **البديل المقترح:** إظهار رسالة الخادم العامة لأي حالة غير مؤكدة، وربط أخطاء الحقول بعد تثبيت الحالة (`422` أو `400` أو كلتاهما) وشكل واحد لـ `details`.
+- **السؤال:** هل أخطاء التحقق تأتي على HTTP `422` أو `400` أو كليهما؟ وما شكل `error.details`؟ على `main` حالة `422` فقط تُقرأ كتحقق، و`400` تبقى طلبًا مرفوضًا حتى لو حمل `details`. التطبيق يقبل `{fields: {name: msg}}` أو خريطة `{name: msg}` أو قائمة `[{field, code, message}]`. شكل آخر يُسقط أخطاء الحقول. فرع PR #9 يحوّل `400` إلى تحقق فقط عندما تُستخرج أخطاء حقول من `details`.
+
+## 34 — أصل staging وحسابات الاختبار
+
+- **الملف والسطر:** على فرع PR #9 غير المدموج: `docs/staging.md:81-85`. على `main`: `packages/api_layer/lib/core/config/api_config.dart:52-56` يرفض عنوان إنتاج افتراضيًا ويبقي `API_BASE` على `https://staging.example.invalid`، و`README.md` يمنع أسرار المستودع. لا ملف في المستودع يحمل مضيفًا حقيقيًا ولا حساب اختبار.
+- **ما هو مفترض:** لا شيء عن عنوان حي. التشغيل الحقيقي يشترط `--dart-define=USE_FAKE_API=false --dart-define=API_BASE=https://<staging-host>`. الحسابات تُسلَّم خارج المستودع.
+- **الأثر إذا رفض الخادم أو اختلف:** بلا أصل staging يبقى التطبيق على الـ Fake ولا يُختبر عقد هذا الملف على خادم. حساب اختبار داخل المستودع يخالف قاعدة «لا أسرار». دور بلا حساب لا يُتحقق من بنود الصلاحيات 05–12.
+- **البديل المقترح:** الإبقاء على الـ Fake كافتراضي، وتمرير الأصل والحسابات عند التشغيل فقط، خارج git.
+- **السؤال:** هل تتوفر بيئة staging، ومن يصدر حسابات الاختبار لكل دور؟ العنوان والحسابات يبقيان خارج المستودع.
+
+## 35 — شكل `GET /api/auth/csrf` وهل الدخول يتطلب الرمز
+
+- **الملف والسطر:** `packages/api_layer/lib/core/network/api_endpoints.dart:13` (`/api/auth/csrf`). القراءة: `packages/api_layer/lib/core/auth/cookie_csrf_auth_strategy.dart:12-13` و`:55-65` و`:115-134`. الدخول عام بلا مصادقة: `packages/api_layer/lib/data/repositories/auth_repository.dart:6-8` و`:22` (`authenticated: false`). الرأس يُرسل على الطلب غير الآمن فقط إذا كان الرمز موجودًا في الذاكرة؛ الدخول بلا رمز سابق يُزيل `X-CSRF-Token`. السؤال نفسه في `docs/staging.md:87` على PR #9.
+- **ما هو مفترض:** `GET /api/auth/csrf` يعيد `{ ok: true, data: { csrfToken } }`، والرأس في الطلبات اللاحقة اسمه `X-CSRF-Token`. `POST /api/auth/login` لا يتطلب الرمز؛ الدخول يعيد `data.csrfToken` مع كوكي الجلسة، وإن غاب الرمز يُعاد جلبه من مسار CSRF.
+- **الأثر إذا رفض الخادم أو اختلف:** جسم بلا `data.csrfToken` يترك الرمز فارغًا، فطلبات الكتابة تخرج بلا الرأس ويرفضها الخادم. مسار أو اسم حقل مختلف يمنع استئناف الجلسة بعد إعادة تشغيل التطبيق. إذا كان الدخول نفسه يتطلب الرمز، أول `POST /api/auth/login` يُرفض لأن التطبيق لا يجلب CSRF قبل الدخول.
+- **البديل المقترح:** الإبقاء على الدخول بلا رأس CSRF، ثم قراءة `csrfToken` من جسم الدخول، ثم `GET /api/auth/csrf` إذا غاب. عدم تخزين الرمز إلا في الذاكرة.
+- **السؤال:** هل `GET /api/auth/csrf` هو المسار الصحيح، وجسمه `{ ok: true, data: { csrfToken } }`، والرأس المُعاد في الطلبات غير الآمنة هو `X-CSRF-Token`؟ وهل `POST /api/auth/login` نفسه يتطلب رمز CSRF؟
+
+## 36 — هل تصحيح الحركة قيد عكسي
+
+- **الملف والسطر:** على فرع PR #7 غير المدموج (`cursor/ledger-transaction-correction-7e25`): `lib/features/accounts/transaction_correction_form.dart:15-20`. الإرسال: `packages/api_layer/lib/data/repositories/accounts_repository.dart:106-111` إلى `POST /api/{section}/{id}/transactions/{tx}/corrections` بجسم `AccountTransactionRequest` (`type` و`paymentMode` و`inputValue` و`calculationMode` و`factor` و`date` و`note`) زائد `requestId` و`expectedVersion`. لا علم عكس ولا استدعاء لمسار الإلغاء. على `main` المسار موجود في `api_endpoints.dart:32-33` والمستودع بلا شاشة.
+- **ما هو مفترض:** لا شيء عن شكل القيد الناتج. الواجهة لا تقول إن الخادم ينشئ سطرًا عكسيًا ولا سطرًا جديدًا. بعد النجاح تُعاد قراءة الدفتر والكارت والقائمة، بلا تعديل أرصدة على الجهاز. الزر يُخفى لسطر `reversed` أو `deleted` وللكارت `systemManaged`، ويظهر لبقية الحالات لمن يملك كتابة القسم.
+- **الأثر إذا رفض الخادم أو اختلف:** إذا كان التصحيح يرفض جسم الحركة أو يتطلب حقل عكس غير مُرسل، الحفظ يفشل وتظهر رسالة الخادم ويبقى الدفتر كما كان. إذا أنشأ الخادم سطرين، الواجهة تعرضهما بعد إعادة الجلب بلا نص يشرح أنهما عكس. حالة لا يقبلها الخادم (مثل `finalized`) تُظهر الزر ثم تُرفض عند الحفظ.
+- **البديل المقترح:** الإبقاء على إرسال جسم الحركة بلا علم عكس، وعدم كتابة «قيد عكسي» في الواجهة إلى جواب المالك. إخفاء الزر عن `reversed` و`deleted` كما هو.
+- **السؤال:** هل حفظ التصحيح `POST /api/{section}/{id}/transactions/{tx}/corrections` يكتب قيدًا عكسيًا (وسطرًا جديدًا) أم يعدّل السطر نفسه؟ التطبيق يرسل جسم الحركة ولا يرسل علم عكس ولا يدّعي في الواجهة أن الخادم ينشئ قيدًا عكسيًا.
+
+## 37 — `expectedVersion` لتصحيح الحركة
+
+- **الملف والسطر:** على فرع PR #7: `lib/features/accounts/transaction_correction_form.dart:255-280` يرسل `version` سطر الدفتر (`LedgerEntryDto.version`)، وبعد إعادة الجلب يأخذ إصدار السطر ذي المعرّف نفسه. الإلغاء على `main` يرسل إصدار السطر أيضًا: `lib/features/accounts/ledger_screen.dart:605-609`. إصدار الكارت حقل آخر: `account_models.dart:55`. اسم الحقل في الجسم `expectedVersion` (`idempotency.dart:20-25`).
+- **ما هو مفترض:** أن قفل التصحيح هو إصدار السطر لا إصدار الكارت. لم يُؤكد ذلك في عقد مكتوب داخل المستودع.
+- **الأثر إذا رفض الخادم أو اختلف:** إذا كان المطلوب إصدار الكارت، الخادم يعيد `VERSION_CONFLICT` أو رفض تحقق في كل حفظ، لأن الرقم المُرسل رقم السطر. الواجهة عند التعارض تعيد الجلب وتعرض «تم تعديل البيانات. أُعيد الجلب من الخادم.» ثم تعيد المحاولة بإصدار السطر من جديد، فيتكرر الرفض إن بقي الحقل الخطأ.
+- **البديل المقترح:** الإبقاء على إصدار السطر، وهو ما يستخدمه الإلغاء للسطر نفسه، إلى أن يسمّي المالك الحقل. عدم إرسال إصداري السطر والكارت معًا.
+- **السؤال:** هل `expectedVersion` في تصحيح الحركة هو `version` سطر الدفتر أم `version` الكارت؟ التطبيق يرسل إصدار السطر، وهو ما يرسله الإلغاء للسطر نفسه.
+
+## 38 — رمز `allowedActions` لتعديل الكارت
+
+- **الملف والسطر:** على فرع PR #10 غير المدموج (`cursor/edit-account-card-ae82`): `lib/features/accounts/edit_account_card_screen.dart:15-34` (`accountCardEditAction = 'edit'` ثم `PermissionService.canOnRecord`). القراءة العامة للقائمة على `main`: `account_models.dart:64` و`:91-92`، والبوابة `permission_service.dart:141-149`: إن وُجدت `allowedActions` فهي المرجع، وإلا تُستخدم كتابة القسم. كارت `systemManaged` لا يُظهر التعديل حتى لو احتوت القائمة `edit`.
+- **ما هو مفترض:** النص `edit` هو رمز تعديل الكارت. لا تعليق في النموذج يؤكد هذا النص من الخادم.
+- **الأثر إذا رفض الخادم أو اختلف:** قائمة موجودة برمز آخر (مثل `update` أو `edit_card`) تخفي زر «تعديل الكارت» ومسار `/<section>/<id>/edit` عن مستخدم كان يحق له الكتابة بالقسم. قائمة غائبة تُبقي زر الكتابة لمن يملك `canWrite`. القائمة الفارغة تخفي الزر لأن `canOnRecord` يبحث داخلها ولا يسقط إلى القسم.
+- **البديل المقترح:** عند غياب `allowedActions` الإبقاء على كتابة القسم. عند وجودها عدم تخمين مرادف لـ `edit`؛ الزر يبقى مخفيًا إلى أن يُؤكد النص.
+- **السؤال:** هل رمز `allowedActions` لتعديل الكارت هو `edit`؟ إذا أرسل الخادم القائمة برمز آخر، زر التعديل يبقى مخفيًا لأن `canOnRecord` يطابق النص حرفيًا. غياب القائمة يسقط إلى صلاحية كتابة القسم.
+
+## 39 — `phone: ""` لمسح الهاتف
+
+- **الملف والسطر:** على فرع PR #10: `lib/features/accounts/edit_account_card_screen.dart:43-51` يرسل `phone` بعد `trim`، والفارغ يبقى `''`. النموذج على `main`: `packages/api_layer/lib/data/models/account_models.dart:256-261` يضع `phone` في JSON كلما لم يكن `null`، والنص الفارغ ليس `null`. إنشاء الكارت يحذف المفتاح عند الغياب: `:249-252` (`if (phone != null)`، والنموذج لا يمرّر هاتفًا فارغًا من شاشة الإنشاء). الحفظ: `accounts_repository.dart:75-79` على فرع PR #10، `PATCH /api/{section}/{id}` مع `expectedVersion` من إصدار الكارت.
+- **ما هو مفترض:** أن `phone: ""` يمسح الهاتف على الخادم. لم يُختبر على خادم حقيقي. صيغة الهاتف بلا تحقق في التطبيق.
+- **الأثر إذا رفض الخادم أو اختلف:** إذا تجاهل الخادم `""` يبقى الهاتف القديم بعد أن يرى المستخدم الحقل فارغًا. إذا رفض القيمة، الحفظ يفشل وتظهر رسالة التحقق. الإنشاء لا يرسل `""`، فسلوك المسح مختلف عن سلوك الخلق.
+- **البديل المقترح:** الإبقاء على إرسال `""` للمسح الصريح في التعديل، وعدم إرسال المفتاح في الإنشاء عندما يكون الهاتف فارغًا، إلى جواب المالك. عدم اختراع قيمة مثل `null` في JSON.
+- **السؤال:** هل `phone: ""` في `PATCH /api/{section}/{id}` يمسح الهاتف، أم يُتجاهل، أم يُرفض؟ نموذج التعديل يرسل النص الفارغ بعد المسح. إنشاء الكارت يحذف المفتاح عندما يكون الهاتف فارغًا ولا يرسل `""`.
+
+## 40 — الأسعار: عدد JSON أم نص
+
+- **الملف والسطر:** `packages/api_layer/lib/core/config/api_config.dart:12-18` و`:64-66`. الافتراضي `RateWireFormat.number` عبر `--dart-define=RATE_WIRE_FORMAT` (القيمة `string` تبدّل الإرسال فقط). القراءة تقبل النص وعدد JSON الصحيح والنص الرقمي المحفوظ بلا `double`: `packages/api_layer/lib/core/money/decimal_string.dart:7-9` و`:30-34`. الحقول: `factor` في حركة الكارت (`account_models.dart:325-337`)، و`egpPerLyd` في `PATCH /api/egyptian-deposits/exchange-rate`، و`exchangeRate` في بند المشتريات (`purchase_models.dart:223-233`). فرع PR #9 يُبقي الافتراض نفسه ويسأل عنه في `docs/staging.md:34` و`:92`.
+- **ما هو مفترض:** التعليقان متعارضان. `RateWireFormat.number` يقول إن الخادم الحالي يرسل ويتوقع عدد JSON. `DecimalString` يقول إن العقد نصوص مثل `"9.5"`. التعليق على `string` يسمّيه الشكل الهدف. لا علامة 🔶 واحدة تحسم الاثنين، لذلك أُدرج البند بعد PR #9.
+- **الأثر إذا رفض الخادم أو اختلف:** طلب بسعر بالشكل المرفوض يفشل حفظ الحركة أو سعر الأمانات المصرية أو بند المشتريات. قراءة شكل لا يقبله `DecimalString` (أس، أو `double` فقد نصه، أو فواصل آلاف) ترمي `INVALID_SERVER_RESPONSE` وتُفشل الاستجابة. داخل التطبيق السعر يبقى نصًا بلا حساب.
+- **البديل المقترح:** الإبقاء على إرسال العدد الحرفي (`9.5` لا `"9.5"`) إلى جواب المالك، وقبول القراءة للنص والعدد الصحيح معًا. عدم التحويل إلى `double`.
+- **السؤال:** هل أسعار الصرف والمعامل (`exchangeRate` و`factor` و`egpPerLyd`) تُرسل وتُستقبل كأعداد JSON أم كنصوص JSON؟ الافتراضي في الطلب `RATE_WIRE_FORMAT=number`. تعليق `DecimalString` يقول إن العقد نصوص، وتعليق `RateWireFormat.number` يقول إن الخادم الحالي يتوقع أعدادًا.
 
 ---
 
@@ -330,14 +395,14 @@
 3. هل توجد خريطة `sectionAccess` داخل `GET /api/me` كما لوحظت على `GET /api/users`؟ وما المفاتيح المؤكدة من بين `customerDebts` و`companyDebts` و`libyanDeposits` و`egyptianDeposits` و`masraweya` و`purchases` و`treasury` و`reports`؟ وهل غياب `collections` من الخريطة مقصود؟
 4. ما القيم الحرفية المسموحة لـ `sectionAccess[<key>]`؟ الكود لاحظ `none` و`manage`، و`read` موجود في كود الويب. أي قيمة أخرى تُعامَل كـ `none` فيُخفى القسم. هل توجد قيمة ثالثة يجب أن يفهمها التطبيق؟
 5. هل سيُرجع `GET /api/me` الكود `collections.assign` داخل `permissions[]`؟ إن لم يُرجعه، هل يبقى `POST /api/collections/assignments` مسموحًا للمدير الكامل فقط؟
-6. هل سيُرجع `GET /api/me` الكود `collections.decide` داخل `permissions[]`؟ إن لم يُرجعه، هل تبقى قرارات الاعتماد والرفض والربط (`POST /api/collections/submissions/{id}/decision` و`POST /api/collections/unlinked-receipts/{id}/decision`) ومؤشرات الشاشة للمدير الكامل فقط؟
-7. هل سيُرجع `GET /api/me` الكود `collections.cash_receive` داخل `permissions[]`؟ إن لم يُرجعه، هل يبقى `POST /api/collections/submissions/{id}/cash-received` و`POST /api/collections/unlinked-receipts/{id}/cash-received` للمدير الكامل فقط؟
+6. هل كود `collections.decide` مؤكد ويُرجع داخل `permissions[]` في `GET /api/me`، أم ما زال مقترحًا والويب يفتح الاعتماد والرفض باسم الدور فقط؟ إن لم يُرجَع، هل تبقى `POST /api/collections/submissions/{id}/decision` و`POST /api/collections/unlinked-receipts/{id}/decision` (بما فيها رفض الاستلام غير المربوط) ومؤشرات الشاشة للمدير الكامل فقط؟
+7. هل كود `collections.cash_receive` مؤكد ويُرجع داخل `permissions[]` في `GET /api/me`، أم ما زال مقترحًا؟ إن لم يُرجَع، هل يبقى `POST /api/collections/submissions/{id}/cash-received` و`POST /api/collections/unlinked-receipts/{id}/cash-received` للمدير الكامل فقط؟ ظهور الزر ما زال مشروطًا أيضًا بـ `cashStatus = pending` (البند 13).
 8. هل سيُرجع `GET /api/me` الكود `collections.close_day` داخل `permissions[]`؟ إن لم يُرجعه، هل يبقى `POST /api/collections/days/close` للمدير الكامل فقط؟
 9. هل سيُرجع `GET /api/me` الكود `payroll.manage` داخل `permissions[]`؟ إن لم يُرجعه، هل يرى غير المدير «مرتبي» فقط عبر `collections.write`، وتبقى إدارة المرتبات (حركة، راتب أساسي، تأكيد) خارج الجوال؟
 10. هل سيُرجع `GET /api/me` الكود `debts.zero_review` داخل `permissions[]`؟ إن لم يُرجعه، هل تبقى `POST /api/customers/{id}/zero-review` للمدير الكامل فقط؟
 11. هل سيُرجع `GET /api/me` الكود `users.manage` داخل `permissions[]`؟ إن لم يُرجعه، هل تبقى قرارات `POST /api/account-requests/{id}/decision` خارج الجوال؟
 12. هل سيُرجع `GET /api/me` الكود `settings.manage` داخل `permissions[]`؟ إن لم يُرجعه، هل تبقى شاشة الإعدادات (الموظفون، سجل التدقيق، مركز التشغيل) للصلاحية الكاملة فقط؟
-13. هل يرسل الخادم على الاستلام وعلى الاستلام غير المربوط الحقل `cashStatus` بالقيم `pending` أو `received` أو `not_applicable`، أو الحقل `cashPending: true`؟ ما النص الحرفي إن اختلف؟ بدون قيمة تُقرأ كـ `pending` لا يظهر شارة «ينتظر النقد» ولا زر تأكيد استلام النقد.
+13. هل يرسل الخادم على الاستلام المربوط وعلى الاستلام غير المربوط الحقل `cashStatus` بالقيم `pending` أو `received` أو `not_applicable`، أو `cashPending: true`، وهل يُرسل ذلك أيضًا عندما تكون حالة الاستلام غير المربوط `rejected`؟ وهل يجب أن يظهر زر تأكيد النقد كلما كانت القيمة `pending`، أم فقط بعد الرفض؟ التطبيق (وفرع PR #3) يظهر الزر عند `pending` ولا يشترطه بعد الرفض، ولا يشتقه من `status`.
 14. ما شكل JSON الفعلي لـ `GET /api/collections`؟ أكد أو صحّح: مصفوفات `assignments` و`submissions` و`unlinkedReceipts` و`employeeTotals`؛ و`metrics.collectedUnits` و`metrics.dayTotalUnits` (أو `dayTotalUnits` في الجذر) و`assignedCount` (في الجذر أو داخل `metrics`) و`metrics.pendingCount` و`metrics.unlinkedPendingCount` و`metrics.cashOutstandingUnits`؛ و`batchId` أو `batch.id`؛ وأسماء العرض البديلة `customerName`/`name` و`submittedByName`/`employeeName` و`employeeName`/`displayName`. وما قيم `mode` (`full`/`partial`) و`status` (`pending`/`approved`/`rejected`)؟
 15. ما القيم الحرفية لحقل `kind` في `POST /api/collections/payroll/entries`؟ النموذج يفترض `withdrawal` و`commission` (`PayrollEntryKind`). هل إدارة المرتبات مطلوبة في الجوال؟
 16. هل سيُبنى `GET /api/home`؟ إن نعم، هل الشكل هو `businessDate` و`generatedAt` و`summaries[]` بحقول `key` و`section` و`title` و`valueUnits` و`currency` و`tone` و`note` و`status` و`updatedAt`، و`counters` كخريطة أعداد، و`oldDebts[]` بحقول `id` و`section` و`name` و`balanceUnits` و`currency` و`debtAgeDays` و`ageStatus` و`ageStatusLabel`؟ وما قيم `tone` (`positive`/`negative`/`neutral`) وقيم `status`؟ إن لن يُبنى، هل نعتمد بيانات الأقسام الحالية ونتوقف عن استدعاء `/api/home`؟
@@ -354,10 +419,17 @@
 27. هل يرسل سبب التقرير الحقل `changeUnits`، وما عملته؟ التطبيق يعرضه كـ `LYD`. وما مفتاح النص إن لم يكن `text` (يقبل أيضًا `message` و`label`)؟
 28. هل يرسل `GET /api/treasury` الحقل `activeCashTone` أو `tone` بالقيم `positive` أو `negative` أو `neutral`؟ غياب القيمة أو قيمة غير معروفة يُبقي بطاقة الفلوس النشطة بلون محايد.
 29. هل أعداد `*Units` أعداد صحيحة بلا كسور، أي `MONEY_UNIT_SCALE = 0`؟ أم فيها خانات عشرية ثابتة يجب أن يمرّرها التطبيق؟ وهل يرفض الخادم إرسال المبلغ كنص أو كعدد كسري (التطبيق يرمي `INVALID_SERVER_RESPONSE` في الحالتين)؟
-30. ما أكواد انتهاء الجلسة غير `AUTH_REQUIRED`؟ التطبيق يخمن أيضًا `SESSION_EXPIRED` و`SESSION_REVOKED`. أي كود منها على حالة غير 401 يُجبر تسجيل الخروج.
-31. ما الكود الحرفي لخطأ CSRF؟ التطبيق يعدّ أي كود يحتوي المقطع `CSRF` خطأ CSRF ويعيد جلب `GET /api/auth/csrf` مرة واحدة. كود بلا هذا المقطع لا يُعاد المحاولة عليه.
+30. ما أكواد انتهاء الجلسة غير `AUTH_REQUIRED`؟ على `main` التطبيق يخمن `SESSION_EXPIRED` و`SESSION_REVOKED`. فرع PR #9 يضيف التخمين `PAGE_EXPIRED`. أي كود منها على حالة غير 401 يُجبر تسجيل الخروج. حالة `419` العارية مذكورة في البند 31.
+31. ما حالة HTTP والكود الحرفي لخطأ CSRF؟ هل يصل أحيانًا كـ `419` عارٍ بلا كود يحتوي `CSRF`؟ على `main` أي كود يحتوي المقطع `CSRF` يعيد جلب `GET /api/auth/csrf` مرة واحدة، و`419` العاري لا يُعاد جلب الرمز من أجله ولا يُخرج الجلسة. فرع PR #9 يعامل الرسالة التي تحتوي `CSRF` كخطأ CSRF، ويعامل `419` بلا ذلك المقطع كإنتهاء جلسة.
 32. هل كل استجابة 401 ليست خطأ دخول (الكود لا يحتوي `CREDENTIALS` ولا `LOGIN`) تعني انتهاء الجلسة حتى لو اختلف الكود عن `AUTH_REQUIRED`؟ ما كود رفض كلمة المرور الحرفي في `POST /api/auth/login`؟
-33. ما شكل `error.details` في أخطاء التحقق؟ التطبيق يقبل `{fields: {name: msg}}` أو خريطة `{name: msg}` أو قائمة `[{field, code, message}]`. شكل آخر يُسقط أخطاء الحقول ويُبقي الرسالة العامة فقط.
+33. هل أخطاء التحقق تأتي على HTTP `422` أو `400` أو كليهما؟ وما شكل `error.details`؟ على `main` حالة `422` فقط تُقرأ كتحقق، و`400` تبقى طلبًا مرفوضًا حتى لو حمل `details`. التطبيق يقبل `{fields: {name: msg}}` أو خريطة `{name: msg}` أو قائمة `[{field, code, message}]`. شكل آخر يُسقط أخطاء الحقول. فرع PR #9 يحوّل `400` إلى تحقق فقط عندما تُستخرج أخطاء حقول من `details`.
+34. هل تتوفر بيئة staging، ومن يصدر حسابات الاختبار لكل دور؟ العنوان والحسابات يبقيان خارج المستودع.
+35. هل `GET /api/auth/csrf` هو المسار الصحيح، وجسمه `{ ok: true, data: { csrfToken } }`، والرأس المُعاد في الطلبات غير الآمنة هو `X-CSRF-Token`؟ وهل `POST /api/auth/login` نفسه يتطلب رمز CSRF؟
+36. هل حفظ التصحيح `POST /api/{section}/{id}/transactions/{tx}/corrections` يكتب قيدًا عكسيًا (وسطرًا جديدًا) أم يعدّل السطر نفسه؟ التطبيق يرسل جسم الحركة ولا يرسل علم عكس ولا يدّعي في الواجهة أن الخادم ينشئ قيدًا عكسيًا.
+37. هل `expectedVersion` في تصحيح الحركة هو `version` سطر الدفتر أم `version` الكارت؟ التطبيق يرسل إصدار السطر، وهو ما يرسله الإلغاء للسطر نفسه.
+38. هل رمز `allowedActions` لتعديل الكارت هو `edit`؟ إذا أرسل الخادم القائمة برمز آخر، زر التعديل يبقى مخفيًا لأن `canOnRecord` يطابق النص حرفيًا. غياب القائمة يسقط إلى صلاحية كتابة القسم.
+39. هل `phone: ""` في `PATCH /api/{section}/{id}` يمسح الهاتف، أم يُتجاهل، أم يُرفض؟ نموذج التعديل يرسل النص الفارغ بعد المسح. إنشاء الكارت يحذف المفتاح عندما يكون الهاتف فارغًا ولا يرسل `""`.
+40. هل أسعار الصرف والمعامل (`exchangeRate` و`factor` و`egpPerLyd`) تُرسل وتُستقبل كأعداد JSON أم كنصوص JSON؟ الافتراضي في الطلب `RATE_WIRE_FORMAT=number`. تعليق `DecimalString` يقول إن العقد نصوص، وتعليق `RateWireFormat.number` يقول إن الخادم الحالي يتوقع أعدادًا.
 
 ## سجل القرار
 
@@ -367,7 +439,7 @@
 |---|---|---|---|---|
 | 01 | مخطط Bearer للجوال | | | |
 | 02 | `fullAccess` / `isSuperuser` | | | |
-| 03 | `sectionAccess` على `GET /api/me` | | | |
+| 03 | وجود `sectionAccess` على `GET /api/me` | | | |
 | 04 | قيم `sectionAccess` | | | |
 | 05 | `collections.assign` | | | |
 | 06 | `collections.decide` | | | |
@@ -378,23 +450,31 @@
 | 11 | `users.manage` | | | |
 | 12 | `settings.manage` | | | |
 | 13 | `cashStatus` / `cashPending` | | | |
-| 14 | شكل `GET /api/collections` | | | |
+| 14 | شكل استجابة `GET /api/collections` | | | |
 | 15 | `PayrollEntryKind` | | | |
 | 16 | `GET /api/home` | | | |
-| 17 | `unread-count` | | | |
-| 18 | `title` / `body` | | | |
-| 19 | `mobile-push/devices` | | | |
-| 20 | `statements/pdf` | | | |
+| 17 | `GET /api/notifications/unread-count` | | | |
+| 18 | `title` / `body` للإشعار | | | |
+| 19 | `POST /api/mobile-push/devices` | | | |
+| 20 | `GET /api/statements/pdf` | | | |
 | 21 | `systemKind` | | | |
-| 22 | `tabCounts` | | | |
-| 23 | عملة فودافون | | | |
+| 22 | `summary.tabCounts` | | | |
+| 23 | عملة حقول فودافون | | | |
 | 24 | حالة يوم المشتريات | | | |
-| 25 | مفاتيح `lifetimeTotals` | | | |
+| 25 | مفاتيح إجماليات سجل المشتريات | | | |
 | 26 | حالة صف التقرير | | | |
 | 27 | `changeUnits` | | | |
 | 28 | `activeCashTone` | | | |
 | 29 | `MONEY_UNIT_SCALE` | | | |
 | 30 | أكواد انتهاء الجلسة | | | |
-| 31 | كود CSRF | | | |
-| 32 | تصنيف 401 | | | |
-| 33 | شكل `error.details` | | | |
+| 31 | حالة وكود خطأ CSRF | | | |
+| 32 | أي 401 آخر يعني انتهاء الجلسة | | | |
+| 33 | حالة التحقق وشكل `error.details` | | | |
+| 34 | أصل staging وحسابات الاختبار | | | |
+| 35 | شكل `GET /api/auth/csrf` وهل الدخول يتطلب الرمز | | | |
+| 36 | هل تصحيح الحركة قيد عكسي | | | |
+| 37 | `expectedVersion` لتصحيح الحركة | | | |
+| 38 | رمز `allowedActions` لتعديل الكارت | | | |
+| 39 | `phone: ""` لمسح الهاتف | | | |
+| 40 | الأسعار: عدد JSON أم نص | | | |
+
