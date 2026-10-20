@@ -114,6 +114,7 @@ class PurchaseDayDto {
     this.status,
     this.entries = const [],
     this.previousDebtUnits,
+    this.previousVodafoneUnits,
     this.todayResultUnits,
     this.todayPaidUnits,
     this.totalDebtUnits,
@@ -125,6 +126,7 @@ class PurchaseDayDto {
   final String? status; // draft | finalized | correction (🔶)
   final List<PurchaseEntryDto> entries;
   final int? previousDebtUnits;
+  final int? previousVodafoneUnits;
   final int? todayResultUnits;
   final int? todayPaidUnits;
   final int? totalDebtUnits;
@@ -141,6 +143,7 @@ class PurchaseDayDto {
           .map(PurchaseEntryDto.fromJson)
           .toList(growable: false),
       previousDebtUnits: unitsOrNull(t['previousDebtUnits']),
+      previousVodafoneUnits: unitsOrNull(t['previousVodafoneUnits']),
       todayResultUnits: unitsOrNull(t['todayResultUnits']),
       todayPaidUnits: unitsOrNull(t['todayPaidUnits']),
       totalDebtUnits: unitsOrNull(t['totalDebtUnits']),
@@ -152,11 +155,19 @@ class PurchaseDayDto {
 
 /// GET /api/purchases/{book}?limit=100&before
 class PurchasesBookPage {
-  const PurchasesBookPage({required this.page, this.lifetimeTotals});
+  const PurchasesBookPage({
+    required this.page,
+    this.lifetimeTotals,
+    this.opening,
+  });
   final Paged<PurchaseDayDto> page;
 
   /// Null when the server omits the totals object.
   final PurchasesLifetimeTotalsDto? lifetimeTotals;
+
+  /// Null when the server omits an `opening` object. The screen then shows the
+  /// first day's previous-balance fields.
+  final PurchaseOpeningDto? opening;
 
   factory PurchasesBookPage.fromData(Object? data) {
     final p = Paged.fromData(data, PurchaseDayDto.fromJson, itemsKey: 'days');
@@ -165,6 +176,61 @@ class PurchasesBookPage {
       lifetimeTotals: PurchasesLifetimeTotalsDto.fromJsonOrNull(
         p.raw['lifetimeTotals'] ?? p.raw['totals'],
       ),
+      opening: PurchaseOpeningDto.fromJsonOrNull(p.raw['opening']),
+    );
+  }
+}
+
+/// Book opening returned by the server, when it sends one.
+/// Amounts are raw units. There is no local balance math.
+class PurchaseOpeningDto {
+  const PurchaseOpeningDto({
+    this.previousDebtUnits,
+    this.previousVodafoneUnits,
+    this.version,
+  });
+
+  final int? previousDebtUnits;
+  final int? previousVodafoneUnits;
+  final int? version;
+
+  static PurchaseOpeningDto? fromJsonOrNull(Object? v) {
+    if (v == null) return null;
+    if (v is! Map) {
+      throw const InvalidServerResponseException(
+        message: 'استجابة الخادم غير صالحة (الرصيد الافتتاحي)',
+      );
+    }
+    final j = asJson(v);
+    return PurchaseOpeningDto(
+      previousDebtUnits: unitsOrNull(j['previousDebtUnits']),
+      previousVodafoneUnits: unitsOrNull(j['previousVodafoneUnits']),
+      version: intOrNull(j['version'] ?? j['dayVersion']),
+    );
+  }
+}
+
+/// Opening figures the screen may show: the server `opening` object when
+/// present, otherwise the first day on the page. Field choice only.
+class ResolvedPurchaseOpening {
+  const ResolvedPurchaseOpening({
+    this.previousDebtUnits,
+    this.previousVodafoneUnits,
+    this.version,
+  });
+
+  final int? previousDebtUnits;
+  final int? previousVodafoneUnits;
+  final int? version;
+
+  factory ResolvedPurchaseOpening.fromPage(PurchasesBookPage page) {
+    final opening = page.opening;
+    final first = page.page.items.isEmpty ? null : page.page.items.first;
+    return ResolvedPurchaseOpening(
+      previousDebtUnits: opening?.previousDebtUnits ?? first?.previousDebtUnits,
+      previousVodafoneUnits:
+          opening?.previousVodafoneUnits ?? first?.previousVodafoneUnits,
+      version: opening?.version ?? first?.version,
     );
   }
 }
@@ -208,14 +274,15 @@ class PurchasesLifetimeTotalsDto {
 /// POST /api/purchases/{book} / PATCH …/entries/{id}
 /// {requestId, expectedDayVersion, itemCode, itemLabel, egpValueUnits, calculationMode, exchangeRate, paidUnits, vodafoneConsumedUnits}
 class PurchaseEntryRequest {
-  const PurchaseEntryRequest(
-      {this.itemCode,
-      this.itemLabel,
-      this.egpValueUnits,
-      this.calculationMode,
-      this.exchangeRate,
-      this.paidUnits,
-      this.vodafoneConsumedUnits});
+  const PurchaseEntryRequest({
+    this.itemCode,
+    this.itemLabel,
+    this.egpValueUnits,
+    this.calculationMode,
+    this.exchangeRate,
+    this.paidUnits,
+    this.vodafoneConsumedUnits,
+  });
   final String? itemCode;
   final String? itemLabel;
   final int? egpValueUnits;

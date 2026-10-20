@@ -7,7 +7,7 @@ class FakeFixtures {
   static const employeePermissions = [
     'collections.read',
     'collections.write',
-    'debts.read'
+    'debts.read',
   ];
 
   /// Proposed management codes, per API contract, used by the limited-admin fixture.
@@ -15,7 +15,7 @@ class FakeFixtures {
     'collections.read',
     'collections.write',
     'collections.decide',
-    'debts.read'
+    'debts.read',
   ];
 
   /// Fixture picked by username (FAKE ONLY):
@@ -28,31 +28,34 @@ class FakeFixtures {
   static Map<String, dynamic> meFor(String username) {
     if (username.startsWith('limited.admin')) {
       return _me(
-          id: 'u_2',
-          username: 'limited.admin@example.invalid',
-          name: 'إداري محدود تجريبي',
-          role: 'admin',
-          permissions: limitedAdminPermissions,
-          sectionAccess: const {'customerDebts': 'read'});
+        id: 'u_2',
+        username: 'limited.admin@example.invalid',
+        name: 'إداري محدود تجريبي',
+        role: 'admin',
+        permissions: limitedAdminPermissions,
+        sectionAccess: const {'customerDebts': 'read'},
+      );
     }
     if (username.startsWith('flag.admin')) {
       return _me(
-          id: 'u_3',
-          username: 'flag.admin@example.invalid',
-          name: 'إداري بعلم صريح',
-          role: 'admin',
-          permissions: const [],
-          sectionAccess: const {},
-          fullAccess: false);
+        id: 'u_3',
+        username: 'flag.admin@example.invalid',
+        name: 'إداري بعلم صريح',
+        role: 'admin',
+        permissions: const [],
+        sectionAccess: const {},
+        fullAccess: false,
+      );
     }
     if (username.startsWith('guest')) {
       return _me(
-          id: 'u_9',
-          username: 'guest@example.invalid',
-          name: 'دور غير معروف',
-          role: 'guest',
-          permissions: employeePermissions,
-          sectionAccess: const {'customerDebts': 'manage'});
+        id: 'u_9',
+        username: 'guest@example.invalid',
+        name: 'دور غير معروف',
+        role: 'guest',
+        permissions: employeePermissions,
+        sectionAccess: const {'customerDebts': 'manage'},
+      );
     }
     return me(admin: username.startsWith('admin'));
   }
@@ -64,7 +67,8 @@ class FakeFixtures {
           name: 'مدير تجريبي',
           role: 'admin',
           permissions: const [],
-          sectionAccess: null)
+          sectionAccess: null,
+        )
       : _me(
           id: 'u_12',
           username: 'employee@example.invalid',
@@ -72,13 +76,14 @@ class FakeFixtures {
           role: 'employee',
           permissions: employeePermissions,
           sectionAccess: const {
-              'customerDebts':
-                  'read', // has debts.read only -> read-only in the app
-              'companyDebts': 'none', 'libyanDeposits': 'none',
-              'egyptianDeposits': 'none',
-              'masraweya': 'none', 'purchases': 'none', 'treasury': 'none',
-              'reports': 'none',
-            });
+            'customerDebts':
+                'read', // has debts.read only -> read-only in the app
+            'companyDebts': 'none', 'libyanDeposits': 'none',
+            'egyptianDeposits': 'none',
+            'masraweya': 'none', 'purchases': 'none', 'treasury': 'none',
+            'reports': 'none',
+          },
+        );
 
   static Map<String, dynamic> _me({
     required String id,
@@ -125,7 +130,7 @@ class FakeFixtures {
           'netBalance': egp ? 15000 : 320,
           'totalDebt': egp ? 15000 : 320,
           'activeCards': 1,
-          'pendingReviewCount': 0
+          'pendingReviewCount': 0,
         },
       };
 
@@ -145,7 +150,7 @@ class FakeFixtures {
             'calculationMode': 'direct',
             'balanceAfterUnits': 40,
             'createdByName': 'مدير تجريبي',
-            'version': 1
+            'version': 1,
           },
         ],
         'pageOpeningBalanceUnits': 0,
@@ -154,40 +159,40 @@ class FakeFixtures {
       };
     }
     return {
-        'items': [
-          {
-            'id': 'tx_1',
-            'sequence': 1,
-            'type': 'debt',
-            'status': 'posted',
-            'date': '2026-10-02T10:00:00+02:00',
-            'note': 'دين',
-            'amountUnits': 500,
-            'inputValue': 500,
-            'calculationMode': 'direct',
-            'balanceAfterUnits': 500,
-            'createdByName': 'مدير تجريبي',
-            'version': 1
-          },
-          {
-            'id': 'tx_2',
-            'sequence': 2,
-            'type': 'payment',
-            'status': 'posted',
-            'date': '2026-10-10T10:00:00+02:00',
-            'note': 'سداد جزئي',
-            'amountUnits': 180,
-            'inputValue': 180,
-            'calculationMode': 'direct',
-            'balanceAfterUnits': 320,
-            'createdByName': 'مدير تجريبي',
-            'version': 1
-          },
-        ],
-        'pageOpeningBalanceUnits': 0,
-        'nextBefore': 'tx_1',
-        'hasMore': true,
-      };
+      'items': [
+        {
+          'id': 'tx_1',
+          'sequence': 1,
+          'type': 'debt',
+          'status': 'posted',
+          'date': '2026-10-02T10:00:00+02:00',
+          'note': 'دين',
+          'amountUnits': 500,
+          'inputValue': 500,
+          'calculationMode': 'direct',
+          'balanceAfterUnits': 500,
+          'createdByName': 'مدير تجريبي',
+          'version': 1,
+        },
+        {
+          'id': 'tx_2',
+          'sequence': 2,
+          'type': 'payment',
+          'status': 'posted',
+          'date': '2026-10-10T10:00:00+02:00',
+          'note': 'سداد جزئي',
+          'amountUnits': 180,
+          'inputValue': 180,
+          'calculationMode': 'direct',
+          'balanceAfterUnits': 320,
+          'createdByName': 'مدير تجريبي',
+          'version': 1,
+        },
+      ],
+      'pageOpeningBalanceUnits': 0,
+      'nextBefore': 'tx_1',
+      'hasMore': true,
+    };
   }
 
   /// Proposed GET /api/home — HARDCODED server-style values (nothing computed), filtered per user.
@@ -203,7 +208,7 @@ class FakeFixtures {
             'currency': 'LYD',
             'tone': 'negative',
             'note': 'من ملخص القسم',
-            'updatedAt': '2026-10-19T02:00:00+02:00'
+            'updatedAt': '2026-10-19T02:00:00+02:00',
           },
           {
             'key': 'collections.collected',
@@ -212,7 +217,7 @@ class FakeFixtures {
             'valueUnits': 250,
             'currency': 'LYD',
             'tone': 'neutral',
-            'updatedAt': '2026-10-19T02:00:00+02:00'
+            'updatedAt': '2026-10-19T02:00:00+02:00',
           },
           if (admin) ...[
             {
@@ -222,7 +227,7 @@ class FakeFixtures {
               'valueUnits': 15000,
               'currency': 'EGP',
               'tone': 'positive',
-              'updatedAt': '2026-10-19T02:00:00+02:00'
+              'updatedAt': '2026-10-19T02:00:00+02:00',
             },
             {
               'key': 'treasury.activeCash',
@@ -231,7 +236,7 @@ class FakeFixtures {
               'valueUnits': 5000,
               'currency': 'LYD',
               'tone': 'positive',
-              'updatedAt': '2026-10-19T02:00:00+02:00'
+              'updatedAt': '2026-10-19T02:00:00+02:00',
             },
             {
               'key': 'reports.status',
@@ -240,7 +245,7 @@ class FakeFixtures {
               'valueUnits': null,
               'status': 'normal',
               'note': 'صافي المركز المالي ارتفع مقارنة باليوم السابق',
-              'updatedAt': '2026-10-19T02:00:00+02:00'
+              'updatedAt': '2026-10-19T02:00:00+02:00',
             },
           ],
         ],
@@ -254,7 +259,7 @@ class FakeFixtures {
             'currency': 'LYD',
             'debtAgeDays': 4,
             'ageStatus': 'warning',
-            'ageStatusLabel': 'منذ 4 أيام'
+            'ageStatusLabel': 'منذ 4 أيام',
           },
         ],
       };
@@ -268,7 +273,7 @@ class FakeFixtures {
             'section': 'customers',
             'phone': '0910000000',
             'balanceUnits': 320,
-            'status': 'open'
+            'status': 'open',
           },
         ],
         'submissions': [
@@ -280,7 +285,7 @@ class FakeFixtures {
             'version': 1,
             'cashStatus': 'not_applicable',
             'submittedByName': 'موظف استلام تجريبي',
-            'createdAt': '2026-10-18T12:00:00+02:00'
+            'createdAt': '2026-10-18T12:00:00+02:00',
           },
           {
             'id': 'sb_2',
@@ -292,7 +297,7 @@ class FakeFixtures {
             'cashPending': true,
             'cashReceivedAt': null,
             'submittedByName': 'موظف استلام تجريبي',
-            'createdAt': '2026-10-18T09:30:00+02:00'
+            'createdAt': '2026-10-18T09:30:00+02:00',
           },
         ],
         'unlinkedReceipts': [
@@ -302,7 +307,7 @@ class FakeFixtures {
             'amountUnits': 50,
             'status': 'pending',
             'version': 1,
-            'cashStatus': 'not_applicable'
+            'cashStatus': 'not_applicable',
           },
         ],
         'employeeTotals': [
@@ -310,7 +315,7 @@ class FakeFixtures {
             'employeeName': 'موظف استلام تجريبي',
             'collectedUnits': 0,
             'approvedCount': 0,
-            'pendingCount': 1
+            'pendingCount': 1,
           },
         ],
         'metrics': {
@@ -335,7 +340,7 @@ class FakeFixtures {
             'commissionsUnits': 50,
             'withdrawalsUnits': 300,
             'remainingUnits': 1250,
-            'entries': []
+            'entries': [],
           },
         ],
       };
@@ -346,7 +351,7 @@ class FakeFixtures {
         'previousValueUnits': 10000,
         'purchasesUnits': 2000,
         'entries': [
-          {'valueUnits': 3000, 'commissionUnits': 50}
+          {'valueUnits': 3000, 'commissionUnits': 50},
         ],
         'workTotalUnits': 3050,
         'remainingUnits': 8950,
@@ -373,23 +378,24 @@ class FakeFixtures {
                 'paidUnits': 500,
                 'remainingUnits': 553,
                 'vodafoneConsumedUnits': 0,
-                'version': 1
+                'version': 1,
               },
             ],
             'totals': {
               'previousDebtUnits': 2000,
+              'previousVodafoneUnits': 80,
               'todayResultUnits': 1053,
               'todayPaidUnits': 500,
               'totalDebtUnits': 2553,
               'vodafoneRemainingUnits': 0,
-              'dayClosingDebtUnits': 2553
+              'dayClosingDebtUnits': 2553,
             },
           },
         ],
         'lifetimeTotals': {
           'resultUnits': 50000,
           'paidUnits': 47447,
-          'remainingUnits': 2553
+          'remainingUnits': 2553,
         },
         'nextBefore': null,
       };
@@ -404,7 +410,7 @@ class FakeFixtures {
           'egyptianRate': '9.5',
           'egyptianConvertedUnits': 10000,
           'netUnits': 51000,
-          'activeCashTone': 'positive'
+          'activeCashTone': 'positive',
         },
       };
 
@@ -419,7 +425,7 @@ class FakeFixtures {
             'description': 'خروج أقدم',
             'balanceAfterUnits': 7000,
             'createdAt': '2026-09-01T09:00:00+02:00',
-            'createdByName': 'مدير تجريبي'
+            'createdByName': 'مدير تجريبي',
           },
         ],
         'nextBefore': null,
@@ -427,20 +433,20 @@ class FakeFixtures {
       };
     }
     return {
-        'items': [
-          {
-            'id': 'ce_1',
-            'direction': 'in',
-            'amountUnits': 1000,
-            'description': 'إيداع تجريبي',
-            'balanceAfterUnits': 8000,
-            'createdAt': '2026-10-18T09:00:00+02:00',
-            'createdByName': 'مدير تجريبي'
-          },
-        ],
-        'nextBefore': 'ce_1',
-        'hasMore': true,
-      };
+      'items': [
+        {
+          'id': 'ce_1',
+          'direction': 'in',
+          'amountUnits': 1000,
+          'description': 'إيداع تجريبي',
+          'balanceAfterUnits': 8000,
+          'createdAt': '2026-10-18T09:00:00+02:00',
+          'createdByName': 'مدير تجريبي',
+        },
+      ],
+      'nextBefore': 'ce_1',
+      'hasMore': true,
+    };
   }
 
   static Map<String, dynamic> reports() => {
@@ -458,13 +464,13 @@ class FakeFixtures {
             'status': 'normal',
             'note': 'ملاحظة النظام',
             'reasons': [
-              {'text': 'سبب تجريبي', 'changeUnits': 1200}
-            ]
+              {'text': 'سبب تجريبي', 'changeUnits': 1200},
+            ],
           },
         ],
         'methodology': {
           'formula': 'ديون لنا + النشط + المصري − ديون علينا',
-          'note': 'نص من الخادم'
+          'note': 'نص من الخادم',
         },
       };
 
@@ -478,7 +484,7 @@ class FakeFixtures {
             'section': 'collections',
             'entityId': 'sb_1',
             'readAt': null,
-            'createdAt': '2026-10-18T12:00:00+02:00'
+            'createdAt': '2026-10-18T12:00:00+02:00',
           },
         ],
         'unreadCount': unread,

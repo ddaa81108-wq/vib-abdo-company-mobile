@@ -18,15 +18,29 @@ import 'fake_fixtures.dart';
 /// server today (empty permission list), `limited.admin…`, `flag.admin…`, `guest…`, else employee.
 /// Password "wrong" -> 401. It only returns canned values; it never computes money.
 class FakeApiClient implements ApiClient {
-  FakeApiClient(
-      {this.latency = const Duration(milliseconds: 250),
-      this.rateWireFormat = RateWireFormat.number});
+  FakeApiClient({
+    this.latency = const Duration(milliseconds: 250),
+    this.rateWireFormat = RateWireFormat.number,
+  });
 
   final Duration latency;
   final RateWireFormat rateWireFormat;
 
   /// Last request body exactly as it would go on the wire (for tests).
   String? lastWireBody;
+
+  /// Path of the last business mutation (tests).
+  String? lastMutationPath;
+
+  /// Echo of the last opening write. Returned on the next purchases GET.
+  Map<String, dynamic>? _openingEcho;
+
+  /// Day id -> status after a correction write. Echoed on the next GET.
+  final Map<String, String> _correctionStatus = {};
+
+  /// When set, purchases days without an echoed correction use this status.
+  /// Tests only. The default fixture stays `draft`.
+  String? purchaseFixtureStatus;
 
   /// Request ids of business mutations, in send order (tests).
   final List<String> mutationRequestIds = [];
@@ -61,39 +75,50 @@ class FakeApiClient implements ApiClient {
   static const _err = ErrorMapper();
 
   @override
-  Future<ApiResponse> get(String path,
-          {Map<String, dynamic>? query,
-          ApiRequestOptions options = const ApiRequestOptions()}) =>
+  Future<ApiResponse> get(
+    String path, {
+    Map<String, dynamic>? query,
+    ApiRequestOptions options = const ApiRequestOptions(),
+  }) =>
       _handle('GET', path, null, options, query: query);
   @override
-  Future<ApiResponse> post(String path,
-          {Object? body,
-          Map<String, dynamic>? query,
-          ApiRequestOptions options = const ApiRequestOptions()}) =>
+  Future<ApiResponse> post(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+    ApiRequestOptions options = const ApiRequestOptions(),
+  }) =>
       _handle('POST', path, body, options);
   @override
-  Future<ApiResponse> put(String path,
-          {Object? body,
-          ApiRequestOptions options = const ApiRequestOptions()}) =>
+  Future<ApiResponse> put(
+    String path, {
+    Object? body,
+    ApiRequestOptions options = const ApiRequestOptions(),
+  }) =>
       _handle('PUT', path, body, options);
   @override
-  Future<ApiResponse> patch(String path,
-          {Object? body,
-          ApiRequestOptions options = const ApiRequestOptions()}) =>
+  Future<ApiResponse> patch(
+    String path, {
+    Object? body,
+    ApiRequestOptions options = const ApiRequestOptions(),
+  }) =>
       _handle('PATCH', path, body, options);
   @override
-  Future<ApiResponse> delete(String path,
-          {Object? body,
-          ApiRequestOptions options = const ApiRequestOptions()}) =>
+  Future<ApiResponse> delete(
+    String path, {
+    Object? body,
+    ApiRequestOptions options = const ApiRequestOptions(),
+  }) =>
       _handle('DELETE', path, body, options);
 
   ApiResponse _ok(Object? data, {int status = 200}) {
     ApiReachability.instance.recordSuccess();
     return ApiResponse(
-        statusCode: status,
-        // Same decode path as the real client: fixtures -> JSON text -> PreciseJson.
-        data: data == null ? null : PreciseJson.decode(jsonEncode(data)),
-        correlationId: 'fake');
+      statusCode: status,
+      // Same decode path as the real client: fixtures -> JSON text -> PreciseJson.
+      data: data == null ? null : PreciseJson.decode(jsonEncode(data)),
+      correlationId: 'fake',
+    );
   }
 
   Never _fail(int status, String code, String message) {
@@ -106,7 +131,7 @@ class FakeApiClient implements ApiClient {
         'code': code,
         'message': message,
         'details': {},
-        'correlationId': 'fake'
+        'correlationId': 'fake',
       },
     });
   }
@@ -121,13 +146,47 @@ class FakeApiClient implements ApiClient {
     }
   }
 
+  /// Canned purchases page, with any echoed opening or correction status
+  /// the fake server stored. Values are copied through, never recalculated.
+  Map<String, dynamic> _purchasesPage() {
+    final data = FakeFixtures.purchases();
+    final days = data['days'];
+    if (_openingEcho != null && days is List && days.isNotEmpty) {
+      data['opening'] = _openingEcho;
+      final day = days.first;
+      if (day is Map) {
+        final totals = day['totals'];
+        if (totals is Map) {
+          totals['previousDebtUnits'] = _openingEcho!['previousDebtUnits'];
+          totals['previousVodafoneUnits'] =
+              _openingEcho!['previousVodafoneUnits'];
+        }
+      }
+    }
+    if (days is List) {
+      for (final day in days) {
+        if (day is! Map) continue;
+        final echoed = _correctionStatus['${day['day']}'];
+        final status = echoed ?? purchaseFixtureStatus;
+        if (status != null) day['status'] = status;
+      }
+    }
+    return data;
+  }
+
   Future<ApiResponse> _handle(
-      String method, String path, Object? body, ApiRequestOptions options,
-      {Map<String, dynamic>? query}) async {
+    String method,
+    String path,
+    Object? body,
+    ApiRequestOptions options, {
+    Map<String, dynamic>? query,
+  }) async {
     await Future<void>.delayed(latency);
     // Same serialization as the real client, then decoded like a server would.
-    lastWireBody = body == null ? null : WireJson.encode(body, rateWireFormat);
-    final decoded = lastWireBody == null ? null : jsonDecode(lastWireBody!);
+    // A later GET must not erase the last mutation body tests assert on.
+    final encoded = body == null ? null : WireJson.encode(body, rateWireFormat);
+    if (encoded != null) lastWireBody = encoded;
+    final decoded = encoded == null ? null : jsonDecode(encoded);
     final b = decoded is Map ? decoded : const {};
     final seg = path
         .split('/')
@@ -161,6 +220,7 @@ class FakeApiClient implements ApiClient {
         head != 'notifications' &&
         head != 'notification-preferences') {
       _requireMutationMeta(b);
+      lastMutationPath = path;
       mutationRequestIds.add('${b['requestId']}');
       final paused = pauseMutations;
       if (paused != null) await paused.future;
@@ -206,9 +266,10 @@ class FakeApiClient implements ApiClient {
         }
         if (method == 'GET' && seg.length == 2) {
           return _ok(
-              (FakeFixtures.accounts(egp: head == 'egyptian-deposits')['items']
-                      as List)
-                  .first);
+            (FakeFixtures.accounts(egp: head == 'egyptian-deposits')['items']
+                    as List)
+                .first,
+          );
         }
         if (b['expectedVersion'] == -1) {
           _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
@@ -225,8 +286,8 @@ class FakeApiClient implements ApiClient {
         if (method == 'GET' && seg.length > 1 && seg[1] == 'assignees') {
           return _ok({
             'items': [
-              {'id': 'u_12', 'displayName': 'موظف استلام تجريبي'}
-            ]
+              {'id': 'u_12', 'displayName': 'موظف استلام تجريبي'},
+            ],
           });
         }
         if (method == 'GET') return _ok({'items': []});
@@ -245,7 +306,30 @@ class FakeApiClient implements ApiClient {
       case 'masraweya':
         return _ok(FakeFixtures.masraweyaDay());
       case 'purchases':
-        if (method == 'GET') return _ok(FakeFixtures.purchases());
+        if (method == 'GET') return _ok(_purchasesPage());
+        if (b['expectedDayVersion'] == -1) {
+          _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
+        }
+        if (method == 'PATCH' && seg.length >= 3 && seg[2] == 'opening') {
+          _openingEcho = {
+            'previousDebtUnits': b['previousDebtUnits'],
+            'previousVodafoneUnits': b['previousVodafoneUnits'],
+            'version': 4,
+          };
+          return _ok({'id': 'opening', 'version': 4});
+        }
+        if (method == 'PATCH' &&
+            seg.length >= 5 &&
+            seg[2] == 'days' &&
+            seg[4] == 'correction') {
+          final open = b['open'] == true;
+          _correctionStatus[seg[3]] = open ? 'correction' : 'finalized';
+          return _ok({
+            'id': seg[3],
+            'version': 5,
+            'status': _correctionStatus[seg[3]],
+          });
+        }
         final entryWrite = (method == 'POST' && seg.length == 2) ||
             ((method == 'POST' || method == 'PATCH') &&
                 seg.length > 3 &&
@@ -287,7 +371,7 @@ class FakeApiClient implements ApiClient {
         _requireAdmin();
         return _ok({
           'items': [],
-          'scopeTotals': {'LYD': 0, 'EGP': 0}
+          'scopeTotals': {'LYD': 0, 'EGP': 0},
         });
       case 'notifications':
         if (method == 'GET') {

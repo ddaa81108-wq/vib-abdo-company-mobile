@@ -95,6 +95,18 @@ abstract final class AppStrings {
   static const closeBatchConfirm = 'تأكيد إغلاق الدفعة ومسحها؟';
   static const finalizeDay = 'ترحيل اليوم';
   static const finalizeConfirm = 'تأكيد ترحيل اليوم؟';
+  static const purchaseOpening = 'الرصيد الافتتاحي';
+  static const previousVodafone = 'فودافون سابق';
+  static const saveOpening = 'حفظ الرصيد الافتتاحي';
+  static const openingConfirm =
+      'تأكيد حفظ الرصيد الافتتاحي؟ يُرسل المبلغ كما أدخلته، والرصيد الجديد يظهر من الخادم فقط.';
+  static const openDayCorrection = 'فتح تصحيح اليوم';
+  static const closeDayCorrection = 'إغلاق تصحيح اليوم';
+  static const openCorrectionConfirm =
+      'تأكيد فتح تصحيح اليوم؟ بعد التأكيد يُرسل الطلب كما هو، وتظهر حالة اليوم من الخادم.';
+  static const closeCorrectionConfirm =
+      'تأكيد إغلاق تصحيح اليوم؟ بعد التأكيد يُرسل الطلب كما هو، وتظهر حالة اليوم من الخادم.';
+  static const correctionClosed = 'التصحيح مغلق';
   static const cashIn = 'دخول';
   static const cashOut = 'خروج';
   static const formulaCaption = 'ديون لنا + النشط + المصري − ديون علينا';

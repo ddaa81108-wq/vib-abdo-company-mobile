@@ -63,6 +63,13 @@ class PurchasesScreen extends ConsumerWidget {
           builder: (data) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              _OpeningCard(
+                book: book,
+                opening: ResolvedPurchaseOpening.fromPage(data),
+                money: money,
+                canWrite: canWrite,
+                online: online,
+              ),
               for (final day in data.page.items)
                 _DayCard(
                   day: day,
@@ -135,6 +142,7 @@ class _DayCard extends ConsumerWidget {
     final tone = dayToneIndex(day.day);
     final band = tone == null ? null : context.statusColors.dayTones[tone];
     final editable = dayIsEditable(day.status);
+    final correctionOpen = dayCorrectionIsOpen(day.status);
     final caption = vodafoneCaption(day.vodafoneRemainingUnits);
     return Card(
       color: band,
@@ -144,9 +152,17 @@ class _DayCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${AppStrings.todayTab} ${day.day}',
-              style: Theme.of(context).textTheme.titleSmall,
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  '${AppStrings.todayTab} ${day.day}',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                _CorrectionStatus(day: day.day, open: correctionOpen),
+              ],
             ),
             Text(dayStatusLabel(day.status)),
             _line(AppStrings.previousDebt, day.previousDebtUnits, Currency.lyd),
@@ -159,26 +175,52 @@ class _DayCard extends ConsumerWidget {
               Currency.egp,
             ),
             if (caption != null) Text(caption),
-            if (canWrite && editable)
-              GatedButton(
-                buttonKey: const Key('add-purchase'),
-                allowed: true,
-                online: online,
-                label: AppStrings.add,
-                onPressed: () => showAppForm<void>(
-                  context,
-                  _PurchaseForm(book: book, version: day.version),
-                ),
-              ),
-            if (canFinalize && day.status == 'draft')
-              GuardedMutation(
-                buttonKey: const Key('finalize-day'),
-                inputs: 'finalize:${day.day}:${day.version}',
-                expectedVersion: day.version,
-                label: AppStrings.finalizeDay,
-                confirmText: AppStrings.finalizeConfirm,
-                onSubmit: (meta) => _finalize(context, ref, meta),
-              ),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                if (canWrite && editable)
+                  GatedButton(
+                    buttonKey: const Key('add-purchase'),
+                    allowed: true,
+                    online: online,
+                    label: AppStrings.add,
+                    onPressed: () => showAppForm<void>(
+                      context,
+                      _PurchaseForm(book: book, version: day.version),
+                    ),
+                  ),
+                if (canFinalize && day.status == 'draft')
+                  GuardedMutation(
+                    buttonKey: const Key('finalize-day'),
+                    inputs: 'finalize:${day.day}:${day.version}',
+                    expectedVersion: day.version,
+                    label: AppStrings.finalizeDay,
+                    confirmText: AppStrings.finalizeConfirm,
+                    onSubmit: (meta) => _finalize(context, ref, meta),
+                  ),
+                if (canFinalize && day.status == 'finalized')
+                  GuardedMutation(
+                    buttonKey: Key('open-correction-${day.day}'),
+                    inputs: 'open-correction:${day.day}:${day.version}',
+                    expectedVersion: day.version,
+                    label: AppStrings.openDayCorrection,
+                    confirmText: AppStrings.openCorrectionConfirm,
+                    onSubmit: (meta) =>
+                        _correct(context, ref, meta, open: true),
+                  ),
+                if (canFinalize && correctionOpen)
+                  GuardedMutation(
+                    buttonKey: Key('close-correction-${day.day}'),
+                    inputs: 'close-correction:${day.day}:${day.version}',
+                    expectedVersion: day.version,
+                    label: AppStrings.closeDayCorrection,
+                    confirmText: AppStrings.closeCorrectionConfirm,
+                    onSubmit: (meta) =>
+                        _correct(context, ref, meta, open: false),
+                  ),
+              ],
+            ),
             for (final entry in day.entries)
               _Entry(
                 entry: entry,
@@ -224,6 +266,36 @@ class _DayCard extends ConsumerWidget {
       return ref.read(errorHandlerProvider).toFailure(error).message;
     }
   }
+
+  Future<String?> _correct(
+    BuildContext context,
+    WidgetRef ref,
+    MutationMeta meta, {
+    required bool open,
+  }) async {
+    try {
+      final ack = await ref
+          .read(apiLayerProvider)
+          .purchases
+          .setDayCorrection(book, day.day, open: open, meta: meta);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+        );
+      }
+      ref.invalidate(purchasesProvider);
+      return null;
+    } catch (error) {
+      return _purchaseFailure(ref, error);
+    }
+  }
+}
+
+String _purchaseFailure(WidgetRef ref, Object error) {
+  final failure = ref.read(errorHandlerProvider).toFailure(error);
+  ref.invalidate(purchasesProvider);
+  if (failure.code == 'VERSION_CONFLICT') return AppStrings.versionConflict;
+  return failure.message;
 }
 
 class _PurchaseForm extends ConsumerStatefulWidget {
@@ -402,6 +474,221 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
     } catch (error) {
       return ref.read(errorHandlerProvider).toFailure(error).message;
     }
+  }
+}
+
+class _OpeningCard extends StatelessWidget {
+  const _OpeningCard({
+    required this.book,
+    required this.opening,
+    required this.money,
+    required this.canWrite,
+    required this.online,
+  });
+
+  final PurchaseBook book;
+  final ResolvedPurchaseOpening opening;
+  final MoneyFormatter money;
+  final bool canWrite;
+  final bool online;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      key: const Key('opening-card'),
+      margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppStrings.purchaseOpening,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            _MoneyLine(
+              AppStrings.previousDebt,
+              opening.previousDebtUnits,
+              Currency.lyd,
+              money,
+            ),
+            _MoneyLine(
+              AppStrings.previousVodafone,
+              opening.previousVodafoneUnits,
+              Currency.egp,
+              money,
+            ),
+            if (canWrite)
+              GatedButton(
+                buttonKey: const Key('set-opening'),
+                allowed: true,
+                online: online,
+                label: AppStrings.purchaseOpening,
+                onPressed: () => showAppForm<void>(
+                  context,
+                  _OpeningForm(book: book, opening: opening),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MoneyLine extends StatelessWidget {
+  const _MoneyLine(this.label, this.units, this.currency, this.money);
+
+  final String label;
+  final int? units;
+  final Currency currency;
+  final MoneyFormatter money;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Text(label)),
+        MoneyText(money.formatOrDash(units, currency)),
+      ],
+    );
+  }
+}
+
+class _OpeningForm extends ConsumerStatefulWidget {
+  const _OpeningForm({required this.book, required this.opening});
+
+  final PurchaseBook book;
+  final ResolvedPurchaseOpening opening;
+
+  @override
+  ConsumerState<_OpeningForm> createState() => _OpeningFormState();
+}
+
+class _OpeningFormState extends ConsumerState<_OpeningForm> {
+  final _debt = TextEditingController();
+  final _vodafone = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final debt = widget.opening.previousDebtUnits;
+    final vodafone = widget.opening.previousVodafoneUnits;
+    if (debt != null) _debt.text = '$debt';
+    if (vodafone != null) _vodafone.text = '$vodafone';
+    for (final controller in [_debt, _vodafone]) {
+      controller.addListener(_changed);
+    }
+  }
+
+  void _changed() => setState(() {});
+
+  @override
+  void dispose() {
+    for (final controller in [_debt, _vodafone]) {
+      controller.removeListener(_changed);
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final debt = parseUnits(_debt.text);
+    final vodafone = parseUnits(_vodafone.text);
+    final valid = debt != null && vodafone != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          AppStrings.purchaseOpening,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const Text(AppStrings.noPreview),
+        const SizedBox(height: AppSpacing.md),
+        UnitsField(
+          key: const Key('opening-debt'),
+          controller: _debt,
+          label: AppStrings.previousDebt,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        UnitsField(
+          key: const Key('opening-vodafone'),
+          controller: _vodafone,
+          label: AppStrings.previousVodafone,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        GuardedMutation(
+          buttonKey: const Key('save-opening'),
+          inputs: '${_debt.text}|${_vodafone.text}|${widget.opening.version}',
+          expectedVersion: widget.opening.version,
+          label: AppStrings.saveOpening,
+          confirmText: valid ? AppStrings.openingConfirm : null,
+          normalizedValue: valid ? '$debt · $vodafone' : null,
+          onSubmit: (meta) => _submit(meta, debt, vodafone),
+        ),
+      ],
+    );
+  }
+
+  Future<String?> _submit(MutationMeta meta, int? debt, int? vodafone) async {
+    if (debt == null || vodafone == null) return AppStrings.integerOnly;
+    try {
+      final ack = await ref
+          .read(apiLayerProvider)
+          .purchases
+          .setOpening(
+            widget.book,
+            previousDebtUnits: debt,
+            previousVodafoneUnits: vodafone,
+            meta: meta,
+          );
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+      );
+      ref.invalidate(purchasesProvider);
+      // The confirm dialog is the top route. Close this form after it pops.
+      final navigator = Navigator.of(context);
+      final formRoute = ModalRoute.of(context);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (formRoute != null && formRoute.isActive) {
+          navigator.removeRoute(formRoute);
+        }
+      });
+      return null;
+    } catch (error) {
+      return _purchaseFailure(ref, error);
+    }
+  }
+}
+
+class _CorrectionStatus extends StatelessWidget {
+  const _CorrectionStatus({required this.day, required this.open});
+
+  final String day;
+  final bool open;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.statusColors;
+    final background = open ? colors.chipReviewBg : colors.chipNormalBg;
+    final foreground = open ? colors.chipReviewFg : colors.chipNormalFg;
+    final label = open
+        ? AppStrings.correctionOpen
+        : AppStrings.correctionClosed;
+    return Container(
+      key: Key('correction-status-$day'),
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xxs,
+      ),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+      ),
+      child: Text(label, style: cairo(11, 800, color: foreground)),
+    );
   }
 }
 
