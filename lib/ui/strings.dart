@@ -160,6 +160,10 @@ abstract final class AppStrings {
   static const myPayroll = 'مرتبي';
   static const payroll = 'المرتبات';
   static const statementHidden = 'عمود الرصيد يظهر فقط عندما يرسله الخادم.';
+  static const customerLedger = 'سجل العميل';
+  static const companyLedger = 'سجل الشركة';
+  static const libyanLedger = 'سجل الأمانة الليبية';
+  static const egyptianLedger = 'سجل الأمانة المصرية';
   static const bell = 'الجرس';
   static const connection = 'حالة الاتصال';
   static const openSection = 'فتح القسم';
