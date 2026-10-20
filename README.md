@@ -87,4 +87,8 @@ Other defines are listed in `packages/api_layer/README.md`.
 
 ## Android
 
-The debug application id is `com.example.vib_abdo_company_mobile`. Replace it before any store listing. Debug builds are signed with the debug key only.
+The application id is the placeholder `com.example.vib_abdo_company_mobile` on every build type. Leave it until the store id is chosen. `docs/RELEASE.md` lists every file that rename touches, and how release signing works.
+
+Debug and profile builds use the debug keystore. A release build uses the upload key when `android/key.properties` or the `ANDROID_KEYSTORE_*` variables are complete. When that material is absent, release signing falls back to the debug keystore so local and pull-request builds still run. Keep a debug-signed release build off Play. Partial signing material fails the build.
+
+`.github/workflows/ci.yml` runs analyze, test, and a debug APK build. `.github/workflows/android-release.yml` builds a signed AAB and APK when the repository secrets are present. Branch protection for `main` is described in `docs/BRANCH_PROTECTION.md` and is not enabled from this repository.

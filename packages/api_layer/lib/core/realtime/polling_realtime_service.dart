@@ -5,7 +5,7 @@ import '../network/api_client.dart';
 import '../network/api_endpoints.dart';
 import 'realtime_service.dart';
 
-/// Fallback: GET /api/event-changes?after=<seq> every [interval] (default 4s)
+/// Fallback: GET `/api/event-changes?after=<seq>` every [interval] (default 4s)
 /// -> { events: [{sequence, topic, aggregateId, payload, createdAt}], latest, fullResync }.
 class PollingRealtimeService implements RealtimeService {
   PollingRealtimeService({
