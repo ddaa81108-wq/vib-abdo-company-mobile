@@ -11,6 +11,9 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Whole window, every route. Do not add a disable method: clearing
+        // FLAG_SECURE would put ledgers, totals, and the password screen
+        // into screenshots and the recents thumbnail.
         window.setFlags(
             WindowManager.LayoutParams.FLAG_SECURE,
             WindowManager.LayoutParams.FLAG_SECURE,

@@ -122,7 +122,10 @@ class ApiLayer {
         : ResilientRealtimeService(
             sse: SseRealtimeService(dio: dio, cursor: cursor),
             polling: PollingRealtimeService(
-                api: api, cursor: cursor, interval: cfg.pollingInterval),
+              api: api,
+              cursor: cursor,
+              interval: cfg.pollingInterval,
+            ),
           );
 
     final auth = RemoteAuthRepository(api);
@@ -139,6 +142,13 @@ class ApiLayer {
           if (realtime is ResilientRealtimeService) realtime.reset();
         },
         push.deleteToken,
+        // The active strategy wipes only the store it uses. main() always
+        // creates both, so a leftover cookie or token would survive logout
+        // and session expiry when the other strategy is selected.
+        () async {
+          await cookieStore?.clear();
+          await tokenStorage?.clear();
+        },
         ...cleanups,
       ],
     );

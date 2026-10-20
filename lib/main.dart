@@ -1,4 +1,4 @@
-import 'dart:ui';
+import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_api_layer/api_layer.dart';
@@ -9,18 +9,14 @@ import 'app.dart';
 import 'error_handling/error_handler.dart';
 import 'notifications/app_push_service.dart';
 import 'secure_storage/app_secure_stores.dart';
+import 'security/platform_screen_security.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   const errors = ErrorHandler();
-  FlutterError.onError = (details) {
-    errors.report(details.exception, details.stack);
-    FlutterError.presentError(details);
-  };
-  PlatformDispatcher.instance.onError = (error, stack) {
-    errors.report(error, stack);
-    return true;
-  };
+  installErrorHooks(errors);
+  // The activity also sets FLAG_SECURE in onCreate, before this runs.
+  unawaited(const PlatformScreenSecurity().enable());
 
   final stores = AppSecureStores();
   final layer = ApiLayer.create(
