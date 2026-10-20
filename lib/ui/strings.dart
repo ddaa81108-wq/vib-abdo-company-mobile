@@ -271,6 +271,14 @@ abstract final class AppStrings {
   static const chooseAssignee = 'اختر الموظف.';
   static const enterReference = 'أدخل المرجع.';
   static const edit = 'تعديل';
+  static const editCard = 'تعديل الكارت';
+  static const editCardTitle = 'تعديل بيانات الكارت';
+  static const editCardScope =
+      'يُحفظ الاسم والهاتف فقط. الرصيد والحركات تبقى كما يرسلها الخادم.';
+  static const editCardUnavailable = 'تعديل هذا الكارت غير متاح لهذا الحساب.';
+  static const nameRequired = 'أدخل الاسم.';
+  static const cardVersionMissing =
+      'تعذر الحفظ قبل وصول إصدار الكارت من الخادم. أُعيد الجلب.';
   static const delete = 'حذف';
   static const confirmDelete = 'تأكيد حذف هذا السطر';
   static const confirmPayroll = 'تأكيد حركة المرتب';
