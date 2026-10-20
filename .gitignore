@@ -53,3 +53,5 @@ packages/**/build/
 .env.*
 *.jks
 *.keystore
+# Local release signing. Real values stay out of git. See docs/RELEASE.md.
+/android/key.properties

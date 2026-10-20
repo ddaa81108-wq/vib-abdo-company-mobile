@@ -1,0 +1,10 @@
+# Copy to android/key.properties (gitignored). Keep the real file out of git.
+# A copied file with a missing keystore fails every Android build until the
+# four values below are real or android/key.properties is deleted.
+# Passwords are read as UTF-8. Prefer an ASCII password.
+# PKCS12 has one password. Use it for both storePassword and keyPassword.
+# storeFile is an absolute path, or a path relative to android/app. Do not use ~.
+storePassword=REPLACE_ME
+keyPassword=REPLACE_ME
+keyAlias=upload
+storeFile=/absolute/path/to/upload-keystore.jks

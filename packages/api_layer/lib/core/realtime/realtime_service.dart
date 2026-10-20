@@ -1,8 +1,8 @@
 import 'dart:async';
 
 /// Realtime change SIGNALS from the existing system:
-///   SSE      GET /api/events?after=<seq>         (event name = topic, id = sequence)
-///   fallback GET /api/event-changes?after=<seq>  -> {events[], latest, fullResync}
+///   SSE      GET `/api/events?after=<seq>`         (event name = topic, id = sequence)
+///   fallback GET `/api/event-changes?after=<seq>`  -> {events[], latest, fullResync}
 /// RULE: a signal only says "something changed" -> invalidate/refetch from the server.
 /// Payloads are deliberately DROPPED: no number from an event is ever displayed or applied.
 class RealtimeSignal {
