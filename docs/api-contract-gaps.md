@@ -3,7 +3,7 @@
 جرد ما يفترضه تطبيق الجوال ولم يؤكّده الخادم. هذا المستند مخرج المرحلة 0 من تحليل المستودع: كل حقل أو كود أو مسار موسوم بـ `proposed` / «مقترح» / 🔶 / `pending server confirmation` / `assumed` / `to confirm` / `STUB`، مع أثر الاختلاف وبديل مؤقت والسؤال الحرفي لمالك الخادم.
 
 - **لا يغيّر هذا المستند سلوك التطبيق.** لا مسارات جديدة، ولا تعديل على الطلبات.
-- **أساس الأسطر:** الفرع `main` عند `fea12dd`، ما لم يُذكر فرع آخر. بنود أُضيفت من طلبات دمج لم تُدمَج بعد تذكر الفرع: PR #3 `cursor/unlinked-receipt-actions-30bd`، PR #7 `cursor/ledger-transaction-correction-7e25`، PR #9 `cursor/staging-api-ready-8c4a`، PR #10 `cursor/edit-account-card-ae82`.
+- **أساس الأسطر:** الفرع `main` عند `fea12dd`، ما لم يُذكر فرع آخر. بنود أُضيفت من طلبات دمج لم تُدمَج بعد تذكر الفرع: PR #3 `cursor/unlinked-receipt-actions-30bd`، PR #7 `cursor/ledger-transaction-correction-7e25`، PR #8 `cursor/security-review-6b5f`، PR #9 `cursor/staging-api-ready-8c4a`، PR #10 `cursor/edit-account-card-ae82`.
 - **النطاق:** `packages/api_layer/lib/core/network/api_endpoints.dart`، و`packages/api_layer/lib/core/permissions/permission_codes.dart`، وكل `*_models.dart`، ثم العلامات المماثلة في بقية المستودع، ثم أسئلة مالك الخادم المفتوحة في تلك الطلبات.
 - **ما لم يُدرَج:** مسارات وكودات يصفها التعليق بأنها من العقد القائم (مثل `debts.read` و`POST /api/auth/login` و`GET /api/events`). علامة 🔶 على `API_BASE` في `api_config.dart` قيد أمان (لا عنوان إنتاج افتراضي) وليست حقلًا غير مؤكد؛ سؤال وجود بيئة staging نفسها هو البند 34. مسارا `GET /api/account-requests` و`/api/notification-preferences` موجودان في الملف بلا وسم «مقترح»؛ نقصهما في الواجهة خارج هذا الجرد. صيغة السعر لم تعد خارج الجرد: التعليقات تتعارض، وهي البند 40.
 
@@ -51,6 +51,11 @@
 | 38 | رمز `allowedActions` للتعديل = `edit` | `edit_account_card_screen.dart` على PR #10 |
 | 39 | `phone: ""` لمسح الهاتف | `UpdateAccountRequest` وPR #10 |
 | 40 | الأسعار: عدد JSON أم نص | `api_config.dart:12-18` |
+| 41 | أعلام كوكي الدخول | `cookie_store.dart:16-21` و`:86-107` |
+| 42 | عمر الجلسة | `cookie_store.dart:21` |
+| 43 | هل `error.message` يعيد سرًا | `error_handler.dart:11-12` و`:18-27` |
+| 44 | WebView يشارك جرة كوكي الموقع | لا تبعية WebView في المستودع |
+| 45 | HTTPS ودبابيس SPKI | `api_client_factory.dart:48-50` |
 
 آلية الصلاحيات المشتركة للبنود 05–12: التعليق في `permission_codes.dart:83-86` يقول إن الويب الحالي يتحكم بهذه الإجراءات **باسم الدور** (`admin`) بلا كود دقيق، وكل `ManagementAction` يقابل كودًا مقترحًا. `PermissionService.canDo` يسمح بالإجراء إذا وُجد الكود في `permissions[]`، أو إذا كانت الصلاحية كاملة: `fullAccess == true`، أو الدور `admin` وقائمتا `permissions` و`sectionAccess` فارغتان (`permission_service.dart:135-136`). غياب الكود يخفي الزر عن غير المدير الكامل. الإخفاء في الواجهة ليس حماية؛ الخادم يفرض الصلاحية على الطلب نفسه.
 
@@ -58,11 +63,11 @@
 
 ## 01 — مخطط Bearer للجوال
 
-- **الملف والسطر:** `packages/api_layer/lib/core/network/api_endpoints.dart:18-21` (`proposedMobileLogin` و`proposedMobileRefresh` و`proposedMobileLogout`). العلامات المماثلة: `packages/api_layer/lib/core/auth/bearer_token_auth_strategy.dart:7-11` و`:69`، `packages/api_layer/lib/core/config/api_config.dart:5-7`، `packages/api_layer/lib/core/auth/auth_strategy.dart:17-19`، `packages/api_layer/lib/data/models/auth_models.dart:24-30` (`LoginChallenge`)، `packages/api_layer/lib/core/session/session_manager.dart:25-30` (`SessionOtpRequired`).
-- **ما هو مفترض:** مسارات لا توجد على الخادم: `POST /api/auth/mobile/login` يعيد `{accessToken, refreshToken, expiresIn}`، و`POST /api/auth/mobile/refresh` مع تدوير، و`POST /api/auth/mobile/logout`. تجديد الرمز معلّق (`TODO(pending server answer)`). `LoginChallenge` (`loginTicket` و`channel` و`maskedDestination`) لخطوة OTP مستقبلية وغير ناتج اليوم. التشغيل الافتراضي هو Cookie مع `X-CSRF-Token`. تفعيل الـ stub يتم بـ `--dart-define=AUTH_BEARER=true`.
-- **الأثر إذا رفض الخادم أو اختلف:** المسارات الثلاثة غير مستدعاة في الكود الحالي؛ `AuthRepository` يبقى على `POST /api/auth/login`. بناء Cookie العادي لا يتأثر بغيابها. إذا فُعّل `AUTH_BEARER` على الخادم الحالي، الدخول ما زال يضرب مسار الكوكي، ولا يُحفظ رمز إلا إذا أعاد الجسم `accessToken` و`refreshToken` كنصين، و`hasPersistedSession` يبقى كاذبًا، وأي 401 على طلب مصادق يُجبر الخروج لأن التجديد غير مبني.
-- **البديل المقترح:** الإبقاء على Cookie و`X-CSRF-Token`، وعدم تمرير `AUTH_BEARER`، إلى أن يقرّ المالك المخطط كتابةً.
-- **السؤال:** هل تبقى مصادقة الجوال على Cookie مع `X-CSRF-Token` عبر `POST /api/auth/login` و`GET /api/auth/csrf` و`POST /api/auth/logout`، أم سيُضاف مخطط Bearer على `POST /api/auth/mobile/login` (يعيد `accessToken` و`refreshToken` و`expiresIn`) و`POST /api/auth/mobile/refresh` مع تدوير و`POST /api/auth/mobile/logout`؟ وهل سيُنتج الخادم لاحقًا `loginTicket` (وحقول `channel` و`maskedDestination`) لخطوة OTP؟
+- **الملف والسطر:** `packages/api_layer/lib/core/network/api_endpoints.dart:18-21` (`proposedMobileLogin` و`proposedMobileRefresh` و`proposedMobileLogout`). العلامات المماثلة: `packages/api_layer/lib/core/auth/bearer_token_auth_strategy.dart:7-11` و`:69`، `packages/api_layer/lib/core/config/api_config.dart:5-7`، `packages/api_layer/lib/core/auth/auth_strategy.dart:17-19`، `packages/api_layer/lib/data/models/auth_models.dart:24-30` (`LoginChallenge`)، `packages/api_layer/lib/core/session/session_manager.dart:25-30` (`SessionOtpRequired`). توصية PR #8 في `docs/security-review.md:35-53` على الفرع `cursor/security-review-6b5f`: إبقاء Cookie وCSRF، وعدم تشغيل المخططين معًا، ورفض كوكي هذا العميل بعد إضافة Bearer.
+- **ما هو مفترض:** مسارات لا توجد على الخادم: `POST /api/auth/mobile/login` يعيد `{accessToken, refreshToken, expiresIn}`، و`POST /api/auth/mobile/refresh` مع تدوير يرفض الرمز السابق عند إعادة استخدامه، و`POST /api/auth/mobile/logout` يلغي `refreshToken`. تجديد الرمز معلّق (`TODO(pending server answer)`). `LoginChallenge` (`loginTicket` و`channel` و`maskedDestination`) لخطوة OTP مستقبلية وغير ناتج اليوم. التشغيل الافتراضي هو Cookie مع `X-CSRF-Token`. تفعيل الـ stub يتم بـ `--dart-define=AUTH_BEARER=true`. سؤالا مراجعة الأمان «هل يُضاف المسار، وهل يُرفض الكوكي بعدها» هما هذا البند، لا بندين جديدين. أعلام الكوكي في البند 41، وعمر الجلسة في البند 42.
+- **الأثر إذا رفض الخادم أو اختلف:** المسارات الثلاثة غير مستدعاة في الكود الحالي؛ `AuthRepository` يبقى على `POST /api/auth/login`. بناء Cookie العادي لا يتأثر بغيابها. إذا فُعّل `AUTH_BEARER` على الخادم الحالي، الدخول ما زال يضرب مسار الكوكي، ولا يُحفظ رمز إلا إذا أعاد الجسم `accessToken` و`refreshToken` كنصين، و`hasPersistedSession` يبقى كاذبًا، وأي 401 على طلب مصادق يُجبر الخروج لأن التجديد غير مبني. إذا أُضيف Bearer وبقي الخادم يقبل كوكي هذا العميل، كوكي متبقٍ في `flutter_secure_storage` يعيد الجلسة بعد الخروج من مخطط الرمز.
+- **البديل المقترح:** الإبقاء على Cookie و`X-CSRF-Token`، وعدم تمرير `AUTH_BEARER`، إلى أن يقرّ المالك المسارات وأعمار الرموز وقاعدة التدوير كتابةً. بعد ذلك يُرفض كوكي هذا العميل على الخادم، ولا يُشغَّل المخططان معًا.
+- **السؤال:** هل سيُضاف `POST /api/auth/mobile/login` و`POST /api/auth/mobile/refresh` مع تدوير يرفض الرمز السابق عند إعادة استخدامه، و`POST /api/auth/mobile/logout` يلغي `refreshToken`؟ إن لم يُضف، تبقى Cookie مع `X-CSRF-Token` المخطط الوحيد ويبقى `AUTH_BEARER` مطفأً. إن أُضيف، هل يرفض الخادم جلسة الكوكي من هذا العميل حتى لا يعيد كوكي قديم تسجيل الدخول، وما أسماء الحقول (`accessToken` و`refreshToken` و`expiresIn`) وأعمارها؟ وهل سيُنتج الخادم لاحقًا `loginTicket` (وحقول `channel` و`maskedDestination`) لخطوة OTP؟
 
 ## 02 — `fullAccess` / `isSuperuser`
 
@@ -299,7 +304,7 @@
 ## 30 — أكواد انتهاء الجلسة
 
 - **الملف والسطر:** على `main`: `packages/api_layer/lib/core/network/error_mapper.dart:12-17` (`AUTH_REQUIRED` و`SESSION_EXPIRED` و`SESSION_REVOKED`). الخروج: `cookie_csrf_auth_strategy.dart:109-110`. على فرع PR #9 غير المدموج (`cursor/staging-api-ready-8c4a`): `error_mapper.dart:12-20` يضيف `PAGE_EXPIRED`، و`:121-127` يجعل حالة `419` انتهاء جلسة إلا إذا سبقها تصنيف CSRF (البند 31). `docs/staging.md:88` على ذلك الفرع يسأل المالك عن الحالة والكود.
-- **ما هو مفترض:** `AUTH_REQUIRED` هو الكود الملاحظ. البقية تخمين. أي منها ينتج `SessionExpiredException` ويُخرج الجلسة على طلب مصادق. حالة `419` العارية سؤال البند 31 لا سؤالًا مكررًا هنا.
+- **ما هو مفترض:** `AUTH_REQUIRED` هو الكود الملاحظ. البقية تخمين. أي منها ينتج `SessionExpiredException` ويُخرج الجلسة على طلب مصادق. حالة `419` العارية سؤال البند 31 لا سؤالًا مكررًا هنا. سؤال PR #8 «هل `AUTH_REQUIRED` إشارة الانتهاء الوحيدة؟» هو هذا البند؛ عمر الجلسة بالزمن في البند 42، وكود CSRF في البند 31.
 - **الأثر إذا رفض الخادم أو اختلف:** كود انتهاء حقيقي بغير هذه القائمة وبغير حالة 401 (البند 32) لا يُخرج المستخدم على `main`؛ الطلب يفشل والجلسة تبقى. كود التخمين بمعنى آخر يُخرج المستخدم. بعد دمج PR #9، `PAGE_EXPIRED` أو `419` بلا CSRF يُخرجان الجلسة أيضًا.
 - **البديل المقترح:** معاملة `AUTH_REQUIRED` على الطلب المصادق كخروج إجباري، وإضافة أي كود أو حالة أخرى حرفيًا بعد جواب المالك.
 - **السؤال:** ما أكواد انتهاء الجلسة غير `AUTH_REQUIRED`؟ على `main` التطبيق يخمن `SESSION_EXPIRED` و`SESSION_REVOKED`. فرع PR #9 يضيف التخمين `PAGE_EXPIRED`. أي كود منها على حالة غير 401 يُجبر تسجيل الخروج. حالة `419` العارية مذكورة في البند 31.
@@ -335,7 +340,7 @@
 - **الملف والسطر:** على فرع PR #9 غير المدموج: `docs/staging.md:81-85`. على `main`: `packages/api_layer/lib/core/config/api_config.dart:52-56` يرفض عنوان إنتاج افتراضيًا ويبقي `API_BASE` على `https://staging.example.invalid`، و`README.md` يمنع أسرار المستودع. لا ملف في المستودع يحمل مضيفًا حقيقيًا ولا حساب اختبار.
 - **ما هو مفترض:** لا شيء عن عنوان حي. التشغيل الحقيقي يشترط `--dart-define=USE_FAKE_API=false --dart-define=API_BASE=https://<staging-host>`. الحسابات تُسلَّم خارج المستودع.
 - **الأثر إذا رفض الخادم أو اختلف:** بلا أصل staging يبقى التطبيق على الـ Fake ولا يُختبر عقد هذا الملف على خادم. حساب اختبار داخل المستودع يخالف قاعدة «لا أسرار». دور بلا حساب لا يُتحقق من بنود الصلاحيات 05–12.
-- **البديل المقترح:** الإبقاء على الـ Fake كافتراضي، وتمرير الأصل والحسابات عند التشغيل فقط، خارج git.
+- **البديل المقترح:** الإبقاء على الـ Fake كافتراضي، وتمرير الأصل والحسابات عند التشغيل فقط، خارج git. هل الأصل HTTPS فقط وهل تُسلَّم دبابيس SPKI؟ ذلك البند 45.
 - **السؤال:** هل تتوفر بيئة staging، ومن يصدر حسابات الاختبار لكل دور؟ العنوان والحسابات يبقيان خارج المستودع.
 
 ## 35 — شكل `GET /api/auth/csrf` وهل الدخول يتطلب الرمز
@@ -386,11 +391,51 @@
 - **البديل المقترح:** الإبقاء على إرسال العدد الحرفي (`9.5` لا `"9.5"`) إلى جواب المالك، وقبول القراءة للنص والعدد الصحيح معًا. عدم التحويل إلى `double`.
 - **السؤال:** هل أسعار الصرف والمعامل (`exchangeRate` و`factor` و`egpPerLyd`) تُرسل وتُستقبل كأعداد JSON أم كنصوص JSON؟ الافتراضي في الطلب `RATE_WIRE_FORMAT=number`. تعليق `DecimalString` يقول إن العقد نصوص، وتعليق `RateWireFormat.number` يقول إن الخادم الحالي يتوقع أعدادًا.
 
+## 41 — أعلام كوكي الدخول
+
+- **الملف والسطر:** `packages/api_layer/lib/core/auth/cookie_store.dart:16-21` يخزّن الاسم والقيمة و`expiresAt` فقط. الحفظ في `:86-107`: `Cookie.fromSetCookieValue`، ثم `maxAge` أو `expires`، ثم الاسم والقيمة. لا يُحفظ `Secure` ولا `HttpOnly` ولا `SameSite` ولا `Path` ولا `Domain`. الإرسال: `cookie_csrf_auth_strategy.dart:47-50` يضع كل كوكي مخزّن في رأس `Cookie` على كل مسار للأصل الواحد. PR #8 يسجّل هذا في `docs/security-review.md:22` (SR-12) على الفرع `cursor/security-review-6b5f`؛ منطق الحفظ هناك في `cookie_store.dart:136-159` ولا يفرض الأعلام أيضًا.
+- **ما هو مفترض:** أن `Set-Cookie` القادم من `POST /api/auth/login` كوكي جلسة واحد لهذا الأصل، وأن إرساله على كل مسار `/api` صحيح. الأعلام نفسها غير معروفة.
+- **الأثر إذا رفض الخادم أو اختلف:** `Path` أضيق من `/` أو `Domain` لمضيف آخر لا يُحترَم: الكوكي يُرسل على كل مسار للأصل المُعدّ. `Secure` غير مُلزَم في الجرة، فكوكي بلا هذا العلم يُخزَّن ويُرسل إذا كان `API_BASE` على `http` (البند 45). `HttpOnly` و`SameSite` بلا أثر داخل هذا التطبيق لأنه ليس متصفحًا (البند 44)، ويهمان فقط إذا شارك WebView جرة الموقع. `Max-Age` أو `Expires` غائبان يبقيان الكوكي حتى `clear()`، أي حتى الخروج أو انتهاء الجلسة الذي يعلنه الخادم.
+- **البديل المقترح:** الإبقاء على جرة الأصل الواحد، وعدم تخمين اسم الكوكي، وعدم إرسال الكوكي إلى مضيف آخر. عدم بناء WebView يشارك جرة المتصفح إلى جواب البند 44.
+- **السؤال:** ما الكوكي الذي يضبطه `POST /api/auth/login`؟ الاسم، و`Secure`، و`HttpOnly`، و`SameSite`، و`Path`، و`Domain`، و`Max-Age`. التطبيق يخزّن كل `Set-Cookie` للأصل الواحد ويرسله على كل مسار API، ولا يفرض `Path` ولا `Domain` ولا `Secure`.
+
+## 42 — عمر الجلسة
+
+- **الملف والسطر:** `packages/api_layer/lib/core/auth/cookie_store.dart:20-21`: `expiresAt == null` يعني كوكي جلسة يُبقى حتى الخروج أو حتى انتهاء يعلنه الخادم. لا مؤقّت محلي لعمر الجلسة. إشارات الانتهاء بالكود في البند 30 (`error_mapper.dart:12-17`). PR #8 يسأل العمر في `docs/security-review.md:59`؛ كود CSRF و`AUTH_REQUIRED` ليسا هذا البند.
+- **ما هو مفترض:** لا رقم. الجلسة تبقى صالحة ما دام الكوكي في الجرة والخادم لا يعيد كود انتهاء. `Max-Age` على الكوكي، إن وُجد، يُسقطه من الرأس بعد مدته (البند 41) حتى لو كانت جلسة الخادم أطول أو أقصر.
+- **الأثر إذا رفض الخادم أو اختلف:** جلسة أقصر من الكوكي تُفشل الطلب التالي بكود انتهاء ويُخرج المستخدم (البند 30). جلسة أطول من `Max-Age` تُسقط الكوكي محليًا قبل أن يلغيها الخادم، فيُطلب دخول جديد والكوكي ما زال صالحًا على الخادم. بلا أي مدة لا يعرف التطبيق متى يُجدّد أو متى يُحذّر.
+- **البديل المقترح:** عدم اختراع مدة على الجهاز. إسقاط الكوكي عند `Max-Age` أو `Expires` إن وُجدا، وإلا إبقاؤه حتى الخروج أو حتى كود الانتهاء.
+- **السؤال:** ما عمر جلسة الدخول بالزمن؟ هل هو `Max-Age` الكوكي نفسه، أم مدة على الخادم مستقلة عنه؟ التطبيق لا يملك مؤقّتًا محليًا: كوكي بلا `expiresAt` يبقى حتى الخروج أو حتى كود انتهاء الجلسة (البند 30).
+
+## 43 — هل `error.message` أو `error.details` يعيد سرًا
+
+- **الملف والسطر:** على `main`: `lib/error_handling/error_handler.dart:11-12` و`:18-27` يعرض `error.message` كما وصل، ولا يعرض `error.details` ولا يكتبه في السجل. شكل `details` للتحقق في البند 33. على فرع PR #8: `lib/error_handling/error_handler.dart:23-38` يمسح من النص المعروض شكل `Bearer` وJWT و`password=` و`cookie=`، ويبقي الاسم والهاتف والبريد كما أرسلهما الخادم. `docs/security-review.md:20` (SR-10) و`:60`.
+- **ما هو مفترض:** أن `error.message` نص عام بلا كلمة مرور ولا رمز ولا كوكي ولا هاتف ولا اسم عميل، وأن `error.details` لا يُعرض. لم يُؤكد أن الخادم يلتزم بذلك.
+- **الأثر إذا رفض الخادم أو اختلف:** على `main` أي سر داخل `message` يظهر في الواجهة. بعد دمج PR #8، التعيين `password=` أو `cookie=` أو الرمز بشكل Bearer أو JWT يُمسح من النص، ويبقى اسم العميل أو هاتفه أو بريده ظاهرًا للمستخدم الداخل. `details` لا تُرسم في الحالتين؛ سر داخلها لا يصل إلى الشاشة اليوم، ويصل إلى أخطاء الحقول إذا طابق شكل البند 33.
+- **البديل المقترح:** الإبقاء على إخفاء `details` عن الواجهة والسجل، وعرض `message` بعد المسح الموجود على فرع PR #8. عدم بناء الرسالة من حقول الطلب على الجهاز.
+- **السؤال:** هل يمكن أن يعيد `error.message` أو `error.details` كلمة المرور المُرسلة، أو رمزًا، أو كوكيًا، أو هاتفًا، أو اسم عميل؟ الواجهة تعرض `message` بعد مسح الأشكال السرية على فرع PR #8، وتُسقط `details`.
+
+## 44 — WebView يشارك جرة كوكي الموقع
+
+- **الملف والسطر:** لا تبعية WebView ولا استدعاء في المستودع. الكوكي يُحفظ في `flutter_secure_storage` ويُرفق يدويًا على أصل واحد: `cookie_store.dart:6-8` و`cookie_csrf_auth_strategy.dart:47-50`. السؤال في `docs/security-review.md:43` و`:61` على PR #8.
+- **ما هو مفترض:** أن هذا العميل تطبيق أصلي لا يشارك جرة متصفح الموقع. لذلك لا يُطبَّق `SameSite` ولا `HttpOnly` داخل التطبيق (البند 41)، وCSRF يُرسل كرأس من الذاكرة لا من متصفح.
+- **الأثر إذا رفض الخادم أو اختلف:** إذا أصبح العميل WebView على جرة الموقع، كوكي بلا `Secure` أو `SameSite` أو `Path` الصحيح يصبح قابلًا للإرسال من صفحات الموقع، ورمز CSRF في الذاكرة لا يغطي طلبات المتصفح نفسه. التطبيق الحالي لا يملك هذا المسار، فالجواب «نعم» يعني عقدًا لم يُبنَ بعد لا سلوكًا قائمًا ينكسر.
+- **البديل المقترح:** الإبقاء على جرة التطبيق الخاصة بالأصل الواحد، وعدم تضمين WebView، إلى أن يقول المالك إن المشاركة مطلوبة. عندها تُراجع أعلام البند 41 قبل أي دمج للجرة.
+- **السؤال:** هل سيصبح هذا العميل WebView يشارك جرة كوكي الموقع؟ إن نعم، تبقى أعلام الكوكي وCSRF بمعنى المتصفح. إن لا، الجرة تبقى خاصة بالتطبيق والأصل الواحد.
+
+## 45 — HTTPS ودبابيس SPKI
+
+- **الملف والسطر:** `packages/api_layer/lib/core/network/api_client_factory.dart:48-50`: تعليق فقط، لا تثبيت شهادة؛ Dio يثق بمخزن المنصة. على `main` لا فحص يرفض `http://` في `API_BASE`. لا `usesCleartextTraffic` في `AndroidManifest.xml`. وجود أصل staging وحسابات الاختبار في البند 34. فرع PR #9 يسمح بـ `http` و`https` ويرفض غيرهما (`docs/staging.md:21`). PR #8 يسجّل الغياب في `docs/security-review.md:21` (SR-11) و`:62`.
+- **ما هو مفترض:** أن أصل التشغيل HTTPS، وأن لا دبابيس SPKI مطلوبة بعد. لا قائمة بصمات في المستودع.
+- **الأثر إذا رفض الخادم أو اختلف:** أصل `http` يرسل الكوكي و`X-CSRF-Token` بلا TLS، والتطبيق على `main` لا يمنعه. شهادة يثق بها مخزن الجهاز وغير شهادة الخادم تُقبل لأن لا تثبيت. دبابيس تُسلَّم لاحقًا بلا هذا التعليق لا تُطبَّق حتى يُربَط المحوّل بها.
+- **البديل المقترح:** عدم توجيه البناء إلا إلى `https`، والإبقاء على مخزن المنصة بلا دبابيس إلى أن يسلّمها المالك. عدم وضع الدبابيس سرًا داخل المستودع إن كانت سرية؛ البصمة العامة يمكن أن تُمرَّر عند البناء.
+- **السؤال:** هل بيئة staging على HTTPS فقط، وهل ستُسلَّم دبابيس SPKI لتثبيت الشهادة؟ التطبيق لا يثبّت الشهادات، وعلى `main` لا يرفض أصل `http`.
+
 ---
 
 ## قائمة الأسئلة لمالك الخادم
 
-1. هل تبقى مصادقة الجوال على Cookie مع `X-CSRF-Token` عبر `POST /api/auth/login` و`GET /api/auth/csrf` و`POST /api/auth/logout`، أم سيُضاف مخطط Bearer على `POST /api/auth/mobile/login` (يعيد `accessToken` و`refreshToken` و`expiresIn`) و`POST /api/auth/mobile/refresh` مع تدوير و`POST /api/auth/mobile/logout`؟ وهل سيُنتج الخادم لاحقًا `loginTicket` (وحقول `channel` و`maskedDestination`) لخطوة OTP؟
+1. هل سيُضاف `POST /api/auth/mobile/login` و`POST /api/auth/mobile/refresh` مع تدوير يرفض الرمز السابق عند إعادة استخدامه، و`POST /api/auth/mobile/logout` يلغي `refreshToken`؟ إن لم يُضف، تبقى Cookie مع `X-CSRF-Token` المخطط الوحيد ويبقى `AUTH_BEARER` مطفأً. إن أُضيف، هل يرفض الخادم جلسة الكوكي من هذا العميل حتى لا يعيد كوكي قديم تسجيل الدخول، وما أسماء الحقول (`accessToken` و`refreshToken` و`expiresIn`) وأعمارها؟ وهل سيُنتج الخادم لاحقًا `loginTicket` (وحقول `channel` و`maskedDestination`) لخطوة OTP؟
 2. هل يرسل `GET /api/me` الحقل `fullAccess` أو الاسم البديل `isSuperuser` كـ boolean؟ إذا أُرسل `false`، هل يجب أن يلغي ذلك صلاحية المدير ذي القائمتين الفارغتين (`permissions` و`sectionAccess`)؟ وما القيم غير `true`/`false` إن وُجدت؟
 3. هل توجد خريطة `sectionAccess` داخل `GET /api/me` كما لوحظت على `GET /api/users`؟ وما المفاتيح المؤكدة من بين `customerDebts` و`companyDebts` و`libyanDeposits` و`egyptianDeposits` و`masraweya` و`purchases` و`treasury` و`reports`؟ وهل غياب `collections` من الخريطة مقصود؟
 4. ما القيم الحرفية المسموحة لـ `sectionAccess[<key>]`؟ الكود لاحظ `none` و`manage`، و`read` موجود في كود الويب. أي قيمة أخرى تُعامَل كـ `none` فيُخفى القسم. هل توجد قيمة ثالثة يجب أن يفهمها التطبيق؟
@@ -430,6 +475,11 @@
 38. هل رمز `allowedActions` لتعديل الكارت هو `edit`؟ إذا أرسل الخادم القائمة برمز آخر، زر التعديل يبقى مخفيًا لأن `canOnRecord` يطابق النص حرفيًا. غياب القائمة يسقط إلى صلاحية كتابة القسم.
 39. هل `phone: ""` في `PATCH /api/{section}/{id}` يمسح الهاتف، أم يُتجاهل، أم يُرفض؟ نموذج التعديل يرسل النص الفارغ بعد المسح. إنشاء الكارت يحذف المفتاح عندما يكون الهاتف فارغًا ولا يرسل `""`.
 40. هل أسعار الصرف والمعامل (`exchangeRate` و`factor` و`egpPerLyd`) تُرسل وتُستقبل كأعداد JSON أم كنصوص JSON؟ الافتراضي في الطلب `RATE_WIRE_FORMAT=number`. تعليق `DecimalString` يقول إن العقد نصوص، وتعليق `RateWireFormat.number` يقول إن الخادم الحالي يتوقع أعدادًا.
+41. ما الكوكي الذي يضبطه `POST /api/auth/login`؟ الاسم، و`Secure`، و`HttpOnly`، و`SameSite`، و`Path`، و`Domain`، و`Max-Age`. التطبيق يخزّن كل `Set-Cookie` للأصل الواحد ويرسله على كل مسار API، ولا يفرض `Path` ولا `Domain` ولا `Secure`.
+42. ما عمر جلسة الدخول بالزمن؟ هل هو `Max-Age` الكوكي نفسه، أم مدة على الخادم مستقلة عنه؟ التطبيق لا يملك مؤقّتًا محليًا: كوكي بلا `expiresAt` يبقى حتى الخروج أو حتى كود انتهاء الجلسة (البند 30).
+43. هل يمكن أن يعيد `error.message` أو `error.details` كلمة المرور المُرسلة، أو رمزًا، أو كوكيًا، أو هاتفًا، أو اسم عميل؟ الواجهة تعرض `message` بعد مسح الأشكال السرية على فرع PR #8، وتُسقط `details`.
+44. هل سيصبح هذا العميل WebView يشارك جرة كوكي الموقع؟ إن نعم، تبقى أعلام الكوكي وCSRF بمعنى المتصفح. إن لا، الجرة تبقى خاصة بالتطبيق والأصل الواحد.
+45. هل بيئة staging على HTTPS فقط، وهل ستُسلَّم دبابيس SPKI لتثبيت الشهادة؟ التطبيق لا يثبّت الشهادات، وعلى `main` لا يرفض أصل `http`.
 
 ## سجل القرار
 
@@ -477,4 +527,9 @@
 | 38 | رمز `allowedActions` لتعديل الكارت | | | |
 | 39 | `phone: ""` لمسح الهاتف | | | |
 | 40 | الأسعار: عدد JSON أم نص | | | |
+| 41 | أعلام كوكي الدخول | | | |
+| 42 | عمر الجلسة | | | |
+| 43 | هل `error.message` أو `error.details` يعيد سرًا | | | |
+| 44 | WebView يشارك جرة كوكي الموقع | | | |
+| 45 | HTTPS ودبابيس SPKI | | | |
 
