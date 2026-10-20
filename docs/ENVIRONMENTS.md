@@ -141,7 +141,15 @@ A command-line `--dart-define` overrides the same key from `--dart-define-from-f
 | `MONEY_UNIT_SCALE`, `RATE_WIRE_FORMAT`, `AUTH_BEARER` | The example values, until the server owner says otherwise | Optional secrets, only if they must differ from the examples | The unconfirmed defaults |
 | Tokens, passwords, usernames | Not in define files. Cookie and CSRF state stay in `flutter_secure_storage` at runtime | Not compile-time defines | Never |
 
-There is no CI workflow in this repo yet. When one is added, the job should create the gitignored file from secrets and then call the script. Do not echo the secret.
+`.github/workflows/ci.yml` runs on pull requests and on pushes to `main`. It analyzes and tests the app and `packages/api_layer` with `--dart-define=USE_FAKE_API=true` (the same value as the compile-time default, so `api_config_test` still passes), then builds the debug APK with:
+
+```bash
+tool/flutter_env.sh fake build apk --debug
+```
+
+That loads the committed fake example. The workflow does not create a staging file and does not read a secret.
+
+A staging build is not part of this workflow. When one is added, the job should create the gitignored file from secrets and then call the script. Do not echo the secret.
 
 ```bash
 umask 077
@@ -168,12 +176,6 @@ tool/flutter_env.sh staging build apk --debug
 ```
 
 `STAGING_API_BASE` is the origin only. `API_DEBUG_LOG` stays false in CI. Leave `AUTH_BEARER` unset until the server owner confirms a mobile token scheme.
-
-A fake CI build needs no secrets:
-
-```bash
-tool/flutter_env.sh fake build apk --debug
-```
 
 ## Open points
 
