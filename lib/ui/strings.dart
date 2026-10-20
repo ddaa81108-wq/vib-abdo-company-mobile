@@ -97,6 +97,7 @@ abstract final class AppStrings {
   static const finalizeConfirm = 'تأكيد ترحيل اليوم؟';
   static const cashIn = 'دخول';
   static const cashOut = 'خروج';
+  static const cashMovements = 'حركات النقد';
   static const formulaCaption = 'ديون لنا + النشط + المصري − ديون علينا';
   static const pinnedColumn = 'التاريخ';
   static const changePassword = 'تغيير كلمة المرور';
@@ -225,6 +226,8 @@ abstract final class AppStrings {
   static const purchases = 'المشتريات';
   static const purchasesValue = purchases;
   static const reports = 'التقارير الذكية';
+  static const reportsReadOnly = 'للقراءة فقط. الأرقام كما أرسلها الخادم.';
+  static const scrollColumns = 'اسحب أفقيًا لعرض بقية الأعمدة';
   static const treasury = 'الخزينة';
   static const adjustment = 'تسوية تاريخية';
   static const period = 'الفترة';
