@@ -1024,7 +1024,12 @@ class _StartAlignedText extends StatelessWidget {
         textDirection: TextDirection.ltr,
         textAlign: TextAlign.end,
         softWrap: true,
-        style: mono ? style.copyWith(fontFamily: 'JetBrainsMono') : style,
+        style: mono
+            ? style.copyWith(
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: const ['Cairo'],
+              )
+            : style,
       ),
     );
   }

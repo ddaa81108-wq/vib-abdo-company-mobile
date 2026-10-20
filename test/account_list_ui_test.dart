@@ -323,6 +323,8 @@ void main() {
       return;
     }
     await pumpFakeApp(tester, size: const Size(360, 1200));
+    await tester.runAsync(_loadScreenshotFonts);
+    await tester.pump();
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     const screens = {
       '/customers': 'customers',
@@ -454,21 +456,50 @@ Future<void> _reveal(WidgetTester tester, Finder target, Finder list) async {
   }
 }
 
-Future<void> _capture(WidgetTester tester, String path) async {
-  RenderRepaintBoundary? best;
-  var area = 0.0;
-  for (final element in find.byType(RepaintBoundary).evaluate()) {
-    final object = element.renderObject;
-    if (object is RenderRepaintBoundary && object.hasSize) {
-      final size = object.size;
-      final next = size.width * size.height;
-      if (next > area) {
-        area = next;
-        best = object;
-      }
-    }
+Future<void> _loadScreenshotFonts() async {
+  await _loadFont('assets/fonts/Cairo-Variable.ttf', 'Cairo');
+  await _loadFont('assets/fonts/JetBrainsMono-Bold.ttf', 'JetBrainsMono');
+  await _loadFont('assets/fonts/JetBrainsMono-ExtraBold.ttf', 'JetBrainsMono');
+  final icons = _materialIconsFile();
+  if (icons != null) {
+    await ui.loadFontFromList(
+      await icons.readAsBytes(),
+      fontFamily: 'MaterialIcons',
+    );
   }
-  final boundary = best!;
+}
+
+Future<void> _loadFont(String path, String family) async {
+  final file = File(path);
+  if (!file.existsSync()) return;
+  await ui.loadFontFromList(await file.readAsBytes(), fontFamily: family);
+}
+
+File? _materialIconsFile() {
+  // flutter_tester lives in bin/cache/artifacts/engine/<arch>/.
+  final artifacts = File(Platform.resolvedExecutable).parent.parent.parent;
+  final candidate = File(
+    '${artifacts.path}/material_fonts/MaterialIcons-Regular.otf',
+  );
+  if (candidate.existsSync()) return candidate;
+  return null;
+}
+
+Future<void> _capture(WidgetTester tester, String path) async {
+  await tester.pump();
+  final view = tester.view.physicalSize / tester.view.devicePixelRatio;
+  final boundaries = tester.allRenderObjects
+      .whereType<RenderRepaintBoundary>()
+      .where((boundary) => boundary.hasSize && boundary.size.isFinite)
+      .toList();
+  RenderRepaintBoundary? match;
+  for (final boundary in boundaries) {
+    final close =
+        (boundary.size.width - view.width).abs() < 2 &&
+        (boundary.size.height - view.height).abs() < 2;
+    if (close) match = boundary;
+  }
+  final boundary = match ?? boundaries.first;
   final bytes = await tester.runAsync(() async {
     final image = await boundary.toImage();
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
