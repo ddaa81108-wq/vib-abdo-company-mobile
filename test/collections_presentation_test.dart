@@ -324,7 +324,7 @@ Future<void> expectTheme(
   final screen = tester.element(find.byKey(CollectionsScreen.screenKey));
   expect(Directionality.of(screen), TextDirection.rtl);
   expect(Theme.of(screen).brightness, brightness);
-  await reveal(tester, const Key('awaiting-cash'));
+  await reveal(tester, const Key('awaiting-cash-sb_2'));
   await reveal(tester, const Key('unlinked-card-ur_1'));
   await reveal(tester, const Key('unlinked-card-ur_2'));
   await reveal(tester, const Key('submission-sb_2'));
@@ -338,7 +338,7 @@ Future<void> expectTheme(
   expect(pending.color, colors.unlinkedPending);
   expect(rejected.color, colors.unlinkedPending);
   expect(pending.color, const Color(0xFF4F5F73));
-  final label = find.byKey(const Key('awaiting-cash'));
+  final label = find.byKey(const Key('awaiting-cash-sb_2'));
   final text = tester.widget<Text>(label);
   expect(text.data, AppStrings.awaitingCash);
   expect(
