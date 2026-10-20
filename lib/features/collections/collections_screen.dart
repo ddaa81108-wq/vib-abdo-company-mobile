@@ -437,7 +437,7 @@ class _Submission extends ConsumerWidget {
             if (awaiting)
               Text(
                 AppStrings.awaitingCash,
-                key: const Key('awaiting-cash'),
+                key: ValueKey('awaiting-cash-${submission.id}'),
                 style: cairo(
                   12,
                   800,
@@ -562,7 +562,7 @@ class _Unlinked extends ConsumerWidget {
             if (awaiting)
               Text(
                 AppStrings.awaitingCash,
-                key: Key('awaiting-cash-${receipt.id}'),
+                key: ValueKey('awaiting-cash-${receipt.id}'),
                 style: cairo(12, 800, color: context.statusColors.onStatus),
               ),
             if (manage && receipt.status == 'pending')
