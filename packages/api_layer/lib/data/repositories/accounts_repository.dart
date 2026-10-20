@@ -21,6 +21,14 @@ abstract interface class AccountsRepository {
   /// Debt / partial payment / full payment (server computes amount + new balance).
   Future<MutationAck> addTransaction(AccountSection s, String accountId,
       AccountTransactionRequest r, MutationMeta meta);
+
+  /// Correct one ledger line: POST `.../transactions/{tx}/corrections` with the
+  /// same [AccountTransactionRequest] body as [addTransaction], plus [MutationMeta]
+  /// (`requestId`, `expectedVersion` of the line being corrected).
+  ///
+  /// This is not [cancelTransaction]. The client sends no reversing flag and does
+  /// not describe a reversing entry; the server decides the stored lines, the
+  /// amount, and the balance. The UI refetches after the acknowledgement.
   Future<MutationAck> correctTransaction(AccountSection s, String accountId,
       String txId, AccountTransactionRequest r, MutationMeta meta);
   Future<MutationAck> cancelTransaction(

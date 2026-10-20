@@ -14,6 +14,7 @@ import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
 import 'edit_account_card_screen.dart';
+import 'transaction_correction_form.dart';
 
 /// Ledger for one card. Customers, companies, Libyan deposits, and Egyptian
 /// deposits all use this screen; [section] selects the repository and the labels.
@@ -137,6 +138,7 @@ class LedgerScreen extends ConsumerWidget {
                     for (final entry in page.page.items)
                       _EntryTile(
                         section: section,
+                        accountId: id,
                         entry: entry,
                         money: money,
                         showBalance: showBalance,
@@ -506,6 +508,7 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
         for (final entry in _extra)
           _EntryTile(
             section: widget.section,
+            accountId: widget.id,
             entry: entry,
             money: widget.money,
             showBalance: widget.showBalance,
@@ -535,6 +538,7 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
 class _EntryTile extends StatelessWidget {
   const _EntryTile({
     required this.section,
+    required this.accountId,
     required this.entry,
     required this.money,
     required this.showBalance,
@@ -543,6 +547,7 @@ class _EntryTile extends StatelessWidget {
   });
 
   final AccountSection section;
+  final String accountId;
   final LedgerEntryDto entry;
   final MoneyFormatter money;
   final bool showBalance;
@@ -614,6 +619,11 @@ class _EntryTile extends StatelessWidget {
                 confirmText: AppStrings.confirmCancel,
                 onSubmit: onCancel,
               ),
+            TransactionCorrectionLauncher(
+              section: section,
+              accountId: accountId,
+              entry: entry,
+            ),
           ],
         ),
       ),
