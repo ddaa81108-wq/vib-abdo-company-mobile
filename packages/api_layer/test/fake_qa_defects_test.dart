@@ -264,6 +264,52 @@ void main() {
   );
 
   test(
+    'every card ageStatusLabel matches debtAgeDays and the home bulletin',
+    () {
+      final seen = <String>{};
+      for (final section in sections) {
+        final items = (FakeFixtures.accountsFor(section)['items'] as List)
+            .cast<Map>();
+        expect(items, hasLength(10), reason: section);
+        for (final card in items) {
+          final days = card['debtAgeDays'];
+          final id = card['id'];
+          expect(days, isA<int>(), reason: '$section/$id');
+          expect(
+            card['ageStatusLabel'],
+            'منذ $days أيام',
+            reason: '$section/$id',
+          );
+          expect(card['ageStatusLabel'], isNot(contains('مرّ عليه')));
+          seen.add('$section/$id');
+        }
+      }
+      expect(seen, hasLength(40));
+
+      final bulletin = (FakeFixtures.home()['oldDebts'] as List).cast<Map>();
+      expect(bulletin, isNotEmpty);
+      for (final row in bulletin) {
+        final card = FakeFixtures.cardById('${row['section']}', '${row['id']}');
+        expect(card, isNotEmpty, reason: '${row['section']}/${row['id']}');
+        expect(row['debtAgeDays'], card['debtAgeDays']);
+        expect(row['ageStatus'], card['ageStatus']);
+        expect(row['ageStatusLabel'], card['ageStatusLabel']);
+        expect(row['ageStatusLabel'], 'منذ ${row['debtAgeDays']} أيام');
+        expect(row['ageStatusLabel'], isNot(contains('مرّ عليه')));
+      }
+
+      final demo = FakeFixtures.cardById('customers', 'c_55');
+      expect(demo['debtAgeDays'], 4);
+      expect(demo['ageStatusLabel'], 'منذ 4 أيام');
+      final demoBulletin = bulletin.singleWhere(
+        (row) => row['section'] == 'customers' && row['id'] == 'c_55',
+      );
+      expect(demoBulletin['debtAgeDays'], 4);
+      expect(demoBulletin['ageStatusLabel'], 'منذ 4 أيام');
+    },
+  );
+
+  test(
     'home copies section fixtures and withholds sections the profile cannot read',
     () async {
       final catalog = FakeFixtures.home();
