@@ -99,6 +99,29 @@ warning • Unused import: 'package:flutter_riverpod/flutter_riverpod.dart'. Try
 
 معيار المرحلة 1 «ينجح `tool/check.sh`» يبقى **فاشلًا** إلى أن يخرج تحليل التطبيق 0. لم يُعد تشغيل السكربت كاملًا بعد إضافة الاختبارات لأن `set -e` سيتوقف عند التحليل كما في خط الأساس.
 
+## إعادة اختبار DEF-001 على PR #15
+
+التاريخ: 2026-10-20. الفرع: `cursor/fix-def-001-doc-comments-cc17`. الالتزام: `56156a8`. الطلب: https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/15
+
+الأساس `main` بعد دمج PR #4، وهو الذي أزال تحذير `unused_import` من `test/qa_round_test.dart`. هذا الفرع لا يعدّل ذلك الملف.
+
+الأمر: `bash tool/check.sh` من جذر المستودع، مع Flutter 3.47.7 / Dart 3.13.5 على `PATH`.
+
+**رمز الخروج: 0.**
+
+| الخطوة داخل السكربت | النتيجة الفعلية |
+|---|---|
+| `flutter analyze` للتطبيق | `No issues found! (ran in 9.4s)` |
+| `flutter test` للتطبيق | `+72: All tests passed!` — **72 ناجح، 0 فاشل** |
+| `flutter analyze` في `packages/api_layer` | `No issues found! (ran in 4.2s)` |
+| `flutter test` في `packages/api_layer` | `+52: All tests passed!` — **52 ناجح، 0 فاشل** |
+
+مراجعة الفرق مقابل `main`: أربعة ملفات وخمسة أسطر، وكلها تعليقات. المواضع الستة لـ `unintended_html_in_doc_comment` صارت داخل backticks. لا تغيير سلوكي.
+
+**الحكم:** Fixed in #15 — verified.
+
+اختبارات القبول الأربعة في `test/acceptance/` ليست على هذا الفرع، لذلك العدد 72 هنا يطابق مجموعة `main` لا مجموعة فرع القبول (76). هذا لا يغيّر حكم DEF-001.
+
 ## خلاصة خط الأساس
 
 | البند | القيمة |
@@ -111,3 +134,4 @@ warning • Unused import: 'package:flutter_riverpod/flutter_riverpod.dart'. Try
 | تحليل `packages/api_layer` يدويًا | 0 مشكلات |
 | اختبارات `packages/api_layer` يدويًا | 52 ناجح / 0 فاشل |
 | Flutter / Dart | 3.47.7 / 3.13.5 |
+| DEF-001 على PR #15 (`56156a8`) | Fixed in #15 — verified. `tool/check.sh` خروج 0: تحليل التطبيق والحزمة بلا مشكلات، 72 و52 اختبارًا ناجحة |

@@ -13,19 +13,23 @@
 
 | التصنيف | المعرّفات |
 |---|---|
-| Blocking | DEF-001، DEF-002، DEF-003، DEF-004، DEF-005، DEF-006 |
+| Blocking ما زال مفتوحًا | DEF-002، DEF-003، DEF-004، DEF-005، DEF-006 |
 | Non-blocking | DEF-007، DEF-008، DEF-009، DEF-010، DEF-011، DEF-012 |
+| أُغلق بعد إعادة اختبار | DEF-001: Fixed in #15 — verified |
 
 ---
 
 ### DEF-001 — `tool/check.sh` يفشل عند تحليل التطبيق
 
+**الحالة:** Fixed in #15 — verified
+
 | الحقل | القيمة |
 |---|---|
 | المرحلة | 1 |
 | الشدة | عالية |
-| التصنيف | Blocking |
-| الملفات | `test/qa_round_test.dart:4`؛ `packages/api_layer/lib/core/network/precise_json.dart:25`؛ `packages/api_layer/lib/core/realtime/polling_realtime_service.dart:8`؛ `packages/api_layer/lib/core/realtime/realtime_service.dart:4` و`:5`؛ `packages/api_layer/lib/data/models/home_models.dart:10` |
+| التصنيف الأصلي | Blocking |
+| الحالة بعد إعادة الاختبار | Fixed in #15 — verified |
+| الملفات | `test/qa_round_test.dart:4` (أُزيل في PR #4 على `main`)؛ `packages/api_layer/lib/core/network/precise_json.dart:25`؛ `packages/api_layer/lib/core/realtime/polling_realtime_service.dart:8`؛ `packages/api_layer/lib/core/realtime/realtime_service.dart:4` و`:5`؛ `packages/api_layer/lib/data/models/home_models.dart:10` |
 
 **خطوات الإعادة**
 
@@ -34,7 +38,18 @@
 
 **المتوقع:** `flutter analyze` و`flutter test` للتطبيق ثم للحزمة يخرجان 0.
 
-**الفعلي:** في تشغيل `tool/check.sh` خرج التحليل بـ 7 مشكلات (6 × `unintended_html_in_doc_comment` من المستوى info في تعليقات الحزمة، و1 × `unused_import` في `test/qa_round_test.dart:4`) ورمز 1. `set -e` يوقف السكربت قبل أي اختبار. إعادة `flutter analyze` لاحقًا من جذر التطبيق أظهرت التحذير وحده وما زالت تخرج 1؛ ملاحظات info لم تتكرر بعد تحليل الحزمة بخياراتها (`flutter_lints` 4 بلا مشكلات). التحذير وحده يكفي لإسقاط البوابة. التفاصيل في `baseline-check-results.md`.
+**الفعلي على `fea12dd`:** في تشغيل `tool/check.sh` خرج التحليل بـ 7 مشكلات (6 × `unintended_html_in_doc_comment` من المستوى info في تعليقات الحزمة، و1 × `unused_import` في `test/qa_round_test.dart:4`) ورمز 1. `set -e` يوقف السكربت قبل أي اختبار. إعادة `flutter analyze` لاحقًا من جذر التطبيق أظهرت التحذير وحده وما زالت تخرج 1. التفاصيل في `baseline-check-results.md`.
+
+**إعادة الاختبار على PR #15 (2026-10-20):** الفرع `cursor/fix-def-001-doc-comments-cc17` عند `56156a8`، المبني على `main` بعد دمج PR #4 الذي أزال `unused_import`. Flutter 3.47.7 / Dart 3.13.5. `bash tool/check.sh` خرج **0**.
+
+| الخطوة | النتيجة |
+|---|---|
+| `flutter analyze` للتطبيق | No issues found (9.4s) |
+| `flutter test` للتطبيق | 72 ناجح، 0 فاشل |
+| `flutter analyze` في `packages/api_layer` | No issues found (4.2s) |
+| `flutter test` في `packages/api_layer` | 52 ناجح، 0 فاشل |
+
+فرق PR #15 مقابل `main`: 4 ملفات، +5/−5، وكلها تعليقات توثيق تضع الأقواس الزاوية داخل علامات اقتباس مفردة للكود. لا تغيير في كود قابل للتنفيذ ولا تعطيل لأي قاعدة تحليل. `test/qa_round_test.dart` ليس في الفرق. الحكم: **Fixed in #15 — verified**. الطلب #15 لم يُدمج من هذه الجولة.
 
 ---
 
