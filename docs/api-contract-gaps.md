@@ -3,9 +3,9 @@
 جرد ما يفترضه تطبيق الجوال ولم يؤكّده الخادم. هذا المستند مخرج المرحلة 0 من تحليل المستودع: كل حقل أو كود أو مسار موسوم بـ `proposed` / «مقترح» / 🔶 / `pending server confirmation` / `assumed` / `to confirm` / `STUB`، مع أثر الاختلاف وبديل مؤقت والسؤال الحرفي لمالك الخادم.
 
 - **لا يغيّر هذا المستند سلوك التطبيق.** لا مسارات جديدة، ولا تعديل على الطلبات.
-- **أساس الأسطر:** الفرع `main` عند `fea12dd`، ما لم يُذكر فرع آخر. بنود أُضيفت من طلبات دمج لم تُدمَج بعد تذكر الفرع: PR #3 `cursor/unlinked-receipt-actions-30bd`، PR #7 `cursor/ledger-transaction-correction-7e25`، PR #8 `cursor/security-review-6b5f`، PR #9 `cursor/staging-api-ready-8c4a`، PR #10 `cursor/edit-account-card-ae82`.
+- **أساس الأسطر:** الفرع `main` عند `fea12dd`، ما لم يُذكر فرع آخر. بنود أُضيفت من طلبات دمج لم تُدمَج بعد تذكر الفرع: PR #3 `cursor/unlinked-receipt-actions-30bd`، PR #7 `cursor/ledger-transaction-correction-7e25`، PR #8 `cursor/security-review-6b5f`، PR #9 `cursor/staging-api-ready-8c4a`، PR #10 `cursor/edit-account-card-ae82`، PR #11 `cursor/account-requests-repository-5b4e`.
 - **النطاق:** `packages/api_layer/lib/core/network/api_endpoints.dart`، و`packages/api_layer/lib/core/permissions/permission_codes.dart`، وكل `*_models.dart`، ثم العلامات المماثلة في بقية المستودع، ثم أسئلة مالك الخادم المفتوحة في تلك الطلبات.
-- **ما لم يُدرَج:** مسارات وكودات يصفها التعليق بأنها من العقد القائم (مثل `debts.read` و`POST /api/auth/login` و`GET /api/events`). علامة 🔶 على `API_BASE` في `api_config.dart` قيد أمان (لا عنوان إنتاج افتراضي) وليست حقلًا غير مؤكد؛ سؤال وجود بيئة staging نفسها هو البند 34. مسارا `GET /api/account-requests` و`/api/notification-preferences` موجودان في الملف بلا وسم «مقترح»؛ نقصهما في الواجهة خارج هذا الجرد. صيغة السعر لم تعد خارج الجرد: التعليقات تتعارض، وهي البند 40.
+- **ما لم يُدرَج:** مسارات وكودات يصفها التعليق بأنها من العقد القائم (مثل `debts.read` و`POST /api/auth/login` و`GET /api/events`). علامة 🔶 على `API_BASE` في `api_config.dart` قيد أمان (لا عنوان إنتاج افتراضي) وليست حقلًا غير مؤكد؛ سؤال وجود بيئة staging نفسها هو البند 34. مسار `/api/notification-preferences` موجود في الملف بلا وسم «مقترح»؛ نقصه في الواجهة خارج هذا الجرد. شكل `GET /api/account-requests` وجسم القرار صارا البنود 46–52 بعد PR #11، وبوابة `users.manage` تبقى البند 11. صيغة السعر لم تعد خارج الجرد: التعليقات تتعارض، وهي البند 40.
 
 كل بند أدناه يحمل الرقم نفسه في [قائمة الأسئلة](#قائمة-الأسئلة-لمالك-الخادم).
 
@@ -56,6 +56,13 @@
 | 43 | هل `error.message` يعيد سرًا | `error_handler.dart:11-12` و`:18-27` |
 | 44 | WebView يشارك جرة كوكي الموقع | لا تبعية WebView في المستودع |
 | 45 | HTTPS ودبابيس SPKI | `api_client_factory.dart:48-50` |
+| 46 | صفحة `GET /api/account-requests` | `account_request_models.dart` على PR #11 |
+| 47 | حقول عنصر طلب الحساب | النموذج نفسه على PR #11 |
+| 48 | جسم `POST …/decision` ورده | `account_requests_repository.dart` على PR #11 |
+| 49 | `VERSION_CONFLICT` و`ALREADY_DECIDED` | `fake_api_client.dart` على PR #11 |
+| 50 | مثلية `requestId` للقرار | الـ Fake نفسه على PR #11 |
+| 51 | لا إنشاء ولا جلب بمعرّف ولا كلمة مرور | المستودع والنموذج على PR #11 |
+| 52 | بعد القرار: `allowedActions` و`decidedAt` والدخول | الـ Fake نفسه على PR #11 |
 
 آلية الصلاحيات المشتركة للبنود 05–12: التعليق في `permission_codes.dart:83-86` يقول إن الويب الحالي يتحكم بهذه الإجراءات **باسم الدور** (`admin`) بلا كود دقيق، وكل `ManagementAction` يقابل كودًا مقترحًا. `PermissionService.canDo` يسمح بالإجراء إذا وُجد الكود في `permissions[]`، أو إذا كانت الصلاحية كاملة: `fullAccess == true`، أو الدور `admin` وقائمتا `permissions` و`sectionAccess` فارغتان (`permission_service.dart:135-136`). غياب الكود يخفي الزر عن غير المدير الكامل. الإخفاء في الواجهة ليس حماية؛ الخادم يفرض الصلاحية على الطلب نفسه.
 
@@ -143,11 +150,11 @@
 
 ## 11 — `users.manage`
 
-- **الملف والسطر:** `packages/api_layer/lib/core/permissions/permission_codes.dart:94` (`accountRequestsDecide`). يظهر زرًا في الرئيسية بعنوان «طلبات الحسابات» ينقل إلى `/settings` (`lib/ui/section_labels.dart:63` و`:74-75`). لا مستودع يستدعي `POST /api/account-requests/{id}/decision`.
-- **ما هو مفترض:** كود صريح مقترح. المسار نفسه في `api_endpoints.dart:88-90` غير موسوم «مقترح»؛ غير المؤكد هو كود الصلاحية.
-- **الأثر إذا رفض الخادم أو اختلف:** غير المدير الكامل لا يرى زر الإجراء. المدير الكامل يرى الزر ويصل إلى شاشة إعدادات بلا قائمة طلبات. لا يُرسل قرار حسابات من التطبيق اليوم.
-- **البديل المقترح:** إبقاء قرارات طلبات الحسابات على الويب إلى أن يُؤكد الكود وتُطلب شاشة الجوال صراحة.
-- **السؤال:** هل سيُرجع `GET /api/me` الكود `users.manage` داخل `permissions[]`؟ إن لم يُرجعه، هل تبقى قرارات `POST /api/account-requests/{id}/decision` خارج الجوال؟
+- **الملف والسطر:** `packages/api_layer/lib/core/permissions/permission_codes.dart:94` (`accountRequestsDecide`). يظهر زرًا في الرئيسية بعنوان «طلبات الحسابات» ينقل إلى `/settings` (`lib/ui/section_labels.dart:63` و`:74-75`). على `main` لا مستودع يستدعي القرار. على فرع PR #11 غير المدموج (`cursor/account-requests-repository-5b4e`): `account_requests_repository.dart:7-12` يقول إن الخادم يفرض الوصول وإن الإخفاء يكون بـ `users.manage` أو الصلاحية الكاملة، والمستودع نفسه لا يفحص الكود. الـ Fake يفحص اسم الدور فقط: `fake_api_client.dart:296-299` (`_requireAdmin`، و`403 FORBIDDEN` لغير المدير). شكل القائمة والحقول والقرار في البنود 46–52، لا هنا.
+- **ما هو مفترض:** الكود `users.manage` ما زال مقترحًا. المسار في `api_endpoints.dart:88-90` على `main` غير موسوم «مقترح». الويب والـ Fake يغلقان المورد باسم الدور `admin` لا بالكود.
+- **الأثر إذا رفض الخادم أو اختلف:** غير المدير الكامل لا يرى زر الإجراء، ومدير بقائمة صلاحيات صريحة بلا `users.manage` لا يراه أيضًا. إن كان الخادم يقبل الدور بلا الكود، ذلك المدير يُمنع في الواجهة بينما الطلب نفسه مسموح. إن كان الخادم يشترط الكود، المدير ذو القوائم الفارغة يمرّ بقاعدة الصلاحية الكاملة، والموظف يُرفض. على `main` الزر يصل إلى إعدادات بلا قائمة. PR #11 يضيف المستودع بلا شاشة.
+- **البديل المقترح:** إبقاء الزر للصلاحية الكاملة إلى أن يُرجع الخادم الكود، وعدم فحص الكود داخل المستودع. الـ Fake يبقى على اسم الدور لأنه يحاكي الويب الحالي.
+- **السؤال:** هل مورد `GET /api/account-requests` و`POST /api/account-requests/{id}/decision` للمدير باسم الدور `admin` فقط، أم يُغلق بالكود `users.manage` داخل `permissions[]` في `GET /api/me`؟ الـ Fake في PR #11 يفحص اسم الدور لا الكود. إن لم يُرجع الكود، هل يبقى القرار للمدير الكامل فقط؟
 
 ## 12 — `settings.manage`
 
@@ -431,11 +438,83 @@
 - **البديل المقترح:** عدم توجيه البناء إلا إلى `https`، والإبقاء على مخزن المنصة بلا دبابيس إلى أن يسلّمها المالك. عدم وضع الدبابيس سرًا داخل المستودع إن كانت سرية؛ البصمة العامة يمكن أن تُمرَّر عند البناء.
 - **السؤال:** هل بيئة staging على HTTPS فقط، وهل ستُسلَّم دبابيس SPKI لتثبيت الشهادة؟ التطبيق لا يثبّت الشهادات، وعلى `main` لا يرفض أصل `http`.
 
+## 46 — صفحة `GET /api/account-requests`
+
+- **الملف والسطر:** على فرع PR #11: `packages/api_layer/lib/data/models/account_request_models.dart:112-124` يقرأ الصفحة عبر `Paged.fromData`. مفاتيح الصفحة المشتركة على الفرع نفسه: `common.dart:51-73` (`items`، ثم `nextCursor` أو `nextBefore`، و`hasMore`). الاستعلام: `account_requests_repository.dart:17-24` و`:54-68` يرسل `limit` و`cursor` دائمًا، و`status` فقط إذا مُرّر. الـ Fake: `fake_api_client.dart:346-370`. على `main` المسار ثابت في `api_endpoints.dart:88-90` بلا مستودع.
+- **ما هو مفترض:** أن القائمة صفحة `{ items, nextCursor, hasMore }` لا مصفوفة عارية، وأن الفلاتر هي `limit` و`cursor` و`status`. التعليق يقول إن التقسيم نفسه غير مؤكد، وأن المفاتيح الغائبة تعني صفحة واحدة. مؤشر غير معروف في الـ Fake يعيد صفحة فارغة (`:358-359`).
+- **الأثر إذا رفض الخادم أو اختلف:** جسم مصفوفة يُقرأ كصفحة واحدة بلا `hasMore`. مفتاح عناصر غير `items` يعطي قائمة فارغة. `nextCursor` باسم آخر يوقف «المزيد» أو يعيد الصفحة الأولى. `status` غير مقبول يفشل الطلب أو يُتجاهل فيُعرض كل الحالات. مؤشر يرفضه الخادم يظهر خطأ بدل الصفحة الفارغة التي يحاكيها الـ Fake.
+- **البديل المقترح:** الإبقاء على قراءة `Paged` الدفاعية، وإرسال `status` فقط عند طلب المستخدم، ومعاملة الصفحة الفارغة كآخر صفحة إلى جواب المالك.
+- **السؤال:** هل يعيد `GET /api/account-requests` الصفحة `{ items, nextCursor, hasMore }` ويقبل `limit` و`cursor` و`status`؟ `status` يُرسل فقط عندما يمرّره المستدعي. مفاتيح ناقصة تُقرأ كصفحة واحدة، ومؤشر غير معروف في الـ Fake يعيد صفحة فارغة لا خطأ.
+
+## 47 — حقول عنصر طلب الحساب
+
+- **الملف والسطر:** على فرع PR #11: `account_request_models.dart:9-19` و`:65-80`. الحالات المقترحة: `:84-95` (`pending` و`approved` و`rejected`؛ غيرها تبقى نصًا خامًا و`knownStatus` يصير `null`). لا شاشة تقرأ النموذج على هذا الفرع.
+- **ما هو مفترض:** الحقول والأسماء البديلة في السؤال أدناه. `allowedActions` الغائبة تبقى `null` (البوابة إذن كود الإدارة)، والقائمة الفارغة تعني أن الخادم أرسل بلا إجراءات. لا اشتقاق لاسم أو دور على الجهاز.
+- **الأثر إذا رفض الخادم أو اختلف:** اسم حقل غير البدائل المذكورة يترك العرض فارغًا (`username` و`displayName` و`phone` و`requestedRole` و`note`). حالة بغير `pending`/`approved`/`rejected` لا تُصنَّف فلا يُبنى عليها زر. `version` غير عدد صحيح يُقرأ `null` فيرفض المستودع الإرسال قبل الطلب (البند 48).
+- **البديل المقترح:** الإبقاء على الأسماء البديلة الحالية وعلى حفظ النص الخام، وعدم تخمين مفتاح رابع للاسم أو الملاحظة.
+- **السؤال:** هل يحمل كل عنصر الحقول `id` و`status` (`pending` أو `approved` أو `rejected`) و`version` و`createdAt` و`decidedAt` و`username` (والاسم البديل `requestedUsername`) و`displayName` (والبدائل `applicantName` و`name`) و`phone` و`requestedRole` (والبديل `role`) و`note` (والبديل `reason`) و`decisionNote` و`allowedActions`؟ نص حالة غير معروف يُحفظ كما هو ولا يُفسَّر.
+
+## 48 — جسم قرار طلب الحساب ورده
+
+- **الملف والسطر:** على فرع PR #11: `account_requests_repository.dart:26-34` و`:42-51` و`:71-90`. الجسم: `requestId` و`expectedVersion` من `MutationMeta`، و`decision` نص `approve` أو `reject` (`account_request_models.dart:98-109`)، و`note` إذا كان غير فارغ. غياب `expectedVersion` يرمي `ArgumentError` قبل الإرسال. الرد عبر `MutationAck.fromData` في `common.dart:79-88`: يُقرأ `id` و`version`، وبقية الجسم ومنها `status` تبقى في `raw`. الـ Fake يعيد `{ id, version, status }` في `fake_api_client.dart:422-426`.
+- **ما هو مفترض:** أن هذا الجسم وهذا الرد هما عقد المسار. `decision` بنفس اسمي قرارات الاستلامات، والتعليق يقول إن ذلك غير مؤكد لهذا المسار.
+- **الأثر إذا رفض الخادم أو اختلف:** اسم حقل غير `decision` أو قيم غير `approve`/`reject` يرفضها الخادم. ملاحظة بمفتاح غير `note` لا تصل. رد بلا `id` أو `version` يتركهما `null` في العلم؛ الواجهة غير مبنية فلا تعرض الرد أصلًا. `status` في الرد لا يُنسخ إلى قائمة محلية لأن لا شاشة تحدّث الصف من `raw`.
+- **البديل المقترح:** الإبقاء على الجسم الحالي، ورفض الإرسال بلا `expectedVersion`، وإعادة جلب القائمة بعد النجاح بدل كتابة الحالة من الرد.
+- **السؤال:** هل يأخذ `POST /api/account-requests/{id}/decision` الحقول `requestId` و`expectedVersion` و`decision` (`approve` أو `reject`) و`note` اختياريًا، ويعيد `{ id, version, status }`؟ التطبيق يرفض الإرسال محليًا إذا غاب `expectedVersion`، ويقرأ من الرد `id` و`version` ويبقي `status` داخل `raw`.
+
+## 49 — `VERSION_CONFLICT` و`ALREADY_DECIDED`
+
+- **الملف والسطر:** على فرع PR #11: `fake_api_client.dart:398-403`. نسخة لا تطابق `version` العنصر: `409 VERSION_CONFLICT`. حالة ليست `pending`: `409 ALREADY_DECIDED`، والتعليق في `:401` يسمّيه مقترحًا. على `main`، `error_mapper.dart:129-135` يجعل الكود `VERSION_CONFLICT` تعارضًا، و`:140-142` يجعل أي `409` تعارضًا أيضًا. لا شاشة طلبات حسابات تفرّق بين الكودين.
+- **ما هو مفترض:** أن التعارض قفلًا هو `409` بالكود `VERSION_CONFLICT`، وأن البت المكرر هو `409` بالكود `ALREADY_DECIDED`. الكود الثاني غير مذكور في `ErrorMapper`.
+- **الأثر إذا رفض الخادم أو اختلف:** كود آخر على `409` ما زال `ConflictException` برسالة الخادم. شاشة تبحث فقط عن `VERSION_CONFLICT` (كما تفعل شاشات أخرى) لن تعرض مسار «أُعيد الجلب» لـ `ALREADY_DECIDED`، وقد تُبقي زر إعادة المحاولة لقرار تم. حالة نجاح على `200` لقرار مكرر، بلا `ALREADY_DECIDED`، تُعامل كنجاح جديد.
+- **البديل المقترح:** عند أي `409` إعادة جلب القائمة وعدم إعادة القرار نفسه. بعد تأكيد `ALREADY_DECIDED` إظهار رسالة الخادم بلا مسار تعارض النسخة.
+- **السؤال:** هل النسخة القديمة على هذا المسار هي `409` بالكود `VERSION_CONFLICT`، وقرار على طلب ليست حالته `pending` هو `409` بالكود `ALREADY_DECIDED`؟ الكود الثاني مقترح في الـ Fake فقط.
+
+## 50 — مثلية `requestId` لقرار طلب الحساب
+
+- **الملف والسطر:** على فرع PR #11: `fake_api_client.dart:62-64` و`:385-387`. نجاح سابق لنفس `requestId` يعيد الجسم المحفوظ ولا يغيّر العنصر مرة ثانية. الفشل لا يُحفظ، فيُعاد بالمعرّف نفسه. التعليق يقول إن بقية الـ Fake لا تعيد قرارات المسارات الأخرى. المستودع يرسل `requestId` ولا يعيد القرار من عنده (`account_requests_repository.dart:28` و`:81-88`).
+- **ما هو مفترض:** أن الخادم الحقيقي يطبّق المثلية على هذا المسار كما يفعل الـ Fake: أول نجاح هو الجواب لكل إعادة لاحقة بنفس المعرّف.
+- **الأثر إذا رفض الخادم أو اختلف:** إعادة بعد نجاح لم يصِل إلى الجهاز تُنتج `ALREADY_DECIDED` أو قرارًا ثانيًا إذا تغيّر المعرّف. إعادة بعد فشل شبكة بمعرّف جديد قد تُنفَّذ مرتين إن كان الأول قد نجح على الخادم. بلا مثلية، زر إعادة المحاولة الذي يعيد نفس `requestId` ليس آمنًا.
+- **البديل المقترح:** معرّف واحد للمحاولة الواحدة، يُعاد كما هو بعد فشل الإرسال، ويُستبدل فقط عندما تتغير المدخلات أو `expectedVersion`. بعد النجاح لا يُرسل مرة أخرى؛ تُجلب القائمة.
+- **السؤال:** هل `requestId` في `POST /api/account-requests/{id}/decision` مثلي، بحيث تعيد إعادة الطلب أول قرار ناجح ولا تطبّقه مرتين؟ محاولة فاشلة تُعاد بنفس المعرّف. بقية الـ Fake لا تعيد قرارات المسارات الأخرى.
+
+## 51 — لا إنشاء ولا جلب بمعرّف ولا كلمة مرور
+
+- **الملف والسطر:** على فرع PR #11: `account_requests_repository.dart:13-15` (لا إنشاء ولا تسجيل ذاتي). `account_request_models.dart:21-22` لا يقرأ كلمة مرور. الـ Fake: `fake_api_client.dart:300-306` يقبل `GET` للقائمة و`POST` للقرار فقط، وغيرهما `404`. لا مسار `GET /api/account-requests/{id}` في `api_endpoints.dart:87-91`.
+- **ما هو مفترض:** أن هذا المورد قائمة وقرار فقط، بلا إنشاء وبلا جلب مفرد وبلا كلمة مرور مؤقتة في الاستجابة.
+- **الأثر إذا رفض الخادم أو اختلف:** إنشاء مطلوب من الجوال غير موجود فيرفض بناء شاشة التسجيل. جلب بمعرّف هو مصدر الحقيقة الوحيد فيفشل عرض التفاصيل لأن العميل لا يستدعيه. كلمة مرور في الجسم تُحفظ داخل `raw` ولا تُعرض اليوم، وتظهر في السجل إذا طُبع `raw` قبل التنقيح. PR #11 ينقّح الأسماء البديلة للملاحظة والاسم في `redactor.dart`، لا حقل كلمة مرور لأنه غير مقروء.
+- **البديل المقترح:** عدم إضافة مسار إنشاء أو جلب مفرد، وعدم قراءة أي حقل كلمة مرور حتى يؤكَّد ثم يُنقَّح قبل العرض والسجل.
+- **السؤال:** أكد أنه لا إنشاء ولا `GET` بمعرّف ولا حقل كلمة مرور على مورد `/api/account-requests`. النموذج لا يقرأ كلمة مرور، والـ Fake يرد `404` على أي مسار غير القائمة والقرار.
+
+## 52 — بعد القرار: الإجراءات ووقت البت وإنشاء الدخول
+
+- **الملف والسطر:** على فرع PR #11: `fake_api_client.dart:415-421`. بعد النجاح تُضبط `status` و`version` و`decidedAt` بوقت ثابت، وتُنسخ `note` إلى `decisionNote` إن وُجدت، ثم `item.remove('allowedActions')`. لا يُنشأ مستخدم ولا جلسة. قراءة الحقل: `account_request_models.dart:56-58` و`:77-79` — المفتاح الغائب يعني `null` والبوابة تعود لكود الإدارة، والقائمة الفارغة تعني بلا إجراءات.
+- **ما هو مفترض:** أن الخادم يزيل `allowedActions` ويضبط `decidedAt`، وأن الاعتماد لا ينشئ دخولًا يعيده هذا المسار. الـ Fake لا يثبت أن الخادم يفعل ذلك.
+- **الأثر إذا رفض الخادم أو اختلف:** حذف المفتاح (كما يفعل الـ Fake) يجعل `allowedActions == null`، فواجهة تعتمد «الغياب = كود الإدارة» تُبقي زر القرار ظاهرًا بعد البت. قائمة فارغة تخفيه. غياب `decidedAt` يترك وقت البت فارغًا. إن كان الاعتماد ينشئ دخولًا، هذا العميل لا يعرض المستخدم الجديد ولا كلمة مرور (البند 51).
+- **البديل المقترح:** بعد العلم إعادة جلب القائمة، وإخفاء القرار عندما `knownStatus` ليست `pending` حتى لو بقيت `allowedActions` أو غابت. عدم إنشاء مستخدم على الجهاز.
+- **السؤال:** بعد القرار، هل تختفي `allowedActions` ويضبط الخادم `decidedAt`؟ وهل ينشئ الاعتماد حساب دخول؟ الـ Fake يمسح المفتاح ويضع وقتًا ثابتًا ولا ينشئ دخولًا. حذف المفتاح يُقرأ `null` فيعود البت إلى بوابة `users.manage`، بينما القائمة الفارغة تخفي الإجراء.
+
 ---
 
 ## قائمة الأسئلة لمالك الخادم
 
+الأرقام هي أرقام البنود أعلاه. التجميع للعرض فقط.
+
+### المصادقة والجلسة
+
 1. هل سيُضاف `POST /api/auth/mobile/login` و`POST /api/auth/mobile/refresh` مع تدوير يرفض الرمز السابق عند إعادة استخدامه، و`POST /api/auth/mobile/logout` يلغي `refreshToken`؟ إن لم يُضف، تبقى Cookie مع `X-CSRF-Token` المخطط الوحيد ويبقى `AUTH_BEARER` مطفأً. إن أُضيف، هل يرفض الخادم جلسة الكوكي من هذا العميل حتى لا يعيد كوكي قديم تسجيل الدخول، وما أسماء الحقول (`accessToken` و`refreshToken` و`expiresIn`) وأعمارها؟ وهل سيُنتج الخادم لاحقًا `loginTicket` (وحقول `channel` و`maskedDestination`) لخطوة OTP؟
+30. ما أكواد انتهاء الجلسة غير `AUTH_REQUIRED`؟ على `main` التطبيق يخمن `SESSION_EXPIRED` و`SESSION_REVOKED`. فرع PR #9 يضيف التخمين `PAGE_EXPIRED`. أي كود منها على حالة غير 401 يُجبر تسجيل الخروج. حالة `419` العارية مذكورة في البند 31.
+31. ما حالة HTTP والكود الحرفي لخطأ CSRF؟ هل يصل أحيانًا كـ `419` عارٍ بلا كود يحتوي `CSRF`؟ على `main` أي كود يحتوي المقطع `CSRF` يعيد جلب `GET /api/auth/csrf` مرة واحدة، و`419` العاري لا يُعاد جلب الرمز من أجله ولا يُخرج الجلسة. فرع PR #9 يعامل الرسالة التي تحتوي `CSRF` كخطأ CSRF، ويعامل `419` بلا ذلك المقطع كإنتهاء جلسة.
+32. هل كل استجابة 401 ليست خطأ دخول (الكود لا يحتوي `CREDENTIALS` ولا `LOGIN`) تعني انتهاء الجلسة حتى لو اختلف الكود عن `AUTH_REQUIRED`؟ ما كود رفض كلمة المرور الحرفي في `POST /api/auth/login`؟
+35. هل `GET /api/auth/csrf` هو المسار الصحيح، وجسمه `{ ok: true, data: { csrfToken } }`، والرأس المُعاد في الطلبات غير الآمنة هو `X-CSRF-Token`؟ وهل `POST /api/auth/login` نفسه يتطلب رمز CSRF؟
+41. ما الكوكي الذي يضبطه `POST /api/auth/login`؟ الاسم، و`Secure`، و`HttpOnly`، و`SameSite`، و`Path`، و`Domain`، و`Max-Age`. التطبيق يخزّن كل `Set-Cookie` للأصل الواحد ويرسله على كل مسار API، ولا يفرض `Path` ولا `Domain` ولا `Secure`.
+42. ما عمر جلسة الدخول بالزمن؟ هل هو `Max-Age` الكوكي نفسه، أم مدة على الخادم مستقلة عنه؟ التطبيق لا يملك مؤقّتًا محليًا: كوكي بلا `expiresAt` يبقى حتى الخروج أو حتى كود انتهاء الجلسة (البند 30).
+43. هل يمكن أن يعيد `error.message` أو `error.details` كلمة المرور المُرسلة، أو رمزًا، أو كوكيًا، أو هاتفًا، أو اسم عميل؟ الواجهة تعرض `message` بعد مسح الأشكال السرية على فرع PR #8، وتُسقط `details`.
+44. هل سيصبح هذا العميل WebView يشارك جرة كوكي الموقع؟ إن نعم، تبقى أعلام الكوكي وCSRF بمعنى المتصفح. إن لا، الجرة تبقى خاصة بالتطبيق والأصل الواحد.
+45. هل بيئة staging على HTTPS فقط، وهل ستُسلَّم دبابيس SPKI لتثبيت الشهادة؟ التطبيق لا يثبّت الشهادات، وعلى `main` لا يرفض أصل `http`.
+
+### الصلاحيات
+
 2. هل يرسل `GET /api/me` الحقل `fullAccess` أو الاسم البديل `isSuperuser` كـ boolean؟ إذا أُرسل `false`، هل يجب أن يلغي ذلك صلاحية المدير ذي القائمتين الفارغتين (`permissions` و`sectionAccess`)؟ وما القيم غير `true`/`false` إن وُجدت؟
 3. هل توجد خريطة `sectionAccess` داخل `GET /api/me` كما لوحظت على `GET /api/users`؟ وما المفاتيح المؤكدة من بين `customerDebts` و`companyDebts` و`libyanDeposits` و`egyptianDeposits` و`masraweya` و`purchases` و`treasury` و`reports`؟ وهل غياب `collections` من الخريطة مقصود؟
 4. ما القيم الحرفية المسموحة لـ `sectionAccess[<key>]`؟ الكود لاحظ `none` و`manage`، و`read` موجود في كود الويب. أي قيمة أخرى تُعامَل كـ `none` فيُخفى القسم. هل توجد قيمة ثالثة يجب أن يفهمها التطبيق؟
@@ -445,41 +524,54 @@
 8. هل سيُرجع `GET /api/me` الكود `collections.close_day` داخل `permissions[]`؟ إن لم يُرجعه، هل يبقى `POST /api/collections/days/close` للمدير الكامل فقط؟
 9. هل سيُرجع `GET /api/me` الكود `payroll.manage` داخل `permissions[]`؟ إن لم يُرجعه، هل يرى غير المدير «مرتبي» فقط عبر `collections.write`، وتبقى إدارة المرتبات (حركة، راتب أساسي، تأكيد) خارج الجوال؟
 10. هل سيُرجع `GET /api/me` الكود `debts.zero_review` داخل `permissions[]`؟ إن لم يُرجعه، هل تبقى `POST /api/customers/{id}/zero-review` للمدير الكامل فقط؟
-11. هل سيُرجع `GET /api/me` الكود `users.manage` داخل `permissions[]`؟ إن لم يُرجعه، هل تبقى قرارات `POST /api/account-requests/{id}/decision` خارج الجوال؟
 12. هل سيُرجع `GET /api/me` الكود `settings.manage` داخل `permissions[]`؟ إن لم يُرجعه، هل تبقى شاشة الإعدادات (الموظفون، سجل التدقيق، مركز التشغيل) للصلاحية الكاملة فقط؟
+
+### الاستلامات
+
 13. هل يرسل الخادم على الاستلام المربوط وعلى الاستلام غير المربوط الحقل `cashStatus` بالقيم `pending` أو `received` أو `not_applicable`، أو `cashPending: true`، وهل يُرسل ذلك أيضًا عندما تكون حالة الاستلام غير المربوط `rejected`؟ وهل يجب أن يظهر زر تأكيد النقد كلما كانت القيمة `pending`، أم فقط بعد الرفض؟ التطبيق (وفرع PR #3) يظهر الزر عند `pending` ولا يشترطه بعد الرفض، ولا يشتقه من `status`.
 14. ما شكل JSON الفعلي لـ `GET /api/collections`؟ أكد أو صحّح: مصفوفات `assignments` و`submissions` و`unlinkedReceipts` و`employeeTotals`؛ و`metrics.collectedUnits` و`metrics.dayTotalUnits` (أو `dayTotalUnits` في الجذر) و`assignedCount` (في الجذر أو داخل `metrics`) و`metrics.pendingCount` و`metrics.unlinkedPendingCount` و`metrics.cashOutstandingUnits`؛ و`batchId` أو `batch.id`؛ وأسماء العرض البديلة `customerName`/`name` و`submittedByName`/`employeeName` و`employeeName`/`displayName`. وما قيم `mode` (`full`/`partial`) و`status` (`pending`/`approved`/`rejected`)؟
 15. ما القيم الحرفية لحقل `kind` في `POST /api/collections/payroll/entries`؟ النموذج يفترض `withdrawal` و`commission` (`PayrollEntryKind`). هل إدارة المرتبات مطلوبة في الجوال؟
-16. هل سيُبنى `GET /api/home`؟ إن نعم، هل الشكل هو `businessDate` و`generatedAt` و`summaries[]` بحقول `key` و`section` و`title` و`valueUnits` و`currency` و`tone` و`note` و`status` و`updatedAt`، و`counters` كخريطة أعداد، و`oldDebts[]` بحقول `id` و`section` و`name` و`balanceUnits` و`currency` و`debtAgeDays` و`ageStatus` و`ageStatusLabel`؟ وما قيم `tone` (`positive`/`negative`/`neutral`) وقيم `status`؟ إن لن يُبنى، هل نعتمد بيانات الأقسام الحالية ونتوقف عن استدعاء `/api/home`؟
+
+### الإشعارات
+
 17. هل يبقى عدد غير المقروء في الحقل `unreadCount` داخل `GET /api/notifications`، أم سيُضاف `GET /api/notifications/unread-count`؟ وما اسم الحقل إن اختلف عن `unreadCount`؟
 18. هل يرسل الإشعار `title` و`body`، أم النص يُبنى في الويب من `action` و`details` فقط؟ ما المفاتيح الفعلية للعنوان والنص و`entityId` (التطبيق يقبل أيضًا `type` و`aggregateId`)؟
 19. هل سيُضاف تسجيل جهاز الجوال على `POST /api/mobile-push/devices` (FCM/APNs)، أم يبقى الدفع للويب فقط عبر `/api/browser-push/*` والجوال يكتفي بـ `GET /api/events` و`GET /api/event-changes`؟
+
+### طلبات الحسابات
+
+11. هل مورد `GET /api/account-requests` و`POST /api/account-requests/{id}/decision` للمدير باسم الدور `admin` فقط، أم يُغلق بالكود `users.manage` داخل `permissions[]` في `GET /api/me`؟ الـ Fake في PR #11 يفحص اسم الدور لا الكود. إن لم يُرجع الكود، هل يبقى القرار للمدير الكامل فقط؟
+46. هل يعيد `GET /api/account-requests` الصفحة `{ items, nextCursor, hasMore }` ويقبل `limit` و`cursor` و`status`؟ `status` يُرسل فقط عندما يمرّره المستدعي. مفاتيح ناقصة تُقرأ كصفحة واحدة، ومؤشر غير معروف في الـ Fake يعيد صفحة فارغة لا خطأ.
+47. هل يحمل كل عنصر الحقول `id` و`status` (`pending` أو `approved` أو `rejected`) و`version` و`createdAt` و`decidedAt` و`username` (والاسم البديل `requestedUsername`) و`displayName` (والبدائل `applicantName` و`name`) و`phone` و`requestedRole` (والبديل `role`) و`note` (والبديل `reason`) و`decisionNote` و`allowedActions`؟ نص حالة غير معروف يُحفظ كما هو ولا يُفسَّر.
+48. هل يأخذ `POST /api/account-requests/{id}/decision` الحقول `requestId` و`expectedVersion` و`decision` (`approve` أو `reject`) و`note` اختياريًا، ويعيد `{ id, version, status }`؟ التطبيق يرفض الإرسال محليًا إذا غاب `expectedVersion`، ويقرأ من الرد `id` و`version` ويبقي `status` داخل `raw`.
+49. هل النسخة القديمة على هذا المسار هي `409` بالكود `VERSION_CONFLICT`، وقرار على طلب ليست حالته `pending` هو `409` بالكود `ALREADY_DECIDED`؟ الكود الثاني مقترح في الـ Fake فقط.
+50. هل `requestId` في `POST /api/account-requests/{id}/decision` مثلي، بحيث تعيد إعادة الطلب أول قرار ناجح ولا تطبّقه مرتين؟ محاولة فاشلة تُعاد بنفس المعرّف. بقية الـ Fake لا تعيد قرارات المسارات الأخرى.
+51. أكد أنه لا إنشاء ولا `GET` بمعرّف ولا حقل كلمة مرور على مورد `/api/account-requests`. النموذج لا يقرأ كلمة مرور، والـ Fake يرد `404` على أي مسار غير القائمة والقرار.
+52. بعد القرار، هل تختفي `allowedActions` ويضبط الخادم `decidedAt`؟ وهل ينشئ الاعتماد حساب دخول؟ الـ Fake يمسح المفتاح ويضع وقتًا ثابتًا ولا ينشئ دخولًا. حذف المفتاح يُقرأ `null` فيعود البت إلى بوابة `users.manage`، بينما القائمة الفارغة تخفي الإجراء.
+
+### صيغ البيانات
+
+23. ما عملة `vodafoneConsumedUnits` و`vodafoneRemainingUnits`؟ الثابت `vodafoneCurrencyAssumption` يفترض `EGP`، وشاشة المشتريات تعرض «باقي فودافون» بـ `ج.م`.
+27. هل يرسل سبب التقرير الحقل `changeUnits`، وما عملته؟ التطبيق يعرضه كـ `LYD`. وما مفتاح النص إن لم يكن `text` (يقبل أيضًا `message` و`label`)؟
+29. هل أعداد `*Units` أعداد صحيحة بلا كسور، أي `MONEY_UNIT_SCALE = 0`؟ أم فيها خانات عشرية ثابتة يجب أن يمرّرها التطبيق؟ وهل يرفض الخادم إرسال المبلغ كنص أو كعدد كسري (التطبيق يرمي `INVALID_SERVER_RESPONSE` في الحالتين)؟
+33. هل أخطاء التحقق تأتي على HTTP `422` أو `400` أو كليهما؟ وما شكل `error.details`؟ على `main` حالة `422` فقط تُقرأ كتحقق، و`400` تبقى طلبًا مرفوضًا حتى لو حمل `details`. التطبيق يقبل `{fields: {name: msg}}` أو خريطة `{name: msg}` أو قائمة `[{field, code, message}]`. شكل آخر يُسقط أخطاء الحقول. فرع PR #9 يحوّل `400` إلى تحقق فقط عندما تُستخرج أخطاء حقول من `details`.
+40. هل أسعار الصرف والمعامل (`exchangeRate` و`factor` و`egpPerLyd`) تُرسل وتُستقبل كأعداد JSON أم كنصوص JSON؟ الافتراضي في الطلب `RATE_WIRE_FORMAT=number`. تعليق `DecimalString` يقول إن العقد نصوص، وتعليق `RateWireFormat.number` يقول إن الخادم الحالي يتوقع أعدادًا.
+
+### غير ذلك
+
+16. هل سيُبنى `GET /api/home`؟ إن نعم، هل الشكل هو `businessDate` و`generatedAt` و`summaries[]` بحقول `key` و`section` و`title` و`valueUnits` و`currency` و`tone` و`note` و`status` و`updatedAt`، و`counters` كخريطة أعداد، و`oldDebts[]` بحقول `id` و`section` و`name` و`balanceUnits` و`currency` و`debtAgeDays` و`ageStatus` و`ageStatusLabel`؟ وما قيم `tone` (`positive`/`negative`/`neutral`) وقيم `status`؟ إن لن يُبنى، هل نعتمد بيانات الأقسام الحالية ونتوقف عن استدعاء `/api/home`؟
 20. هل سيُضاف `GET /api/statements/pdf`؟ إن نعم، هل الجسم `{filename, contentBase64}` أم ملف ثنائي؟ وإن لن يُضاف، يبقى الزر مخفيًا خارج وضع Fake.
 21. هل يرسل كارت الحساب الحقل `systemKind`، وما قيمه الحرفية؟ وهل يغني عن `systemManaged`؟ التطبيق لا يستنتج `systemKind` من `systemLinkKey` ولا يعرضه اليوم.
 22. هل يرسل `GET /api/{section}` الكائن `summary.tabCounts` بالمفاتيح `active` و`today` و`debts` و`paid` و`pinned` و`pendingReview`؟ الواجهة اليوم تعرض العدد من `activeCards` و`pendingReviewCount` فقط.
-23. ما عملة `vodafoneConsumedUnits` و`vodafoneRemainingUnits`؟ الثابت `vodafoneCurrencyAssumption` يفترض `EGP`، وشاشة المشتريات تعرض «باقي فودافون» بـ `ج.م`.
 24. ما القيم الحرفية لحالة يوم المشتريات `status`؟ النموذج يذكر `draft` و`finalized` و`correction`. الواجهة تعامل أيضًا `open` و`correctionOpen` كيوم قابل للتحرير، وزر الاعتماد يظهر فقط عندما تكون القيمة `draft` بالضبط.
 25. ما أسماء مفاتيح إجماليات سجل المشتريات (`lifetimeTotals` أو `totals`)؟ التطبيق يقرأ `resultUnits` و`paidUnits` و`remainingUnits`. أي قيمة ليست عدد JSON صحيح تُفشل استجابة الدفتر كلها (`INVALID_SERVER_RESPONSE`).
 26. ما القيم الحرفية لحالة صف التقرير `status`؟ النموذج يذكر `normal` و`needs_review` و`urgent_review` و`rate_missing`. الواجهة تقبل أيضًا `review` و`critical` و`missing_rate` (وتعليق `GET /api/home` يستخدم هذه المجموعة الثانية). أي قيمة أخرى تُخفي شارة الحالة.
-27. هل يرسل سبب التقرير الحقل `changeUnits`، وما عملته؟ التطبيق يعرضه كـ `LYD`. وما مفتاح النص إن لم يكن `text` (يقبل أيضًا `message` و`label`)؟
 28. هل يرسل `GET /api/treasury` الحقل `activeCashTone` أو `tone` بالقيم `positive` أو `negative` أو `neutral`؟ غياب القيمة أو قيمة غير معروفة يُبقي بطاقة الفلوس النشطة بلون محايد.
-29. هل أعداد `*Units` أعداد صحيحة بلا كسور، أي `MONEY_UNIT_SCALE = 0`؟ أم فيها خانات عشرية ثابتة يجب أن يمرّرها التطبيق؟ وهل يرفض الخادم إرسال المبلغ كنص أو كعدد كسري (التطبيق يرمي `INVALID_SERVER_RESPONSE` في الحالتين)؟
-30. ما أكواد انتهاء الجلسة غير `AUTH_REQUIRED`؟ على `main` التطبيق يخمن `SESSION_EXPIRED` و`SESSION_REVOKED`. فرع PR #9 يضيف التخمين `PAGE_EXPIRED`. أي كود منها على حالة غير 401 يُجبر تسجيل الخروج. حالة `419` العارية مذكورة في البند 31.
-31. ما حالة HTTP والكود الحرفي لخطأ CSRF؟ هل يصل أحيانًا كـ `419` عارٍ بلا كود يحتوي `CSRF`؟ على `main` أي كود يحتوي المقطع `CSRF` يعيد جلب `GET /api/auth/csrf` مرة واحدة، و`419` العاري لا يُعاد جلب الرمز من أجله ولا يُخرج الجلسة. فرع PR #9 يعامل الرسالة التي تحتوي `CSRF` كخطأ CSRF، ويعامل `419` بلا ذلك المقطع كإنتهاء جلسة.
-32. هل كل استجابة 401 ليست خطأ دخول (الكود لا يحتوي `CREDENTIALS` ولا `LOGIN`) تعني انتهاء الجلسة حتى لو اختلف الكود عن `AUTH_REQUIRED`؟ ما كود رفض كلمة المرور الحرفي في `POST /api/auth/login`؟
-33. هل أخطاء التحقق تأتي على HTTP `422` أو `400` أو كليهما؟ وما شكل `error.details`؟ على `main` حالة `422` فقط تُقرأ كتحقق، و`400` تبقى طلبًا مرفوضًا حتى لو حمل `details`. التطبيق يقبل `{fields: {name: msg}}` أو خريطة `{name: msg}` أو قائمة `[{field, code, message}]`. شكل آخر يُسقط أخطاء الحقول. فرع PR #9 يحوّل `400` إلى تحقق فقط عندما تُستخرج أخطاء حقول من `details`.
 34. هل تتوفر بيئة staging، ومن يصدر حسابات الاختبار لكل دور؟ العنوان والحسابات يبقيان خارج المستودع.
-35. هل `GET /api/auth/csrf` هو المسار الصحيح، وجسمه `{ ok: true, data: { csrfToken } }`، والرأس المُعاد في الطلبات غير الآمنة هو `X-CSRF-Token`؟ وهل `POST /api/auth/login` نفسه يتطلب رمز CSRF؟
 36. هل حفظ التصحيح `POST /api/{section}/{id}/transactions/{tx}/corrections` يكتب قيدًا عكسيًا (وسطرًا جديدًا) أم يعدّل السطر نفسه؟ التطبيق يرسل جسم الحركة ولا يرسل علم عكس ولا يدّعي في الواجهة أن الخادم ينشئ قيدًا عكسيًا.
 37. هل `expectedVersion` في تصحيح الحركة هو `version` سطر الدفتر أم `version` الكارت؟ التطبيق يرسل إصدار السطر، وهو ما يرسله الإلغاء للسطر نفسه.
 38. هل رمز `allowedActions` لتعديل الكارت هو `edit`؟ إذا أرسل الخادم القائمة برمز آخر، زر التعديل يبقى مخفيًا لأن `canOnRecord` يطابق النص حرفيًا. غياب القائمة يسقط إلى صلاحية كتابة القسم.
 39. هل `phone: ""` في `PATCH /api/{section}/{id}` يمسح الهاتف، أم يُتجاهل، أم يُرفض؟ نموذج التعديل يرسل النص الفارغ بعد المسح. إنشاء الكارت يحذف المفتاح عندما يكون الهاتف فارغًا ولا يرسل `""`.
-40. هل أسعار الصرف والمعامل (`exchangeRate` و`factor` و`egpPerLyd`) تُرسل وتُستقبل كأعداد JSON أم كنصوص JSON؟ الافتراضي في الطلب `RATE_WIRE_FORMAT=number`. تعليق `DecimalString` يقول إن العقد نصوص، وتعليق `RateWireFormat.number` يقول إن الخادم الحالي يتوقع أعدادًا.
-41. ما الكوكي الذي يضبطه `POST /api/auth/login`؟ الاسم، و`Secure`، و`HttpOnly`، و`SameSite`، و`Path`، و`Domain`، و`Max-Age`. التطبيق يخزّن كل `Set-Cookie` للأصل الواحد ويرسله على كل مسار API، ولا يفرض `Path` ولا `Domain` ولا `Secure`.
-42. ما عمر جلسة الدخول بالزمن؟ هل هو `Max-Age` الكوكي نفسه، أم مدة على الخادم مستقلة عنه؟ التطبيق لا يملك مؤقّتًا محليًا: كوكي بلا `expiresAt` يبقى حتى الخروج أو حتى كود انتهاء الجلسة (البند 30).
-43. هل يمكن أن يعيد `error.message` أو `error.details` كلمة المرور المُرسلة، أو رمزًا، أو كوكيًا، أو هاتفًا، أو اسم عميل؟ الواجهة تعرض `message` بعد مسح الأشكال السرية على فرع PR #8، وتُسقط `details`.
-44. هل سيصبح هذا العميل WebView يشارك جرة كوكي الموقع؟ إن نعم، تبقى أعلام الكوكي وCSRF بمعنى المتصفح. إن لا، الجرة تبقى خاصة بالتطبيق والأصل الواحد.
-45. هل بيئة staging على HTTPS فقط، وهل ستُسلَّم دبابيس SPKI لتثبيت الشهادة؟ التطبيق لا يثبّت الشهادات، وعلى `main` لا يرفض أصل `http`.
 
 ## سجل القرار
 
@@ -532,4 +624,11 @@
 | 43 | هل `error.message` أو `error.details` يعيد سرًا | | | |
 | 44 | WebView يشارك جرة كوكي الموقع | | | |
 | 45 | HTTPS ودبابيس SPKI | | | |
+| 46 | صفحة `GET /api/account-requests` | | | |
+| 47 | حقول عنصر طلب الحساب | | | |
+| 48 | جسم قرار طلب الحساب ورده | | | |
+| 49 | `VERSION_CONFLICT` و`ALREADY_DECIDED` | | | |
+| 50 | مثلية `requestId` لقرار طلب الحساب | | | |
+| 51 | لا إنشاء ولا جلب بمعرّف ولا كلمة مرور | | | |
+| 52 | بعد القرار: الإجراءات ووقت البت وإنشاء الدخول | | | |
 
