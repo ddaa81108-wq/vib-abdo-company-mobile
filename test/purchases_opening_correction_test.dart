@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_riverpod/misc.dart';
@@ -483,6 +486,43 @@ void main() {
       await exercisePhone(tester, const Size(430, 900), dark: true);
     },
   );
+
+  testWidgets('screenshots of opening and correction in light and dark', (
+    tester,
+  ) async {
+    await pumpFakeApp(
+      tester,
+      size: const Size(320, 900),
+      overrides: [
+        purchasesProvider.overrideWith((ref) async {
+          return _constBook(
+            days: const [_Day('1', 'finalized'), _Day('2', 'correction')],
+          );
+        }),
+      ],
+    );
+    await tester.runAsync(loadScreenshotFonts);
+    await tester.pump();
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+    await capturePurchases(tester, 'light-small');
+
+    tester.view.physicalSize = const Size(430, 900);
+    tester.view.devicePixelRatio = 1;
+    await settle(tester);
+    await capturePurchases(tester, 'light-large');
+
+    await go(tester, '/account');
+    await tester.tap(find.byKey(const Key('theme-switch')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await go(tester, '/purchases');
+    await capturePurchases(tester, 'dark-large');
+
+    tester.view.physicalSize = const Size(320, 900);
+    await settle(tester);
+    await capturePurchases(tester, 'dark-small');
+  });
 }
 
 class _Day {
@@ -605,6 +645,64 @@ Future<void> settle(WidgetTester tester) {
     EnginePhase.sendSemanticsUpdate,
     const Duration(seconds: 20),
   );
+}
+
+Future<void> loadScreenshotFonts() async {
+  await _loadFont('assets/fonts/Cairo-Variable.ttf', 'Cairo');
+  await _loadFont('assets/fonts/JetBrainsMono-Bold.ttf', 'JetBrainsMono');
+  await _loadFont('assets/fonts/JetBrainsMono-ExtraBold.ttf', 'JetBrainsMono');
+  final icons = _materialIconsFile();
+  if (icons != null) {
+    await ui.loadFontFromList(
+      await icons.readAsBytes(),
+      fontFamily: 'MaterialIcons',
+    );
+  }
+}
+
+Future<void> _loadFont(String path, String family) async {
+  final file = File(path);
+  if (!file.existsSync()) return;
+  await ui.loadFontFromList(await file.readAsBytes(), fontFamily: family);
+}
+
+File? _materialIconsFile() {
+  final artifacts = File(Platform.resolvedExecutable).parent.parent.parent;
+  final candidate = File(
+    '${artifacts.path}/material_fonts/MaterialIcons-Regular.otf',
+  );
+  if (candidate.existsSync()) return candidate;
+  return null;
+}
+
+Future<void> capturePurchases(WidgetTester tester, String name) async {
+  await tester.pump();
+  final view = tester.view.physicalSize / tester.view.devicePixelRatio;
+  final boundaries = tester.allRenderObjects
+      .whereType<RenderRepaintBoundary>()
+      .where((boundary) => boundary.hasSize && boundary.size.isFinite)
+      .toList();
+  RenderRepaintBoundary? match;
+  for (final boundary in boundaries) {
+    final close =
+        (boundary.size.width - view.width).abs() < 2 &&
+        (boundary.size.height - view.height).abs() < 2;
+    if (close) match = boundary;
+  }
+  final boundary = match ?? boundaries.first;
+  final image = await boundary.toImage();
+  await tester.runAsync(() async {
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    final file = File(
+      '/opt/cursor/artifacts/purchases-opening-correction/$name.png',
+    );
+    try {
+      await file.parent.create(recursive: true);
+      await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
+    } on FileSystemException {
+      // The artifact directory exists for this agent, not in CI.
+    }
+  });
 }
 
 Future<void> exercisePhone(
