@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';

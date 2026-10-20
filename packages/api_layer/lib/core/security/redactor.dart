@@ -29,15 +29,16 @@ class Redactor {
     'iban',
   };
 
-  static final _userinfo = RegExp(r'://[^/\s:@]+:[^@\s/]+@');
-  static final _bearer = RegExp(r'(?i)\bbearer\s+[a-z0-9\-._~+/]+=*');
+  static final _userinfo = RegExp(r'://[^/\s:]+:[^@\s]+@');
+  static final _bearer = RegExp(r'\bbearer\s+\S+', caseSensitive: false);
   static final _jwt = RegExp(
     r'\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b',
   );
   static final _assignment = RegExp(
-    '(?i)\\b(set-cookie|csrf[-_]?token|access[-_]?token|refresh[-_]?token|'
-    'api[-_]?key|password|passwd|pwd|cookie|csrf|authorization|token|secret|'
-    'session)\\b\\s*[:=]\\s*(?:"[^"]*"|\'[^\']*\'|\\S+)',
+    r'\b(set-cookie|csrf[-_]?token|access[-_]?token|refresh[-_]?token|'
+    r'api[-_]?key|password|passwd|pwd|cookie|csrf|authorization|token|secret|'
+    r'session)\b\s*[:=]\s*\S+',
+    caseSensitive: false,
   );
 
   static String normalizeKey(String key) =>
