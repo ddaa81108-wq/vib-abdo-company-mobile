@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 
 import '../auth/auth_strategy.dart';
+import 'api_exception.dart';
 import 'error_mapper.dart';
 
 /// Delegates credentials to the active [AuthStrategy].
@@ -61,6 +62,11 @@ class AuthInterceptor extends Interceptor {
         await _onForcedLogout('session_expired');
         return handler.next(err);
       case AuthErrorAction.retryOnce:
+        // Session expiry is logout, never a replay, even if a strategy asks.
+        if (mapped is SessionExpiredException) {
+          if (_authenticated(req)) await _onForcedLogout('session_expired');
+          return handler.next(err);
+        }
         if (req.extra['authRetried'] == true) return handler.next(err);
         req.extra['authRetried'] = true;
         try {

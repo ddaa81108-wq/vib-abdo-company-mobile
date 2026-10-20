@@ -29,6 +29,7 @@ class ApiStack {
     CookieStore? cookieStore,
     TokenStorage? tokenStorage,
     Duration? fakeLatency,
+    HttpClientAdapter? httpClientAdapter,
   }) {
     if (config.useFakeApi) {
       return ApiStack._(
@@ -41,10 +42,16 @@ class ApiStack {
       );
     }
 
-    final options = DioApiClient.baseOptions(config);
+    // Rejects a missing, relative, or credential-bearing origin before Dio exists.
+    final origin = ApiConfig.requireRealBaseUrl(config.baseUrl);
+    final options = DioApiClient.baseOptions(config, baseUrl: origin);
     final bareDio = Dio(options); // no interceptors: CSRF fetch only
     DioApiClient.usePreciseJson(bareDio);
     final dio = Dio(options);
+    if (httpClientAdapter != null) {
+      bareDio.httpClientAdapter = httpClientAdapter;
+      dio.httpClientAdapter = httpClientAdapter;
+    }
     // TLS pinning hook (optional): configure dio.httpClientAdapter with an
     // IOHttpClientAdapter + SecurityContext / badCertificateCallback using SPKI
     // pins supplied by the server owner, per API contract.
