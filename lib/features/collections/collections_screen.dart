@@ -12,6 +12,7 @@ import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
+import 'unlinked_receipt_actions.dart';
 
 class CollectionsScreen extends ConsumerWidget {
   const CollectionsScreen({super.key});
@@ -587,6 +588,7 @@ class _Unlinked extends ConsumerWidget {
                   ),
                 ],
               ),
+            UnlinkedReceiptActions(receipt: receipt),
           ],
         ),
       ),

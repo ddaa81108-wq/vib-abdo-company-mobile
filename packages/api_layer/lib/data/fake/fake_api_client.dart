@@ -49,6 +49,12 @@ class FakeApiClient implements ApiClient {
   /// The next N notification writes fail (tests).
   int failNotificationWritesRemaining = 0;
 
+  /// The next N versioned collection mutations fail with VERSION_CONFLICT (tests).
+  int versionConflictRemaining = 0;
+
+  /// GET /api/collections calls, including a refetch after a conflict (tests).
+  int collectionOverviewReads = 0;
+
   /// Omit `unreadCount` from the notifications page (tests).
   bool omitUnreadCount = false;
 
@@ -217,6 +223,7 @@ class FakeApiClient implements ApiClient {
         return _ok({'id': 'tx_new', 'version': 5});
       case 'collections':
         if (method == 'GET' && seg.length == 1) {
+          collectionOverviewReads++;
           return _ok(FakeFixtures.collections());
         }
         if (method == 'GET' && seg.length > 1 && seg[1] == 'payroll') {
@@ -240,6 +247,10 @@ class FakeApiClient implements ApiClient {
             (seg.last == 'decision' || seg.last == 'cash-received');
         if (needsVersion && b['expectedVersion'] == null) {
           _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
+        }
+        if (needsVersion && versionConflictRemaining > 0) {
+          versionConflictRemaining--;
+          _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
         }
         return _ok({'id': 'ok', 'version': 1});
       case 'masraweya':
