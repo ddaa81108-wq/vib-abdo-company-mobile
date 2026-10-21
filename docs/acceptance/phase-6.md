@@ -35,7 +35,7 @@
 
 طريقة التحقق واحدة من ثلاث: اختبار وحدة أو ودجت على Fake، أو مصفوفة محاكٍ في CI، أو جهاز حقيقي أو staging. ما لا يُغلق إلا بالجهاز أو staging معلَّم في الحالة وفي الجدول أسفل الخطة.
 
-الحكم الآن لكل معيار في جدول «من المعيار إلى الحكم». المرحلة لم تُوقَّع. «غير مبني بعد» ليس عيبًا. DEF-017 لم يُستخدم.
+الحكم الآن لكل معيار في جدول «من المعيار إلى الحكم»، ثم في إعادة اختبار فرع الصينية `82e0e8c`. المرحلة لم تُوقَّع. «غير مبني بعد» ليس عيبًا. DEF-017 لم يُستخدم في الخطة الأولى؛ فُتح لاحقًا على ذلك الفرع، والتالي الحر DEF-018.
 
 ---
 
@@ -821,6 +821,8 @@ verified on #41 `ae7311f3545aa1110ff02da7fa6c1ed06ac34b81`, not on main. هذا 
 | (12) منح الإذن ورفضه | #43 حوار مُمَثَّل على Fake (منح، رفض، رفض دائم إلى الإعدادات). #42 منح ورفض adb على المحاكي. النوعان غير موصولين | كل نصف على حدة. المسار الواحد من الحوار إلى تسجيل الجهاز **غير مغطى** |
 | (13) تبديل الحساب | #41 القائمة والعدد على Fake. #44 نسيان الرمز عند الخروج على Fake بحقن إذن ممنوح. النقر بعد التبديل على الشجرة المجمّعة عبر الفتاحة فقط | القائمة Pass على Fake. نقر الصينية عبر الواجهة **غير مغطى** إلى طلب المتابعة. نقر الفتاحة بعد التبديل Pass على الشجرة المحلية وليس على `main` |
 
+هذا جدول لقطة الطلبات الخمسة. قسم «إعادة اختبار فرع الصينية» أدناه يحدّث (1) و(2) و(3) و(4) و(10) و(12) و(13) والحالات العشر المطلوبة. مرشح #42 لم يعد على `main` بعد `9a734df`.
+
 ### الحالات بحسب المالك
 
 كبير المهندسين، على #41 `ae7311f`، Fake وليس جهازًا: P6-01 (جلب بلا زيادة محلية)، P6-03، P6-12، P6-15، P6-16، P6-18، P6-19، P6-20، P6-21، P6-22، P6-23 لجهة العدد، P6-31 لذاكرة القائمة، P6-33، P6-35، P6-37، P6-38، P6-40 لشكل الحمولة. لا تُغلق من هذا الطلب: P6-02 وP6-04 وP6-06 وP6-07 وP6-32 وP6-39.
@@ -853,19 +855,123 @@ P6-02 وP6-04 وP6-06 وP6-07، ورسم الصينية الحي في P6-08 وP6
 
 ---
 
+## إعادة اختبار فرع الصينية والاستطلاع `82e0e8c`
+
+التاريخ 2026-10-21. الفرع `cursor/phase6-system-tray-bg-poll` عند `82e0e8cd687daf79bc8ca88ee049af2259cbdaa0`. لا طلب مفتوح بعد. لم يُدفع إلى هذا الفرع، ولم يُدمج شيء، ولم يُمس كود الإنتاج. التوثيق على #12 فقط. المرحلة لم تُوقَّع.
+
+`main` تحرّك منذ الحكم المجمّع. `origin/main` الآن `9a734df1f5bc313f884e817ba13c55b4dbdf85cc` (دمج #44)، وأبوه `07bf4ec` (#42)، وقبله `e97690e` (#40). مرشح `push` في workflow #42 أُزيل في `2bf0222` وليس على `main`. رأس #43 الأحدث `56c44b6` ويحتوي `ae7311f` و`6fc4204`، وليس داخل فرع الصينية. فرع الصينية يحتوي `52ab75f` و`2bf0222` و`6fc4204` و`8a6f287` و`6424257` و`ae7311f`، ولا يحتوي `9a734df` ولا `8149b55` ولا `56c44b6`.
+
+### البوابة على الرأس
+
+Flutter 3.47.7 / Dart 3.13.5. `bash tool/check.sh` خرج **0**. الادعاء (التطبيق 354/0، الحزمة 150/0) يطابق التشغيل. السالب لم يكن في الادعاء.
+
+| المجموعة | المدّعى | الفعلي |
+|---|---|---|
+| `flutter test` التطبيق | 354/0 | **354/0** |
+| `flutter test` الحزمة | 150/0 | **150/0** |
+| `flutter test --tags permissions-negative` التطبيق | — | **25/0** |
+| `flutter test --tags permissions-negative` الحزمة | — | **23/0** |
+
+تحليل التطبيق بلا مشكلات، وتحليل الحزمة بلا مشكلات. مسبار الإصدار 4/0. الثمانية الزائدة في السالب عن #44 (17) هي `test/permissions/system_tray_permission_negative_test.dart`.
+
+### الفحوص الستة
+
+| الفحص | الحكم | الدليل |
+|---|---|---|
+| (a) تبديل الحساب بين وصول الدفع وGET لا يعرض `employeeName` السابق | Pass | `test/permissions/system_tray_permission_negative_test.dart`: `account change before the GET finishes shows nothing`. المستخدم ينقلب من `u_12` إلى `u_20` داخل `reload`، والنتيجة `TrayDelivery.accountChanged`، والصينية فارغة، والنص بلا «الاسم السابق». `presentPush` يقارن المستخدم قبل `reload` وبعده وقبل النشر. `test/system_tray_bg_poll_test.dart`: `account switch cancels the periodic work` يلغي العمل ويمسح التكرار والمخزن |
+| (b) فشل GET أو 404 بلا اسم، و401 بلا عرض مع `expireSession` مرة واحدة | Fail على المسار الموصول | اختبار المؤلف `a failed GET or a 404 shows no name, and a 401 shows nothing`: `NetworkException` صينية بلا اسم وبلا `900`؛ `NotFoundException` وصف مستخدم آخر لا شيء؛ `SessionExpiredException` المحقونة من `reload` ترجع `sessionEnded` ولا شيء. هذا الرمي داخل `try` ولا يستدعي `expireSession`. المزوّد الحقيقي يعيد الجلب بـ `notificationsProvider.refresh()`. `acceptPush` يستدعي `ingest(source: push)` قبل `try`، و`ingest` عند الدفع يستدعي `_resolveUnread` فيرمي `SessionExpiredException` خارج `presentPush`. المضيف: `unawaited(presentPush)`. المسبار المحلي غير المدفوع `a 401 on the refresh GET posts nothing and expires the session once`: الاستثناء يخرج، والصينية فارغة، و`session_expired` مرة واحدة، والنداء الثاني `loggedOut` والعدّاد يبقى 1. لا اسم. هذا DEF-017. 404 في اختبار المؤلف لا يعرض اسمًا لأنه لا يعرض شيئًا. عامل الخلفية عند HTTP 401 يلغي العمل ويبقي كوكي الواجهة `session=keep-me` ولا يستدعي `expireSession`، وهذا مقصود في `CookieNotificationPollFetcher` |
+| (c) النسخة العامة لشاشة القفل بلا اسم وبلا مبالغ؛ العنوان اسم النظام والجسم نوع العملية مع الاسم | Pass على الوحدة | `the lock-screen public version has no name and no amount`: `publicTitle` هو `VIB` و`publicBody` هو `إشعار جديد`، والجسم الخاص فيه «علي» وليس `900`. `RecordingSystemTrayPlatform` بلا اسم ولا مبلغ. `MainActivity.showPrivateTray` يضع `VISIBILITY_PRIVATE` و`setPublicVersion`. المسبار المحلي `private tray text is system name plus operation and employee name`: العنوان `الاستلامات`، والجسم `اعتماد · علي`، والجسم العام `إشعار جديد`، بلا `900` ولا هاتف ولا اسم على النسخة العامة. رسم الظل على الجهاز ما زال مطلوبًا |
+| (d) استطلاع WorkManager لا يقل عن 15 دقيقة، يُلغى عند الخروج والتبديل، ومطفأ في الإصدار والإنتاج، ويعمل في Fake أو debug فقط | Pass مع ملاحظة | `scheduling uses at least 15 minutes, the network, and keep`: 15 دقيقة، و`StateError` عند 14، والاسم `vib.notification.poll`، والشبكة، و`keep`. الخروج: `logout cancels the work and a later run shows nothing` عبر `registrar.forget` وردّ `onCancelBackground` المحقون. التبديل: الاختبار في (a). `deviceTokenRegistrarProvider` يوصل الرد نفسه في `lib/notifications/push_providers.dart`؛ الاختبار يحقن الرد ولا يشغّل المزوّد. `release builds leave the poll off and stay fake-free`: الإصدار مع Fake بلا `true` صريح يبقى مطفأً ويختار `Noop`. `fake and debug default the poll on, and an explicit false stays off`: debug بلا Fake يعمل، وFake خارج الإصدار يعمل، وprofile بلا شيء مطفأ. `resolveBackgroundNotificationPoll(raw: 'true', releaseMode: true)` يرجع true، والاختبار يتوقع ذلك. هذا مفتاح السؤال 9 في `docs/push-transport.md`، وليس تشغيلًا صامتًا للإنتاج: الإنتاج يترك المعرّف فارغًا فيبقى مطفأً. الثابت `kBackgroundNotificationPoll` يبقى false. تنفيذ WorkManager على جهاز غير مُختبَر (`RecordingPeriodicWorkClient`) |
+| (e) منع التكرار مشترك بين الدفع والاستطلاع بمعرّف ووسم ثابتين، و`unreadCount` لا يزيد مرتين لنفس `notificationId` | Pass على Fake | `tray dedup is shared by push, poll, and the worker`: `presentPoll` الثاني `idle`، وصينية واحدة، والوسم `n-9`، والجسم فيه «علي» وليس اسم الحمولة «من الإشعار». `the unread count does not increase twice for the same id`: العدد يبقى 1 بعد `presentPush` مرتين لمعرّف `77`، وصينية واحدة، و`publicBody` بلا «موظف». تكرار الظل على جهاز Not run |
+| (f) `OpenerNotificationSeam` يحل محل `notificationOpenSeamProvider`، ويستدعي `notificationOpenerProvider.open` بأصل `systemTray` من الصينية و`list` من القائمة، ويحوّل تعداد الفتاحة، ويعلّم القراءة | Pass | `lib/features/notifications/notification_open_seam.dart`: المزوّد `Provider(OpenerNotificationSeam.new)`. الصنف البديل ما زال في الملف وليس المزوّد. التحويل يغطي `list` و`banner` و`systemTray` والنتائج الخمس. القائمة تستدعي الدرزة بأصل `list`، والشريط بأصل `banner`. نقر الصينية يستدعي الفتاحة مباشرة بأصل `systemTray`، لا الدرزة. الدرزة نفسها لا تستدعي `markRead`؛ الفتاحة تعلّم القراءة بعد فحص الجلسة والمستلم في `opened` و`noTarget` و`notFound`، ولا تعلّم في `forbidden` و`needsLogin`. `test/system_tray_navigation_test.dart`: `a list tap and a tray tap both open through NotificationOpener` يفتح الاستلامات من أصل `list` بلا مستلم، و`openPayload('n-tray')` بلا مستلم يفتح الممنوع، وأصل `systemTray` بلا مستلم يرجع `forbidden`. `a cold tray payload for the signed-in user opens collections` يفتح `77`. هذا الاختبار لا يثبت `readAt`. المسبار المحلي `the seam marks the opened row read`: فتح `77` بأصل `list` يضع `readAt`، والعدد 0، و`notificationMutationApplies` يساوي 1 |
+
+المسبار المحلي `test/qa_tray_followup_probe_test.dart` بقي في شجرة العمل `/tmp` ولم يُنسخ إلى #12. التشغيل بعد تصحيح توقع 401: **6/0**.
+
+### الحالات على مستوى Fake أو الوحدة
+
+ما زال يحتاج جهازًا أو محاكيًا أو staging كل ما يرسمه النظام أو يقتل العملية. Fake لا يغلق تلك النصف.
+
+| الحالة | الحكم على هذا الرأس | ما زال جهازًا أو staging |
+|---|---|---|
+| P6-02 | Partially على Fake. المُقدِّم ينشر صينية عند دفع والمستخدم داخل الجلسة. الشريط الداخلي يبقى من #43 | ظل أندرويد المرسوم، والإشعار الحي من خادم |
+| P6-04 | Partially على الوحدة. مسار WorkManager مُختبَر وهو استطلاع فقط، ومطفأ في الإصدار ما لم يُمرَّر المعرّف | تشغيل حقيقي والتطبيق في الخلفية. المعيار (2) ما زال فجوة للتوقيع |
+| P6-06 | Not covered. جدول `docs/push-transport.md`: السحب من الأخيرة «عادة» يبقي العمل وليس وعدًا، والإيقاف الإجباري يوقف WorkManager حتى يفتح المستخدم التطبيق. لا اختبار يقتل العملية | نعم. المعيار (3) فجوة. هذا استطلاع وليس دفعًا، وFCM غير مستخدم |
+| P6-07 | Partially على Fake داخل العملية. `openPayload('77')` بعد الدخول يفتح الاستلامات، والمسبار يفتحها بعد خروج ثم دخول `employee.demo` | فتح عملية مقتولة من الظل |
+| P6-08 | Partially. عنوان الوحدة هو `systemName`. اسم القناة «تنبيهات VIB» من #42 | الظل المرسوم |
+| P6-09 | Partially. معرّف القناة `vib_collections_alerts` داخلي، والنص العام `إشعار جديد` | اسم القناة كما تعرضه إعدادات النظام |
+| P6-23 | Pass على Fake لنصف العدد ونصف الصينية داخل الاختبار (صينية واحدة، والعدد لا يزيد). نصف الظل الحي Not run | تكرار الإشعار على الجهاز |
+| P6-34 | Pass على Fake للاسم: لا اسم إن تغيّر المستخدم قبل GET. المسبار: بعد الخروج ثم `other.employee` لا استلامات ولا العنوان السابق ولا «موظف استلام تجريبي» (الصف يغيب بعد التحديث، بلا شاشة ممنوع في هذا المسار) | نقر الظل الحقيقي |
+| P6-36 | Pass على Fake داخل العملية (اختبار المؤلف والمسبار) | الظل بعد موت العملية |
+| P6-39 | Pass على Fake. المسبار: أصل `list` وقسم `companies` يرجع `forbidden` و`/forbidden` والنص «القسم غير مصرح لهذا الحساب»، و«علي» غائب. اختبار التنقل: أصل `systemTray` بلا مستلم `forbidden` | لا، لهذا المسار على Fake |
+
+### المعايير 2 و3 و12 وجدول التطبيق المقتول
+
+`docs/push-transport.md` على هذا الرأس يقول إن التسليم الحقيقي والتطبيق مغلق غير مدعوم إلى أن يقدّم الخادم دفعًا. WorkManager يستطلع `GET /api/notifications` فقط وليس قناة دفع. `firebase_messaging` ليس اعتمادًا، و`FcmPushTransport` بلا رمز.
+
+| حالة الوثيقة | ماذا يعمل | حكم القبول |
+|---|---|---|
+| مفتوح ومسجّل | SSE أو استطلاع التغييرات، ثم صينية من صف الخادم إن وصل دفع | وحدة فقط. لا FCM |
+| خلفية والعملية حية | الوقت الفعلي يتوقف. الاستطلاع يعمل إن كان العلم مفتوحًا، وإلا لا شيء | (2) مغطى على الوحدة كاستطلاع، وغير مغطى كتسليم خلفية حقيقي. الإصدار مطفأ حتى السؤال 9 |
+| سحب من الأخيرة | WorkManager عادة يبقي العمل. ليس وعدًا، ولا اختبار | (3) غير مغطى |
+| إيقاف إجباري | WorkManager يتوقف حتى يفتح المستخدم التطبيق | (3) فجوة موثّقة، وليست Fail إن منعها النظام، وما زالت غير مُختبَرة |
+| بعد إعادة التشغيل | يعيد الجدولة ما لم يكن الإيقاف إجباريًا | غير مُختبَر |
+| أرضية 15 دقيقة وDoze وموفّرو OEM | الوثيقة تذكرها | الوحدة تثبت الأرضية 15 فقط |
+
+في الإنتاج العلم مطفأ، فلا صف من هذا الجدول يشغّل الاستطلاع في بناء release.
+
+(12) ما زال فجوة. `notificationPermissionProvider` يبقى `StubNotificationPermissionService` وقيمته false. إذن الحوار في `lib/features/notifications/notification_permission.dart` نوع آخر. منح الحوار لا يسجّل جهازًا. الإطلاق العادي لا يستدعي `POST /api/mobile-push/devices`. منح adb في محاكي #42 منفصل وهو أصلًا على `main`.
+
+### الشجرة المجمّعة المحلية
+
+لم تُدفع. دمج عادي بلا إعادة قاعدة: `origin/main` `9a734df` (وفيه #40 و#42 و#44) ثم #43 `56c44b6` ثم هذا الفرع `82e0e8c`. الالتزام المحلي `31f706f78b3b6a771d69f839f275b7b91ba629c0`، أبواه `b507867` (#43) و`82e0e8c`. ليس على فرع `cursor/`.
+
+تعارضات هذا الفرع فوق `main`+#43، بعد حلول #43 المعروفة (اتحاد `.gitignore`، وترتيب `NotificationTransportHost` ثم `ForegroundNotificationBanner` ثم `RealtimeLifecycle`، والإبقاء على `flutter_local_notifications` و`flutter_secure_storage` و`permission_handler` 12.0.3، واتحاد `pump_app.dart`، وحذف إبطالي `unreadNotificationsCountProvider` في `realtime_lifecycle.dart`):
+
+| الملف | الشكل | الحل في الشجرة المحلية |
+|---|---|---|
+| `docs/push-transport.md` | add/add | نسخة الفرع. جدول الحالات المقتولة وعلم الاستطلاع |
+| `lib/notifications/background_poll.dart` | add/add | نسخة الفرع. `resolveBackgroundNotificationPoll` |
+| `lib/notifications/background_scheduler.dart` | add/add | نسخة الفرع |
+| `lib/notifications/local_notification_poster.dart` | add/add | نسخة الفرع. الملصق ينشر `showTray` لا النص الصامت القديم |
+| `lib/notifications/notification_transport_host.dart` | add/add | نسخة الفرع. `unawaited(presentPush)` واستئناف نقر الصينية |
+| `lib/notifications/push_payload.dart` | add/add | نسخة الفرع |
+| `lib/notifications/push_providers.dart` | add/add | نسخة الفرع. المُلصق `AndroidControllerPoster`، وجدولة الخلفية، وإلغاء العمل عند الخروج |
+| `test/push_transport_test.dart` | تعارض توقع النص | نسخة الفرع: `trays` وعنوان `VIB` وجسم `اعتماد · موظف سري` والجسم العام `إشعار جديد` |
+| `pubspec.lock` | تعارض | حُذف وأُعيد بـ `flutter pub get`. `workmanager` 0.10.10 مع الاعتمادات الثلاثة |
+| `test/support/pump_app.dart` | تعارض الاستيراد فقط | الاتحاد: استيراد الإذن مع `background_scheduler.dart` و`shown_notification_store.dart`. الجسم كان قد جمع تجاوز الإذن وتجاوز المجدول الصامت ومخزن الذاكرة |
+
+بلا تعارض، وهي النقاط المطلوبة:
+
+- `pubspec.yaml` اندمج وأبقى `flutter_local_notifications` و`flutter_secure_storage` و`permission_handler: 12.0.3` وأضاف `workmanager: ^0.10.10`.
+- `lib/app.dart` لم يتعارض في هذا الدمج. الترتيب بقي `NotificationTransportHost` ثم `ForegroundNotificationBanner` ثم `RealtimeLifecycle`. `git merge-tree` بين `origin/main` والفرع وحده كان سيتعارض في `lib/app.dart` و`lib/features/notifications/notifications_screen.dart` و`test/qa_round_test.dart`. بعد #43 لم يبقَ ذلك: الشاشة بقيت نسخة #43، و`qa_round_test.dart` اندمج على توقع الفرع «a notification list tap opens the collection through the opener».
+- `lib/features/notifications/notification_open_seam.dart` اندمج بلا علامات. المزوّد `OpenerNotificationSeam`، والصنف البديل باقٍ وغير مستخدم كمزوّد. لا تعارض مع #43 أو #44 في هذا الملف.
+- `lib/notifications/realtime_lifecycle.dart` اندمج بلا `invalidate(unreadNotificationsCountProvider)`.
+
+`bash tool/check.sh` على الشجرة المحلية خرج **0**: التطبيق **354/0**، والحزمة **150/0**، والسالب **25/0** و**23/0**. لا مسبار داخل هذه الشجرة. لا اختبار منتج فشل فقط بعد الجمع. الأعداد تطابق الرأس وحده.
+
+### الحكم على هذا الفرع
+
+**نعم مع ملاحظات.** verified on `cursor/phase6-system-tray-bg-poll` `82e0e8cd687daf79bc8ca88ee049af2259cbdaa0`, not on main.
+
+الأسباب: البوابة تطابق 354 و150. الفحوص (a) و(c) و(d) و(e) و(f) Pass على Fake أو الوحدة، مع ملاحظة أن `BACKGROUND_NOTIFICATION_POLL=true` الصريح يشغّل الاستطلاع في release، وأن (d) على الجهاز و(c) و(e) على الظل المرسوم ما زالت خارج الوحدة. الفحص (b) Fail على المسار الموصول: DEF-017، غير مانع لأن لا شيء يُنشر والخروج مرة واحدة. إن عُدّ الاستثناء غير الممسوك مانعًا يصبح الحكم لا. المعياران (2) و(3) والمعيار (12) فجوات للتوقيع على جهاز أو staging. FCM غير مستخدم، والمسار استطلاع فقط، ومطفأ في الإنتاج حتى السؤال 9. لا يُدمج هذا الفرع إلى `main` من هذه الجولة، ولا طلب له بعد.
+
+DEF-017 مفتوح وغير مانع. التالي الحر DEF-018. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
+
+---
+
 ## توقيع قبول المرحلة 6
 
 | الحقل | القيمة |
 |---|---|
 | رقم المرحلة | 6 |
 | النطاق المُسلَّم | خطة إشعارات، 40 حالة، على `main` `8a52160`. لا تنفيذ جديد |
-| نتيجة كل معيار | (1) و(6) و(7) و(9) و(13) Partially على Fake. (5) و(8) و(10) و(12) Not implemented. (2) و(3) و(4) و(11) Not run على جهاز. التفاصيل في جدول الحكم |
+| نتيجة كل معيار | لقطة الخطة في جدول «من المعيار إلى الحكم». لقطة الطلبات الخمسة في جدول التغطية. إعادة اختبار فرع الصينية `82e0e8c` تحدّث (2) و(3) و(12): (2) وحدة استطلاع فقط وما زال فجوة جهاز، (3) ما زال فجوة، (12) ما زال فجوة من الإذن إلى التسجيل. المرحلة لم تُوقَّع |
 | الاسم | وكيل القبول الآلي لهذه الجولة (بلا اسم شخص) |
 | الدور | مهندس قبول |
 | التاريخ | 2026-10-21 |
 | القرار | لم يُوقَّع |
-| العيوب المانعة المفتوحة | لا عيب جديد. DEF-017 لم يُستخدم |
-| ملاحظات | الحكم المجمّع للطلبات الخمسة في القسم السابق. المرحلة لم تُوقَّع: #42 مانع دمج بسبب مرشح push، والنقر غير موصول، والخلفية والقتل غير مغطاة. القرار عند التوقيع أحد: مقبول / مقبول بشروط / مرفوض. التوقيع الإداري في الجدول التالي فارغ |
+| العيوب المانعة المفتوحة | لا عيب مانع جديد. DEF-017 مفتوح وغير مانع على فرع الصينية `82e0e8c`، وليس على `main` |
+| ملاحظات | الحكم المجمّع للطلبات الخمسة قسم سابق. إعادة اختبار `cursor/phase6-system-tray-bg-poll` عند `82e0e8c`: نعم مع ملاحظات. المرحلة لم تُوقَّع. (2) و(3) و(12) فجوات جهاز أو staging، وDEF-017 على 401 الموصول. مرشح #42 لم يعد على `main`. القرار عند التوقيع أحد: مقبول / مقبول بشروط / مرفوض. التوقيع الإداري في الجدول التالي فارغ |
 
 توقيع الإدارة:
 

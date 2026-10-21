@@ -15,7 +15,7 @@
 |---|---|
 | Pending PM decision | DEF-002. على `main` عند `8a52160` السلوك لم يتغير. الإداري المحدود ما زال `collections.decide`، ومسار الإجماليات المخصص يرفضه بـ 403 |
 | Blocking مفتوح على `main` | لا يبقى عيب مانع من DEF-013 أو DEF-014. هما verified on main 451ec58 |
-| Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `8a52160` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل |
+| Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `8a52160` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل. DEF-017 على فرع الصينية `82e0e8c` وليس على `main`: 401 أثناء ابتلاع الدفع يرمي خارج `presentPush` |
 | verified on main 8a52160 | DEF-010. «عرض الكل» يتبع قسم النشرة |
 | verified on main 451ec58 | DEF-001، DEF-003، DEF-004، DEF-005، DEF-006، DEF-013، DEF-014، DEF-015، DEF-016 |
 | أُغلق بعد إعادة اختبار | DEF-007 وDEF-008 وDEF-009 وDEF-011 بقيت مغلقة ضمن المجموعة على `451ec58` |
@@ -526,6 +526,29 @@
 
 ---
 
+### DEF-017 — 401 أثناء ابتلاع الدفع يخرج من `presentPush` بلا `sessionEnded`
+
+**الحالة:** Open. verified on branch `cursor/phase6-system-tray-bg-poll` `82e0e8cd687daf79bc8ca88ee049af2259cbdaa0`, not on main. غير مانع.
+
+| الحقل | القيمة |
+|---|---|
+| المرحلة | 6 |
+| الشدة | متوسطة |
+| التصنيف | Non-blocking |
+| الملفات | `lib/notifications/system_tray_presenter.dart` (`presentPush`، الـ `try` يلف `reload` فقط)؛ `lib/notifications/notification_ingress.dart` (`acceptPush` يستدعي `ingest` قبل الـ `try`)؛ `lib/state/notification_providers.dart` (`ingest` عند `NotificationSource.push` يستدعي `_resolveUnread`، و`SessionExpiredException` يُعاد رميه)؛ `lib/notifications/notification_transport_host.dart` (`unawaited(presentPush)`) |
+
+**خطوات الإعادة**
+
+1. على Fake ادخل `employee.demo` بكلمة مرور غير `wrong`.
+2. استدعِ `FakeApiClient.expireSession()`.
+3. استدعِ `systemTrayPresenterProvider.presentPush` بحمولة مبيّضة لمعرّف `77` ومستلم `u_12`، وفيها `employeeName` و`amount`.
+
+**المتوقع:** لا صينية، ولا اسم الحساب السابق، و`TrayDelivery.sessionEnded`، و`expireSession` / `session_expired` مرة واحدة.
+
+**الفعلي:** لا صينية، والسبب `session_expired` مرة واحدة، ونداء ثانٍ يرجع `loggedOut` بلا مسح ثانٍ. لكن `SessionExpiredException` (`AUTH_REQUIRED`، 401) تخرج من `DioApiClient._send` عبر عدد غير المقروء داخل `acceptPush`، قبل `try` في `presentPush`. المضيف يستدعي `presentPush` بلا انتظار، فالخطأ غير ممسوك. اختبار المؤلف `a failed GET or a 404 shows no name, and a 401 shows nothing` يحقن `SessionExpiredException` من `reload` نفسه، وذلك داخل `try` ويرجع `sessionEnded`، ولا يستدعي `expireSession`. المسبار المحلي غير المدفوع `a 401 on the refresh GET posts nothing and expires the session once` أثبت الرمي على المزوّد الموصول. لا اسم ولا مبلغ يُرسم. لذلك العيب غير مانع: نصف الأمان (لا عرض، وخروج واحد) قائم، ونصف «لا يرمي» على المسار الموصول فاشل.
+
+---
+
 ## أسئلة مفتوحة لمدير المشروع على `main` `451ec58`
 
 هذه ليست عيوبًا جديدة، ولا تُغلق من هذه الجولة:
@@ -569,3 +592,4 @@
 - القبول النهائي على `main` `8a52160` لم يفتح DEF-017. فحص `_leaks` صار مساواة تامة لحقول المالك، و`--dry-run` يكتشف `u_20` ويبقي `u_200` والنص العابر نظيفين. إغلاق حقول النموذج وسؤال `employeeTotals` وP5-63 وP5-64 بقوا أسئلة. DEF-002 بقي Pending PM decision. DEF-012 بقي Fail. DEF-010 صار verified. staging لم يُشغَّل، وذلك ليس عيبًا.
 - إعادة اختبار #41 عند `ae7311f` (ويحل محل `ad4f3d8`) لم تفتح DEF-017. الشاشة صارت على المتحكّم، والنداء المزدوج طلب واحد، وفشل مسار العدد (404 و500 و403 وشبكة ومهلة) يبقي القائمة ويأخذ الشارة من القائمة بلا خروج. 401 على المسار خروج واحد `session_expired`. `fromDto` يبقي `recipientUserId`، وحمولة الدفع تسقط المفاتيح الحساسة. سؤال `requestId` على السلك وP6-39 مفتوحان وليسا عيبين. التالي الحر يبقى DEF-017.
 - الحكم المجمّع للمرحلة 6 على #40 `8149b55` و#41 `ae7311f` و#42 `52ab75f` و#43 `6fc4204` و#44 `8a6f287` لم يفتح DEF-017. مرشح `push` في workflow #42 مانع دمج. درزة النقر ودرزة الإذن وملصق الصينية الصامت طلبات متابعة، لا عيوب داخل رأس واحد. التالي الحر يبقى DEF-017.
+- إعادة اختبار فرع الصينية `cursor/phase6-system-tray-bg-poll` عند `82e0e8c` فتحت DEF-017 أعلاه. التالي الحر صار DEF-018. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
