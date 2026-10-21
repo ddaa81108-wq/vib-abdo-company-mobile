@@ -92,7 +92,7 @@ The API contract still says the server speaks web push, not FCM. `AppPushService
 
 `.github/workflows/android-notifications-emulator.yml` (`Android notification emulator`) runs on `workflow_dispatch` and nightly at 03:00 UTC. It does not run on pull requests.
 
-`workflow_dispatch` is rejected until this workflow file is on the default branch. A temporary `push` filter lists only `cursor/android-notification-platform-0368`, so pushes to that branch run the matrix. It is not a `pull_request` trigger. Remove that filter before merge.
+`workflow_dispatch` becomes available once this file is on `main`. Until then GitHub rejects a dispatch of a workflow that exists only on a branch. The nightly schedule is 03:00 UTC.
 
 Matrix: API 29, 33, and 34, `google_apis` / `x86_64`, KVM, AVD cache. Debug builds pass `USE_FAKE_API=true`.
 
@@ -101,7 +101,7 @@ The integration test does not call a permission API and does not use `Notificati
 - API 29: `NOTIF_CASE=implicit`. No grant. `areNotificationsEnabled` is true, the collections channel is present (Arabic name, high importance, badge on), and a probe alert is posted.
 - API 33 and 34: `adb shell pm revoke` plus `appops set … POST_NOTIFICATION deny`, then `NOTIF_CASE=denied` (`areNotificationsEnabled` is false and nothing is posted). Then `pm grant` plus `appops set … POST_NOTIFICATION allow`, then `NOTIF_CASE=granted` (enabled is true, the same channel is still high importance with the badge flag, and a probe alert is posted).
 
-Dispatch it from the branch:
+After the file is on `main`, dispatch it against a branch:
 
 ```bash
 gh workflow run android-notifications-emulator.yml --ref <branch>
