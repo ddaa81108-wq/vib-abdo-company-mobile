@@ -34,7 +34,8 @@ class LedgerScreen extends ConsumerWidget {
     final money = ref.watch(apiLayerProvider).money;
     final online = ref.watch(onlineProvider);
     String messageOf(Object error) =>
-        ref.read(errorHandlerProvider).toFailure(error).message;
+        failureText(ref.read(errorHandlerProvider).toFailure(error));
+    failureOf(Object error) => ref.read(errorHandlerProvider).toFailure(error);
 
     return Scaffold(
       key: Key('screen-ledger-${section.path}'),
@@ -47,6 +48,7 @@ class LedgerScreen extends ConsumerWidget {
           ref.invalidate(ledgerProvider((section, id)));
         },
         messageOf: messageOf,
+        failureOf: failureOf,
         loading: const _LedgerLoading(),
         builder: (loadedCard) {
           // Writes stay hidden until the card has loaded and is not system-managed.
@@ -59,6 +61,7 @@ class LedgerScreen extends ConsumerWidget {
             expand: true,
             onRetry: () => ref.invalidate(ledgerProvider((section, id))),
             messageOf: messageOf,
+            failureOf: failureOf,
             loading: const _LedgerLoading(),
             builder: (page) {
               final showBalance = page.page.items.any(
@@ -217,7 +220,7 @@ class LedgerScreen extends ConsumerWidget {
       ref.invalidate(homeDashboardProvider);
       return null;
     } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
+      return failureText(ref.read(errorHandlerProvider).toFailure(error));
     }
   }
 
@@ -250,7 +253,7 @@ class LedgerScreen extends ConsumerWidget {
         ref.invalidate(accountsProvider(section));
         ref.invalidate(homeDashboardProvider);
       }
-      return failure.message;
+      return failureText(failure);
     }
   }
 }
@@ -404,7 +407,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       Navigator.of(context).pop(true);
       return null;
     } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
+      return failureText(ref.read(errorHandlerProvider).toFailure(error));
     }
   }
 }
@@ -561,7 +564,7 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = ref.read(errorHandlerProvider).toFailure(error).message;
+        _error = failureText(ref.read(errorHandlerProvider).toFailure(error));
       });
     }
   }

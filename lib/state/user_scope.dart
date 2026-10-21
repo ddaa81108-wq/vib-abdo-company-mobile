@@ -1,6 +1,7 @@
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'employee_totals_provider.dart';
 import 'notification_providers.dart';
 import 'pending_mutation.dart';
 import 'router_provider.dart';
@@ -26,6 +27,8 @@ void invalidateUserScope(WidgetRef ref) {
   ref.invalidate(purchaseBookProvider);
   ref.invalidate(purchasesProvider);
   ref.invalidate(collectionsProvider);
+  ref.invalidate(employeeTotalsProvider);
+  ref.invalidate(employeeTotalsQueryProvider);
   ref.invalidate(payrollProvider);
   ref.invalidate(assigneesProvider);
   ref.invalidate(treasuryProvider);

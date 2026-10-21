@@ -7,6 +7,20 @@ enum AuthStrategyKind {
   bearerToken,
 }
 
+/// 🔶 Which body `EmployeeTotalsRepository` reads. The provider never branches
+/// on this. `docs/api-contract-gaps.md` is not in this repo; item 14 names the
+/// collections array and is still unconfirmed, as is `/api/admin/employee-totals`.
+///
+/// `--dart-define=EMPLOYEE_TOTALS_SOURCE=collections` selects the collections
+/// array. Any other value, including empty, stays on the standalone endpoint.
+enum EmployeeTotalsSource {
+  /// GET /api/admin/employee-totals (proposed; no `/api/admin` prefix is confirmed).
+  standalone,
+
+  /// `employeeTotals` inside GET /api/collections (contract gap 14, unconfirmed).
+  collections,
+}
+
 /// How rate/factor values (`DecimalString`) are encoded ON THE WIRE only.
 /// Inside the app they are always decimal text with no operations.
 enum RateWireFormat {
@@ -29,6 +43,7 @@ class ApiConfig {
     this.pollingInterval = const Duration(seconds: 4),
     this.moneyUnitScale = 0,
     this.rateWireFormat = RateWireFormat.number,
+    this.employeeTotalsSource = EmployeeTotalsSource.standalone,
   });
 
   /// Origin only, e.g. https://host — paths in ApiEndpoints already start with /api.
@@ -49,6 +64,11 @@ class ApiConfig {
   /// Wire encoding for DecimalString values in request bodies (serialization layer only).
   final RateWireFormat rateWireFormat;
 
+  /// 🔶 Source for the admin employee-totals dashboard. See [EmployeeTotalsSource].
+  /// Changing this is the only switch when the server confirms a body. The
+  /// provider and the UI call `EmployeeTotalsRepository.fetch` either way.
+  final EmployeeTotalsSource employeeTotalsSource;
+
   /// 🔶 Real base URL is intentionally NOT defaulted to production. The app must be
   /// pointed at a staging/test copy explicitly via --dart-define=API_BASE=...
   factory ApiConfig.fromEnvironment() => const ApiConfig(
@@ -64,5 +84,9 @@ class ApiConfig {
         rateWireFormat: String.fromEnvironment('RATE_WIRE_FORMAT') == 'string'
             ? RateWireFormat.string
             : RateWireFormat.number,
+        employeeTotalsSource:
+            String.fromEnvironment('EMPLOYEE_TOTALS_SOURCE') == 'collections'
+                ? EmployeeTotalsSource.collections
+                : EmployeeTotalsSource.standalone,
       );
 }

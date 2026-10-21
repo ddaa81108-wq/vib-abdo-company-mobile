@@ -237,12 +237,13 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
   }
 
   /// Maps a thrown write error. Version conflicts refetch and show the shared
-  /// conflict copy; every other error keeps the mapped server message.
+  /// conflict copy. A 403 shows the unified Arabic notice, never the raw text.
   ///
   /// A session expiry is not retried. The request id is kept for a manual
   /// retry of these same inputs after the same user signs in again.
   String _presentFailure(Object error) {
     final failure = ref.read(errorHandlerProvider).toFailure(error);
+    if (failure.code == 'FORBIDDEN') return AppStrings.forbidden;
     if (failure.code != 'VERSION_CONFLICT') return failure.message;
     _announceConflict();
     widget.onVersionConflict?.call();

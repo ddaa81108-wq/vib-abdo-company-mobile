@@ -17,6 +17,7 @@ import 'core/session/token_storage.dart';
 import 'data/repositories/accounts_repository.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/collections_repository.dart';
+import 'data/repositories/employee_totals_repository.dart';
 import 'data/repositories/home_repository.dart';
 import 'data/repositories/masraweya_repository.dart';
 import 'data/repositories/notifications_repository.dart';
@@ -41,6 +42,7 @@ export 'core/session/token_storage.dart';
 export 'data/models/account_models.dart';
 export 'data/models/auth_models.dart';
 export 'data/models/collection_models.dart';
+export 'data/models/employee_totals_models.dart';
 export 'data/models/common.dart';
 export 'data/models/home_models.dart';
 export 'data/models/masraweya_models.dart';
@@ -62,6 +64,7 @@ class ApiLayer {
     required this.profile,
     required this.accounts,
     required this.collections,
+    required this.employeeTotals,
     required this.masraweya,
     required this.purchases,
     required this.treasury,
@@ -81,6 +84,7 @@ class ApiLayer {
   final ProfileRepository profile;
   final AccountsRepository accounts;
   final CollectionsRepository collections;
+  final EmployeeTotalsRepository employeeTotals;
   final MasraweyaRepository masraweya;
   final PurchasesRepository purchases;
   final TreasuryRepository treasury;
@@ -122,7 +126,10 @@ class ApiLayer {
         : ResilientRealtimeService(
             sse: SseRealtimeService(dio: dio, cursor: cursor),
             polling: PollingRealtimeService(
-                api: api, cursor: cursor, interval: cfg.pollingInterval),
+              api: api,
+              cursor: cursor,
+              interval: cfg.pollingInterval,
+            ),
           );
 
     final auth = RemoteAuthRepository(api);
@@ -158,6 +165,11 @@ class ApiLayer {
       profile: profile,
       accounts: RemoteAccountsRepository(api),
       collections: RemoteCollectionsRepository(api),
+      employeeTotals: RemoteEmployeeTotalsRepository(
+        api,
+        permissions: permissions,
+        source: cfg.employeeTotalsSource,
+      ),
       masraweya: RemoteMasraweyaRepository(api),
       purchases: RemotePurchasesRepository(api),
       treasury: RemoteTreasuryRepository(api),

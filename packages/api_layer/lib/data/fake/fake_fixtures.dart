@@ -4,6 +4,13 @@
 class FakeFixtures {
   FakeFixtures._();
 
+  /// Ordinary collections employee. Own-data routes key off this id.
+  static const demoEmployeeId = 'u_12';
+
+  /// A second fixture employee. Used to prove an ordinary employee cannot
+  /// read someone else's records. 🔶 The id is fake, not a server value.
+  static const otherEmployeeId = 'u_20';
+
   static const employeePermissions = [
     'collections.read',
     'collections.write',
@@ -95,7 +102,7 @@ class FakeFixtures {
           sectionAccess: null,
         )
       : _me(
-          id: 'u_12',
+          id: demoEmployeeId,
           username: 'employee@example.invalid',
           name: 'موظف استلام تجريبي',
           role: 'employee',
@@ -706,6 +713,18 @@ class FakeFixtures {
             'phone': '0910000000',
             'balanceUnits': 320,
             'status': 'open',
+            // 🔶 Owner id so the fake can scope a list to the caller.
+            'assigneeUserId': demoEmployeeId,
+          },
+          {
+            'id': 'as_9',
+            'customerId': 'c_58',
+            'customerName': 'عميل موظف آخر',
+            'section': 'customers',
+            'phone': '0910000004',
+            'balanceUnits': 900,
+            'status': 'open',
+            'assigneeUserId': otherEmployeeId,
           },
         ],
         'submissions': [
@@ -717,6 +736,7 @@ class FakeFixtures {
             'version': 1,
             'cashStatus': 'not_applicable',
             'submittedByName': 'موظف استلام تجريبي',
+            'submittedByUserId': demoEmployeeId,
             'createdAt': '2026-10-18T12:00:00+02:00',
           },
           {
@@ -729,7 +749,19 @@ class FakeFixtures {
             'cashPending': true,
             'cashReceivedAt': null,
             'submittedByName': 'موظف استلام تجريبي',
+            'submittedByUserId': demoEmployeeId,
             'createdAt': '2026-10-18T09:30:00+02:00',
+          },
+          {
+            'id': 'sb_9',
+            'mode': 'partial',
+            'amountUnits': 900,
+            'status': 'pending',
+            'version': 1,
+            'cashStatus': 'not_applicable',
+            'submittedByName': 'موظف آخر تجريبي',
+            'submittedByUserId': otherEmployeeId,
+            'createdAt': '2026-10-18T15:00:00+02:00',
           },
         ],
         'unlinkedReceipts': [
@@ -740,6 +772,7 @@ class FakeFixtures {
             'status': 'pending',
             'version': 1,
             'cashStatus': 'not_applicable',
+            'submittedByUserId': demoEmployeeId,
           },
           {
             'id': 'ur_2',
@@ -749,14 +782,33 @@ class FakeFixtures {
             'version': 4,
             'cashStatus': 'pending',
             'cashPending': true,
+            'submittedByUserId': demoEmployeeId,
+          },
+          {
+            'id': 'ur_9',
+            'customerName': 'إيصال موظف آخر',
+            'amountUnits': 900,
+            'status': 'pending',
+            'version': 1,
+            'cashStatus': 'not_applicable',
+            'submittedByUserId': otherEmployeeId,
           },
         ],
         'employeeTotals': [
           {
+            // 🔶 userId is not a confirmed employeeTotals field.
+            'userId': demoEmployeeId,
             'employeeName': 'موظف استلام تجريبي',
             'collectedUnits': 0,
             'approvedCount': 0,
             'pendingCount': 1,
+          },
+          {
+            'userId': otherEmployeeId,
+            'employeeName': 'موظف آخر تجريبي',
+            'collectedUnits': 900,
+            'approvedCount': 4,
+            'pendingCount': 2,
           },
         ],
         'metrics': {
@@ -771,11 +823,71 @@ class FakeFixtures {
         'version': 1,
       };
 
+  /// 🔶 Canned `GET /api/admin/employee-totals`.
+  ///
+  /// Literals already stored on the collections fixtures, not derived here:
+  /// `u_12` / `موظف استلام تجريبي` (payroll and assignees), `collectedUnits` 0,
+  /// `approvedCount` 0, `pendingCount` 1 (collections `employeeTotals`),
+  /// `pendingUnits` 100 (`metrics.dayTotalUnits`, also `sb_1.amountUnits`),
+  /// `cashOutstandingUnits` 250 (`metrics.cashOutstandingUnits`). The totals
+  /// row repeats those same stored literals. A window that misses
+  /// `2026-10-18` is a second canned payload (`items: []`, totals 0), not a
+  /// sum of the rows. `employeeId` is not a filter.
+  static Map<String, dynamic> employeeTotals({String? from, String? to}) {
+    const day = '2026-10-18';
+    final included = _dayWindowIncludes(day, from, to);
+    return {
+      'generatedAt': '2026-10-18T18:00:00+02:00',
+      'from': from,
+      'to': to,
+      'version': 1,
+      'currency': 'LYD',
+      'items': included ? _employeeTotalItems : const <Map<String, dynamic>>[],
+      'totals': included ? _employeeTotalTotals : _employeeTotalEmptyTotals,
+    };
+  }
+
+  static bool _dayWindowIncludes(String day, String? from, String? to) {
+    if (from != null && _isoDay.hasMatch(from) && from.compareTo(day) > 0) {
+      return false;
+    }
+    if (to != null && _isoDay.hasMatch(to) && to.compareTo(day) < 0) {
+      return false;
+    }
+    return true;
+  }
+
+  static final RegExp _isoDay = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+
+  static const _employeeTotalItems = [
+    {
+      'employeeId': 'u_12',
+      'employeeName': 'موظف استلام تجريبي',
+      'collectedUnits': 0,
+      'pendingUnits': 100,
+      'approvedCount': 0,
+      'rejectedCount': 0,
+      'pendingCount': 1,
+      'cashOutstandingUnits': 250,
+      'currency': 'LYD',
+    },
+  ];
+
+  static const _employeeTotalTotals = {
+    'collectedUnits': 0,
+    'pendingUnits': 100,
+  };
+
+  static const _employeeTotalEmptyTotals = {
+    'collectedUnits': 0,
+    'pendingUnits': 0,
+  };
+
   static Map<String, dynamic> payroll() => {
         'period': '2026-10',
         'employees': [
           {
-            'userId': 'u_12',
+            'userId': demoEmployeeId,
             'displayName': 'موظف استلام تجريبي',
             'baseSalaryUnits': 1500,
             'openingCarryUnits': 0,
@@ -784,8 +896,31 @@ class FakeFixtures {
             'remainingUnits': 1250,
             'entries': [],
           },
+          {
+            'userId': otherEmployeeId,
+            'displayName': 'موظف آخر تجريبي',
+            'baseSalaryUnits': 2400,
+            'openingCarryUnits': 100,
+            'commissionsUnits': 80,
+            'withdrawalsUnits': 0,
+            'remainingUnits': 2580,
+            'entries': [],
+          },
         ],
       };
+
+  /// 🔶 Stored own-overview literals for [demoEmployeeId]. Not a sum of rows.
+  /// Company metrics stay on [collections]. The fake substitutes this map when
+  /// the caller is not allowed to see every employee's totals.
+  static const ownCollectionMetrics = {
+    'collectedUnits': 0,
+    'dayTotalUnits': 40,
+    'pendingCount': 1,
+    'unlinkedPendingCount': 1,
+    'cashOutstandingUnits': 0,
+  };
+
+  static const ownAssignedCount = 1;
 
   static Map<String, dynamic> masraweyaDay() => {
         'businessDate': '2026-10-19',
@@ -927,6 +1062,18 @@ class FakeFixtures {
             'entityId': 'sb_1',
             'readAt': null,
             'createdAt': '2026-10-18T12:00:00+02:00',
+          },
+          {
+            'id': '88',
+            'action': 'collection.submit',
+            'title': 'إشعار موظف آخر',
+            'body': 'لا يظهر لموظف غيره',
+            'section': 'collections',
+            'entityId': 'sb_9',
+            'readAt': null,
+            'createdAt': '2026-10-18T16:00:00+02:00',
+            // 🔶 recipientUserId is not a confirmed notifications field.
+            'recipientUserId': otherEmployeeId,
           },
         ],
         'unreadCount': unread,

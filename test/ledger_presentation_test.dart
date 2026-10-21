@@ -8,6 +8,7 @@ import 'package:flutter_api_layer/data/fake/fake_fixtures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
+import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
@@ -281,7 +282,8 @@ void main() {
     await pumpFakeApp(tester, size: const Size(320, 1400));
     await signIn(tester, username: 'flag.admin', password: 'demo-only');
     await go(tester, '/customers/c_55');
-    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+    expect(find.byKey(HomeDashboard.screenKey), findsNothing);
     expect(find.byKey(const Key('screen-ledger-customers')), findsNothing);
     _expectWritesHidden(tester);
   });
@@ -290,7 +292,8 @@ void main() {
     await pumpFakeApp(tester, size: const Size(430, 1400));
     await signIn(tester, username: 'guest.demo', password: 'demo-only');
     await go(tester, '/companies/c_55');
-    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+    expect(find.byKey(HomeDashboard.screenKey), findsNothing);
     expect(find.byKey(const Key('screen-ledger-companies')), findsNothing);
     _expectWritesHidden(tester);
   });

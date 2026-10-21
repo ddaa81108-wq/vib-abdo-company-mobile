@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/ui/widgets/common.dart';
+import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
@@ -185,8 +186,9 @@ void main() {
       '/settings',
     ]) {
       await go(tester, path);
-      expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
-      expect(find.byKey(ForbiddenPane.paneKey), findsNothing);
+      expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+      expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
+      expect(find.byKey(HomeDashboard.screenKey), findsNothing);
     }
 
     expect(find.byKey(const Key('cash-in')), findsNothing);
@@ -206,12 +208,14 @@ void main() {
     await pumpFakeApp(tester, size: const Size(800, 1600));
     await signIn(tester, username: 'guest.demo', password: 'demo-only');
     await go(tester, '/treasury');
-    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
-    expect(find.byKey(ForbiddenPane.paneKey), findsNothing);
+    expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
+    expect(find.byKey(HomeDashboard.screenKey), findsNothing);
     expect(find.byKey(const Key('cash-in')), findsNothing);
     await go(tester, '/collections');
-    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
-    expect(find.byKey(ForbiddenPane.paneKey), findsNothing);
+    expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
+    expect(find.byKey(HomeDashboard.screenKey), findsNothing);
     expect(find.byKey(const Key('submit-as_1')), findsNothing);
   });
 }

@@ -5,6 +5,7 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../authentication/auth_gate.dart';
 import '../../models/home_summary.dart';
 import '../../notifications/unread_badge.dart';
 import '../../state/notification_providers.dart';
@@ -15,6 +16,7 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/logout_confirm.dart';
 import '../../ui/widgets/soft_tile.dart';
 
 class NavItem {
@@ -161,7 +163,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           IconButton(
             key: HomeShell.logoutKey,
             tooltip: AppStrings.logout,
-            onPressed: () => ref.read(sessionStateProvider.notifier).logout(),
+            onPressed: () => requestLogout(context, ref),
             icon: const Icon(Icons.logout),
           ),
         ],
@@ -271,6 +273,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   String _title(String location) {
     if (location == '/' || location.isEmpty) return AppStrings.homeTitle;
     if (location.startsWith('/notifications')) return AppStrings.notifications;
+    if (location.startsWith(forbiddenLocation)) return AppStrings.forbidden;
+    if (location.startsWith('/settings/employee-totals')) {
+      return AppStrings.employeeTotals;
+    }
     if (location.startsWith('/settings/employees')) {
       return AppStrings.employeesTile;
     }
