@@ -57,7 +57,9 @@ void main() {
     expect(gate.calls, greaterThanOrEqualTo(2));
   });
 
-  testWidgets('a corrupt lifetime total fails the purchases screen', (tester) async {
+  testWidgets('a corrupt lifetime total fails the purchases screen', (
+    tester,
+  ) async {
     final gate = _FailGate();
     await pumpFakeApp(
       tester,
@@ -71,7 +73,10 @@ void main() {
               'lifetimeTotals': {'resultUnits': 50000, 'paidUnits': '1'},
             });
           }
-          return ref.read(apiLayerProvider).purchases.list(PurchaseBook.alBayan);
+          return ref
+              .read(apiLayerProvider)
+              .purchases
+              .list(PurchaseBook.alBayan);
         }),
       ],
     );
@@ -91,12 +96,14 @@ void main() {
     expect(find.text(AppStrings.retry), findsNothing);
   });
 
-  testWidgets('custom purchase item requires a free-text label', (tester) async {
+  testWidgets('custom purchase item requires a free-text label', (
+    tester,
+  ) async {
     final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
-    await tester.tap(find.byKey(const Key('add-purchase')));
+    await tester.tap(find.byKey(const Key('add-purchase-12')));
     await settle(tester);
     await tester.tap(find.byKey(const Key('purchase-kind-custom')));
     await tester.pump();
@@ -107,7 +114,10 @@ void main() {
     expect(find.text(AppStrings.customItemRequired), findsOneWidget);
     expect(fake.mutationRequestIds, isEmpty);
 
-    await tester.enterText(find.byKey(const Key('purchase-custom-label')), 'صنف خاص');
+    await tester.enterText(
+      find.byKey(const Key('purchase-custom-label')),
+      'صنف خاص',
+    );
     await fillLabeled(tester, AppStrings.egpValue, '10000');
     await fillLabeled(tester, AppStrings.exchangeRate, '9.5');
     await fillLabeled(tester, AppStrings.paid, '500');
@@ -137,7 +147,9 @@ void main() {
     await tester.tap(find.byKey(const Key('add-account')));
     await settle(tester);
     expect(
-      tester.widget<FilledButton>(find.byKey(const Key('save-account'))).onPressed,
+      tester
+          .widget<FilledButton>(find.byKey(const Key('save-account')))
+          .onPressed,
       isNotNull,
     );
 
@@ -146,12 +158,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.byKey(const Key('offline-banner')), findsOneWidget);
     expect(
-      tester.widget<FilledButton>(find.byKey(const Key('save-account'))).onPressed,
+      tester
+          .widget<FilledButton>(find.byKey(const Key('save-account')))
+          .onPressed,
       isNull,
     );
   });
 
-  testWidgets('a confirm dialog stays up while the send is in flight', (tester) async {
+  testWidgets('a confirm dialog stays up while the send is in flight', (
+    tester,
+  ) async {
     final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
@@ -159,7 +175,7 @@ void main() {
     final gate = Completer<void>();
     fake.pauseMutations = gate;
 
-    await tester.tap(find.byKey(const Key('finalize-day')));
+    await tester.tap(find.byKey(const Key('finalize-day-12')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byKey(const Key('confirm-mutation')));
@@ -168,7 +184,9 @@ void main() {
 
     expect(find.text(AppStrings.finalizeConfirm), findsOneWidget);
     expect(
-      tester.widget<FilledButton>(find.byKey(const Key('confirm-mutation'))).onPressed,
+      tester
+          .widget<FilledButton>(find.byKey(const Key('confirm-mutation')))
+          .onPressed,
       isNull,
     );
     await tester.tapAt(const Offset(8, 8));
@@ -184,30 +202,36 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   });
 
-  testWidgets('awaiting cash uses the muted ink colour and the contract label', (
+  testWidgets(
+    'awaiting cash uses the muted ink colour and the contract label',
+    (tester) async {
+      await pumpFakeApp(tester, size: const Size(800, 1800));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/collections');
+      final label = find.byKey(const Key('awaiting-cash-sb_2'));
+      expect(label, findsOneWidget);
+      final text = tester.widget<Text>(label);
+      expect(text.data, 'ينتظر النقد');
+      final color = text.style?.color;
+      final theme = Theme.of(tester.element(label));
+      expect(color, theme.colorScheme.onSurfaceVariant);
+      expect(color, isNot(AppStatusColors.light.unlinkedPending));
+    },
+  );
+
+  testWidgets('missing platform connectivity follows the last API result', (
     tester,
   ) async {
-    await pumpFakeApp(tester, size: const Size(800, 1800));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/collections');
-    final label = find.byKey(const Key('awaiting-cash-sb_2'));
-    expect(label, findsOneWidget);
-    final text = tester.widget<Text>(label);
-    expect(text.data, 'ينتظر النقد');
-    final color = text.style?.color;
-    final theme = Theme.of(tester.element(label));
-    expect(color, theme.colorScheme.onSurfaceVariant);
-    expect(color, isNot(AppStatusColors.light.unlinkedPending));
-  });
-
-  testWidgets('missing platform connectivity follows the last API result', (tester) async {
     const channel = MethodChannel('app/connectivity');
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
       channel,
       (call) async => null,
     );
     addTearDown(() {
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      );
     });
     ApiReachability.instance.reset();
     addTearDown(ApiReachability.instance.reset);
@@ -293,7 +317,11 @@ class _FailGate {
   var calls = 0;
 }
 
-Future<void> fillLabeled(WidgetTester tester, String label, String value) async {
+Future<void> fillLabeled(
+  WidgetTester tester,
+  String label,
+  String value,
+) async {
   final field = find.byWidgetPredicate(
     (widget) => widget is TextField && widget.decoration?.labelText == label,
   );
