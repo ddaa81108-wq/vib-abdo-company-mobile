@@ -32,6 +32,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   final _search = TextEditingController();
   final _extra = <AccountCardDto>[];
   var _assigning = false;
+  var _showAllDebts = false;
   final _selected = <String>{};
   String? _reply;
 
@@ -226,21 +227,17 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                 ),
             ],
           );
-    final path = homeShowAllPath(section.sectionKey.key, permissionsOf(ref));
-    final showAll = path == null
-        ? null
-        : Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: TextButton(
-              key: const Key('show-all-debts'),
-              onPressed: () => context.go(path),
-              child: const Text(AppStrings.showAll),
-            ),
-          );
-    if (width <= AppBreakpoints.phone) {
+    if (width <= AppBreakpoints.phone && !_showAllDebts) {
       return ExpansionTile(
         title: const Text(AppStrings.oldDebtsTitle),
-        children: [body, ?showAll],
+        children: [
+          body,
+          TextButton(
+            key: const Key('show-all-debts'),
+            onPressed: () => setState(() => _showAllDebts = true),
+            child: const Text(AppStrings.showAll),
+          ),
+        ],
       );
     }
     return Column(

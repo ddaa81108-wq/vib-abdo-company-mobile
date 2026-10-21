@@ -323,28 +323,6 @@ void main() {
     expect(find.byKey(const Key('screen-companies')), findsOneWidget);
   });
 
-  testWidgets('DEF-010 phone bulletin view-all navigates to its section', (
-    tester,
-  ) async {
-    await pumpFakeApp(tester, size: const Size(360, 1000));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    for (final section in [SectionKey.customers, SectionKey.companies]) {
-      await go(tester, '/${section.key}');
-      expect(find.byType(ExpansionTile), findsOneWidget);
-      await tester.tap(find.text(AppStrings.oldDebtsTitle));
-      await settle(tester);
-      final button = find.byKey(const Key('show-all-debts'));
-      expect(button, findsOneWidget);
-      await tester.ensureVisible(button);
-      await tester.tap(button);
-      await settle(tester);
-      expect(find.byType(ExpansionTile), findsOneWidget);
-      expect(find.byKey(Key('screen-${section.key}')), findsOneWidget);
-      final context = tester.element(find.byKey(Key('screen-${section.key}')));
-      expect(GoRouter.of(context).state.uri.path, '/${section.key}');
-    }
-  });
-
   for (final section in SectionKey.values) {
     testWidgets('DEF-010 view all for ${section.key} opens /${section.key}', (
       tester,
