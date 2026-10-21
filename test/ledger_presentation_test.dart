@@ -437,6 +437,8 @@ void main() {
     Future<void> shoot(String name) => saveShot(tester, '$dir/$name.png');
 
     await pumpFakeApp(tester, size: const Size(360, 780));
+    await tester.runAsync(loadScreenshotFonts);
+    await tester.pump();
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
 
     for (final dark in [false, true]) {
@@ -606,34 +608,81 @@ Future<void> settle(WidgetTester tester) {
   );
 }
 
-Future<void> saveShot(WidgetTester tester, String path) async {
-  await settle(tester);
-  final boundary = _largestBoundary(tester);
-  final image = await tester.runAsync(() => boundary.toImage(pixelRatio: 2));
-  final bytes = await tester.runAsync(
-    () => image!.toByteData(format: ui.ImageByteFormat.png),
+/// Loads Cairo, JetBrains Mono, and Material Icons after the test app is up.
+/// Call from [WidgetTester.runAsync]. flutter_tester does not bundle those
+/// faces, so icons and Arabic otherwise paint as empty squares.
+Future<void> loadScreenshotFonts() async {
+  await _loadFont('assets/fonts/Cairo-Variable.ttf', 'Cairo');
+  await _loadFont('assets/fonts/JetBrainsMono-Bold.ttf', 'JetBrainsMono');
+  await _loadFont('assets/fonts/JetBrainsMono-ExtraBold.ttf', 'JetBrainsMono');
+  final icons = _materialIconsFile();
+  if (icons == null) {
+    throw StateError('MaterialIcons-Regular.otf was not found');
+  }
+  await ui.loadFontFromList(
+    await icons.readAsBytes(),
+    fontFamily: 'MaterialIcons',
   );
-  final file = File(path);
-  await file.parent.create(recursive: true);
-  await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
 }
 
-RenderRepaintBoundary _largestBoundary(WidgetTester tester) {
-  RenderRepaintBoundary? best;
+Future<void> _loadFont(String path, String family) async {
+  final file = File(path);
+  if (!file.existsSync()) {
+    throw StateError('missing font $path');
+  }
+  await ui.loadFontFromList(await file.readAsBytes(), fontFamily: family);
+}
+
+File? _materialIconsFile() {
+  final fromTester = File(Platform.resolvedExecutable).parent.parent.parent;
+  final candidates = [
+    File('${fromTester.path}/material_fonts/MaterialIcons-Regular.otf'),
+    File(
+      '${Platform.environment['FLUTTER_ROOT'] ?? ''}/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+    ),
+  ];
+  for (final candidate in candidates) {
+    if (candidate.existsSync()) return candidate;
+  }
+  return null;
+}
+
+Future<void> saveShot(WidgetTester tester, String path) async {
+  await settle(tester);
+  await tester.pump();
+  final boundary = _viewBoundary(tester);
+  final image = await boundary.toImage();
+  await tester.runAsync(() async {
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    final file = File(path);
+    await file.parent.create(recursive: true);
+    await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
+  });
+}
+
+RenderRepaintBoundary _viewBoundary(WidgetTester tester) {
+  final view = tester.view.physicalSize / tester.view.devicePixelRatio;
+  RenderRepaintBoundary? match;
+  RenderRepaintBoundary? largest;
   var area = 0.0;
   for (final object in tester.allRenderObjects) {
-    if (object is RenderRepaintBoundary &&
-        object.hasSize &&
-        object.size.width > 0 &&
-        object.size.height > 0) {
-      final next = object.size.width * object.size.height;
-      if (next > area) {
-        best = object;
-        area = next;
-      }
+    if (object is! RenderRepaintBoundary ||
+        !object.hasSize ||
+        object.size.width <= 0 ||
+        object.size.height <= 0) {
+      continue;
     }
+    final next = object.size.width * object.size.height;
+    if (next > area) {
+      largest = object;
+      area = next;
+    }
+    final close =
+        (object.size.width - view.width).abs() < 2 &&
+        (object.size.height - view.height).abs() < 2;
+    if (close) match = object;
   }
-  return best!;
+  return match ?? largest!;
 }
 
 class _FailGate {

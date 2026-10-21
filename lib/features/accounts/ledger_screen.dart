@@ -100,10 +100,11 @@ class LedgerScreen extends ConsumerWidget {
                 ),
               ];
               return ListView(
-                padding: pagePadding(MediaQuery.sizeOf(context).width),
+                padding: pagePadding(MediaQuery.sizeOf(context).width)
+                    .copyWith(top: AppSpacing.sm),
                 children: [
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       IconButton(
                         tooltip: AppStrings.back,
@@ -111,15 +112,15 @@ class LedgerScreen extends ConsumerWidget {
                         icon: const Icon(Icons.arrow_back),
                       ),
                       Expanded(
-                        child: Text(
-                          _ledgerTitle(section),
-                          style: Theme.of(context).textTheme.titleLarge,
+                        child: _Header(
+                          section: section,
+                          card: loadedCard,
+                          money: money,
+                          title: _ledgerTitle(section),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  _Header(section: section, card: loadedCard, money: money),
                   EditAccountCardButton(section: section, card: loadedCard),
                   if (canWrite) ...[
                     const SizedBox(height: AppSpacing.sm),
@@ -135,7 +136,7 @@ class LedgerScreen extends ConsumerWidget {
                       AppStrings.statementHidden,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
-                  const SizedBox(height: AppSpacing.md),
+                  const SizedBox(height: AppSpacing.xs),
                   if (page.page.items.isEmpty)
                     const EmptyPane(message: AppStrings.emptyLedger)
                   else ...[
@@ -402,11 +403,13 @@ class _Header extends StatelessWidget {
     required this.section,
     required this.card,
     required this.money,
+    required this.title,
   });
 
   final AccountSection section;
   final AccountCardDto? card;
   final MoneyFormatter money;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
@@ -448,12 +451,23 @@ class _Header extends StatelessWidget {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+          padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (visual.label != null)
-                Text(visual.label!, style: cairo(11, 800, color: accent)),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.xxs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(title, style: cairo(16, 800, color: foreground)),
+                  if (visual.label != null)
+                    Text(visual.label!, style: cairo(12, 700, color: accent)),
+                ],
+              ),
               Text(value.name, style: cairo(18, 800, color: foreground)),
               if (value.phone != null)
                 LtrText(value.phone!, style: cairo(12, 500, color: accent)),
@@ -671,13 +685,12 @@ class _EntryTile extends StatelessWidget {
       money: money,
       showBalance: showBalance,
       reversed: reversed,
-      caption: tight,
     );
     return Card(
       color: reversed ? scheme.surfaceContainerHighest : null,
       margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
       child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+        padding: const EdgeInsetsDirectional.all(AppSpacing.xs),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -694,7 +707,6 @@ class _EntryTile extends StatelessWidget {
                   Expanded(flex: 2, child: figures),
                 ],
               ),
-            const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.xs,
@@ -752,12 +764,13 @@ Color _movementAmountColor(BuildContext context, String type, Color fallback) {
   };
 }
 
-/// Narrow phones and large text stack the amount under the date so neither
-/// is squeezed. Wider phones keep one aligned row.
+/// Phones under 360 dp, and large text, stack the amount under the date so
+/// neither is squeezed. 360 dp at the default scale keeps one aligned row,
+/// which leaves the correction control above the bottom bar.
 bool _tightLayout(BuildContext context) {
   final width = MediaQuery.sizeOf(context).width;
   final scale = MediaQuery.textScalerOf(context).scale(1);
-  return width < 393 || scale >= 1.3;
+  return width < 360 || scale >= 1.3;
 }
 
 String _ledgerTitle(AccountSection section) => switch (section) {
@@ -766,23 +779,6 @@ String _ledgerTitle(AccountSection section) => switch (section) {
   AccountSection.libyanDeposits => AppStrings.libyanLedger,
   AccountSection.egyptianDeposits => AppStrings.egyptianLedger,
 };
-
-ThemeData _stretchButtons(BuildContext context) {
-  final theme = Theme.of(context);
-  const min = WidgetStatePropertyAll(Size(double.infinity, 48));
-  return theme.copyWith(
-    filledButtonTheme: FilledButtonThemeData(
-      style: (theme.filledButtonTheme.style ?? const ButtonStyle()).copyWith(
-        minimumSize: min,
-      ),
-    ),
-    textButtonTheme: TextButtonThemeData(
-      style: (theme.textButtonTheme.style ?? const ButtonStyle()).copyWith(
-        minimumSize: min,
-      ),
-    ),
-  );
-}
 
 class _LedgerLoading extends StatelessWidget {
   const _LedgerLoading();
@@ -809,25 +805,21 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!_tightLayout(context)) {
-      return Wrap(
-        spacing: AppSpacing.sm,
-        runSpacing: AppSpacing.sm,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: children,
-      );
-    }
-    return Theme(
-      data: _stretchButtons(context),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.sm),
-            children[i],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            for (final child in children)
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                child: child,
+              ),
           ],
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -905,7 +897,6 @@ class _AmountBlock extends StatelessWidget {
     required this.money,
     required this.showBalance,
     required this.reversed,
-    required this.caption,
   });
 
   final LedgerEntryDto entry;
@@ -913,7 +904,6 @@ class _AmountBlock extends StatelessWidget {
   final MoneyFormatter money;
   final bool showBalance;
   final bool reversed;
-  final bool caption;
 
   @override
   Widget build(BuildContext context) {
@@ -924,14 +914,11 @@ class _AmountBlock extends StatelessWidget {
       entry.type,
       reversed ? scheme.onSurfaceVariant : scheme.onSurface,
     );
-    final captionStyle = Theme.of(context).textTheme.labelSmall
-        ?.copyWith(color: scheme.onSurfaceVariant);
     return Align(
       alignment: AlignmentDirectional.centerEnd,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (caption) Text(AppStrings.amount, style: captionStyle),
           MoneyText(
             money.formatOrDash(entry.amountUnits, section.currency),
             key: Key('ledger-amount-${entry.id}'),
@@ -942,7 +929,6 @@ class _AmountBlock extends StatelessWidget {
           ),
           if (showBalance && entry.balanceAfterUnits != null) ...[
             const SizedBox(height: AppSpacing.xxs),
-            Text(AppStrings.balanceAfter, style: captionStyle),
             MoneyText(
               money.format(entry.balanceAfterUnits!, section.currency),
               key: Key('ledger-balance-${entry.id}'),
@@ -991,20 +977,21 @@ class _EntryActions extends StatelessWidget {
       accountId: accountId,
       entry: entry,
     );
-    if (!_tightLayout(context)) {
-      return Wrap(
-        spacing: AppSpacing.sm,
-        runSpacing: AppSpacing.xs,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [?cancel, correct],
-      );
-    }
-    return Theme(
-      data: _stretchButtons(context),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [?cancel, correct],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            for (final child in [?cancel, correct])
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                child: child,
+              ),
+          ],
+        );
+      },
     );
   }
 }
