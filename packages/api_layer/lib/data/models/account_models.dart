@@ -165,6 +165,7 @@ class LedgerEntryDto {
     this.corrected = false,
     this.version,
     this.paymentMode,
+    this.allowedActions,
   });
 
   final String id;
@@ -192,6 +193,11 @@ class LedgerEntryDto {
   /// Server value `full` / `partial` when present. Never inferred from amounts.
   final String? paymentMode;
 
+  /// Present only when the server sends a list. A missing field stays null so
+  /// the UI can fall back to the section permission. The action names inside
+  /// the list, including `correct`, are not a confirmed permission vocabulary.
+  final List<String>? allowedActions;
+
   factory LedgerEntryDto.fromJson(Json j) => LedgerEntryDto(
         id: str(j['id']),
         sequence: intOrNull(j['sequence']),
@@ -209,6 +215,8 @@ class LedgerEntryDto {
         corrected: boolOf(j['corrected']) || j['correctedAt'] != null,
         version: intOrNull(j['version']),
         paymentMode: strOrNull(j['paymentMode']),
+        allowedActions:
+            j['allowedActions'] is List ? strList(j['allowedActions']) : null,
       );
 }
 
@@ -264,8 +272,9 @@ class UpdateAccountRequest {
 enum PaymentMode { partial, full }
 
 /// POST /api/{section}/{id}/transactions
-/// {requestId, expectedVersion, type: debt|payment, paymentMode?, inputValue, calculationMode, factor?, date, note}
+/// {requestId, expectedVersion, type: debt|payment, paymentMode?, inputValue, calculationMode, factor?, date?, note}
 /// The server computes the final amount. The app shows no preview, per API contract.
+/// [date] is omitted when the caller has no date the user chose; the server stamps it.
 class AccountTransactionRequest {
   const AccountTransactionRequest._({
     required this.type,
@@ -273,7 +282,7 @@ class AccountTransactionRequest {
     required this.inputValue,
     required this.calculationMode,
     this.factor,
-    required this.date,
+    this.date,
     this.note,
   });
 
@@ -307,8 +316,11 @@ class AccountTransactionRequest {
           note: note);
 
   /// Full payment: same constant body as the web client (inputValue: 1, direct); the server zeroes the balance.
+  ///
+  /// [date] is sent only when the user chose one. The ledger button has no
+  /// date control, so it omits the field and the server stamps the financial date.
   factory AccountTransactionRequest.fullPayment(
-          {required DateTime date, String? note}) =>
+          {DateTime? date, String? note}) =>
       AccountTransactionRequest._(
           type: 'payment',
           paymentMode: PaymentMode.full,
@@ -325,7 +337,7 @@ class AccountTransactionRequest {
   /// Rate as typed by the user, kept as decimal TEXT (no float). On the wire it is a JSON
   /// number literal or string per ApiConfig.rateWireFormat (default number), per API contract.
   final DecimalString? factor;
-  final DateTime date;
+  final DateTime? date;
   final String? note;
 
   Json toJson() => {
@@ -335,7 +347,7 @@ class AccountTransactionRequest {
         'calculationMode': calculationMode.name,
         if (factor != null && calculationMode != CalculationMode.direct)
           'factor': factor, // DecimalString; WireJson encodes it
-        'date': date.toIso8601String(),
+        if (date != null) 'date': date!.toIso8601String(),
         if (note != null) 'note': note,
       };
 }
