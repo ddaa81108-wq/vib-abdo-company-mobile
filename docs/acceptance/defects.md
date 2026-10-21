@@ -377,6 +377,17 @@
 
 **إعادة الاختبار على `main` (`dff1456`):** الجملة العامة ومفاتيح `LYD` / `EGP` اختفت. `P4-003 settings empty states and Arabic ledger labels` و`DEF-012 admin settings replace the old unavailable sentence` ناجحان: الإجماليات «0 د.ل» و«0 ج.م»، والبلاطات تعرض `employeesEmpty` و`auditEmpty` و`operationsEmpty`. المتوقع في P4-003 ما زال بيانات أو إخفاء البلاطة، فلم يتحقق. العيب يبقى مفتوحًا وغير مانع. لا يُغلق قبل المرحلة 5 أو قرار مكتوب بإزالة الشاشات.
 
+**إعادة الاختبار على PR #27 (2026-10-21، `5d9700f`، فوق `main`، ليس على `main` بعد):** الحكم **Fail**. لم يُعلَّم verified. `bash tool/check.sh` خرج 0 (التطبيق 250/0، الحزمة 74/0).
+
+| الفحص | النتيجة |
+|---|---|
+| مدير كامل، فاتح وداكن | سجل الأستاذ من Fake: «0 د.ل» و«0 ج.م»، بلا نص `LYD` أو `EGP` (`the financial ledger tile shows the server totals`) |
+| الموظفون والتدقيق والتشغيل | `EmptyPane` ونص `employeesEmpty` / `auditEmpty` / `operationsEmpty`. لا قائمة من الخادم (`employees, audit, and operations use an empty pane`). التعليق في `admin_destinations.dart` يقول إن Fake لا يرسل هذه البيانات |
+| إداري محدود | بلا `settings.manage`. `/settings` والبلاطات الثلاث غائبة (`admin tiles stay hidden without settings.manage` و`limited admin has no settings entry`) |
+| موظف وضيف و`flag.admin` | لا يرون الإعدادات (`an employee does not see settings or admin routes` و`guest and flag admin see no sections and no settings`) |
+
+المعيار في `phase-4-ui.md` يطلب بيانات حقيقية أو إخفاء البلاطة، وبلا نص بديل. البلاطات الثلاث ما زالت ظاهرة للمدير الكامل وبنص بديل. العيب يبقى مفتوحًا وغير مانع.
+
 ---
 
 ### DEF-013 — لا نموذج لحفظ يوم المصراوية، و`PUT` لا يخزّن القيم
