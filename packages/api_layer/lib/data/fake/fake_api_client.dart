@@ -183,15 +183,16 @@ class FakeApiClient implements ApiClient {
     _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
   }
 
-  /// Home publishes the full fixture catalog, then drops every summary, counter,
-  /// and old-debt row whose section this profile cannot read. An unknown section
-  /// name is dropped as well.
+  /// Home publishes the section catalog, then replaces each account-section
+  /// net figure with the summary the list endpoint returns for that section.
+  /// It then drops every summary, counter, and old-debt row whose section this
+  /// profile cannot read. An unknown section name is dropped as well.
   Map<String, dynamic> _homeForSignedInUser() {
     final source = FakeFixtures.home();
     final summaries = <Map<String, dynamic>>[
       for (final raw in source['summaries'] as List)
         if (_mayReadSection((raw as Map)['section']))
-          Map<String, dynamic>.from(raw),
+          _withStoredSectionFigure(Map<String, dynamic>.from(raw)),
     ];
     final counters = <String, Object?>{
       for (final entry in (source['counters'] as Map).entries)
@@ -216,6 +217,34 @@ class FakeApiClient implements ApiClient {
       if (section.key == name) return _access.canRead(section);
     }
     return false;
+  }
+
+  /// Account sections whose list summary is the home figure for that section.
+  static const _accountSections = {
+    'customers',
+    'companies',
+    'libyan-deposits',
+    'egyptian-deposits',
+  };
+
+  /// The same page [AccountsRepository.list] returns for [section].
+  Map<String, dynamic> _sectionPage(String section) =>
+      FakeFixtures.accountsFor(section);
+
+  Map<String, dynamic> _withStoredSectionFigure(Map<String, dynamic> summary) {
+    final section = summary['section'];
+    final key = summary['key'];
+    if (section is! String ||
+        key is! String ||
+        !key.endsWith('.netBalance') ||
+        !_accountSections.contains(section)) {
+      return summary;
+    }
+    final stored = _sectionPage(section)['summary'];
+    if (stored is Map && stored['netBalance'] != null) {
+      summary['valueUnits'] = stored['netBalance'];
+    }
+    return summary;
   }
 
   Map<String, dynamic>? _cardOrNull(String head, String id) {
@@ -455,7 +484,7 @@ class FakeApiClient implements ApiClient {
     }
     if (method == 'GET') {
       _requireRead(section);
-      if (seg.length == 1) return _ok(FakeFixtures.accountsFor(head));
+      if (seg.length == 1) return _ok(_sectionPage(head));
       if (seg.length > 1 && seg[1] == 'suggestions') {
         final paused = pauseSuggestions;
         if (paused != null) await paused.future;
