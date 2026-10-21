@@ -49,6 +49,7 @@ app.*.map.json
 
 # Package build output and local secrets
 packages/**/build/
+staging-permissions-junit.xml
 .env
 .env.*
 *.jks

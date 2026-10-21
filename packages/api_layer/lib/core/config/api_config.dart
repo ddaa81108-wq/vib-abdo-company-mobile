@@ -1,3 +1,5 @@
+import 'release_fake_api_guard.dart';
+
 /// Environment configuration. Values come from --dart-define, never hardcoded.
 enum AuthStrategyKind {
   /// Current real system: session cookie + X-CSRF-Token (default).
@@ -83,15 +85,19 @@ class ApiConfig {
   /// Compile-time defines. Fake mode is the default and does not read a host.
   /// Real mode (`USE_FAKE_API=false`) throws [ApiConfigException] when `API_BASE`
   /// is missing or not an origin. The value is never given a placeholder host.
+  ///
+  /// Release compilation rejects `USE_FAKE_API=true` (the default). Debug and
+  /// tests keep that default. See [ReleaseFakeApiGuard].
   factory ApiConfig.fromEnvironment() {
-    const useFakeApi = bool.fromEnvironment('USE_FAKE_API', defaultValue: true);
+    const ReleaseFakeApiGuard();
+    const useFakeApi = kUseFakeApiFromEnvironment;
     const apiBase = String.fromEnvironment('API_BASE');
     const debug = bool.fromEnvironment('API_DEBUG_LOG');
     const bearer = bool.fromEnvironment('AUTH_BEARER');
     const scale = int.fromEnvironment('MONEY_UNIT_SCALE', defaultValue: 0);
     const rate = String.fromEnvironment('RATE_WIRE_FORMAT');
     const totals = String.fromEnvironment('EMPLOYEE_TOTALS_SOURCE');
-    return ApiConfig.fromDefines(
+    final config = ApiConfig.fromDefines(
       useFakeApi: useFakeApi,
       apiBase: apiBase,
       enableDebugLogging: debug,
@@ -104,6 +110,8 @@ class ApiConfig {
           ? EmployeeTotalsSource.collections
           : EmployeeTotalsSource.standalone,
     );
+    rejectFakeApiInRelease(config.useFakeApi);
+    return config;
   }
 
   /// Same rules as [fromEnvironment], with explicit values so tests can cover
