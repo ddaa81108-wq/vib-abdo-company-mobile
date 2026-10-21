@@ -143,6 +143,12 @@ void main() {
       );
       expect(second.data, first.data);
       expect(api.mutationRequestIds, ['same-id']);
+      final card = (await api.get('/api/customers/c_55')).data as Map;
+      expect(card['balanceUnits'], 0);
+      expect(card['version'], 5);
+      final list = (await api.get('/api/customers')).data as Map;
+      expect((list['summary'] as Map)['netBalance'], 10315);
+      expect(list['totalItems'], 10);
 
       api.failMutationsRemaining = 1;
       final replay = await api.post(
@@ -155,7 +161,7 @@ void main() {
 
       await expectLater(
         api.post(
-          '/api/customers/c_55/transactions',
+          '/api/customers/c_56/transactions',
           body: {
             'requestId': 'fails-once',
             'expectedVersion': 4,
@@ -166,7 +172,7 @@ void main() {
       );
       expect(api.mutationRequestIds, ['same-id', 'fails-once']);
       final retried = await api.post(
-        '/api/customers/c_55/transactions',
+        '/api/customers/c_56/transactions',
         body: {
           'requestId': 'fails-once',
           'expectedVersion': 4,
@@ -268,8 +274,8 @@ void main() {
     () {
       final seen = <String>{};
       for (final section in sections) {
-        final items = (FakeFixtures.accountsFor(section)['items'] as List)
-            .cast<Map>();
+        final items =
+            (FakeFixtures.accountsFor(section)['items'] as List).cast<Map>();
         expect(items, hasLength(10), reason: section);
         for (final card in items) {
           final days = card['debtAgeDays'];

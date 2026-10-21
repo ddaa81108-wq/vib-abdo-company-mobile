@@ -48,7 +48,9 @@ void main() {
     },
   );
 
-  test('fake admin: explicit permissions, home, cashStatus from server, versioned decisions', () async {
+  test(
+      'fake admin: explicit permissions, home, cashStatus from server, versioned decisions',
+      () async {
     final api = ApiLayer.create(
       config: const ApiConfig(
         baseUrl: 'https://fake.invalid',
@@ -95,7 +97,12 @@ void main() {
       'sb_2',
       MutationMeta(expectedVersion: approved.version),
     );
-    expect(ack.version, 1);
+    expect(ack.version, 4);
+    final afterCash = await api.collections.overview();
+    expect(
+      afterCash.submissions.firstWhere((s) => s.id == 'sb_2').cashStatus,
+      CashStatus.received,
+    );
     await api.session.logout();
   });
 
