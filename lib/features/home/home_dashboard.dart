@@ -430,39 +430,63 @@ class _DebtRow extends StatelessWidget {
       section: null,
       serverLabel: debt.ageStatusLabel,
     );
+    final colors = context.statusColors;
     final amount = debt.currency == null
         ? AppStrings.dash
         : money.formatOrDash(debt.balanceUnits, debt.currency!);
-    final flat = useFlatAgeCard(
-      MediaQuery.sizeOf(context).width,
-      Theme.of(context).brightness,
-    );
+    final width = MediaQuery.sizeOf(context).width;
+    final theme = Theme.of(context);
+    final flat = useFlatAgeCard(width, theme.brightness);
     final colored = visual.colored;
-    final paintGradient = colored && !flat && visual.gradient != null;
-    final tile = ListTile(
-      textColor: colored ? context.statusColors.onStatus : null,
-      title: Text(debt.name),
-      subtitle: Text(
-        [
-          amount,
-          if (visual.label != null) visual.label!,
-          if (debt.debtAgeDays != null) sinceDays(debt.debtAgeDays),
-        ].join(' · '),
+    final serverLabel = debt.ageStatusLabel?.trim();
+    final age = (serverLabel != null && serverLabel.isNotEmpty)
+        ? debt.ageStatusLabel
+        : (debt.debtAgeDays != null ? sinceDays(debt.debtAgeDays) : null);
+    final fg = colored ? colors.onStatus : theme.colorScheme.onSurface;
+    final accent = colored
+        ? (visual.accent ?? colors.onStatus)
+        : theme.colorScheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
+      child: Material(
+        key: Key('old-debt-${debt.id}'),
+        color: colored
+            ? (flat ? visual.flat : colors.neutralCard)
+            : theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        clipBehavior: Clip.antiAlias,
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: colored && !flat ? visual.gradient : null,
+            color: colored && flat ? visual.flat : null,
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            border: Border.all(
+              color: colored
+                  ? colors.onStatus.withValues(alpha: 0.2)
+                  : theme.colorScheme.outline,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(debt.name, style: cairo(16, 800, color: fg)),
+                MoneyText(
+                  amount,
+                  style: context.textExtras.amountLarge.copyWith(color: fg),
+                ),
+                if (age != null)
+                  Text(
+                    age,
+                    key: Key('old-debt-age-${debt.id}'),
+                    style: cairo(11, 500, color: accent),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
-    );
-    return Card(
-      key: Key('old-debt-${debt.id}'),
-      margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-      clipBehavior: Clip.antiAlias,
-      color: paintGradient
-          ? Colors.transparent
-          : (colored && flat ? visual.flat : null),
-      child: paintGradient
-          ? Ink(
-              decoration: BoxDecoration(gradient: visual.gradient),
-              child: tile,
-            )
-          : tile,
     );
   }
 }

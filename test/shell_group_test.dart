@@ -11,9 +11,11 @@ import 'package:vib_abdo_company_mobile/features/notifications/notifications_scr
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'package:vib_abdo_company_mobile/state/session_providers.dart';
+import 'package:vib_abdo_company_mobile/ui/presentation.dart';
 import 'package:vib_abdo_company_mobile/ui/section_labels.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'package:vib_abdo_company_mobile/ui/theme.dart';
+import 'package:vib_abdo_company_mobile/ui/widgets/common.dart';
 import 'package:vib_abdo_company_mobile/ui/widgets/soft_tile.dart';
 
 import 'support/pump_app.dart';
@@ -453,6 +455,82 @@ void main() {
     );
   });
 
+  testWidgets('home debt amount and age stay on separate lines', (
+    tester,
+  ) async {
+    await pumpFakeApp(
+      tester,
+      size: const Size(360, 900),
+      overrides: [
+        homeDashboardProvider.overrideWith(
+          (ref) async => const HomeDto(
+            summaries: <HomeSummaryDto>[],
+            counters: <String, int>{},
+            oldDebts: [
+              OldDebtDto(
+                id: 'labeled',
+                section: 'customers',
+                name: 'عميل موسوم',
+                balanceUnits: 15,
+                currency: Currency.lyd,
+                debtAgeDays: 2,
+                ageStatus: 'warning',
+                ageStatusLabel: 'منذ 4 أيام',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    final labeled = find.byKey(const Key('old-debt-labeled'));
+    expect(
+      tester.widget<Text>(find.byKey(const Key('old-debt-age-labeled'))).data,
+      'منذ 4 أيام',
+    );
+    expect(find.text('منذ 2 أيام'), findsNothing);
+    var amount = tester.widget<MoneyText>(
+      find.descendant(of: labeled, matching: find.byType(MoneyText)),
+    );
+    expect(amount.text, '15 د.ل');
+    expect(amount.text.contains('منذ'), isFalse);
+
+    await pumpFakeApp(
+      tester,
+      size: const Size(360, 900),
+      overrides: [
+        homeDashboardProvider.overrideWith(
+          (ref) async => const HomeDto(
+            summaries: <HomeSummaryDto>[],
+            counters: <String, int>{},
+            oldDebts: [
+              OldDebtDto(
+                id: 'counted',
+                section: 'customers',
+                name: 'عميل بلا وسم',
+                balanceUnits: 8,
+                currency: Currency.lyd,
+                debtAgeDays: 2,
+                ageStatus: 'warning',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    expect(
+      tester.widget<Text>(find.byKey(const Key('old-debt-age-counted'))).data,
+      sinceDays(2),
+    );
+    final counted = find.byKey(const Key('old-debt-counted'));
+    amount = tester.widget<MoneyText>(
+      find.descendant(of: counted, matching: find.byType(MoneyText)),
+    );
+    expect(amount.text, '8 د.ل');
+    expect(amount.text.contains('منذ'), isFalse);
+  });
+
   for (final dark in [false, true]) {
     testWidgets(
       'P4-002 home debt row uses the ageStatus gradient (${dark ? 'dark' : 'light'})',
@@ -479,7 +557,17 @@ void main() {
         );
         final decoration = ink.decoration! as BoxDecoration;
         expect(decoration.gradient, context.statusColors.warningDebt);
-        expect(find.text('منذ 4 أيام'), findsWidgets);
+        expect(find.text('منذ 4 أيام'), findsOneWidget);
+        final amount = tester.widget<MoneyText>(
+          find.descendant(of: row, matching: find.byType(MoneyText)),
+        );
+        expect(amount.text, '320 د.ل');
+        expect(amount.text.contains('منذ'), isFalse);
+        final age = tester.widget<Text>(
+          find.byKey(const Key('old-debt-age-c_55')),
+        );
+        expect(age.data, 'منذ 4 أيام');
+        expect(age.data!.contains('د.ل'), isFalse);
       },
     );
   }
