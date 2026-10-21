@@ -14,8 +14,9 @@
 | التصنيف | المعرّفات |
 |---|---|
 | Pending PM decision | DEF-002. السلوك لم يتغير على `main` عند `dff1456`، والعيب لم يُغلق |
-| Blocking ما زال مفتوحًا | DEF-013 وDEF-014 على المرحلة 4. لا يبقى DEF-003 أو DEF-004 أو DEF-005 أو DEF-006 مفتوحًا على `main` |
-| Non-blocking | DEF-010، DEF-012، DEF-015، DEF-016 |
+| Blocking ما زال مفتوحًا على `main` | DEF-013 وDEF-014 ما زالا في `dff1456`. لا يبقى DEF-003 أو DEF-004 أو DEF-005 أو DEF-006 مفتوحًا على `main` |
+| Non-blocking على `main` | DEF-010، DEF-012. DEF-015 وDEF-016 أُغلقا على مسودات وليسا على `main` |
+| verified وليس على `main` | DEF-013 على #31 `636ef4b`. DEF-014 على #30 `fe69157`. DEF-015 على #28 `002db97`. DEF-016 على #29 `5b27815` |
 | أُغلق بعد إعادة اختبار | DEF-001: Fixed in #15 — verified، وأُعيد على `main`. DEF-003 وDEF-004 وDEF-005: Verified على #24 وأُعيدت على `main`. DEF-006 وDEF-008 وDEF-009 وDEF-011: Verified على #17 وأُعيد DEF-006 على `main`. DEF-007: Verified على #26 عند `aead4c5` وأُعيد ضمن المجموعة على `main` |
 
 ---
@@ -392,7 +393,7 @@
 
 ### DEF-013 — لا نموذج لحفظ يوم المصراوية، و`PUT` لا يخزّن القيم
 
-**الحالة:** مفتوح
+**الحالة:** verified on #31 636ef4b, not yet on main
 
 | الحقل | القيمة |
 |---|---|
@@ -411,11 +412,15 @@
 
 **الفعلي على `dff1456`:** الشاشة عمود قراءة (`screen-masraweya`) بلا حقل إدخال ولا زر حفظ. `PUT` يعيد ملف اليوم الثابت (`previousValueUnits` 10000، المشتريات 2000، إجمالي العمل 3050، المتبقي 8950، الإصدار 2). `GET` التالي يطابق ذلك ولا يحتفظ بالقيمة 1. العرض نفسه من حقول الخادم، وهذا الجزء لا يُحتسب نجاحًا للمعيار.
 
+**إعادة الاختبار على PR #31 (`636ef4b`، فوق `main`، ليس على `main` بعد):** verified on #31 636ef4b, not yet on main. `bash tool/check.sh` خرج 0 (التطبيق 252/0، الحزمة 78/0).
+
+المدير يحفظ من النموذج. `DEF-013 PUT stores the submitted day and GET returns it`: القيمة السابقة 1 والمشتريات 9 والإصدار يصير 3، و`GET` يعيد ذلك. `saving the day sends raw inputs and refreshes server values`: الواجهة تعرض «1 ج.م» و«9 ج.م» بعد التأكيد، والجسم فيه `requestId` و`expectedVersion` 2. إصدار قديم يعيد 409 `VERSION_CONFLICT` ولا يغيّر اليوم (`DEF-013 a stale expectedVersion is VERSION_CONFLICT`). إعادة نفس `requestId` تعيد اليوم الأول ولا تطبّق القيمة الثانية. الموظف و`limited.admin.demo` و`guest.demo` بلا قراءة ولا كتابة: `GET` و`PUT` يعيدان 403، والنموذج يختفي بلا `masraweya.write` (`the save form is visible only with write permission`). `workTotal` يبقى 3050 و`remaining` يبقى 8950 لأن لا صيغة معتمدة. هذا **سؤال مفتوح** وليس عيبًا.
+
 ---
 
 ### DEF-014 — Fake API يقبل كتابة بند على يوم مشتريات معتمد
 
-**الحالة:** مفتوح
+**الحالة:** verified on #30 fe69157, not yet on main
 
 | الحقل | القيمة |
 |---|---|
@@ -435,11 +440,15 @@
 
 **الفعلي على `dff1456`:** الواجهة تخفي الإضافة والتعديل والحذف عندما لا يكون اليوم قابلًا للتحرير، وتبدّل الاعتماد إلى `open-correction-12`. الطلبات الثلاثة من API تعيد **200** `{id: pe_new, version: 4}`. الدفتر يبقى `finalized` / الإصدار 4 وبندًا واحدًا. لا 409 ولا 403.
 
+**إعادة الاختبار على PR #30 (`fe69157`، فوق `main`، ليس على `main` بعد):** verified on #30 fe69157, not yet on main. `bash tool/check.sh` خرج 0 (التطبيق 251/0، الحزمة 79/0).
+
+`DEF-014 finalized purchase day rejects entry create update and delete`: بعد الاعتماد الإصدار 4، الإضافة والتعديل والحذف كل منها 409 `DAY_FINALIZED`، وبصمة الدفتر لا تتغير. إعادة نفس `requestId` الذي نجح على المسودة لا تتجاوز الرفض (`DEF-014 a stored requestId does not bypass the finalized-day check`). الواجهة تخفي `add-purchase-12` و`edit-pe_1` و`delete-pe_1` وتبقي `open-correction-12` (`a finalized purchases day hides add edit and delete`). حفظ أو حذف بعد الاعتماد يعرض رسالة الخادم لا رسالة تعارض الإصدار. الموظف و`limited.admin.demo` و`guest.demo` يأخذون 403 قبل ذلك لأنهم بلا `purchases.write`. يوم `correction` يبقى قابلًا للكتابة.
+
 ---
 
 ### DEF-015 — قبض الخزينة وصرفها لا يظهران في دفتر النقد
 
-**الحالة:** مفتوح
+**الحالة:** verified on #28 002db97, not yet on main
 
 | الحقل | القيمة |
 |---|---|
@@ -458,11 +467,15 @@
 
 **الفعلي على `dff1456`:** الردان `{id: ce_new, version: 8}`. الدفتر يبقى `[ce_1]` والملخص يبقى الإصدار 7 و`activeCashUnits` 8000. الموظف: 403 `FORBIDDEN`، والزر مخفي في اختبارات الواجهة. نصف المنع ناجح، وظهور الحركة فاشل. غير مانع لأن أولوية المعيار متوسطة ونصف الصلاحية يعمل.
 
+**إعادة الاختبار على PR #28 (`002db97`، فوق `main`، ليس على `main` بعد):** verified on #28 002db97, not yet on main. `bash tool/check.sh` خرج 0 (التطبيق 248/0، الحزمة 76/0).
+
+`DEF-015 cash in and cash out are returned by the ledger`: قبض 1250 يعيد `ce_8` والإصدار 8. إعادة نفس `requestId` لا تضيف سطرًا. إصدار 7 بعد ذلك يعيد 409 `VERSION_CONFLICT`. الصرف 200 يعيد `ce_9` والإصدار 9. الدفتر `[ce_9, ce_8, ce_1]`، والنقد النشط 9050، والصافي 52050، والإصدار 9. الواجهة `DEF-015 cash in and cash out refresh the ledger and the summaries` ترسم `cash-entry-ce_8` بمبلغ 1,250 د.ل وبطاقة النقد 9,250 د.ل ثم `ce_9`. الموظف و`limited.admin.demo` و`guest.demo`: قراءة الخزينة و`POST` يعيدان 403، والأزرار مخفية عمن بلا `treasury.write`.
+
 ---
 
 ### DEF-016 — نشرة الديون في الرئيسية تبقى على رصيد الملف بعد السداد
 
-**الحالة:** مفتوح
+**الحالة:** verified on #29 5b27815, not yet on main
 
 | الحقل | القيمة |
 |---|---|
@@ -481,7 +494,17 @@
 
 **الفعلي على `dff1456`:** الملخص يصبح **10315** والأمانات المصرية تبقى **23750**، وهذا يطابق P2-03. `oldDebts` يبقى `c_55` برصيد **320** لأن النشرة تُنسخ من ملف الرئيسية ولا تُحدَّث من رصيد الكارت المخزَّن. الواجهة ترسم `debt.balanceUnits`. لا يعيد فتح DEF-003 ولا يغيّر قرار المرحلة 2.
 
+**إعادة الاختبار على PR #29 (`5b27815`، فوق `main`، ليس على `main` بعد):** verified on #29 5b27815, not yet on main. `bash tool/check.sh` خرج 0 (التطبيق 250/0، الحزمة 76/0).
+
+`DEF-016 home debt rows copy the stored card balance`: بعد السداد الكامل رصيد الكارت 0 وصف النشرة 0، والملخص 10315، والمصري 23750. السداد الجزئي 100 يجعل الكارت والنشرة **220**. الواجهة `DEF-016 full payment no longer shows the 320 home debt row` لا تعرض «320 د.ل» بعد السداد الكلي وتعرض الصفر. `limited.admin.demo` و`employee.demo` يقرآن الصف 220 بعد سداد المدير على العميل نفسه. `guest.demo` بلا `oldDebts`. الصف يبقى ظاهرًا عند الصفر. اختفاؤه عند الصفر **سؤال مفتوح لمدير المشروع** وليس عيبًا.
+
 ---
+
+## سؤالان مفتوحان من إعادة #28–#31
+
+- **المصراوية:** `workTotalUnits` و`remainingUnits` لا يُعاد حسابهما من القيم المحفوظة. لا صيغة معتمدة. ليس عيبًا.
+- **نشرة الديون:** بعد السداد الكامل يبقى صف `c_55` برصيد 0. هل يختفي الصف عند الصفر سؤال لمدير المشروع، وليس عيبًا.
+- **P3-01** يبقى Blocked. يحتاج staging حقيقيًا.
 
 ## سؤال مفتوح على PR #17 — بطاقة «الاستلامات المعتمدة اليوم»
 
