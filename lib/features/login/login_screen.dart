@@ -10,6 +10,7 @@ import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
+import '../../ui/widgets/session_expired_notice.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -47,7 +48,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ? ref.watch(errorHandlerProvider).toFailure(login.error!)
         : null;
     final notice = failure == null ? signedOutNotice(session) : null;
-    final message = failure?.message ?? notice;
+    final message = failure?.message;
     final busy = login.isLoading;
     final theme = Theme.of(context);
     final dark = ref.watch(themeModeProvider) == ThemeMode.dark;
@@ -161,6 +162,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               ),
                             ),
+                            if (notice != null) ...[
+                              const SizedBox(height: AppSpacing.lg),
+                              SessionExpiredNotice(message: notice),
+                            ],
                             if (message != null) ...[
                               const SizedBox(height: AppSpacing.lg),
                               Text(

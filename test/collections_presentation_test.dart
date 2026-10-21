@@ -448,6 +448,8 @@ Future<void> reveal(WidgetTester tester, Key key) async {
 Future<void> relog(WidgetTester tester, String username) async {
   await tester.tap(find.byKey(HomeShell.logoutKey));
   await settle(tester);
+  await tester.tap(find.byKey(const Key('logout-confirm')));
+  await settle(tester);
   await signIn(tester, username: username, password: 'demo-only');
 }
 

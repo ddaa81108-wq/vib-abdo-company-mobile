@@ -62,6 +62,13 @@ void main() {
         EnginePhase.sendSemanticsUpdate,
         const Duration(seconds: 20),
       );
+      expect(find.text(AppStrings.logoutConfirm), findsOneWidget);
+      await tester.tap(find.byKey(const Key('logout-confirm')));
+      await tester.pumpAndSettle(
+        const Duration(milliseconds: 50),
+        EnginePhase.sendSemanticsUpdate,
+        const Duration(seconds: 20),
+      );
       expect(find.byKey(LoginScreen.submitKey), findsOneWidget);
     },
   );

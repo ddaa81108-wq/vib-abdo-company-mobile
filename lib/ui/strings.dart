@@ -16,6 +16,7 @@ abstract final class AppStrings {
   static const sessionExpired = 'انتهت الجلسة، يرجى تسجيل الدخول';
   static const homeTitle = 'الرئيسية';
   static const logout = 'تسجيل الخروج';
+  static const logoutConfirm = 'هل تريد تسجيل الخروج؟';
   static const signedInAs = 'الحساب';
   static const roleAdmin = 'مدير النظام';
   static const roleEmployee = 'موظف';
