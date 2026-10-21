@@ -70,7 +70,7 @@ void main() {
     expect(api.permissions.role, AccountRole.unknown);
   });
 
-  testWidgets('limited admin and unknown role deep links return home', (
+  testWidgets('limited admin and unknown role deep links open /forbidden', (
     tester,
   ) async {
     await pumpFakeApp(tester, size: const Size(800, 1600));
@@ -78,8 +78,11 @@ void main() {
 
     for (final path in ['/treasury', '/reports', '/settings', '/companies']) {
       await go(tester, path);
-      expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+      expect(find.byKey(const Key('screen-forbidden')), findsOneWidget);
+      expect(find.byKey(HomeDashboard.screenKey), findsNothing);
+      expect(find.text(AppStrings.forbidden), findsWidgets);
     }
+    await go(tester, '/');
     expect(find.byKey(HomeShell.sectionKey(SectionKey.treasury)), findsNothing);
     expect(
       find.byKey(HomeShell.sectionKey(SectionKey.customers)),
@@ -88,11 +91,16 @@ void main() {
 
     await tester.tap(find.byKey(HomeShell.logoutKey));
     await settle(tester);
+    expect(find.byKey(const Key('logout-dialog')), findsOneWidget);
+    expect(find.text('هل تريد تسجيل الخروج؟'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('logout-confirm')));
+    await settle(tester);
     await signIn(tester, username: 'guest.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
-    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
-    expect(find.text(AppStrings.roleUnknown), findsOneWidget);
+    expect(find.byKey(const Key('screen-forbidden')), findsOneWidget);
     expect(find.byKey(const Key('add-debt')), findsNothing);
+    await go(tester, '/');
+    expect(find.text(AppStrings.roleUnknown), findsOneWidget);
   });
 
   testWidgets('full access false cannot open settings by direct link', (
@@ -100,9 +108,12 @@ void main() {
   ) async {
     await pumpFakeApp(tester);
     await signIn(tester, username: 'flag.admin.demo', password: 'demo-only');
+    expect(find.text(AppStrings.noSections), findsOneWidget);
     await go(tester, '/settings');
-    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+    expect(find.byKey(const Key('screen-forbidden')), findsOneWidget);
+    expect(find.byKey(HomeDashboard.screenKey), findsNothing);
     expect(find.byKey(const Key('financial-ledger')), findsNothing);
+    await go(tester, '/');
     expect(find.text(AppStrings.noSections), findsOneWidget);
   });
 

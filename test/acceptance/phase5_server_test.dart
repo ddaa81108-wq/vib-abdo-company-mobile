@@ -17,7 +17,8 @@ void main() {
     final totals = collections.dataMap['employeeTotals'] as List;
     expect(totals, isNotEmpty);
     final payroll = await api.collections.payroll();
-    expect(payroll.employees.map((e) => e.userId), ['u_12']);
+    expect(payroll.employees.map((e) => e.userId), containsAll(['u_12', 'u_20']));
+    expect(payroll.employees, hasLength(2));
   });
 
   test('P5-14 a logged-out token cannot read or approve', () async {
@@ -92,9 +93,8 @@ void main() {
         MutationMeta(requestId: 'p5-21-salary'),
       ),
     );
-    expect(salary.statusCode, 403);
-    expect(salary.code, 'FORBIDDEN');
-    expect(salary.message, 'هذا الإجراء للإدارة فقط');
+    expect(salary.statusCode, 404);
+    expect(salary.code, 'NOT_FOUND');
 
     final home = await api.client.get('/api/home');
     expect(_sections(home.dataMap), ['customers', 'collections']);
@@ -133,17 +133,22 @@ void main() {
         section: 'customers',
         meta: MutationMeta(requestId: 'p5-32-assign'),
       ),
-      () => api.collections.setBaseSalary(
-        'u_1',
-        9000,
-        MutationMeta(requestId: 'p5-32-salary'),
-      ),
     ]) {
       final error = await _apiOf(call);
       expect(error.statusCode, 403);
       expect(error.code, 'FORBIDDEN');
       expect(error.message, adminOnly);
     }
+
+    final salary = await _apiOf(
+      () => api.collections.setBaseSalary(
+        'u_1',
+        9000,
+        MutationMeta(requestId: 'p5-32-salary'),
+      ),
+    );
+    expect(salary.statusCode, 404);
+    expect(salary.code, 'NOT_FOUND');
 
     final overview = await api.collections.overview();
     expect(
@@ -195,11 +200,7 @@ void main() {
     final byPath = await api.client.get(
       '/api/collections/payroll/employees/u_1',
     );
-    final byQuery = await api.client.get(
-      '/api/collections/payroll',
-      query: const {'employeeId': 'u_1'},
-    );
-    for (final response in [plain, byPath, byQuery]) {
+    for (final response in [plain, byPath]) {
       expect(response.statusCode, 200);
       final ids = [
         for (final row in (response.dataMap['employees'] as List))
@@ -207,6 +208,14 @@ void main() {
       ];
       expect(ids, ['u_12']);
     }
+    final byQuery = await _apiOf(
+      () => api.client.get(
+        '/api/collections/payroll',
+        query: const {'employeeId': 'u_1'},
+      ),
+    );
+    expect(byQuery.statusCode, 404);
+    expect(byQuery.code, 'NOT_FOUND');
   });
 
   test('P5-42 guest and flag.admin are refused on the server', () async {
@@ -244,9 +253,17 @@ void main() {
     }
   });
 
-  test('P5-65 account-requests has no fake route for any role', () async {
+  test('P5-65 account-requests is an admin catalog on the fake', () async {
+    final admin = await _signedIn('admin.demo');
+    final list = await admin.client.get('/api/account-requests');
+    expect(list.statusCode, 200);
+    expect(list.dataMap['items'], isNotEmpty);
+    final decision = await admin.client.get(
+      '/api/account-requests/ar_1/decision',
+    );
+    expect(decision.statusCode, 200);
+
     for (final username in const [
-      'admin.demo',
       'limited.admin.demo',
       'employee.demo',
       'guest.demo',
@@ -258,8 +275,8 @@ void main() {
         '/api/account-requests/ar_1/decision',
       ]) {
         final error = await _apiOf(() => api.client.get(path));
-        expect(error.statusCode, 404, reason: '$username $path');
-        expect(error.code, 'NOT_FOUND', reason: '$username $path');
+        expect(error.statusCode, 403, reason: '$username $path');
+        expect(error.code, 'FORBIDDEN', reason: '$username $path');
       }
     }
   });

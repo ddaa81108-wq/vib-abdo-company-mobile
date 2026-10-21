@@ -57,9 +57,7 @@ void main() {
 
     for (final path in _adminPaths) {
       await go(tester, path);
-      expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
-      expect(find.byKey(const Key('screen-settings-employees')), findsNothing);
-      expect(find.byKey(const Key('financial-ledger')), findsNothing);
+      _expectForbiddenRoute(tester);
     }
   });
 
@@ -90,8 +88,7 @@ void main() {
 
     for (final path in _adminPaths) {
       await go(tester, path);
-      expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
-      expect(find.text(AppStrings.employeeTotals), findsNothing);
+      _expectForbiddenRoute(tester);
     }
   });
 
@@ -104,19 +101,17 @@ void main() {
     expect(find.text(AppStrings.noSections), findsOneWidget);
     for (final path in ['/collections', '/customers/c_55', ..._adminPaths]) {
       await go(tester, path);
-      expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
-      expect(find.text(AppStrings.employeeTotals), findsNothing);
+      _expectForbiddenRoute(tester);
     }
 
-    await tester.tap(find.byKey(HomeShell.logoutKey));
-    await settle(tester);
+    await go(tester, '/');
+    await confirmLogout(tester);
     await signIn(tester, username: 'flag.admin.demo', password: 'demo-only');
     expect(find.text(AppStrings.noSections), findsOneWidget);
     expect(find.text(AppStrings.roleUnknown), findsNothing);
     for (final path in ['/collections', ..._adminPaths]) {
       await go(tester, path);
-      expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
-      expect(find.byKey(const Key('financial-ledger')), findsNothing);
+      _expectForbiddenRoute(tester);
     }
   });
 
@@ -130,8 +125,7 @@ void main() {
     await go(tester, '/settings/employees');
     expect(find.byKey(const Key('screen-settings-employees')), findsOneWidget);
 
-    await tester.tap(find.byKey(HomeShell.logoutKey));
-    await settle(tester);
+    await confirmLogout(tester);
     _expectSignedOut(tester, expired: false);
 
     await _goFromLogin(tester, '/collections');
@@ -191,6 +185,27 @@ const _adminPaths = [
   '/masraweya',
   '/purchases',
 ];
+
+/// A denied section stays inside the shell on `/forbidden`.
+void _expectForbiddenRoute(WidgetTester tester) {
+  expect(find.byKey(const Key('screen-forbidden')), findsOneWidget);
+  expect(find.byKey(HomeDashboard.screenKey), findsNothing);
+  expect(find.text(AppStrings.forbidden), findsWidgets);
+  expect(find.byKey(const Key('screen-settings-employees')), findsNothing);
+  expect(find.byKey(const Key('financial-ledger')), findsNothing);
+  expect(find.byKey(const Key('screen-employee-totals')), findsNothing);
+  expect(find.text('هذا الإجراء للإدارة فقط'), findsNothing);
+  expect(find.text('لا تملك صلاحية لهذا الإجراء'), findsNothing);
+}
+
+Future<void> confirmLogout(WidgetTester tester) async {
+  await tester.tap(find.byKey(HomeShell.logoutKey));
+  await settle(tester);
+  expect(find.byKey(const Key('logout-dialog')), findsOneWidget);
+  expect(find.text('هل تريد تسجيل الخروج؟'), findsOneWidget);
+  await tester.tap(find.byKey(const Key('logout-confirm')));
+  await settle(tester);
+}
 
 void _expectSignedOut(WidgetTester tester, {required bool expired}) {
   expect(find.byKey(LoginScreen.screenKey), findsOneWidget);
