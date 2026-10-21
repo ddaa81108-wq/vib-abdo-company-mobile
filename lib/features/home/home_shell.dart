@@ -508,62 +508,73 @@ class _NavList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.sidebarPalette;
     final colors = context.appColors;
+    final themeTile = SoftTile(
+      leading: Icon(
+        dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+      ),
+      title: dark ? AppStrings.themeLight : AppStrings.themeDark,
+      titleColor: palette.shine,
+      iconColor: palette.shine,
+      onTap: () => ref.read(themeModeProvider.notifier).toggle(),
+    );
     return Material(
       color: colors.sidebarBg,
       child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsetsDirectional.symmetric(
-            vertical: AppSpacing.md,
-          ),
+        child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsetsDirectional.symmetric(
-                horizontal: AppSpacing.lg,
-              ),
-              child: Text(
-                AppStrings.brandWord,
-                style: cairo(20, 800, color: palette.base),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsetsDirectional.symmetric(
-                horizontal: AppSpacing.lg,
-              ),
-              child: Text(
-                AppStrings.organization,
-                style: cairo(12, 600, color: colors.sidebarMuted),
-              ),
-            ),
-            if (showIdentity)
-              Theme(
-                data: Theme.of(context).copyWith(
-                  textTheme: Theme.of(context).textTheme.apply(
-                    bodyColor: palette.shine,
-                    displayColor: palette.shine,
-                  ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsetsDirectional.symmetric(
+                  vertical: AppSpacing.md,
                 ),
-                child: IdentityBlock(summary: summary),
+                children: [
+                  Padding(
+                    padding: const EdgeInsetsDirectional.symmetric(
+                      horizontal: AppSpacing.lg,
+                    ),
+                    child: Text(
+                      AppStrings.brandWord,
+                      style: cairo(20, 800, color: palette.base),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsetsDirectional.symmetric(
+                      horizontal: AppSpacing.lg,
+                    ),
+                    child: Text(
+                      AppStrings.organization,
+                      style: cairo(12, 600, color: colors.sidebarMuted),
+                    ),
+                  ),
+                  if (showIdentity)
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        textTheme: Theme.of(context).textTheme.apply(
+                          bodyColor: palette.shine,
+                          displayColor: palette.shine,
+                        ),
+                      ),
+                      child: IdentityBlock(summary: summary),
+                    ),
+                  const SizedBox(height: AppSpacing.md),
+                  for (var i = 0; i < items.length; i++)
+                    SoftTile(
+                      selected: i == selected,
+                      selectedColor: palette.glowSoft,
+                      title: items[i].label,
+                      titleColor: i == selected
+                          ? palette.bright
+                          : palette.shine,
+                      iconColor: i == selected
+                          ? palette.bright
+                          : colors.sidebarMuted,
+                      leading: Icon(items[i].icon),
+                      onTap: () => onSelect(items[i]),
+                    ),
+                ],
               ),
-            const SizedBox(height: AppSpacing.md),
-            for (var i = 0; i < items.length; i++)
-              SoftTile(
-                selected: i == selected,
-                selectedColor: palette.glowSoft,
-                title: items[i].label,
-                titleColor: i == selected ? palette.bright : palette.shine,
-                iconColor: i == selected ? palette.bright : colors.sidebarMuted,
-                leading: Icon(items[i].icon),
-                onTap: () => onSelect(items[i]),
-              ),
-            SoftTile(
-              leading: Icon(
-                dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              ),
-              title: dark ? AppStrings.themeLight : AppStrings.themeDark,
-              titleColor: palette.shine,
-              iconColor: palette.shine,
-              onTap: () => ref.read(themeModeProvider.notifier).toggle(),
             ),
+            themeTile,
           ],
         ),
       ),
