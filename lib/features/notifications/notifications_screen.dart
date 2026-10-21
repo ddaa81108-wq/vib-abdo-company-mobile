@@ -3,7 +3,6 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/notification_providers.dart';
 import '../../state/theme_controller.dart';
@@ -92,7 +91,7 @@ class NotificationsScreen extends ConsumerWidget {
     NotificationDto item,
   ) async {
     try {
-      await ref.read(apiLayerProvider).notifications.markRead(item.id);
+      await ref.read(notificationsProvider.notifier).markRead(item.id);
     } catch (error) {
       return (
         error: failureText(ref.read(errorHandlerProvider).toFailure(error)),
@@ -106,7 +105,7 @@ class NotificationsScreen extends ConsumerWidget {
 
   Future<void> _all(WidgetRef ref, BuildContext context) async {
     try {
-      await ref.read(apiLayerProvider).notifications.markAllRead();
+      await ref.read(notificationsProvider.notifier).markAllRead();
     } catch (error) {
       final failure = ref.read(errorHandlerProvider).toFailure(error);
       if (context.mounted) showFailureSnackBar(context, failure);

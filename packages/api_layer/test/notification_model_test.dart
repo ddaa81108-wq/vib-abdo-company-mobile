@@ -83,8 +83,10 @@ void main() {
         'readAt': '',
       }),
       isA<AppNotification>()
-          .having((item) => item.systemName, 'systemName', 'sys')
-          .having((item) => item.employeeName, 'employeeName', 'ن')
+          .having((item) => item.systemName, 'systemName', '')
+          .having((item) => item.employeeName, 'employeeName', isNull)
+          .having((item) => item.title, 'title', isNull)
+          .having((item) => item.body, 'body', isNull)
           .having(
             (item) => item.operationType,
             'operationType',
@@ -112,6 +114,63 @@ void main() {
     expect(fromSection.relatedRef?.type, 'collections');
     expect(fromSection.relatedRef?.id, 'sb_1');
     expect(fromSection.toDto().section, 'collections');
+  });
+
+  test('fromDto reads recipientUserId and leaves it null when absent', () {
+    final present = NotificationDto.fromJson({
+      'id': '77',
+      'action': 'approve',
+      'recipientUserId': 'u_12',
+      'userId': 'u_20',
+      'recipient_user_id': 'u_9',
+    });
+    expect(present.recipientUserId, 'u_12');
+    expect(AppNotification.fromDto(present).recipientUserId, 'u_12');
+    expect(AppNotification.fromDto(present).toDto().recipientUserId, 'u_12');
+
+    final absent = NotificationDto.fromJson({
+      'id': '77',
+      'action': 'approve',
+      'userId': 'u_20',
+      'recipient_user_id': 'u_9',
+    });
+    expect(absent.recipientUserId, isNull);
+    expect(AppNotification.fromDto(absent).recipientUserId, isNull);
+  });
+
+  test('fromPushPayload drops keys that are not on the allow list', () {
+    final parsed = AppNotification.fromPushPayload({
+      'notificationId': 'p',
+      'recipientUserId': 'u_12',
+      'action': 'approve',
+      'relatedRefType': 'receipt',
+      'relatedRefId': 'r1',
+      'createdAt': '2026-10-18T12:00:00Z',
+      'title': 'عنوان',
+      'body': 'متن',
+      'employeeName': 'ن',
+      'systemName': 'sys',
+      'system': 'alt',
+      'readAt': '2026-10-21T18:00:00Z',
+      'section': 'collections',
+      'entityId': 'sb_1',
+      'type': 'cash_received',
+      'extra': 'nope',
+    });
+
+    expect(parsed.notificationId, 'p');
+    expect(parsed.recipientUserId, 'u_12');
+    expect(parsed.operationType, NotificationOperationType.approve);
+    expect(parsed.operationTypeRaw, 'approve');
+    expect(parsed.relatedRef?.type, 'receipt');
+    expect(parsed.relatedRef?.id, 'r1');
+    expect(parsed.createdAt, DateTime.utc(2026, 10, 18, 12));
+    expect(parsed.title, isNull);
+    expect(parsed.body, isNull);
+    expect(parsed.employeeName, isNull);
+    expect(parsed.systemName, '');
+    expect(parsed.readAt, isNull);
+    expect(parsed.isRead, isFalse);
   });
 
   test('pagination cursors are optional', () {

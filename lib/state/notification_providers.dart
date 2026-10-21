@@ -68,14 +68,18 @@ final foregroundNotificationsProvider = StreamProvider<AppNotification>((ref) {
 class NotificationsController extends AsyncNotifier<NotificationsPage> {
   final Map<String, NotificationWriteResult> _writes = {};
   final Map<String, String> _oneReadIds = {};
+  final Map<String, Future<void>> _oneReadFlights = {};
   String? _allReadId;
+  Future<void>? _allReadFlight;
 
   @override
   Future<NotificationsPage> build() async {
     final session = ref.watch(sessionStateProvider);
     _writes.clear();
     _oneReadIds.clear();
+    _oneReadFlights.clear();
     _allReadId = null;
+    _allReadFlight = null;
     ref.read(apiLayerProvider).notifications.clearWriteCache();
     if (session is! SessionAuthenticated) {
       return const NotificationsPage(items: [], unreadCount: null);
@@ -90,22 +94,26 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     return _page(visible, unreadCount: page.unreadCount, base: page);
   }
 
-  /// GET the list and the unread-count route, then ingest with
-  /// [NotificationSource.fetch].
+  /// GET /api/notifications and ingest first, then GET the unread-count route.
+  ///
+  /// A 404 or any other non-auth failure of the count route falls back to the
+  /// list response's `unreadCount`. If that field is absent too, the previous
+  /// count stays. The count is never computed from the rows. A count failure
+  /// does not roll back the list. 401 still throws [SessionExpiredException]
+  /// after the interceptor has called forceLogout.
   ///
   /// Realtime (SSE `/api/events` or polling `/api/event-changes`) should call
   /// `refresh(announce: true)` so a newly seen unread row can raise a banner.
   /// The initial load uses the default and stays quiet.
   Future<void> refresh({bool announce = false}) async {
-    final repo = ref.read(apiLayerProvider).notifications;
-    final page = await repo.list();
-    final count = await repo.serverUnreadCount();
+    final page = await ref.read(apiLayerProvider).notifications.list();
     await ingest(
       page.appNotifications,
       source: NotificationSource.fetch,
       announce: announce,
     );
-    _applyCount(count, pageUnread: page.unreadCount);
+    final count = await _resolveUnread(listUnread: page.unreadCount);
+    if (count != null) _applyCount(count, pageUnread: page.unreadCount);
   }
 
   Future<void> ingest(
@@ -137,11 +145,23 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
       }
     }
     if (source == NotificationSource.push) {
-      final count = await ref
-          .read(apiLayerProvider)
-          .notifications
-          .serverUnreadCount();
-      _applyCount(count);
+      final count = await _resolveUnread();
+      if (count != null) _applyCount(count);
+    }
+  }
+
+  /// [explicit] is a write response's `unreadCount`. Otherwise the unread-count
+  /// route is tried on its own. A non-auth failure returns [listUnread], which
+  /// is null when the list omitted the field so the caller keeps the previous
+  /// count. [SessionExpiredException] is rethrown; forceLogout already ran.
+  Future<int?> _resolveUnread({int? explicit, int? listUnread}) async {
+    if (explicit != null) return explicit;
+    try {
+      return await ref.read(apiLayerProvider).notifications.serverUnreadCount();
+    } on SessionExpiredException {
+      rethrow;
+    } catch (_) {
+      return listUnread;
     }
   }
 
@@ -152,9 +172,24 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
   }) => ingest([item], source: source, announce: announce);
 
   /// Marks one row read. The in-flight attempt keeps one [requestId].
-  /// A network failure keeps that id. A finished attempt drops it.
-  /// The count is the server's number, never a local decrement.
-  Future<void> markRead(String notificationId) async {
+  /// A second call for the same id before that attempt finishes waits on the
+  /// same future and does not send again. A network failure keeps the id.
+  /// A finished attempt drops it. The count is the server's number, never a
+  /// local decrement.
+  Future<void> markRead(String notificationId) {
+    final inFlight = _oneReadFlights[notificationId];
+    if (inFlight != null) return inFlight;
+    final flight = _markOne(notificationId);
+    _oneReadFlights[notificationId] = flight;
+    flight.whenComplete(() {
+      if (identical(_oneReadFlights[notificationId], flight)) {
+        _oneReadFlights.remove(notificationId);
+      }
+    }).ignore();
+    return flight;
+  }
+
+  Future<void> _markOne(String notificationId) async {
     final requestId = _oneReadIds.putIfAbsent(
       notificationId,
       RequestIds.newRequestId,
@@ -170,7 +205,20 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     await _applyWrite(result, onlyId: notificationId);
   }
 
-  Future<void> markAllRead() async {
+  /// Marks every cached row read. A second call while the first is in flight
+  /// waits on the same future and does not send again.
+  Future<void> markAllRead() {
+    final inFlight = _allReadFlight;
+    if (inFlight != null) return inFlight;
+    final flight = _markAll();
+    _allReadFlight = flight;
+    flight.whenComplete(() {
+      if (identical(_allReadFlight, flight)) _allReadFlight = null;
+    }).ignore();
+    return flight;
+  }
+
+  Future<void> _markAll() async {
     final requestId = _allReadId ??= RequestIds.newRequestId();
     final result = await _send(
       requestId,
@@ -207,8 +255,6 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     NotificationWriteResult result, {
     String? onlyId,
   }) async {
-    final count = result.unreadCount ??
-        await ref.read(apiLayerProvider).notifications.serverUnreadCount();
     final notification = result.notification;
     if (notification != null) {
       await ingest(
@@ -216,24 +262,27 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
         source: NotificationSource.fetch,
         announce: false,
       );
-      _applyCount(count);
-      return;
+    } else {
+      final readAt = result.readAt;
+      if (readAt == null) {
+        await refresh();
+        if (result.unreadCount != null) _applyCount(result.unreadCount!);
+        return;
+      }
+      final next = [
+        for (final item in _records(state.value))
+          if ((onlyId == null || item.notificationId == onlyId) && !item.isRead)
+            item.withReadAt(readAt)
+          else
+            item,
+      ];
+      state = AsyncData(_page(next, base: state.value));
     }
-    final readAt = result.readAt;
-    if (readAt == null) {
-      await refresh();
-      _applyCount(count);
-      return;
-    }
-    final next = [
-      for (final item in _records(state.value))
-        if ((onlyId == null || item.notificationId == onlyId) && !item.isRead)
-          item.withReadAt(readAt)
-        else
-          item,
-    ];
-    state = AsyncData(_page(next, unreadCount: count, base: state.value));
-    _applyCount(count);
+    final count = await _resolveUnread(
+      explicit: result.unreadCount,
+      listUnread: state.value?.unreadCount,
+    );
+    if (count != null) _applyCount(count, pageUnread: count);
   }
 
   void _applyCount(int count, {int? pageUnread}) {

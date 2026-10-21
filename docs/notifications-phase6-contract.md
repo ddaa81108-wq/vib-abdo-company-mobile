@@ -47,8 +47,18 @@ enum. Sources, first match that has both parts:
 Optional `title` and `body` are still parsed when present. The current screen
 already shows them. They are not new server fields.
 
-`AppNotification.fromJson` and `AppNotification.fromPushPayload` both tolerate
-string-typed values. Push data is a flat map. Unknown keys are ignored.
+`AppNotification.fromJson` tolerates string-typed values. Unknown operation
+types do not throw.
+
+`fromPushPayload` accepts only `id` or `notificationId`, `recipientUserId`,
+`operationType` or `action`, `relatedRef` (object or JSON string) or
+`relatedRefType` + `relatedRefId`, and `createdAt`. `title`, `body`,
+`employeeName`, `systemName`, `readAt`, `section`, and every other key are
+dropped. Display text comes from the next server refresh.
+
+`NotificationDto.recipientUserId` is read from the camelCase field only.
+`fromDto` copies it, and leaves it null when the field is absent. `userId`
+and `recipient_user_id` are not notification-recipient keys in this client.
 
 ## Endpoints
 
@@ -71,9 +81,12 @@ local increment:
 - mark one: `{unreadCount, readAt, notification}`
 - mark all: `{unreadCount, readAt}`
 
-If `unreadCount` is missing, the controller refetches
-`GET /api/notifications/unread-count`. It never increments or decrements a
-local counter as the source of truth.
+If a write response omits `unreadCount`, the controller tries
+`GET /api/notifications/unread-count`. A 404 or any other non-auth failure
+of that route falls back to the last confirmed list `unreadCount`. If that
+is absent too, the previous count stays. The row update is kept either way.
+401 still throws `SessionExpiredException` after `forceLogout`. The count is
+never computed by counting rows.
 
 Fake effects: marking one unread row decrements that user's server count by
 one. Marking a row that is already read does not decrement again. Read-all
@@ -115,24 +128,33 @@ Retry is `ref.invalidate(notificationsProvider)`.
 - `NotificationsForbidden` — `message` is `AppStrings.forbidden`. The server
   sentence is not stored.
 
-`unreadNotificationsCountProvider` is `AsyncValue<int>` from
-`GET /api/notifications/unread-count` only. Signed out, the value is `0` so
-the previous account's count is gone. The existing `unreadCountProvider`
-(`int?`, hidden when the list omits `unreadCount`) is unchanged for the bell.
+`unreadNotificationsCountProvider` is `AsyncValue<int>`. The unread-count
+route is preferred. When that route fails with anything other than 401, the
+value falls back to the list response's `unreadCount`, and if that field is
+absent the previous value stays. Signed out, the value is `0` so the previous
+account's count is gone. The existing `unreadCountProvider` (`int?`, hidden
+when the list omits `unreadCount`) is unchanged for the bell.
 
 `NotificationsController`:
 
 - `ingest(List<AppNotification> items, {required NotificationSource source, bool announce = false})`
 - `ingestOne(AppNotification item, {required NotificationSource source, bool announce = false})`
 - `refresh({bool announce = false})` — `GET /api/notifications` and
-  `GET /api/notifications/unread-count`, then `ingest(..., source: fetch)`.
-  Realtime (SSE `/api/events` and polling `/api/event-changes`) should call
-  `refresh(announce: true)`. This contract does not attach that call.
+  `ingest(..., source: fetch)` first, then `GET /api/notifications/unread-count`
+  as its own attempt. A non-auth failure of the count route uses the list's
+  `unreadCount`. If that field is missing, the previous count stays and the
+  ingested rows stay. Realtime (SSE `/api/events` and polling
+  `/api/event-changes`) should call `refresh(announce: true)`. This contract
+  does not attach that call.
 - `markRead(String notificationId)` and `markAllRead()` — update `readAt` on
   the cached rows and set the unread count from the server response. One
-  stable `requestId` for the in-flight action. A failed attempt keeps the id.
-  A finished attempt drops it. A second read of an already-read row does not
-  decrement the server count again.
+  stable `requestId` for the in-flight action. A second call while that
+  attempt is still running waits on the same future and does not send a
+  second request. A failed attempt keeps the id. A finished attempt drops it.
+  A second read of an already-read row, after the first attempt has finished,
+  does not decrement the server count again. When the write body has no
+  `unreadCount`, the count route is tried after the row update. Its failure
+  uses the same list-then-previous fallback and does not undo the read.
 
 `NotificationSource` is `push`, `poll`, `fetch`.
 
