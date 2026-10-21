@@ -19,13 +19,21 @@ import 'fake_fixtures.dart';
 /// Fake-only fixture switch by USERNAME (see FakeFixtures.meFor): `admin…` = admin like the real
 /// server today (empty permission list), `limited.admin…`, `flag.admin…`, `guest…`,
 /// `mustchange…`, else employee.
-/// Password "wrong" -> 401. It only returns canned values; it never computes money.
+/// Password "wrong" -> 401. Fixture pages stay canned. A successful mutation
+/// stores its result, and the next read returns that stored result.
 ///
 /// Section reads and writes are rejected with 403 unless the signed-in profile
 /// allows them. The check uses [PermissionService], which is the only place that
 /// matches the server role string. A successful business mutation is stored by
 /// `requestId` for that user; a later call with the same id returns that result
 /// and does not apply the operation again.
+///
+/// Creating, updating, or deleting a purchase entry on a day whose status is
+/// `finalized` is rejected with 409 [dayFinalizedCode]. The README and the
+/// in-repo API notes do not name this status or code. `PurchaseDayDto.status`
+/// is still marked proposed, so this code is an open stand-in, not a confirmed
+/// contract field. A stored success for the same `requestId` does not skip the
+/// check.
 class FakeApiClient implements ApiClient {
   FakeApiClient({
     this.latency = const Duration(milliseconds: 250),
@@ -141,9 +149,24 @@ class FakeApiClient implements ApiClient {
 
   /// Posted lines added by a direct partial payment. Keyed by section.
   final Map<String, List<Map<String, dynamic>>> _extraLedger = {};
+
+  /// Cash lines stored by POST /api/treasury/cash-entries, oldest first.
+  final List<Map<String, dynamic>> _cashEntries = [];
+
+  /// Treasury version and the running cash figures stored by those lines.
+  /// Null until the first successful entry. Reads otherwise use the fixture.
+  Map<String, dynamic>? _treasuryState;
   static const _err = ErrorMapper();
   static const _denied = 'لا تملك صلاحية لهذا الإجراء';
   static const _adminOnly = 'هذا الإجراء للإدارة فقط';
+
+  /// Open stand-in. No in-repo contract names the rejection for a purchase
+  /// entry write on a finalized day. HTTP 409 keeps the existing conflict
+  /// mapping and leaves [ConflictException.code] as this value, distinct from
+  /// `VERSION_CONFLICT`.
+  static const dayFinalizedCode = 'DAY_FINALIZED';
+  static const dayFinalizedMessage =
+      'اليوم مرحّل. لا يمكن إضافة أو تعديل أو حذف بند.';
 
   @override
   Future<ApiResponse> get(
@@ -257,8 +280,10 @@ class FakeApiClient implements ApiClient {
 
   /// Home publishes the section catalog, then replaces each account-section
   /// net figure with the summary the list endpoint returns for that section.
-  /// It then drops every summary, counter, and old-debt row whose section this
-  /// profile cannot read. An unknown section name is dropped as well.
+  /// Each old-debt row keeps its catalog place and copies `balanceUnits` from
+  /// the card stored after later writes. It then drops every summary, counter,
+  /// and old-debt row whose section this profile cannot read. An unknown
+  /// section name is dropped as well.
   Map<String, dynamic> _homeForSignedInUser() {
     final source = FakeFixtures.home();
     final summaries = <Map<String, dynamic>>[
@@ -273,7 +298,7 @@ class FakeApiClient implements ApiClient {
     final debts = <Map<String, dynamic>>[
       for (final raw in source['oldDebts'] as List)
         if (_mayReadSection((raw as Map)['section']))
-          Map<String, dynamic>.from(raw),
+          _withStoredDebtBalance(Map<String, dynamic>.from(raw)),
     ];
     return {
       'businessDate': source['businessDate'],
@@ -306,6 +331,13 @@ class FakeApiClient implements ApiClient {
   Map<String, dynamic> _withStoredSectionFigure(Map<String, dynamic> summary) {
     final section = summary['section'];
     final key = summary['key'];
+    if (section == 'treasury' && key == 'treasury.activeCash') {
+      final stored = _treasuryView()['totals'];
+      if (stored is Map && stored['activeCashUnits'] != null) {
+        summary['valueUnits'] = stored['activeCashUnits'];
+      }
+      return summary;
+    }
     if (section is! String ||
         key is! String ||
         !key.endsWith('.netBalance') ||
@@ -317,6 +349,18 @@ class FakeApiClient implements ApiClient {
       summary['valueUnits'] = stored['netBalance'];
     }
     return summary;
+  }
+
+  /// Bulletin membership stays the catalog. The amount is the card's stored
+  /// balance, including 0 after a full payment. The proposed home payload does
+  /// not say a settled card leaves the list, so this does not drop the row.
+  Map<String, dynamic> _withStoredDebtBalance(Map<String, dynamic> debt) {
+    final section = debt['section'];
+    final id = debt['id'];
+    if (section is! String || id is! String) return debt;
+    if (_cardOrNull(section, id) == null) return debt;
+    debt['balanceUnits'] = _cardView(section, id)['balanceUnits'];
+    return debt;
   }
 
   Map<String, dynamic>? _cardOrNull(String head, String id) {
@@ -395,7 +439,9 @@ class FakeApiClient implements ApiClient {
 
   /// A repeated [requestId] for this user returns the original success and
   /// does not apply the operation again. A failure is not remembered, so a
-  /// retry of the same id can still succeed.
+  /// retry of the same id can still succeed. A purchase-entry write on a
+  /// finalized day is rejected here as well, so a stored success cannot skip
+  /// that check.
   Future<ApiResponse> _mutate(
     Map b,
     String path,
@@ -405,6 +451,7 @@ class FakeApiClient implements ApiClient {
     final requestId = '${b['requestId']}';
     final key = '${_userId ?? ''}|$requestId';
     if (_completedMutations.containsKey(key)) {
+      _rejectFinalizedPurchaseEntry(path);
       return _ok(_completedMutations[key]);
     }
     final pending = _pendingMutations[key];
@@ -483,6 +530,9 @@ class FakeApiClient implements ApiClient {
         if (method == 'PATCH' && seg.length >= 3 && seg[2] == 'opening') {
           return _applyOpening(seg[1], b);
         }
+        if (_isPurchaseEntryWrite(method, seg)) {
+          _rejectIfPurchaseDayFinalized(seg);
+        }
         final entryWrite = (method == 'POST' && seg.length == 2) ||
             ((method == 'POST' || method == 'PATCH') &&
                 seg.length > 3 &&
@@ -501,15 +551,18 @@ class FakeApiClient implements ApiClient {
       case 'treasury':
         if (method == 'GET') {
           _requireRead(SectionKey.treasury);
-          if (seg.length == 1) return _ok(FakeFixtures.treasury());
+          if (seg.length == 1) return _ok(_treasuryView());
           final before = query?['before']?.toString();
           if (before != null && before.isNotEmpty && failOlderRemaining > 0) {
             failOlderRemaining--;
             _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
           }
-          return _ok(FakeFixtures.cashLedger(before: before));
+          return _ok(_cashLedgerView(before));
         }
         _requireWrite(SectionKey.treasury);
+        if (method == 'POST' && seg.length > 1 && seg[1] == 'cash-entries') {
+          return _applyCashEntry(b);
+        }
         return _ok({'id': 'ce_new', 'version': 8});
       case 'reports':
         if (method != 'GET') _requireWrite(SectionKey.reports);
@@ -1098,6 +1151,69 @@ class FakeApiClient implements ApiClient {
     return _ok(next);
   }
 
+  /// Create is `POST /api/purchases/{book}`. Update and delete are
+  /// `POST`/`PATCH`/`DELETE` on `/api/purchases/{book}/entries/{id}`.
+  bool _isPurchaseEntryWrite(String method, List<String> seg) {
+    if (seg.length < 2 || seg.first != 'purchases') return false;
+    if (method == 'POST' && seg.length == 2) return true;
+    return seg.length >= 4 &&
+        seg[2] == 'entries' &&
+        (method == 'POST' || method == 'PATCH' || method == 'DELETE');
+  }
+
+  /// Idempotent replay enters here with the path only. [_mutate] is used for
+  /// non-GET calls, so an entry-shaped path is a create, update, or delete.
+  void _rejectFinalizedPurchaseEntry(String path) {
+    final seg = path
+        .split('/')
+        .where((part) => part.isNotEmpty)
+        .skip(1)
+        .toList();
+    if (seg.length < 2 || seg.first != 'purchases') return;
+    final entryPath =
+        seg.length == 2 || (seg.length >= 4 && seg[2] == 'entries');
+    if (!entryPath) return;
+    _rejectIfPurchaseDayFinalized(seg);
+  }
+
+  /// The in-repo contract does not define this rejection. Status `finalized`
+  /// is the value [_applyFinalize] stores. A day in `correction` stays writable.
+  void _rejectIfPurchaseDayFinalized(List<String> seg) {
+    final rawDays = _purchasesView(seg[1])['days'];
+    if (rawDays is! List || rawDays.isEmpty) return;
+    final days = <Map<String, dynamic>>[
+      for (final raw in rawDays)
+        if (raw is Map) Map<String, dynamic>.from(raw),
+    ];
+    if (days.isEmpty) return;
+    if (seg.length >= 4 && seg[2] == 'entries') {
+      final entryId = seg[3];
+      Map<String, dynamic>? owner;
+      for (final day in days) {
+        final entries = day['entries'];
+        if (entries is! List) continue;
+        for (final entry in entries) {
+          if (entry is Map && '${entry['id']}' == entryId) {
+            owner = day;
+            break;
+          }
+        }
+        if (owner != null) break;
+      }
+      final blocked = owner != null
+          ? owner['status'] == 'finalized'
+          : days.every((day) => day['status'] == 'finalized');
+      if (blocked) _failDayFinalized();
+      return;
+    }
+    if (days.every((day) => day['status'] == 'finalized')) {
+      _failDayFinalized();
+    }
+  }
+
+  Never _failDayFinalized() =>
+      _fail(409, dayFinalizedCode, dayFinalizedMessage);
+
   ApiResponse _applyFinalize(String book, Map b) {
     final days = _purchasesView(book)['days'] as List;
     if (days.isEmpty) _fail(404, 'NOT_FOUND', 'اليوم غير موجود');
@@ -1109,6 +1225,88 @@ class FakeApiClient implements ApiClient {
       'version': version,
     };
     return _ok({'id': 'ok', 'version': version});
+  }
+
+  /// Fixture treasury, with version and running cash from a stored entry.
+  Map<String, dynamic> _treasuryView() {
+    final body = _copy(FakeFixtures.treasury());
+    final state = _treasuryState;
+    if (state == null) return body;
+    body['version'] = state['version'];
+    final totals = Map<String, dynamic>.from(body['totals'] as Map);
+    totals['activeCashUnits'] = state['activeCashUnits'];
+    totals['netUnits'] = state['netUnits'];
+    body['totals'] = totals;
+    return body;
+  }
+
+  /// First page prepends stored cash lines, newest first. An older page stays
+  /// the fixture page: new lines are not copied onto it.
+  Map<String, dynamic> _cashLedgerView(String? before) {
+    final page = _copy(FakeFixtures.cashLedger(before: before));
+    if (before != null && before.isNotEmpty) return page;
+    final items = <Map<String, dynamic>>[
+      for (final entry in _cashEntries.reversed)
+        Map<String, dynamic>.from(entry),
+      for (final raw in page['items'] as List)
+        Map<String, dynamic>.from(raw as Map),
+    ];
+    page['items'] = items;
+    return page;
+  }
+
+  /// Stores one cash line and the running treasury figures.
+  ///
+  /// `direction` is the line type (`in` or `out`). `amountUnits` is stored as
+  /// posted. The running cash is the previous stored active cash with that
+  /// amount applied, and the same signed amount is stored on `netUnits`
+  /// because the fixture net already includes active cash one-for-one.
+  /// `activeCashTone` is left as the fixture sent it. A repeated `requestId`
+  /// never reaches this method.
+  ApiResponse _applyCashEntry(Map b) {
+    final treasury = _treasuryView();
+    _requireVersion(b['expectedVersion'], treasury['version']);
+    final direction = b['direction'];
+    if (direction != 'in' && direction != 'out') {
+      _fail(400, 'VALIDATION_ERROR', 'الاتجاه غير معروف');
+    }
+    final amount = b['amountUnits'];
+    if (amount is! int || amount <= 0) {
+      _fail(400, 'VALIDATION_ERROR', 'amountUnits مطلوب');
+    }
+    final totals = treasury['totals'] as Map;
+    final previousCash = totals['activeCashUnits'];
+    final previousNet = totals['netUnits'];
+    if (previousCash is! int || previousNet is! int) {
+      _fail(500, 'SERVER_ERROR', 'الخزينة بلا رصيد مخزّن');
+    }
+    final signed = direction == 'in' ? amount : -amount;
+    final runningCash = previousCash + signed;
+    final runningNet = previousNet + signed;
+    final version = (treasury['version'] as int) + 1;
+    final user = _me['user'];
+    final actor = user is Map && user['displayName'] != null
+        ? '${user['displayName']}'
+        : 'مدير تجريبي';
+    final stamp = _cashEntries.length;
+    final minute = (stamp ~/ 60).toString().padLeft(2, '0');
+    final second = (stamp % 60).toString().padLeft(2, '0');
+    final entry = <String, dynamic>{
+      'id': 'ce_$version',
+      'direction': direction,
+      'amountUnits': amount,
+      'description': b['description'] is String ? b['description'] : null,
+      'balanceAfterUnits': runningCash,
+      'createdAt': '2026-10-21T03:$minute:$second+02:00',
+      'createdByName': actor,
+    };
+    _cashEntries.add(entry);
+    _treasuryState = {
+      'version': version,
+      'activeCashUnits': runningCash,
+      'netUnits': runningNet,
+    };
+    return _ok({'id': entry['id'], 'version': version});
   }
 
   Map<String, dynamic> _recordById(List items, String id, String missing) {
