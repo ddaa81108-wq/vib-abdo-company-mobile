@@ -58,6 +58,16 @@ class FakeApiClient implements ApiClient {
   bool _admin = false;
   Map<String, dynamic> _me = FakeFixtures.me(admin: false);
   int _unread = 1; // canned server-side state, set (not computed) per action
+
+  /// Card fields changed by a full payment or a cancel. Keyed by section|id.
+  final Map<String, Map<String, dynamic>> _cardState = {};
+
+  /// Ledger rows marked reversed, and their new versions. Keyed by section|txId.
+  final Map<String, int> _txVersion = {};
+  final Set<String> _reversedTx = {};
+
+  /// Submission fields changed by a decision. Keyed by submission id.
+  final Map<String, Map<String, dynamic>> _submissionState = {};
   static const _err = ErrorMapper();
 
   @override
@@ -185,7 +195,7 @@ class FakeApiClient implements ApiClient {
           return _ok({'egpPerLyd': '9.5', 'version': 2});
         }
         if (method == 'GET' && seg.length == 1) {
-          return _ok(FakeFixtures.accounts(egp: head == 'egyptian-deposits'));
+          return _ok(_accountsView(head));
         }
         if (method == 'GET' && seg.length > 1 && seg[1] == 'suggestions') {
           final paused = pauseSuggestions;
@@ -202,13 +212,22 @@ class FakeApiClient implements ApiClient {
             failOlderRemaining--;
             _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
           }
-          return _ok(FakeFixtures.ledger(before: before));
+          return _ok(_ledgerView(head, before));
         }
         if (method == 'GET' && seg.length == 2) {
-          return _ok(
-              (FakeFixtures.accounts(egp: head == 'egyptian-deposits')['items']
-                      as List)
-                  .first);
+          return _ok(_cardView(head, seg[1]));
+        }
+        if (method == 'POST' &&
+            seg.length == 3 &&
+            seg[2] == 'transactions' &&
+            b['paymentMode'] == 'full') {
+          return _applyFullPayment(head, seg[1], b);
+        }
+        if (method == 'POST' &&
+            seg.length == 5 &&
+            seg[2] == 'transactions' &&
+            seg[4] == 'cancel') {
+          return _applyCancel(head, seg[1], seg[3], b);
         }
         if (b['expectedVersion'] == -1) {
           _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
@@ -217,7 +236,7 @@ class FakeApiClient implements ApiClient {
         return _ok({'id': 'tx_new', 'version': 5});
       case 'collections':
         if (method == 'GET' && seg.length == 1) {
-          return _ok(FakeFixtures.collections());
+          return _ok(_collectionsView());
         }
         if (method == 'GET' && seg.length > 1 && seg[1] == 'payroll') {
           return _ok(FakeFixtures.payroll());
@@ -235,11 +254,22 @@ class FakeApiClient implements ApiClient {
                 seg.last == 'submissions') ||
             (seg.length == 2 && seg[1] == 'unlinked-receipts') ||
             (seg.length > 3 && seg[1] == 'payroll' && seg.last == 'confirm');
-        if (!employeeAllowed) _requireAdmin();
+        // A profile that includes collections.decide may decide. The username
+        // prefix is not the permission. Full admin still passes _requireAdmin.
+        final decision = seg.isNotEmpty && seg.last == 'decision';
+        if (!employeeAllowed &&
+            !(decision && _meAllows('collections.decide'))) {
+          _requireAdmin();
+        }
         final needsVersion = seg.isNotEmpty &&
             (seg.last == 'decision' || seg.last == 'cash-received');
         if (needsVersion && b['expectedVersion'] == null) {
           _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
+        }
+        if (seg.length == 4 &&
+            seg[1] == 'submissions' &&
+            seg[3] == 'decision') {
+          return _applyDecision(seg[2], b);
         }
         return _ok({'id': 'ok', 'version': 1});
       case 'masraweya':
@@ -307,5 +337,164 @@ class FakeApiClient implements ApiClient {
         return _ok({'events': [], 'latest': 0, 'fullResync': false});
     }
     _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
+  }
+
+  bool _meAllows(String code) {
+    if (_admin) return true;
+    final user = _me['user'];
+    if (user is! Map) return false;
+    final permissions = user['permissions'];
+    return permissions is List && permissions.contains(code);
+  }
+
+  void _requireVersion(Object? expected, Object? current) {
+    if (expected == null) {
+      _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
+    }
+    if (expected != current) {
+      _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
+    }
+  }
+
+  Map<String, dynamic> _copy(Object? value) =>
+      (jsonDecode(jsonEncode(value)) as Map).cast<String, dynamic>();
+
+  Map<String, dynamic> _cardView(String section, String? id) {
+    final items =
+        FakeFixtures.accounts(egp: section == 'egyptian-deposits')['items']
+            as List;
+    Map? match;
+    Map? first;
+    for (final raw in items) {
+      final card = raw as Map;
+      first ??= card;
+      if (id != null && card['id'] == id) match = card;
+    }
+    final card = Map<String, dynamic>.from(match ?? first!);
+    final state = _cardState['$section|${card['id']}'];
+    if (state != null) card.addAll(state);
+    return card;
+  }
+
+  Map<String, dynamic> _accountsView(String section) {
+    final body =
+        _copy(FakeFixtures.accounts(egp: section == 'egyptian-deposits'));
+    final items = <Map<String, dynamic>>[];
+    for (final raw in body['items'] as List) {
+      final card = Map<String, dynamic>.from(raw as Map);
+      final state = _cardState['$section|${card['id']}'];
+      if (state != null) card.addAll(state);
+      items.add(card);
+    }
+    body['items'] = items;
+    // The one-card fixture summary is that card's stored balance.
+    // A longer list is left as the fixture sent it (no summing here).
+    if (items.length == 1) {
+      final state = _cardState['$section|${items.single['id']}'];
+      final balance = state?['balanceUnits'];
+      if (balance != null) {
+        final summary = Map<String, dynamic>.from(body['summary'] as Map);
+        summary['netBalance'] = balance;
+        summary['totalDebt'] = balance;
+        body['summary'] = summary;
+      }
+    }
+    return body;
+  }
+
+  Map<String, dynamic> _ledgerView(String section, String? before) {
+    if (before != null && before.isNotEmpty) {
+      return FakeFixtures.ledger(before: before);
+    }
+    final body = _copy(FakeFixtures.ledger());
+    final items = <Map<String, dynamic>>[];
+    for (final raw in body['items'] as List) {
+      final entry = Map<String, dynamic>.from(raw as Map);
+      final key = '$section|${entry['id']}';
+      if (_reversedTx.contains(key)) entry['status'] = 'reversed';
+      final version = _txVersion[key];
+      if (version != null) entry['version'] = version;
+      items.add(entry);
+    }
+    body['items'] = items;
+    return body;
+  }
+
+  /// Full payment stores balance 0. That is the server result, not arithmetic.
+  ApiResponse _applyFullPayment(String section, String id, Map b) {
+    final card = _cardView(section, id);
+    _requireVersion(b['expectedVersion'], card['version']);
+    final version = (card['version'] as int) + 1;
+    _cardState['$section|${card['id']}'] = {
+      'balanceUnits': 0,
+      'version': version,
+    };
+    return _ok({'id': 'tx_new', 'version': version});
+  }
+
+  /// Copies balanceAfterUnits already stored on the latest remaining posted line.
+  int _latestPostedBalance(String section) {
+    var balance = 0;
+    for (final raw in _ledgerView(section, null)['items'] as List) {
+      final entry = raw as Map;
+      if (entry['status'] == 'posted' && entry['balanceAfterUnits'] is int) {
+        balance = entry['balanceAfterUnits'] as int;
+      }
+    }
+    return balance;
+  }
+
+  ApiResponse _applyCancel(
+      String section, String accountId, String txId, Map b) {
+    Map<String, dynamic>? entry;
+    for (final raw in _ledgerView(section, null)['items'] as List) {
+      final item = Map<String, dynamic>.from(raw as Map);
+      if (item['id'] == txId) entry = item;
+    }
+    if (entry == null) _fail(404, 'NOT_FOUND', 'الحركة غير موجودة');
+    _requireVersion(b['expectedVersion'], entry['version']);
+    final key = '$section|$txId';
+    _reversedTx.add(key);
+    _txVersion[key] = (entry['version'] as int) + 1;
+    final card = _cardView(section, accountId);
+    final version = (card['version'] as int) + 1;
+    _cardState['$section|${card['id']}'] = {
+      'balanceUnits': _latestPostedBalance(section),
+      'version': version,
+    };
+    return _ok({'id': 'tx_new', 'version': version});
+  }
+
+  Map<String, dynamic> _collectionsView() {
+    final body = _copy(FakeFixtures.collections());
+    final items = <Map<String, dynamic>>[];
+    for (final raw in body['submissions'] as List) {
+      final item = Map<String, dynamic>.from(raw as Map);
+      final state = _submissionState['${item['id']}'];
+      if (state != null) item.addAll(state);
+      items.add(item);
+    }
+    body['submissions'] = items;
+    return body;
+  }
+
+  ApiResponse _applyDecision(String id, Map b) {
+    Map<String, dynamic>? submission;
+    for (final raw in _collectionsView()['submissions'] as List) {
+      final item = raw as Map<String, dynamic>;
+      if (item['id'] == id) submission = item;
+    }
+    if (submission == null) _fail(404, 'NOT_FOUND', 'الاستلام غير موجود');
+    _requireVersion(b['expectedVersion'], submission['version']);
+    final decision = b['decision'];
+    final status = switch (decision) {
+      'approve' => 'approved',
+      'reject' => 'rejected',
+      _ => null,
+    };
+    if (status == null) _fail(400, 'VALIDATION_ERROR', 'قرار غير معروف');
+    final version = (submission['version'] as int) + 1;
+    _submissionState[id] = {'status': status, 'version': version};
+    return _ok({'id': 'ok', 'version': version});
   }
 }
