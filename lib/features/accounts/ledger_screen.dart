@@ -63,7 +63,7 @@ class LedgerScreen extends ConsumerWidget {
               final showBalance = page.page.items.any(
                 (entry) => entry.balanceAfterUnits != null,
               );
-              final tight = _tightLayout(context);
+              final tight = layoutIsTight(context);
               final writes = <Widget>[
                 GatedButton(
                   buttonKey: const Key('add-debt'),
@@ -633,7 +633,7 @@ class _EntryTile extends StatelessWidget {
     final strike = reversed ? TextDecoration.lineThrough : null;
     final body = Theme.of(context).textTheme.bodyMedium
         ?.copyWith(color: muted, decoration: strike);
-    final tight = _tightLayout(context);
+    final tight = layoutIsTight(context);
     final sequence = entry.sequence == null
         ? AppStrings.dash
         : '${entry.sequence}';
@@ -762,15 +762,6 @@ Color _movementAmountColor(BuildContext context, String type, Color fallback) {
     'payment' => colors.creditText,
     _ => fallback,
   };
-}
-
-/// Phones under 360 dp, and large text, stack the amount under the date so
-/// neither is squeezed. 360 dp at the default scale keeps one aligned row,
-/// which leaves the correction control above the bottom bar.
-bool _tightLayout(BuildContext context) {
-  final width = MediaQuery.sizeOf(context).width;
-  final scale = MediaQuery.textScalerOf(context).scale(1);
-  return width < 360 || scale >= 1.3;
 }
 
 String _ledgerTitle(AccountSection section) => switch (section) {

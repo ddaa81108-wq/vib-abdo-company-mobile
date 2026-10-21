@@ -7,6 +7,7 @@ import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
+import '../../ui/presentation.dart';
 import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
@@ -80,7 +81,7 @@ class EditAccountCardButton extends ConsumerWidget {
       label: AppStrings.editCard,
       onPressed: () => context.push('/${section.path}/${card.id}/edit'),
     );
-    final tight = _editLayoutIsTight(context);
+    final tight = layoutIsTight(context);
     return Padding(
       padding: const EdgeInsetsDirectional.only(top: AppSpacing.sm),
       child: tight
@@ -233,7 +234,7 @@ class _EditAccountCardFormState extends ConsumerState<_EditAccountCardForm> {
     final width = MediaQuery.sizeOf(context).width;
     final padding = pagePadding(width);
     final colors = context.appColors;
-    final tight = _editLayoutIsTight(context);
+    final tight = layoutIsTight(context);
     final save = GuardedMutation(
       buttonKey: const Key('save-account-card'),
       inputs: '${_name.text}|${_phone.text}',
@@ -369,12 +370,6 @@ class _EditHeader extends StatelessWidget {
       ],
     );
   }
-}
-
-bool _editLayoutIsTight(BuildContext context) {
-  final width = MediaQuery.sizeOf(context).width;
-  final scale = MediaQuery.textScalerOf(context).scale(1);
-  return width < 393 || scale >= 1.3;
 }
 
 ThemeData _editStretchButtons(BuildContext context) {

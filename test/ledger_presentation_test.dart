@@ -12,6 +12,7 @@ import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
+import 'package:vib_abdo_company_mobile/ui/presentation.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'package:vib_abdo_company_mobile/ui/theme.dart';
 
@@ -430,6 +431,68 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('ledger and edit card share the 360 dp stack threshold', (
+    tester,
+  ) async {
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    expect(stackLayoutWidth, 360);
+    expect(stackLayoutTextScale, 1.3);
+
+    await pumpFakeApp(tester, size: const Size(430, 1600));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+
+    Future<void> size(double width, double scale) async {
+      tester.view.physicalSize = Size(width, 1600);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      await settle(tester);
+      await _scrollToTop(tester, const Key('screen-ledger-customers'));
+    }
+
+    await size(360, 1);
+    expect(_amountIsStacked(tester), isFalse);
+    await _reveal(
+      tester,
+      find.byKey(const Key('edit-account-card')),
+      const Key('screen-ledger-customers'),
+    );
+    expect(_isStretched(tester, const Key('edit-account-card')), isFalse);
+
+    await size(320, 1);
+    expect(_amountIsStacked(tester), isTrue);
+    await _reveal(
+      tester,
+      find.byKey(const Key('edit-account-card')),
+      const Key('screen-ledger-customers'),
+    );
+    expect(_isStretched(tester, const Key('edit-account-card')), isTrue);
+
+    await size(430, 1.3);
+    expect(_amountIsStacked(tester), isTrue);
+    await _reveal(
+      tester,
+      find.byKey(const Key('edit-account-card')),
+      const Key('screen-ledger-customers'),
+    );
+    expect(_isStretched(tester, const Key('edit-account-card')), isTrue);
+
+    await go(tester, '/customers/c_55/edit');
+    tester.view.physicalSize = const Size(360, 1600);
+    tester.platformDispatcher.textScaleFactorTestValue = 1;
+    await settle(tester);
+    expect(_isStretched(tester, const Key('save-account-card')), isFalse);
+
+    tester.view.physicalSize = const Size(320, 1600);
+    await settle(tester);
+    expect(_isStretched(tester, const Key('save-account-card')), isTrue);
+
+    tester.view.physicalSize = const Size(430, 1600);
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    await settle(tester);
+    expect(_isStretched(tester, const Key('save-account-card')), isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('screenshots of the ledger and edit card', (tester) async {
     final dir = Platform.environment['LEDGER_SCREENSHOT_DIR'];
     if (dir == null || dir.isEmpty) return;
@@ -451,6 +514,10 @@ void main() {
         await shoot('customer_ledger_${theme}_${width.toInt()}');
         await go(tester, '/libyan-deposits/c_55');
         await shoot('deposit_ledger_${theme}_${width.toInt()}');
+      }
+      for (final width in [320.0, 430.0]) {
+        tester.view.physicalSize = Size(width, 780);
+        await settle(tester);
         await go(tester, '/customers/c_55/edit');
         await shoot('edit_card_${theme}_${width.toInt()}');
       }
@@ -507,6 +574,18 @@ void _expectWritesHidden(WidgetTester tester) {
   expect(find.byKey(const Key('add-payment')), findsNothing);
   expect(find.byKey(const Key('full-payment')), findsNothing);
   expect(find.text(AppStrings.correctTransaction), findsNothing);
+}
+
+bool _amountIsStacked(WidgetTester tester) {
+  final date = tester.getRect(find.byKey(const Key('ledger-date-tx_1')));
+  final amount = tester.getRect(find.byKey(const Key('ledger-amount-tx_1')));
+  return amount.top >= date.bottom - 1;
+}
+
+bool _isStretched(WidgetTester tester, Key key) {
+  final width = tester.getSize(find.byKey(key)).width;
+  final view = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+  return width > view * 0.7;
 }
 
 void _expectAligned(WidgetTester tester) {
