@@ -40,6 +40,9 @@ abstract final class AppStrings {
   static const emptyTicker = 'لا توجد ديون تجاوزت 3 أيام';
   static const emptyLedger = 'لا توجد حركات';
   static const emptyCollections = 'لا توجد استلامات';
+  static const emptyAssignments = 'لا توجد كروت موجهة';
+  static const emptyEmployeeTotals = 'لا توجد إجماليات من الخادم';
+  static const emptyPayroll = 'لا توجد بيانات مرتبات';
   static const emptyReports = 'لا توجد بيانات';
   static const online = 'متصل • جميع التغييرات محفوظة';
   static const offline = 'غير متصل — تُعرض آخر بيانات محمّلة للقراءة';
@@ -294,6 +297,11 @@ abstract final class AppStrings {
   static const confirmCorrect =
       'تأكيد إرسال تصحيح هذه الحركة؟ المبلغ والرصيد بعد الحفظ يظهران من الخادم فقط.';
   static const currentServerAmount = 'المبلغ الحالي من الخادم';
+  static const receipts = 'الاستلامات';
+  static const cashReceivedAt = 'تاريخ استلام النقد';
+  static const assignmentOpen = 'مفتوح';
+  static const openingCarry = 'رصيد مرحّل';
+  static const approvedCount = 'عدد المعتمد';
 
   // Account-list presentation only. Grouped at the end so ledger and
   // collections edits to the catalogue above can merge without overlap.
