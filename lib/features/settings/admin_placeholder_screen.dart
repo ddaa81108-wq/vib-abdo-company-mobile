@@ -3,15 +3,15 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../state/theme_controller.dart';
+import 'admin_destinations.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 
 /// Empty stand-in for an admin area the server does not feed yet.
 ///
-/// The route is registered only as a place to land. [permissionRedirect] and
-/// the check below both hide it unless `settings.manage` is allowed. There
-/// is no invented list, form, or action. Whether these three routes stay is
-/// a product decision for the project manager.
+/// Which areas exist is [adminDestinations]. [permissionRedirect] and the
+/// check below both hide a route unless `settings.manage` is allowed. There
+/// is no invented list, form, or action.
 class AdminPlaceholderScreen extends ConsumerWidget {
   const AdminPlaceholderScreen({
     required this.title,

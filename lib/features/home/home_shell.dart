@@ -10,6 +10,7 @@ import '../../notifications/unread_badge.dart';
 import '../../state/notification_providers.dart';
 import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
+import '../settings/admin_destinations.dart';
 import '../../ui/section_labels.dart';
 import '../../ui/strings.dart';
 import '../../ui/theme.dart';
@@ -271,13 +272,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   String _title(String location) {
     if (location == '/' || location.isEmpty) return AppStrings.homeTitle;
     if (location.startsWith('/notifications')) return AppStrings.notifications;
-    if (location.startsWith('/settings/employees')) {
-      return AppStrings.employeesTile;
-    }
-    if (location.startsWith('/settings/audit')) return AppStrings.auditTile;
-    if (location.startsWith('/settings/operations')) {
-      return AppStrings.operationsTile;
-    }
+    final admin = adminDestinationFor(location);
+    if (admin != null) return admin.title;
     if (location.startsWith('/settings')) return AppStrings.settings;
     if (location.startsWith('/account')) return AppStrings.myAccount;
     if (location.startsWith('/search')) return AppStrings.search;
