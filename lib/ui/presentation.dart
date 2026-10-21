@@ -212,6 +212,10 @@ bool dayIsEditable(String? status) =>
     status == 'correction' ||
     status == 'correctionOpen';
 
+/// Server day status means a correction session is open.
+bool dayCorrectionIsOpen(String? status) =>
+    status == 'correction' || status == 'correctionOpen';
+
 String notificationFallback(String action) => switch (action) {
   'collection.submit' => 'استلام جديد بانتظار المراجعة',
   'collection.approve' || 'collection.approved' => 'تم اعتماد استلام',

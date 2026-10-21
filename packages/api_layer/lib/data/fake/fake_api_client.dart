@@ -69,6 +69,10 @@ class FakeApiClient implements ApiClient {
   /// The next N versioned collection mutations fail with VERSION_CONFLICT (tests).
   int versionConflictRemaining = 0;
 
+  /// When set, purchases days without a stored finalize or correction use this
+  /// status on the next GET (tests).
+  String? purchaseFixtureStatus;
+
   /// GET /api/collections calls, including a refetch after a conflict (tests).
   int collectionOverviewReads = 0;
 
@@ -118,8 +122,11 @@ class FakeApiClient implements ApiClient {
   /// Unlinked receipt fields changed by a decision or cash receipt. Keyed by id.
   final Map<String, Map<String, dynamic>> _unlinkedState = {};
 
-  /// Purchase day fields changed by finalize. Keyed by book|day.
+  /// Purchase day fields changed by finalize or correction. Keyed by book|day.
   final Map<String, Map<String, dynamic>> _purchaseDays = {};
+
+  /// Opening amounts echoed on the next purchases GET. Keyed by book.
+  final Map<String, Map<String, dynamic>> _openingByBook = {};
 
   /// Collections day close. The next batch id is a stored successor.
   Map<String, dynamic>? _batchState;
@@ -458,8 +465,14 @@ class FakeApiClient implements ApiClient {
         if (seg.isNotEmpty && seg.last == 'finalize') {
           if (!_access.canFinalizePurchases) _fail(403, 'FORBIDDEN', _denied);
           return _applyFinalize(seg.length > 1 ? seg[1] : '', b);
-        } else {
-          _requireWrite(SectionKey.purchases);
+        }
+        if (method == 'PATCH' && seg.length >= 5 && seg.last == 'correction') {
+          if (!_access.canFinalizePurchases) _fail(403, 'FORBIDDEN', _denied);
+          return _applyCorrection(seg[1], seg[3], b);
+        }
+        _requireWrite(SectionKey.purchases);
+        if (method == 'PATCH' && seg.length >= 3 && seg[2] == 'opening') {
+          return _applyOpening(seg[1], b);
         }
         final entryWrite = (method == 'POST' && seg.length == 2) ||
             ((method == 'POST' || method == 'PATCH') &&
@@ -940,8 +953,8 @@ class FakeApiClient implements ApiClient {
 
   ApiResponse _applyCash(String id, Map b, {required bool unlinked}) {
     final view = _collectionsView();
-    final items = (unlinked ? view['unlinkedReceipts'] : view['submissions'])
-        as List;
+    final items =
+        (unlinked ? view['unlinkedReceipts'] : view['submissions']) as List;
     final current = _recordById(
       items,
       id,
@@ -990,11 +1003,55 @@ class FakeApiClient implements ApiClient {
     for (final raw in body['days'] as List) {
       final day = Map<String, dynamic>.from(raw as Map);
       final state = _purchaseDays['$book|${day['day']}'];
-      if (state != null) day.addAll(state);
+      if (state != null) {
+        day.addAll(state);
+      } else if (purchaseFixtureStatus != null) {
+        day['status'] = purchaseFixtureStatus;
+      }
       days.add(day);
     }
     body['days'] = days;
+    final opening = _openingByBook[book];
+    if (opening != null) body['opening'] = Map<String, dynamic>.from(opening);
     return body;
+  }
+
+  ApiResponse _applyOpening(String book, Map b) {
+    final days = _purchasesView(book)['days'] as List;
+    final stored = _openingByBook[book];
+    final current = stored != null
+        ? stored['version']
+        : (days.isEmpty ? null : (days.first as Map)['version']);
+    _requireVersion(b['expectedDayVersion'], current);
+    _openingByBook[book] = {
+      'previousDebtUnits': b['previousDebtUnits'],
+      'previousVodafoneUnits': b['previousVodafoneUnits'],
+      'version': current,
+    };
+    return _ok({'id': 'opening', 'version': current});
+  }
+
+  ApiResponse _applyCorrection(String book, String dayId, Map b) {
+    Map<String, dynamic>? day;
+    for (final raw in _purchasesView(book)['days'] as List) {
+      final item = raw as Map<String, dynamic>;
+      if ('${item['day']}' == dayId) {
+        day = item;
+        break;
+      }
+    }
+    if (day == null) _fail(404, 'NOT_FOUND', 'اليوم غير موجود');
+    _requireVersion(b['expectedDayVersion'], day['version']);
+    final open = b['open'] == true;
+    _purchaseDays['$book|$dayId'] = {
+      ...?_purchaseDays['$book|$dayId'],
+      'status': open ? 'correction' : 'finalized',
+    };
+    return _ok({
+      'id': dayId,
+      'version': day['version'],
+      'status': open ? 'correction' : 'finalized',
+    });
   }
 
   ApiResponse _applyFinalize(String book, Map b) {
