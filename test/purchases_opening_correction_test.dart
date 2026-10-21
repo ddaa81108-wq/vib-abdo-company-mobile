@@ -400,7 +400,7 @@ void main() {
     expect(find.byKey(const Key('set-opening')), findsNothing);
     expect(find.byKey(const Key('close-correction-12')), findsNothing);
     expect(find.byKey(const Key('open-correction-12')), findsNothing);
-    expect(find.byKey(const Key('add-purchase')), findsNothing);
+    expect(find.byKey(const Key('add-purchase-12')), findsNothing);
 
     layer.permissions.applyFromServer(
       const ['purchases.read', 'purchases.write'],
@@ -416,7 +416,7 @@ void main() {
       isNotNull,
     );
     expect(find.byKey(const Key('close-correction-12')), findsNothing);
-    expect(find.byKey(const Key('finalize-day')), findsNothing);
+    expect(find.byKey(const Key('finalize-day-12')), findsNothing);
 
     layer.permissions.applyFromServer(
       const ['purchases.read', 'purchases.finalize'],
@@ -486,6 +486,64 @@ void main() {
       await exercisePhone(tester, const Size(430, 900), dark: true);
     },
   );
+
+  for (final scale in const <double>[1.3, 2]) {
+    testWidgets('opening balance wraps at 320 dp and text scale $scale', (
+      tester,
+    ) async {
+      await pumpScaled(tester, size: const Size(320, 900), textScale: scale);
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/purchases');
+
+      expect(textScaleOf(tester), scale);
+      expect(tester.takeException(), isNull);
+      final card = find.byKey(const Key('opening-card'));
+      final cardRect = tester.getRect(card);
+      for (final sample in ['2,000', '80']) {
+        final figure = find.descendant(
+          of: card,
+          matching: find.textContaining(sample),
+        );
+        expect(figure, findsOneWidget);
+        final text = tester.widget<Text>(figure);
+        expect(text.maxLines, anyOf(isNull, greaterThan(1)));
+        expect(text.overflow, isNot(TextOverflow.ellipsis));
+        expect(text.overflow, isNot(TextOverflow.fade));
+        expect(text.softWrap, isNot(false));
+        final rect = tester.getRect(figure);
+        expect(rect.left, greaterThanOrEqualTo(cardRect.left - 1));
+        expect(rect.right, lessThanOrEqualTo(cardRect.right + 1));
+        expect(rect.top, greaterThanOrEqualTo(cardRect.top - 1));
+        expect(rect.bottom, lessThanOrEqualTo(cardRect.bottom + 1));
+        expect(rect.width, greaterThan(8));
+        expect(rect.height, greaterThan(8));
+      }
+    });
+  }
+
+  testWidgets('add and finalize keys are unique per day', (tester) async {
+    await pumpFakeApp(
+      tester,
+      size: const Size(360, 1100),
+      overrides: [
+        purchasesProvider.overrideWith((ref) async {
+          return _constBook(
+            days: const [_Day('1', 'draft'), _Day('2', 'draft')],
+          );
+        }),
+      ],
+    );
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+
+    expect(find.byKey(const Key('add-purchase-1')), findsOneWidget);
+    expect(find.byKey(const Key('add-purchase-2')), findsOneWidget);
+    expect(find.byKey(const Key('finalize-day-1')), findsOneWidget);
+    expect(find.byKey(const Key('finalize-day-2')), findsOneWidget);
+    expect(find.byKey(const Key('add-purchase')), findsNothing);
+    expect(find.byKey(const Key('finalize-day')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('screenshots of opening and correction in light and dark', (
     tester,

@@ -13,7 +13,9 @@ import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  testWidgets('customer debts shows an error and retries the list', (tester) async {
+  testWidgets('customer debts shows an error and retries the list', (
+    tester,
+  ) async {
     final gate = _FailGate();
     await pumpFakeApp(
       tester,
@@ -91,7 +93,10 @@ void main() {
         purchasesProvider.overrideWith((ref) async {
           gate.calls++;
           if (gate.failing) throw const NetworkException();
-          return ref.read(apiLayerProvider).purchases.list(ref.read(purchaseBookProvider));
+          return ref
+              .read(apiLayerProvider)
+              .purchases
+              .list(ref.read(purchaseBookProvider));
         }),
       ],
     );
@@ -101,7 +106,7 @@ void main() {
     gate.failing = false;
     await tester.tap(find.text(AppStrings.retry));
     await settle(tester);
-    expect(find.byKey(const Key('add-purchase')), findsOneWidget);
+    expect(find.byKey(const Key('add-purchase-12')), findsOneWidget);
     expect(gate.calls, greaterThanOrEqualTo(2));
   });
 
@@ -174,7 +179,9 @@ void main() {
     expect(gate.calls, greaterThanOrEqualTo(2));
   });
 
-  testWidgets('search shows loading, then an error, and retries', (tester) async {
+  testWidgets('search shows loading, then an error, and retries', (
+    tester,
+  ) async {
     final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'admin.demo', password: 'demo-only');

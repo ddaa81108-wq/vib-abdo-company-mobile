@@ -132,8 +132,8 @@ void main() {
     await go(tester, '/companies/c_55');
     expect(find.byKey(const Key('add-debt')), findsOneWidget);
     await go(tester, '/purchases');
-    expect(find.byKey(const Key('add-purchase')), findsOneWidget);
-    expect(find.byKey(const Key('finalize-day')), findsOneWidget);
+    expect(find.byKey(const Key('add-purchase-12')), findsOneWidget);
+    expect(find.byKey(const Key('finalize-day-12')), findsOneWidget);
     await go(tester, '/treasury');
     expect(find.byKey(const Key('cash-in')), findsOneWidget);
     expect(find.byKey(const Key('cash-out')), findsOneWidget);
@@ -188,8 +188,8 @@ void main() {
     }
 
     expect(find.byKey(const Key('cash-in')), findsNothing);
-    expect(find.byKey(const Key('add-purchase')), findsNothing);
-    expect(find.byKey(const Key('finalize-day')), findsNothing);
+    expect(find.byKey(const Key('add-purchase-12')), findsNothing);
+    expect(find.byKey(const Key('finalize-day-12')), findsNothing);
     expect(find.byKey(const Key('save-rate')), findsNothing);
 
     await go(tester, '/account');

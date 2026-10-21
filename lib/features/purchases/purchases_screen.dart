@@ -181,7 +181,7 @@ class _DayCard extends ConsumerWidget {
               children: [
                 if (canWrite && editable)
                   GatedButton(
-                    buttonKey: const Key('add-purchase'),
+                    buttonKey: ValueKey('add-purchase-${day.day}'),
                     allowed: true,
                     online: online,
                     label: AppStrings.add,
@@ -192,7 +192,7 @@ class _DayCard extends ConsumerWidget {
                   ),
                 if (canFinalize && day.status == 'draft')
                   GuardedMutation(
-                    buttonKey: const Key('finalize-day'),
+                    buttonKey: ValueKey('finalize-day-${day.day}'),
                     inputs: 'finalize:${day.day}:${day.version}',
                     expectedVersion: day.version,
                     label: AppStrings.finalizeDay,
@@ -546,11 +546,14 @@ class _MoneyLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Text(label)),
-        MoneyText(money.formatOrDash(units, currency)),
-      ],
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.xs),
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.xxs,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [Text(label), MoneyText(money.formatOrDash(units, currency))],
+      ),
     );
   }
 }
