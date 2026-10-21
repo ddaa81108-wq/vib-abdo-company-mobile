@@ -342,6 +342,52 @@ void main() {
     expect(overview.unlinkedReceipts.single.version, 2);
   });
 
+  test(
+    'close day compares the stored batch version through the repository',
+    () async {
+      final api = await login('admin@example.invalid');
+      expect((await api.collections.overview()).batchId, 'b_1');
+
+      await expectLater(
+        api.collections.closeDay(
+          batchId: 'b_1',
+          meta: MutationMeta(expectedVersion: 99, requestId: 'close-99'),
+        ),
+        throwsA(
+          isA<ConflictException>().having(
+            (e) => e.code,
+            'code',
+            'VERSION_CONFLICT',
+          ),
+        ),
+      );
+      expect((await api.collections.overview()).batchId, 'b_1');
+
+      final ack = await api.collections.closeDay(
+        batchId: 'b_1',
+        meta: MutationMeta(expectedVersion: 1, requestId: 'close-1'),
+      );
+      expect(ack.id, 'ok');
+      expect(ack.version, 2);
+      expect((await api.collections.overview()).batchId, 'b_2');
+
+      await expectLater(
+        api.collections.closeDay(
+          batchId: 'b_1',
+          meta: MutationMeta(expectedVersion: 1, requestId: 'close-stale'),
+        ),
+        throwsA(
+          isA<ConflictException>().having(
+            (e) => e.code,
+            'code',
+            'VERSION_CONFLICT',
+          ),
+        ),
+      );
+      expect((await api.collections.overview()).batchId, 'b_2');
+    },
+  );
+
   test('purchase day finalize stores the day version and rejects a stale one',
       () async {
     final api = await login('admin@example.invalid');

@@ -154,40 +154,40 @@ class FakeFixtures {
       };
     }
     return {
-        'items': [
-          {
-            'id': 'tx_1',
-            'sequence': 1,
-            'type': 'debt',
-            'status': 'posted',
-            'date': '2026-10-02T10:00:00+02:00',
-            'note': 'دين',
-            'amountUnits': 500,
-            'inputValue': 500,
-            'calculationMode': 'direct',
-            'balanceAfterUnits': 500,
-            'createdByName': 'مدير تجريبي',
-            'version': 1
-          },
-          {
-            'id': 'tx_2',
-            'sequence': 2,
-            'type': 'payment',
-            'status': 'posted',
-            'date': '2026-10-10T10:00:00+02:00',
-            'note': 'سداد جزئي',
-            'amountUnits': 180,
-            'inputValue': 180,
-            'calculationMode': 'direct',
-            'balanceAfterUnits': 320,
-            'createdByName': 'مدير تجريبي',
-            'version': 1
-          },
-        ],
-        'pageOpeningBalanceUnits': 0,
-        'nextBefore': 'tx_1',
-        'hasMore': true,
-      };
+      'items': [
+        {
+          'id': 'tx_1',
+          'sequence': 1,
+          'type': 'debt',
+          'status': 'posted',
+          'date': '2026-10-02T10:00:00+02:00',
+          'note': 'دين',
+          'amountUnits': 500,
+          'inputValue': 500,
+          'calculationMode': 'direct',
+          'balanceAfterUnits': 500,
+          'createdByName': 'مدير تجريبي',
+          'version': 1
+        },
+        {
+          'id': 'tx_2',
+          'sequence': 2,
+          'type': 'payment',
+          'status': 'posted',
+          'date': '2026-10-10T10:00:00+02:00',
+          'note': 'سداد جزئي',
+          'amountUnits': 180,
+          'inputValue': 180,
+          'calculationMode': 'direct',
+          'balanceAfterUnits': 320,
+          'createdByName': 'مدير تجريبي',
+          'version': 1
+        },
+      ],
+      'pageOpeningBalanceUnits': 0,
+      'nextBefore': 'tx_1',
+      'hasMore': true,
+    };
   }
 
   /// Proposed GET /api/home — HARDCODED server-style values (nothing computed), filtered per user.
@@ -322,6 +322,7 @@ class FakeFixtures {
         },
         'assignedCount': 1,
         'batchId': 'b_1',
+        'version': 1,
       };
 
   static Map<String, dynamic> payroll() => {
@@ -427,20 +428,20 @@ class FakeFixtures {
       };
     }
     return {
-        'items': [
-          {
-            'id': 'ce_1',
-            'direction': 'in',
-            'amountUnits': 1000,
-            'description': 'إيداع تجريبي',
-            'balanceAfterUnits': 8000,
-            'createdAt': '2026-10-18T09:00:00+02:00',
-            'createdByName': 'مدير تجريبي'
-          },
-        ],
-        'nextBefore': 'ce_1',
-        'hasMore': true,
-      };
+      'items': [
+        {
+          'id': 'ce_1',
+          'direction': 'in',
+          'amountUnits': 1000,
+          'description': 'إيداع تجريبي',
+          'balanceAfterUnits': 8000,
+          'createdAt': '2026-10-18T09:00:00+02:00',
+          'createdByName': 'مدير تجريبي'
+        },
+      ],
+      'nextBefore': 'ce_1',
+      'hasMore': true,
+    };
   }
 
   static Map<String, dynamic> reports() => {

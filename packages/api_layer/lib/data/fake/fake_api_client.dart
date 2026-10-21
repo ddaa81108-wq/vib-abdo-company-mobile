@@ -75,6 +75,9 @@ class FakeApiClient implements ApiClient {
   /// Purchase day fields changed by finalize. Keyed by book|day.
   final Map<String, Map<String, dynamic>> _purchaseDays = {};
 
+  /// Collections day close. The next batch id is a stored successor.
+  Map<String, dynamic>? _batchState;
+
   /// Posted lines added by a direct partial payment. Keyed by section.
   final Map<String, List<Map<String, dynamic>>> _extraLedger = {};
   static const _err = ErrorMapper();
@@ -297,6 +300,11 @@ class FakeApiClient implements ApiClient {
             seg[1] == 'unlinked-receipts' &&
             seg[3] == 'cash-received') {
           return _applyCash(seg[2], b, unlinked: true);
+        }
+        // CollectionsRepository.closeDay posts /api/collections/days/close.
+        // That is not the purchases finalize route.
+        if (seg.length == 3 && seg[1] == 'days' && seg[2] == 'close') {
+          return _applyClose(b);
         }
         return _ok({'id': 'ok', 'version': 1});
       case 'masraweya':
@@ -561,7 +569,21 @@ class FakeApiClient implements ApiClient {
       receipts.add(item);
     }
     body['unlinkedReceipts'] = receipts;
+    final batch = _batchState;
+    if (batch != null) body.addAll(batch);
     return body;
+  }
+
+  /// Compares the stored batch version. A match stores the next batch id.
+  ApiResponse _applyClose(Map b) {
+    final current = _collectionsView();
+    _requireVersion(b['expectedVersion'], current['version']);
+    final version = (current['version'] as int) + 1;
+    _batchState = {
+      'batchId': 'b_2',
+      'version': version,
+    };
+    return _ok({'id': 'ok', 'version': version});
   }
 
   ApiResponse _applyDecision(String id, Map b) {
