@@ -42,10 +42,31 @@ ndk_ready() {
   [[ -x "${NDK_DIR}/ndk-build" ]] || return 1
   [[ -f "${NDK_DIR}/source.properties" ]] || return 1
   grep -Eq "^Pkg\\.Revision[[:space:]]*=[[:space:]]*${VERSION_RE}[[:space:]]*$" "${NDK_DIR}/source.properties" || return 1
-  # Command substitution, not a pipe into grep -q: grep -q would SIGPIPE find,
-  # and pipefail would treat a complete NDK as missing.
-  clang="$(find "${NDK_DIR}/toolchains/llvm/prebuilt" -type f -name clang -print -quit 2>/dev/null || true)"
+  # clang is a symlink to clang-<version>. -type f misses that symlink, which
+  # made a finished sdkmanager install look incomplete and get deleted.
+  clang="$(find "${NDK_DIR}/toolchains/llvm/prebuilt" \( -type f -o -type l \) -name clang -print -quit 2>/dev/null || true)"
   [[ -n "${clang}" && -x "${clang}" ]]
+}
+
+explain_incomplete() {
+  echo "Completeness check failed for ${NDK_DIR}:"
+  if [[ ! -d "${NDK_DIR}" ]]; then
+    echo "  directory does not exist"
+    return 0
+  fi
+  if [[ ! -e "${NDK_DIR}/ndk-build" ]]; then
+    echo "  missing ndk-build"
+  else
+    ls -l "${NDK_DIR}/ndk-build"
+  fi
+  if [[ -f "${NDK_DIR}/source.properties" ]]; then
+    echo "  source.properties:"
+    cat "${NDK_DIR}/source.properties"
+  else
+    echo "  missing source.properties"
+  fi
+  echo "  top-level entries:"
+  ls -la "${NDK_DIR}" | head -40
 }
 
 clear_partial() {
@@ -83,7 +104,9 @@ for attempt in $(seq 1 "${ATTEMPTS}"); do
     ls -1 "${ANDROID_HOME}/ndk"
     exit 0
   fi
-  echo "sdkmanager exited ${status} and ${NDK_DIR} is not a complete NDK ${NDK_VERSION}. Removing the partial directory."
+  echo "sdkmanager exited ${status} and ${NDK_DIR} is not a complete NDK ${NDK_VERSION}."
+  explain_incomplete
+  echo "Removing the partial directory."
   clear_partial
   if [[ "${attempt}" -lt "${ATTEMPTS}" ]]; then
     sleep $((attempt * 5))
