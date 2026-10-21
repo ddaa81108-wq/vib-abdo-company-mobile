@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'api/api_providers.dart';
 import 'app.dart';
 import 'error_handling/error_handler.dart';
+import 'notifications/android_notification_setup.dart';
 import 'notifications/app_push_service.dart';
 import 'secure_storage/app_secure_stores.dart';
 
@@ -42,7 +43,10 @@ void main() {
         return retryUnlessForbidden(retryCount, error);
       },
       overrides: [apiLayerProvider.overrideWithValue(layer)],
-      child: const CompanyApp(),
+      child: AndroidNotificationsBootstrap(
+        onError: errors.report,
+        child: const CompanyApp(),
+      ),
     ),
   );
 }
