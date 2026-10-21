@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../strings.dart';
 import '../tokens.dart';
 
 /// Banner for [signedOutNotice]. One instance on the login screen, not a dialog
