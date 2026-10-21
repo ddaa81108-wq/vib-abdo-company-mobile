@@ -156,10 +156,17 @@ void main() {
         }),
         isA<SessionExpiredException>(),
       );
+      final wrongCode = mapper.fromResponse(401, {
+        'ok': false,
+        'error': {'code': 'INVALID_CREDENTIALS', 'message': 'no'},
+      });
+      expect(wrongCode, isA<SessionExpiredException>());
+      expect(wrongCode.code, 'INVALID_CREDENTIALS');
       final pageExpired = mapper.fromResponse(419, 'Page Expired');
       expect(pageExpired, isA<SessionExpiredException>());
       expect(pageExpired.code, 'PAGE_EXPIRED');
       expect(pageExpired.message, isNot(contains('Page Expired')));
+      expect(pageExpired.message, 'يجب تسجيل الدخول أولًا.');
     });
 
     test('a public 401 is invalid credentials', () {
@@ -258,7 +265,7 @@ void main() {
       expect(await cookies.cookieHeader(), 'sid=abc');
     });
 
-    test('CSRF 419 is refreshed once, then logout, with no third send',
+    test('CSRF 419 is refreshed once and a second CSRF failure is not a logout',
         () async {
       final cookies = InMemoryCookieStore();
       final adapter = _Adapter((request) {
@@ -294,14 +301,11 @@ void main() {
       );
       expect(adapter.count('/api/collections'), 2);
       expect(adapter.count('/api/auth/csrf'), 1);
-      expect(
-        (layer.session.state as SessionUnauthenticated).reason,
-        'session_expired',
-      );
-      expect(await cookies.isEmpty(), isTrue);
+      expect(layer.session.state, isA<SessionAuthenticated>());
+      expect(await cookies.cookieHeader(), 'sid=abc');
     });
 
-    test('a CSRF refresh that returns 401 logs out and does not replay',
+    test('a CSRF refresh that returns 401 does not replay or clear the session',
         () async {
       final cookies = InMemoryCookieStore();
       final adapter = _Adapter((request) {
@@ -333,11 +337,8 @@ void main() {
       );
       expect(adapter.count('/api/collections'), 1);
       expect(adapter.count('/api/auth/csrf'), 1);
-      expect(
-        (layer.session.state as SessionUnauthenticated).reason,
-        'session_expired',
-      );
-      expect(await cookies.isEmpty(), isTrue);
+      expect(layer.session.state, isA<SessionAuthenticated>());
+      expect(await cookies.cookieHeader(), contains('sid=abc'));
     });
   });
 
