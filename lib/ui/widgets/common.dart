@@ -30,7 +30,12 @@ class MoneyText extends StatelessWidget {
         text,
         textAlign: align,
         softWrap: true,
-        style: (style ?? extras.amount).copyWith(fontFamily: 'JetBrainsMono'),
+        style: (style ?? extras.amount).copyWith(
+          fontFamily: 'JetBrainsMono',
+          // Digits stay in JetBrains Mono. That face has no Arabic, so the
+          // currency letters (د.ل) come from Cairo instead of a missing-glyph box.
+          fontFamilyFallback: const ['Cairo'],
+        ),
       ),
     );
   }

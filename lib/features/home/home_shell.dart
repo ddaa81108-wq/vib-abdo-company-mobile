@@ -378,7 +378,15 @@ class _TopBar extends StatelessWidget {
                     top: AppSpacing.md,
                     end: AppSpacing.sm,
                   ),
-                  child: Text(title, style: titleStyle),
+                  child: SizedBox(
+                    height: 32,
+                    width: double.infinity,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(title, maxLines: 1, style: titleStyle),
+                    ),
+                  ),
                 ),
               ),
               IconButton(
