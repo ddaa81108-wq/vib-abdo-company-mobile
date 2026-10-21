@@ -765,6 +765,7 @@ class FakeFixtures {
     },
     'assignedCount': 1,
     'batchId': 'b_1',
+    'version': 1,
   };
 
   static Map<String, dynamic> payroll() => {
