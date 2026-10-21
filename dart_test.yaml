@@ -1,0 +1,5 @@
+# The screenshot tag paints via RenderRepaintBoundary.toImage. Headless CI
+# excludes it. Refresh images with:
+#   flutter test --dart-define=CAPTURE_SCREENSHOTS=true --name screenshots
+tags:
+  screenshots:

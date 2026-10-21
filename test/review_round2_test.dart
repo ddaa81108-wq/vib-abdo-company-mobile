@@ -84,15 +84,26 @@ void main() {
     await go(tester, '/purchases');
 
     expect(find.text(AppStrings.retry), findsOneWidget);
-    expect(find.textContaining('الناتج من الخادم 50,000'), findsNothing);
-    expect(find.textContaining('المسدد 47,447'), findsNothing);
+    expect(find.textContaining('50,000'), findsNothing);
+    expect(find.textContaining('47,447'), findsNothing);
 
     gate.failing = false;
     await tester.tap(find.text(AppStrings.retry));
     await settle(tester);
-    expect(find.textContaining('الناتج من الخادم 50,000 د.ل'), findsOneWidget);
-    expect(find.textContaining('المسدد 47,447 د.ل'), findsOneWidget);
-    expect(find.textContaining('المتبقي 2,553 د.ل'), findsOneWidget);
+    final lifetime = find.byKey(const Key('purchases-lifetime'));
+    expect(lifetime, findsOneWidget);
+    expect(
+      find.descendant(of: lifetime, matching: find.textContaining('50,000')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: lifetime, matching: find.textContaining('47,447')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: lifetime, matching: find.textContaining('2,553')),
+      findsOneWidget,
+    );
     expect(find.text(AppStrings.retry), findsNothing);
   });
 

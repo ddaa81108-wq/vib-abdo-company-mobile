@@ -684,7 +684,9 @@ Future<void> show(WidgetTester tester, Finder finder) async {
     200,
     scrollable: find.descendant(
       of: find.byKey(PurchasesScreen.screenKey),
-      matching: find.byType(Scrollable),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Scrollable && widget.axis == Axis.vertical,
+      ),
     ),
   );
   await tester.pump();

@@ -44,6 +44,7 @@ abstract final class AppStrings {
   static const emptyEmployeeTotals = 'لا توجد إجماليات من الخادم';
   static const emptyPayroll = 'لا توجد بيانات مرتبات';
   static const emptyReports = 'لا توجد بيانات';
+  static const emptyPurchases = 'لا توجد أيام مسجّلة في هذا الدفتر';
   static const online = 'متصل • جميع التغييرات محفوظة';
   static const offline = 'غير متصل — تُعرض آخر بيانات محمّلة للقراءة';
   static const more = 'المزيد';
@@ -331,4 +332,11 @@ abstract final class AppStrings {
   static const assignmentOpen = 'مفتوح';
   static const openingCarry = 'رصيد مرحّل';
   static const approvedCount = 'عدد المعتمد';
+
+  // Account-list presentation only. Grouped at the end so ledger and
+  // collections edits to the catalogue above can merge without overlap.
+  static const dayOne = 'يوم';
+  static const dayTwo = 'يومين';
+  static const dayMany = 'يومًا';
+  static const clearSearch = 'مسح البحث';
 }
