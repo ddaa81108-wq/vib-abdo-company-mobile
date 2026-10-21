@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/widgets.dart';
@@ -7,7 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'api/api_providers.dart';
 import 'app.dart';
 import 'error_handling/error_handler.dart';
+import 'notifications/android_notification_setup.dart';
 import 'notifications/app_push_service.dart';
+import 'notifications/device_token_registrar.dart';
+import 'notifications/device_token_store.dart';
+import 'notifications/push_providers.dart';
 import 'secure_storage/app_secure_stores.dart';
 
 void main() {
@@ -26,12 +31,20 @@ void main() {
     return true;
   };
 
+  // Channel only, after the activity exists. The runtime permission request
+  // lives in another change.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(AndroidNotificationSetup.start(onError: errors.report));
+  });
+
   final stores = AppSecureStores();
+  final pushGate = PushSessionGate();
   final layer = ApiLayer.create(
     config: ApiConfig.fromEnvironment(),
     cookieStore: stores.cookies,
     tokenStorage: stores.tokens,
     push: AppPushService(),
+    cleanups: [pushGate.forget],
   );
   runApp(
     ProviderScope(
@@ -41,7 +54,11 @@ void main() {
         if (error is SessionExpiredException) return null;
         return retryUnlessForbidden(retryCount, error);
       },
-      overrides: [apiLayerProvider.overrideWithValue(layer)],
+      overrides: [
+        apiLayerProvider.overrideWithValue(layer),
+        pushSessionGateProvider.overrideWithValue(pushGate),
+        deviceTokenStoreProvider.overrideWithValue(SecureDeviceTokenStore()),
+      ],
       child: const CompanyApp(),
     ),
   );

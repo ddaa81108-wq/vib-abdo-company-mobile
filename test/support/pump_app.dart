@@ -7,6 +7,9 @@ import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/app.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notification_permission.dart';
+import 'package:vib_abdo_company_mobile/notifications/device_token_registrar.dart';
+import 'package:vib_abdo_company_mobile/notifications/device_token_store.dart';
+import 'package:vib_abdo_company_mobile/notifications/push_providers.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 
 /// Pumps the app with an injected fake [ApiLayer]. The provider does not build one.
@@ -30,9 +33,11 @@ Future<ApiLayer> pumpFakeApp(
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pump();
 
+  final pushGate = PushSessionGate();
   final layer = ApiLayer.create(
     config: const ApiConfig(baseUrl: 'https://fake.invalid', useFakeApi: true),
     fakeLatency: Duration.zero,
+    cleanups: [pushGate.forget],
   );
   addTearDown(layer.dispose);
 
@@ -42,6 +47,8 @@ Future<ApiLayer> pumpFakeApp(
       retry: (retryCount, error) => null,
       overrides: [
         apiLayerProvider.overrideWithValue(layer),
+        pushSessionGateProvider.overrideWithValue(pushGate),
+        deviceTokenStoreProvider.overrideWithValue(MemoryDeviceTokenStore()),
         connectivityPortProvider.overrideWithValue(
           connectivity ?? const FixedConnectivity(true),
         ),

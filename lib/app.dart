@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import 'features/notifications/foreground_notification_banner.dart';
 import 'features/splash/splash_screen.dart';
+import 'notifications/notification_transport_host.dart';
 import 'notifications/realtime_lifecycle.dart';
 import 'state/router_provider.dart';
 import 'state/session_providers.dart';
@@ -75,7 +76,9 @@ class CompanyApp extends ConsumerWidget {
 }
 
 Widget _live(BuildContext context, Widget? page) {
-  return ForegroundNotificationBanner(
-    child: RealtimeLifecycle(child: page ?? const SizedBox.shrink()),
+  return NotificationTransportHost(
+    child: ForegroundNotificationBanner(
+      child: RealtimeLifecycle(child: page ?? const SizedBox.shrink()),
+    ),
   );
 }
