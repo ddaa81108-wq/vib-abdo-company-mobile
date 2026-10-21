@@ -117,6 +117,11 @@ class FakeApiClient implements ApiClient {
   /// 419 uses `PAGE_EXPIRED`, which ends the session and is not a CSRF error.
   int? failNextAuthenticatedStatus;
 
+  /// The next GET /api/notifications list (not unread-count) fails with this
+  /// status, once (tests). 404 is not found. 401 ends the session. Any other
+  /// status is a failed GET.
+  int? failNextNotificationListStatus;
+
   /// Omit `unreadCount` from mark-read and mark-all responses (tests).
   bool omitNotificationWriteUnreadCount = false;
 
@@ -1917,6 +1922,15 @@ class FakeApiClient implements ApiClient {
       return _ok({'unreadCount': _unreadByUser[_userId] ?? 0});
     }
     if (method == 'GET') {
+      final forced = failNextNotificationListStatus;
+      if (forced != null) {
+        failNextNotificationListStatus = null;
+        if (forced == 404) _fail(404, 'NOT_FOUND', _notFound);
+        if (forced == 401) {
+          _fail(401, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
+        }
+        _fail(forced, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الإشعارات.');
+      }
       final data = _notificationsPage(query);
       if (omitUnreadCount) data.remove('unreadCount');
       return _ok(data);

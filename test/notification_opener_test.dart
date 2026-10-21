@@ -1,4 +1,6 @@
 import 'package:flutter_api_layer/api_layer.dart';
+import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
+import 'package:flutter_api_layer/data/repositories/notifications_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/app.dart';
@@ -7,6 +9,7 @@ import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notification_opener.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notifications_screen.dart';
+import 'package:vib_abdo_company_mobile/state/notification_providers.dart';
 import 'package:vib_abdo_company_mobile/state/router_provider.dart';
 
 import 'support/pump_app.dart';
@@ -225,4 +228,75 @@ void main() {
     expect(find.byKey(CollectionsScreen.screenKey), findsOneWidget);
     expect(pathOf(tester), '/collections');
   });
+
+  testWidgets(
+    'permission forbidden marks the current user read, a different recipient does not',
+    (tester) async {
+      final layer = await pumpFakeApp(tester);
+      await signIn(tester, username: 'employee.demo', password: 'demo-only');
+      final fake = layer.client as FakeApiClient;
+      fake.stageNotification({
+        'id': 'n-own',
+        'action': 'approve',
+        'section': 'companies',
+        'entityId': 'co_1',
+        'readAt': null,
+        'createdAt': '2026-10-18T15:00:00Z',
+        'systemName': 'الشركات',
+        'recipientUserId': 'u_12',
+      }, unreadCount: 2);
+      final context = tester.element(find.byType(CompanyApp));
+      final container = ProviderScope.containerOf(context);
+      await finish(
+        tester,
+        container.read(notificationsProvider.notifier).refresh(),
+      );
+      expect(container.read(unreadNotificationsCountProvider).value, 2);
+      final repo = layer.notifications as RemoteNotificationsRepository;
+      final writesBefore = repo.attemptedWriteRequestIds.length;
+
+      final forbidden = await finish(
+        tester,
+        (await openerOf(tester)).open(
+          notice(
+            id: 'n-own',
+            recipient: 'u_12',
+            ref: const NotificationRelatedRef(type: 'companies', id: 'co_1'),
+          ),
+          origin: NotificationOpenOrigin.list,
+        ),
+      );
+      expect(forbidden, NotificationOpenResult.forbidden);
+      await tester.pumpAndSettle();
+      expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+      expect(pathOf(tester), '/forbidden');
+      expect(container.read(unreadNotificationsCountProvider).value, 1);
+      expect(repo.attemptedWriteRequestIds.length, writesBefore + 1);
+      final own = container
+          .read(notificationsProvider)
+          .value!
+          .appNotifications
+          .firstWhere((item) => item.notificationId == 'n-own');
+      expect(own.readAt, isNotNull);
+      expect(fake.notificationMutationApplies, 1);
+
+      final foreignWrites = repo.attemptedWriteRequestIds.length;
+      final foreign = await finish(
+        tester,
+        (await openerOf(tester)).open(
+          notice(
+            id: '88',
+            recipient: 'u_20',
+            ref: const NotificationRelatedRef(type: 'collection', id: 'sb_1'),
+          ),
+          origin: NotificationOpenOrigin.banner,
+        ),
+      );
+      expect(foreign, NotificationOpenResult.forbidden);
+      expect(pathOf(tester), '/forbidden');
+      expect(repo.attemptedWriteRequestIds.length, foreignWrites);
+      expect(container.read(unreadNotificationsCountProvider).value, 1);
+      expect(fake.notificationMutationApplies, 1);
+    },
+  );
 }

@@ -128,51 +128,53 @@ void main() {
   test(
     'a failed GET or a 404 shows no name, and a 401 shows nothing',
     () async {
-      final failed = RecordingLocalNotificationPoster();
-      final failedDelivery = await presenter(
-        userId: () => 'u_12',
-        poster: failed,
-        reload: (_) async => throw const NetworkException(),
-      ).presentPush(pushMap(id: 'n-2', recipient: 'u_12'));
-      expect(failedDelivery, TrayDelivery.nameless);
-      expect(failed.trays, hasLength(1));
-      expect(failed.trays.single.body.contains('الاسم'), isFalse);
-      expect(failed.trays.single.publicBody.contains('الاسم'), isFalse);
-      expect(failed.trays.single.body.contains('900'), isFalse);
-      expect(failed.trays.single.publicBody.contains('900'), isFalse);
-      expect(failed.trays.single.body.contains('091'), isFalse);
+      final failed = await _realPush(
+        id: 'n-2',
+        employeeName: 'الاسم السابق',
+        listStatus: 503,
+      );
+      expect(failed.delivery, TrayDelivery.nameless);
+      expect(failed.poster.trays, hasLength(1));
+      expect(failed.poster.trays.single.body.contains('الاسم'), isFalse);
+      expect(failed.poster.trays.single.publicBody.contains('الاسم'), isFalse);
+      expect(failed.poster.trays.single.body.contains('900'), isFalse);
+      expect(failed.poster.trays.single.publicBody.contains('900'), isFalse);
+      expect(failed.poster.trays.single.body.contains('091'), isFalse);
 
-      final missing = RecordingLocalNotificationPoster();
-      final missingDelivery = await presenter(
-        userId: () => 'u_12',
-        poster: missing,
-        reload: (_) async => throw const NotFoundException(
-          code: 'NOT_FOUND',
-          message: 'غير موجود',
-        ),
-      ).presentPush(pushMap(id: 'n-3', recipient: 'u_12'));
-      expect(missingDelivery, TrayDelivery.notFound);
-      expect(missing.trays, isEmpty);
+      final missing = await _realPush(id: 'n-3', listStatus: 404);
+      expect(missing.delivery, TrayDelivery.notFound);
+      expect(missing.poster.trays, isEmpty);
 
-      final wrongUser = RecordingLocalNotificationPoster();
-      final wrongDelivery = await presenter(
-        userId: () => 'u_12',
-        poster: wrongUser,
-        reload: (id) async =>
-            row(id: id, recipient: 'u_20', employeeName: 'موظف آخر'),
-      ).presentPush(pushMap(id: 'n-4', recipient: 'u_12'));
-      expect(wrongDelivery, TrayDelivery.notFound);
-      expect(wrongUser.trays, isEmpty);
+      // The session list never returns u_20's row. The controller drops it, so
+      // the shade cannot show that employee's name.
+      final wrongUser = await _realPush(
+        id: '88',
+        employeeName: 'موظف آخر',
+        stageForeign: true,
+      );
+      expect(wrongUser.poster.texts.join(), isNot(contains('موظف آخر')));
+      for (final tray in wrongUser.poster.trays) {
+        expect(tray.body.contains('موظف'), isFalse);
+        expect(tray.publicBody.contains('موظف'), isFalse);
+        expect(tray.body.contains('900'), isFalse);
+        expect(tray.publicBody.contains('900'), isFalse);
+        expect(tray.publicBody, 'إشعار جديد');
+      }
 
-      final expired = RecordingLocalNotificationPoster();
-      final expiredDelivery = await presenter(
-        userId: () => 'u_12',
-        poster: expired,
-        reload: (_) async => throw const SessionExpiredException(),
-      ).presentPush(pushMap(id: 'n-5', recipient: 'u_12'));
-      expect(expiredDelivery, TrayDelivery.sessionEnded);
-      expect(expired.trays, isEmpty);
-      expect(expired.texts, isEmpty);
+      final reasons = <String>[];
+      final expired = await _realPush(
+        id: 'n-5',
+        listStatus: 401,
+        onSession: (state) {
+          if (state is SessionUnauthenticated) {
+            reasons.add(state.reason ?? '');
+          }
+        },
+      );
+      expect(expired.delivery, TrayDelivery.sessionEnded);
+      expect(expired.poster.trays, isEmpty);
+      expect(expired.poster.texts, isEmpty);
+      expect(reasons, ['session_expired']);
     },
   );
 
@@ -467,6 +469,79 @@ void main() {
       );
     });
   }
+}
+
+class _RealPush {
+  const _RealPush({required this.delivery, required this.poster});
+
+  final TrayDelivery delivery;
+  final RecordingLocalNotificationPoster poster;
+}
+
+/// Push through [systemTrayPresenterProvider], so ingest and the following
+/// refresh use [NotificationsController]. [listStatus] fails that refresh's
+/// GET /api/notifications after the controller's own unread-count call.
+Future<_RealPush> _realPush({
+  required String id,
+  String employeeName = 'الاسم السابق',
+  int? listStatus,
+  bool stageForeign = false,
+  void Function(SessionState state)? onSession,
+}) async {
+  final layer = ApiLayer.create(
+    config: const ApiConfig(baseUrl: 'https://fake.invalid', useFakeApi: true),
+    fakeLatency: Duration.zero,
+  );
+  addTearDown(layer.dispose);
+  await layer.session.login(username: 'employee.demo', password: 'x');
+  final poster = RecordingLocalNotificationPoster();
+  final container = ProviderContainer(
+    retry: (_, _) => null,
+    overrides: [
+      apiLayerProvider.overrideWithValue(layer),
+      localNotificationPosterProvider.overrideWithValue(poster),
+      shownNotificationStoreProvider.overrideWithValue(
+        MemoryShownNotificationStore(),
+      ),
+    ],
+  );
+  addTearDown(container.dispose);
+  await container.read(notificationsProvider.future);
+  final fake = layer.client as FakeApiClient;
+  if (stageForeign) {
+    fake.stageNotification({
+      'id': id,
+      'action': 'approve',
+      'section': 'collections',
+      'entityId': 'sb_9',
+      'readAt': null,
+      'createdAt': '2026-10-18T16:00:00Z',
+      'systemName': 'الاستلامات',
+      'employeeName': employeeName,
+      'recipientUserId': 'u_20',
+    });
+  }
+  if (onSession != null) {
+    final states = layer.session.states.listen(onSession);
+    addTearDown(states.cancel);
+  }
+  if (listStatus != null) fake.failNextNotificationListStatus = listStatus;
+  final delivery = await container
+      .read(systemTrayPresenterProvider)
+      .presentPush({
+        'notificationId': id,
+        'recipientUserId': 'u_12',
+        'operationType': 'approve',
+        'systemName': 'VIB',
+        'createdAt': '2026-10-18T12:00:00Z',
+        'employeeName': employeeName,
+        'title': 'عميل سري 0910000001',
+        'body': '900',
+        'phone': '0910000001',
+        'token': 'secret-token',
+        'amount': 900,
+      });
+  return _RealPush(delivery: delivery, poster: poster);
 }
 
 class _EnabledPlatform implements NotificationPlatform {

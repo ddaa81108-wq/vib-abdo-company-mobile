@@ -43,6 +43,12 @@ final pendingNotificationOpenProvider = Provider<PendingNotificationOpen>(
 );
 
 /// Agreed with the UI dev. The signature of [open] stays as declared.
+///
+/// [open] marks the row read for every result except
+/// [NotificationOpenResult.needsLogin]. The one other exception is a
+/// `recipientUserId` that is present and is not the signed-in user: that
+/// row is not marked read, and the route is `/forbidden`. A permission
+/// failure for the current user's own row is marked read, then `/forbidden`.
 class NotificationOpener {
   NotificationOpener(this._ref);
 
@@ -63,6 +69,11 @@ class NotificationOpener {
 
     final userId = session.profile.id;
     if (!_belongsToUser(n, userId, origin)) {
+      // A different recipient is not this user's row. Every other result,
+      // including a missing recipient on a tray tap, is marked read.
+      if (!_foreignRecipient(n, userId)) {
+        await _markRead(n.notificationId);
+      }
       _go(forbiddenLocation);
       return NotificationOpenResult.forbidden;
     }
@@ -76,6 +87,7 @@ class NotificationOpener {
 
     final permissions = _ref.read(apiLayerProvider).permissions;
     if (!permissions.canRead(target.section)) {
+      await _markRead(n.notificationId);
       _go(forbiddenLocation);
       return NotificationOpenResult.forbidden;
     }
@@ -133,6 +145,12 @@ class NotificationOpener {
       return owner == null || owner.isEmpty || owner == userId;
     }
     return owner != null && owner.isNotEmpty && owner == userId;
+  }
+
+  /// True only when the server named a recipient and it is not [userId].
+  bool _foreignRecipient(AppNotification notification, String userId) {
+    final owner = notification.recipientUserId?.trim();
+    return owner != null && owner.isNotEmpty && owner != userId;
   }
 }
 
