@@ -15,6 +15,13 @@
 #
 # Java is Temurin 17. AGP 9.1's minimum JDK is 17, Gradle 9.3.1 runs on
 # JVM 17+, and android/app/build.gradle.kts compiles with Java 17.
+#
+# Two more jobs share this workflow. `Negative permission tests` runs the
+# `permissions-negative` tag only and fails if none ran. `Release build rejects
+# fake API` rejects USE_FAKE_API=true in a release compile and scans the
+# release APK for demo profiles. The job below also runs
+# tool/staging_negative_tests/run.sh --dry-run (offline, no secrets).
+# See docs/TESTING.md.
 
 name: CI
 
@@ -105,6 +112,10 @@ jobs:
           set -o pipefail
           flutter test --reporter expanded --dart-define=USE_FAKE_API=true | tee "$RUNNER_TEMP/test-api.log"
 
+      - name: Staging negative script dry-run
+        if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
+        run: bash tool/staging_negative_tests/run.sh --dry-run
+
       - name: Write check summary
         if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
         env:
@@ -153,3 +164,121 @@ jobs:
           path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+  permissions-negative:
+    name: Negative permission tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Flutter 3.47.7
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          flutter-version: "3.47.7"
+          cache: true
+          pub-cache: true
+
+      - name: Verify Flutter and Dart versions
+        run: |
+          flutter --version
+          flutter --version | grep -q 'Flutter 3.47.7'
+          dart --version
+          dart --version | grep -q '3.13.5'
+
+      - name: Resolve packages
+        run: |
+          flutter pub get
+          flutter pub get --directory packages/api_layer
+
+      - name: Run tagged negative permission tests
+        run: tool/run_permissions_negative_tests.sh
+
+  release-no-fake-api:
+    name: Release build rejects fake API
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            **/*.gradle*
+            **/gradle.properties
+            **/gradle-wrapper.properties
+            **/pubspec.lock
+
+      - name: Set up Flutter 3.47.7
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          flutter-version: "3.47.7"
+          cache: true
+          pub-cache: true
+
+      - name: Verify Flutter and Dart versions
+        run: |
+          flutter --version
+          flutter --version | grep -q 'Flutter 3.47.7'
+          dart --version
+          dart --version | grep -q '3.13.5'
+          java -version
+
+      - name: Resolve packages
+        run: |
+          flutter pub get
+          flutter pub get --directory packages/api_layer
+
+      - name: Reject USE_FAKE_API in a release compile
+        run: tool/check_release_rejects_fake_api.sh
+
+      - name: Scan a release APK for demo profiles
+        run: |
+          python3 tool/scan_release_apk.py --self-test
+          # Runner-only. The committed gradle.properties keeps the local 8G heap.
+          # An 8G heap plus a 4G metaspace cap is tight beside Flutter on a
+          # 16 GB GitHub-hosted runner, so this job lowers the daemon heap here.
+          python3 - << 'PY'
+          from pathlib import Path
+          path = Path("android/gradle.properties")
+          text = path.read_text(encoding="utf-8")
+          old = "org.gradle.jvmargs=-Xmx8G -XX:MaxMetaspaceSize=4G -XX:ReservedCodeCacheSize=512m -XX:+HeapDumpOnOutOfMemoryError"
+          new = "org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=512m -XX:+HeapDumpOnOutOfMemoryError"
+          if old not in text:
+              raise SystemExit("android/gradle.properties jvmargs changed; update the CI heap override")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+          # A real release build with the fake API must fail before an APK exists.
+          set +e
+          flutter build apk --release --dart-define=USE_FAKE_API=true \
+            >"$RUNNER_TEMP/release-fake-build.log" 2>&1
+          status=$?
+          set -e
+          if [[ "$status" -eq 0 ]]; then
+            echo "Release APK build accepted USE_FAKE_API=true."
+            exit 1
+          fi
+          if ! grep -q "Release builds cannot use the fake API" "$RUNNER_TEMP/release-fake-build.log"; then
+            echo "Release build with USE_FAKE_API=true failed for a different reason."
+            cat "$RUNNER_TEMP/release-fake-build.log"
+            exit 1
+          fi
+          echo "Release APK build rejected USE_FAKE_API=true."
+          flutter build apk --release \
+            --dart-define=USE_FAKE_API=false \
+            --dart-define=API_BASE=https://staging.example.com
+          test -s build/app/outputs/flutter-apk/app-release.apk
+          python3 tool/scan_release_apk.py build/app/outputs/flutter-apk/app-release.apk
+          {
+            echo "### Release fake-API scan"
+            echo
+            echo "Built \`app-release.apk\` with \`USE_FAKE_API=false\`. Demo profile strings were absent. The APK was not uploaded."
+          } >> "$GITHUB_STEP_SUMMARY"

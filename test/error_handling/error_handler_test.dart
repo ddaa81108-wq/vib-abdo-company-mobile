@@ -23,6 +23,54 @@ void main() {
     expect(failure.message.contains('not-a-real-secret'), isFalse);
   });
 
+  test('validation field messages are shown and details are not', () {
+    const error = ValidationException(
+      code: 'VALIDATION_ERROR',
+      message: 'البيانات المدخلة غير صحيحة',
+      statusCode: 422,
+      correlationId: 'corr-2',
+      details: {'password': 'not-a-real-secret'},
+      fieldErrors: [
+        FieldError(field: 'name', code: 'REQUIRED', message: 'الاسم مطلوب'),
+        FieldError(
+          field: 'amount',
+          code: 'INVALID',
+          message: 'المبلغ غير صالح',
+        ),
+      ],
+    );
+    final failure = handler.toFailure(error);
+    expect(failure.code, 'VALIDATION_ERROR');
+    expect(failure.correlationId, 'corr-2');
+    expect(
+      failure.message,
+      'البيانات المدخلة غير صحيحة\nالاسم مطلوب\nالمبلغ غير صالح',
+    );
+    expect(failure.message.contains('not-a-real-secret'), isFalse);
+    expect(failure.diagnostic.contains('not-a-real-secret'), isFalse);
+    expect(failure.diagnostic, 'code=VALIDATION_ERROR correlationId=corr-2');
+  });
+
+  test('network, timeout, and server failures keep their codes', () {
+    expect(
+      handler.toFailure(const NetworkException()).code,
+      'NETWORK_UNAVAILABLE',
+    );
+    expect(handler.toFailure(const TimeoutApiException()).code, 'TIMEOUT');
+    expect(
+      handler
+          .toFailure(
+            const ServerException(
+              code: 'SERVER_ERROR',
+              message: 'خطأ في الخادم، حاول لاحقاً',
+              statusCode: 503,
+            ),
+          )
+          .message,
+      'خطأ في الخادم، حاول لاحقاً',
+    );
+  });
+
   test(
     'DAY_FINALIZED keeps the server message and is not a version conflict',
     () {

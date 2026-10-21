@@ -11,6 +11,10 @@ import 'notifications/app_push_service.dart';
 import 'secure_storage/app_secure_stores.dart';
 
 void main() {
+  // Compile-time rejection of USE_FAKE_API=true in release. Debug ignores it.
+  const ReleaseFakeApiGuard();
+  rejectFakeApiInRelease(kUseFakeApiFromEnvironment);
+
   WidgetsFlutterBinding.ensureInitialized();
   const errors = ErrorHandler();
   FlutterError.onError = (details) {
@@ -31,6 +35,12 @@ void main() {
   );
   runApp(
     ProviderScope(
+      // A dead session is not fetched again. A 403 is not retried.
+      // Every other failure keeps Riverpod's own retry.
+      retry: (retryCount, error) {
+        if (error is SessionExpiredException) return null;
+        return retryUnlessForbidden(retryCount, error);
+      },
       overrides: [apiLayerProvider.overrideWithValue(layer)],
       child: const CompanyApp(),
     ),

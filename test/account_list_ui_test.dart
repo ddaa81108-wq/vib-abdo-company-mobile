@@ -463,6 +463,8 @@ Future<void> _expectActions(
 Future<void> _switchUser(WidgetTester tester, String username) async {
   await tester.tap(find.byKey(HomeShell.logoutKey));
   await settle(tester);
+  await tester.tap(find.byKey(const Key('logout-confirm')));
+  await settle(tester);
   await signIn(tester, username: username, password: 'demo-only');
 }
 

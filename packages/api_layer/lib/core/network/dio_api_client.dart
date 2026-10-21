@@ -33,8 +33,9 @@ class DioApiClient implements ApiClient {
   Dio get dio => _dio;
 
   /// Same headers the web client sends (per API contract).
-  static BaseOptions baseOptions(ApiConfig config) => BaseOptions(
-        baseUrl: config.baseUrl,
+  static BaseOptions baseOptions(ApiConfig config, {String? baseUrl}) =>
+      BaseOptions(
+        baseUrl: baseUrl ?? config.baseUrl,
         connectTimeout: config.connectTimeout,
         receiveTimeout: config.receiveTimeout,
         responseType: ResponseType.json,

@@ -5,6 +5,7 @@ import '../../error_handling/error_handler.dart';
 import '../../state/session_providers.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
+import '../../ui/widgets/common.dart';
 
 class SplashScreen extends ConsumerWidget {
   const SplashScreen({super.key});
@@ -17,10 +18,11 @@ class SplashScreen extends ConsumerWidget {
     final startup = ref.watch(startupProvider);
     if (startup.hasError) {
       final theme = Theme.of(context);
-      final message = ref
-          .watch(errorHandlerProvider)
-          .toFailure(startup.error!)
-          .message;
+      final failure = ref.watch(errorHandlerProvider).toFailure(startup.error!);
+      if (failure.code == 'FORBIDDEN') {
+        return const Scaffold(key: screenKey, body: ForbiddenPane());
+      }
+      final message = failureText(failure);
       return Scaffold(
         key: screenKey,
         body: SafeArea(

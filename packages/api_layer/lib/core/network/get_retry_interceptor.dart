@@ -32,6 +32,9 @@ class GetRetryInterceptor extends Interceptor {
     final req = err.requestOptions;
     final method = req.method.toUpperCase();
     final attempt = (req.extra['retryAttempt'] as int?) ?? 0;
+    final status = err.response?.statusCode;
+    // Session expiry is never retried, including when a later edit adds statuses.
+    if (status == 401 || status == 419) return handler.next(err);
     if ((method != 'GET' && method != 'HEAD') ||
         req.extra['noRetry'] == true ||
         attempt >= maxRetries ||

@@ -126,7 +126,8 @@ void main() {
     );
 
     expect(host.conflicts, 0);
-    expect(find.text('هذا الإجراء للإدارة فقط'), findsOneWidget);
+    expect(find.text('هذا الإجراء للإدارة فقط'), findsNothing);
+    expect(find.text(AppStrings.forbidden), findsOneWidget);
     expect(find.text(AppStrings.versionConflict), findsNothing);
   });
 
