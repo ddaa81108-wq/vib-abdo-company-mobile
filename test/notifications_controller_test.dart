@@ -175,6 +175,61 @@ void main() {
     );
   });
 
+  test('a failed unread-count route uses the list count, then keeps the previous one', () async {
+    final harness = await signedIn('employee.demo');
+    final container = harness.container;
+    final fake = harness.layer.client as FakeApiClient;
+    expect(await container.read(unreadNotificationsCountProvider.future), 1);
+    await container.read(notificationsProvider.future);
+
+    fake.failUnreadCountRemaining = 1;
+    fake.stageNotification(
+      {
+        'id': 'fresh',
+        'action': 'approve',
+        'createdAt': '2026-10-20T12:00:00Z',
+      },
+      unreadCount: 4,
+    );
+    await container.read(notificationsProvider.notifier).refresh();
+    final updated = container.read(notificationsProvider).value!;
+    expect(updated.items.map((item) => item.id), containsAll(['fresh', '77']));
+    expect(updated.items, hasLength(2));
+    expect(updated.unreadCount, 4);
+    expect(container.read(unreadNotificationsCountProvider).value, 4);
+
+    fake.omitUnreadCount = true;
+    fake.failUnreadCountRemaining = 1;
+    fake.stageNotification({
+      'id': 'later',
+      'action': 'reject',
+      'createdAt': '2026-10-21T12:00:00Z',
+    });
+    await container.read(notificationsProvider.notifier).refresh();
+    final kept = container.read(notificationsProvider).value!;
+    expect(kept.items.map((item) => item.id), contains('later'));
+    expect(kept.unreadCount, 4);
+    expect(container.read(unreadNotificationsCountProvider).value, 4);
+  });
+
+  test('mark-read keeps the previous count when the write and the count route omit it', () async {
+    final harness = await signedIn('employee.demo');
+    final container = harness.container;
+    final fake = harness.layer.client as FakeApiClient;
+    expect(await container.read(unreadNotificationsCountProvider.future), 1);
+    await container.read(notificationsProvider.future);
+    fake.omitNotificationWriteUnreadCount = true;
+    fake.failUnreadCountRemaining = 1;
+
+    await container.read(notificationsProvider.notifier).markRead('77');
+
+    final ready =
+        container.read(notificationsStateProvider) as NotificationsReady;
+    expect(ready.items.single.isRead, isTrue);
+    expect(container.read(unreadNotificationsCountProvider).value, 1);
+    expect(container.read(notificationsProvider).value!.unreadCount, 1);
+  });
+
   test('refresh can announce a new unread row and the initial list does not', () async {
     final harness = await signedIn('employee.demo');
     final container = harness.container;

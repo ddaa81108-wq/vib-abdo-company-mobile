@@ -94,22 +94,26 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     return _page(visible, unreadCount: page.unreadCount, base: page);
   }
 
-  /// GET the list and the unread-count route, then ingest with
-  /// [NotificationSource.fetch].
+  /// GET /api/notifications and ingest first, then GET the unread-count route.
+  ///
+  /// A 404 or any other non-auth failure of the count route falls back to the
+  /// list response's `unreadCount`. If that field is absent too, the previous
+  /// count stays. The count is never computed from the rows. A count failure
+  /// does not roll back the list. 401 still throws [SessionExpiredException]
+  /// after the interceptor has called forceLogout.
   ///
   /// Realtime (SSE `/api/events` or polling `/api/event-changes`) should call
   /// `refresh(announce: true)` so a newly seen unread row can raise a banner.
   /// The initial load uses the default and stays quiet.
   Future<void> refresh({bool announce = false}) async {
-    final repo = ref.read(apiLayerProvider).notifications;
-    final page = await repo.list();
-    final count = await repo.serverUnreadCount();
+    final page = await ref.read(apiLayerProvider).notifications.list();
     await ingest(
       page.appNotifications,
       source: NotificationSource.fetch,
       announce: announce,
     );
-    _applyCount(count, pageUnread: page.unreadCount);
+    final count = await _resolveUnread(listUnread: page.unreadCount);
+    if (count != null) _applyCount(count, pageUnread: page.unreadCount);
   }
 
   Future<void> ingest(
@@ -141,11 +145,23 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
       }
     }
     if (source == NotificationSource.push) {
-      final count = await ref
-          .read(apiLayerProvider)
-          .notifications
-          .serverUnreadCount();
-      _applyCount(count);
+      final count = await _resolveUnread();
+      if (count != null) _applyCount(count);
+    }
+  }
+
+  /// [explicit] is a write response's `unreadCount`. Otherwise the unread-count
+  /// route is tried on its own. A non-auth failure returns [listUnread], which
+  /// is null when the list omitted the field so the caller keeps the previous
+  /// count. [SessionExpiredException] is rethrown; forceLogout already ran.
+  Future<int?> _resolveUnread({int? explicit, int? listUnread}) async {
+    if (explicit != null) return explicit;
+    try {
+      return await ref.read(apiLayerProvider).notifications.serverUnreadCount();
+    } on SessionExpiredException {
+      rethrow;
+    } catch (_) {
+      return listUnread;
     }
   }
 
@@ -239,8 +255,6 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     NotificationWriteResult result, {
     String? onlyId,
   }) async {
-    final count = result.unreadCount ??
-        await ref.read(apiLayerProvider).notifications.serverUnreadCount();
     final notification = result.notification;
     if (notification != null) {
       await ingest(
@@ -248,24 +262,27 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
         source: NotificationSource.fetch,
         announce: false,
       );
-      _applyCount(count);
-      return;
+    } else {
+      final readAt = result.readAt;
+      if (readAt == null) {
+        await refresh();
+        if (result.unreadCount != null) _applyCount(result.unreadCount!);
+        return;
+      }
+      final next = [
+        for (final item in _records(state.value))
+          if ((onlyId == null || item.notificationId == onlyId) && !item.isRead)
+            item.withReadAt(readAt)
+          else
+            item,
+      ];
+      state = AsyncData(_page(next, base: state.value));
     }
-    final readAt = result.readAt;
-    if (readAt == null) {
-      await refresh();
-      _applyCount(count);
-      return;
-    }
-    final next = [
-      for (final item in _records(state.value))
-        if ((onlyId == null || item.notificationId == onlyId) && !item.isRead)
-          item.withReadAt(readAt)
-        else
-          item,
-    ];
-    state = AsyncData(_page(next, unreadCount: count, base: state.value));
-    _applyCount(count);
+    final count = await _resolveUnread(
+      explicit: result.unreadCount,
+      listUnread: state.value?.unreadCount,
+    );
+    if (count != null) _applyCount(count, pageUnread: count);
   }
 
   void _applyCount(int count, {int? pageUnread}) {

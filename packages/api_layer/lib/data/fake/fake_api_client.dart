@@ -110,6 +110,12 @@ class FakeApiClient implements ApiClient {
   /// Omit `unreadCount` from the notifications page (tests).
   bool omitUnreadCount = false;
 
+  /// The next N GET /api/notifications/unread-count calls answer 404 (tests).
+  int failUnreadCountRemaining = 0;
+
+  /// Omit `unreadCount` from mark-read and mark-all responses (tests).
+  bool omitNotificationWriteUnreadCount = false;
+
   /// When set, account-suggestion reads wait here (tests).
   Completer<void>? pauseSuggestions;
 
@@ -1890,6 +1896,10 @@ class FakeApiClient implements ApiClient {
     _ensureNotices();
     if (seg.length > 1 && seg[1] == 'unread-count') {
       if (method != 'GET') _fail(404, 'NOT_FOUND', _notFound);
+      if (failUnreadCountRemaining > 0) {
+        failUnreadCountRemaining--;
+        _fail(404, 'NOT_FOUND', _notFound);
+      }
       // 🔶 Response shape is proposed.
       return _ok({'unreadCount': _unreadByUser[_userId] ?? 0});
     }
@@ -1964,6 +1974,7 @@ class FakeApiClient implements ApiClient {
       'readAt': item['readAt'],
       'notification': Map<String, dynamic>.from(item),
     };
+    if (omitNotificationWriteUnreadCount) result.remove('unreadCount');
     _storeNotificationReplay(b, result);
     return result;
   }
@@ -1982,8 +1993,20 @@ class FakeApiClient implements ApiClient {
       'unreadCount': 0,
       'readAt': _noticeReadStamp,
     };
+    if (omitNotificationWriteUnreadCount) result.remove('unreadCount');
     _storeNotificationReplay(b, result);
     return result;
+  }
+
+  /// Test hook. Adds one row without counting it into the stored unread total.
+  /// [unreadCount] replaces that owner's stored total when passed.
+  void stageNotification(Map<String, dynamic> item, {int? unreadCount}) {
+    _ensureNotices();
+    final copy = Map<String, dynamic>.from(item);
+    final owner = '${copy['recipientUserId'] ?? _userId}';
+    copy['recipientUserId'] = owner;
+    (_notices[owner] ??= []).add(copy);
+    if (unreadCount != null) _unreadByUser[owner] = unreadCount;
   }
 
   void _failNextNotificationWrite() {
