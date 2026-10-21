@@ -201,6 +201,58 @@ void main() {
   });
 
   testWidgets(
+    'phone show-all loads the remaining pages for the active filter',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
+      final fake = layer.client as FakeApiClient;
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/customers');
+      expect(find.byKey(const Key('show-all-debts')), findsNothing);
+
+      tester.view.physicalSize = const Size(360, 2400);
+      tester.view.devicePixelRatio = 1;
+      fake.accountNextCursor = 'page-2';
+      fake.accountNextItems = [
+        {
+          'id': 'c_rest',
+          'name': 'باقي الكروت',
+          'balanceUnits': 8,
+          'version': 1,
+        },
+      ];
+      await go(tester, '/customers');
+      expect(find.byType(ExpansionTile), findsOneWidget);
+      await tester.tap(find.text(AppStrings.oldDebtsTitle));
+      await settle(tester);
+      expect(find.byKey(const Key('show-all-debts')), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('account-search')), 'عميل');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await settle(tester);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('account-filter-pinned')),
+      );
+      await tester.tap(find.byKey(const ValueKey('account-filter-pinned')));
+      await settle(tester);
+
+      final before = fake.accountListQueries.length;
+      await tester.ensureVisible(find.byKey(const Key('show-all-debts')));
+      await tester.tap(find.byKey(const Key('show-all-debts')));
+      await settle(tester);
+
+      expect(find.text('باقي الكروت'), findsOneWidget);
+      final paged = fake.accountListQueries
+          .skip(before)
+          .where((query) => query.cursor != null);
+      expect(paged, hasLength(1));
+      expect(paged.single.section, 'customers');
+      expect(paged.single.filter, 'pinned');
+      expect(paged.single.q, 'عميل');
+      expect(paged.single.cursor, 'page-2');
+    },
+  );
+
+  testWidgets(
     'an empty card name is not an integer error, and suggestions load',
     (tester) async {
       final layer = await pumpFakeApp(tester, size: const Size(800, 1800));

@@ -77,7 +77,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
           children: [
             ScreenTitle(sectionLabel(section.sectionKey)),
             const SizedBox(height: AppSpacing.md),
-            if (_showTicker) _ticker(home, money, width),
+            if (_showTicker) _ticker(home, money, width, data.page.nextCursor),
             _SummaryStrip(
               summary: data.summary,
               currency: section.currency,
@@ -210,6 +210,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     AsyncValue<HomeDto?> home,
     MoneyFormatter money,
     double width,
+    String? nextCursor,
   ) {
     final debts = home.asData?.value?.oldDebts;
     if (debts == null) return const SizedBox.shrink();
@@ -238,7 +239,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
           body,
           TextButton(
             key: const Key('show-all-debts'),
-            onPressed: () => setState(() => _showAllDebts = true),
+            onPressed: () => _showAll(nextCursor),
             child: const Text(AppStrings.showAll),
           ),
         ],
@@ -278,7 +279,34 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     if (ref.read(accountFilterProvider(section)) != filter) return;
     ref
         .read(accountExtraCardsProvider(section).notifier)
-        .append(next.page.items);
+        .append(next.page.items, nextCursor: next.page.nextCursor);
+  }
+
+  /// Phone «عرض الكل»: keep the bulletin's existing flag, and load every
+  /// remaining account page for the filter and search that are active now.
+  void _showAll(String? firstPageCursor) {
+    setState(() => _showAllDebts = true);
+    if (!ref.read(onlineProvider)) return;
+    final query = ref.read(accountQueryProvider(section)).trim();
+    final filter = ref.read(accountFilterProvider(section));
+    ref
+        .read(accountExtraCardsProvider(section).notifier)
+        .loadRemaining(
+          firstPageCursor: firstPageCursor,
+          fetch: (cursor) => ref
+              .read(apiLayerProvider)
+              .accounts
+              .list(
+                section,
+                cursor: cursor,
+                q: query.isEmpty ? null : query,
+                filter: filter,
+              ),
+          stillCurrent: () =>
+              mounted &&
+              ref.read(accountQueryProvider(section)).trim() == query &&
+              ref.read(accountFilterProvider(section)) == filter,
+        );
   }
 
   Future<void> _create(BuildContext context) async {

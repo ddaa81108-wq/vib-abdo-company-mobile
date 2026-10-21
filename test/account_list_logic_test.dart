@@ -215,6 +215,88 @@ void main() {
     );
   });
 
+  test(
+    'show all walks remaining cursors and stops when the filter changes',
+    () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      const section = AccountSection.customers;
+      final sub = container.listen(
+        accountExtraCardsProvider(section),
+        (_, _) {},
+      );
+      addTearDown(sub.close);
+      final notifier = container.read(
+        accountExtraCardsProvider(section).notifier,
+      );
+
+      var calls = 0;
+      await notifier.loadRemaining(
+        firstPageCursor: null,
+        fetch: (cursor) async {
+          calls++;
+          return _page([_card(id: 'unused')]);
+        },
+        stillCurrent: () => true,
+      );
+      expect(calls, 0);
+
+      await notifier.loadRemaining(
+        firstPageCursor: 'c1',
+        fetch: (cursor) async {
+          if (cursor == 'c1') return _page([_card(id: 'p2')], 'c2');
+          expect(cursor, 'c2');
+          return _page([_card(id: 'p3')]);
+        },
+        stillCurrent: () => true,
+      );
+      expect(
+        container
+            .read(accountExtraCardsProvider(section))
+            .map((card) => card.id),
+        ['p2', 'p3'],
+      );
+
+      notifier.clear();
+      notifier.append([_card(id: 'p2')], nextCursor: 'c2');
+      await notifier.loadRemaining(
+        firstPageCursor: 'c1',
+        fetch: (cursor) async {
+          expect(cursor, 'c2');
+          return _page([_card(id: 'p3')]);
+        },
+        stillCurrent: () => true,
+      );
+      expect(
+        container
+            .read(accountExtraCardsProvider(section))
+            .map((card) => card.id),
+        ['p2', 'p3'],
+      );
+
+      notifier.clear();
+      var allow = true;
+      await notifier.loadRemaining(
+        firstPageCursor: 'c1',
+        fetch: (cursor) async {
+          if (cursor == 'c1') return _page([_card(id: 'kept')], 'c2');
+          allow = false;
+          container.read(accountFilterProvider(section).notifier).state =
+              'pinned';
+          return _page([_card(id: 'stale')]);
+        },
+        stillCurrent: () =>
+            allow && container.read(accountFilterProvider(section)) == null,
+      );
+      expect(
+        container
+            .read(accountExtraCardsProvider(section))
+            .map((card) => card.id),
+        isNot(contains('stale')),
+      );
+    },
+  );
+
   test('a blank create name does not call suggestions', () async {
     final layer = ApiLayer.create(
       config: const ApiConfig(
@@ -247,6 +329,13 @@ void main() {
     expect(fake.suggestionQueries.single.q, 'قريب');
     expect(fake.suggestionQueries.single.section, 'customers');
   });
+}
+
+AccountsPage _page(List<AccountCardDto> items, [String? nextCursor]) {
+  return AccountsPage(
+    page: Paged(items: items, nextCursor: nextCursor),
+    summary: const AccountsSummaryDto(),
+  );
 }
 
 AccountCardDto _card({
