@@ -133,6 +133,8 @@ abstract final class AppStrings {
   static const amount = 'المبلغ';
   static const date = 'التاريخ';
   static const name = 'الاسم';
+  static const nameRequired = 'أدخل الاسم.';
+  static const similarNames = 'أسماء مشابهة';
   static const phone = 'الهاتف';
   static const factor = 'المعامل';
   static const sinceDays = 'منذ';
