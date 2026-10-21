@@ -130,9 +130,11 @@ the previous account's count is gone. The existing `unreadCountProvider`
   `refresh(announce: true)`. This contract does not attach that call.
 - `markRead(String notificationId)` and `markAllRead()` — update `readAt` on
   the cached rows and set the unread count from the server response. One
-  stable `requestId` for the in-flight action. A failed attempt keeps the id.
-  A finished attempt drops it. A second read of an already-read row does not
-  decrement the server count again.
+  stable `requestId` for the in-flight action. A second call while that
+  attempt is still running waits on the same future and does not send a
+  second request. A failed attempt keeps the id. A finished attempt drops it.
+  A second read of an already-read row, after the first attempt has finished,
+  does not decrement the server count again.
 
 `NotificationSource` is `push`, `poll`, `fetch`.
 

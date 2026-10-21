@@ -68,14 +68,18 @@ final foregroundNotificationsProvider = StreamProvider<AppNotification>((ref) {
 class NotificationsController extends AsyncNotifier<NotificationsPage> {
   final Map<String, NotificationWriteResult> _writes = {};
   final Map<String, String> _oneReadIds = {};
+  final Map<String, Future<void>> _oneReadFlights = {};
   String? _allReadId;
+  Future<void>? _allReadFlight;
 
   @override
   Future<NotificationsPage> build() async {
     final session = ref.watch(sessionStateProvider);
     _writes.clear();
     _oneReadIds.clear();
+    _oneReadFlights.clear();
     _allReadId = null;
+    _allReadFlight = null;
     ref.read(apiLayerProvider).notifications.clearWriteCache();
     if (session is! SessionAuthenticated) {
       return const NotificationsPage(items: [], unreadCount: null);
@@ -152,9 +156,24 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
   }) => ingest([item], source: source, announce: announce);
 
   /// Marks one row read. The in-flight attempt keeps one [requestId].
-  /// A network failure keeps that id. A finished attempt drops it.
-  /// The count is the server's number, never a local decrement.
-  Future<void> markRead(String notificationId) async {
+  /// A second call for the same id before that attempt finishes waits on the
+  /// same future and does not send again. A network failure keeps the id.
+  /// A finished attempt drops it. The count is the server's number, never a
+  /// local decrement.
+  Future<void> markRead(String notificationId) {
+    final inFlight = _oneReadFlights[notificationId];
+    if (inFlight != null) return inFlight;
+    final flight = _markOne(notificationId);
+    _oneReadFlights[notificationId] = flight;
+    flight.whenComplete(() {
+      if (identical(_oneReadFlights[notificationId], flight)) {
+        _oneReadFlights.remove(notificationId);
+      }
+    }).ignore();
+    return flight;
+  }
+
+  Future<void> _markOne(String notificationId) async {
     final requestId = _oneReadIds.putIfAbsent(
       notificationId,
       RequestIds.newRequestId,
@@ -170,7 +189,20 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     await _applyWrite(result, onlyId: notificationId);
   }
 
-  Future<void> markAllRead() async {
+  /// Marks every cached row read. A second call while the first is in flight
+  /// waits on the same future and does not send again.
+  Future<void> markAllRead() {
+    final inFlight = _allReadFlight;
+    if (inFlight != null) return inFlight;
+    final flight = _markAll();
+    _allReadFlight = flight;
+    flight.whenComplete(() {
+      if (identical(_allReadFlight, flight)) _allReadFlight = null;
+    }).ignore();
+    return flight;
+  }
+
+  Future<void> _markAll() async {
     final requestId = _allReadId ??= RequestIds.newRequestId();
     final result = await _send(
       requestId,

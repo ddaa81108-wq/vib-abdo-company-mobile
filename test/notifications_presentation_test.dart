@@ -152,6 +152,43 @@ void main() {
     },
   );
 
+  testWidgets(
+    'a second read-all tap does nothing while the first is in flight',
+    (tester) async {
+      final gate = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      var calls = 0;
+      await pumpFakeApp(
+        tester,
+        overrides: [
+          notificationsProvider.overrideWith(
+            () => _HoldMarkAll(_samplePage(), gate, () => calls++),
+          ),
+          unreadNotificationsCountProvider.overrideWith(() => _FixedCount(1)),
+        ],
+      );
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/notifications');
+      await tester.tap(find.byKey(const Key('mark-all-read')));
+      await tester.pump();
+      expect(calls, 1);
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('mark-all-read')))
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const Key('mark-all-read')));
+      await tester.pump();
+      expect(calls, 1);
+      gate.complete();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+    },
+  );
+
   testWidgets('rows and the bell use the server notification fields', (
     tester,
   ) async {
@@ -585,6 +622,23 @@ class _FailThenEmpty extends NotificationsController {
     flag.calls++;
     if (flag.failing) throw const NetworkException();
     return const NotificationsPage(items: [], unreadCount: 0);
+  }
+}
+
+class _HoldMarkAll extends NotificationsController {
+  _HoldMarkAll(this.page, this.gate, this.onMarkAll);
+
+  final NotificationsPage page;
+  final Completer<void> gate;
+  final void Function() onMarkAll;
+
+  @override
+  Future<NotificationsPage> build() async => page;
+
+  @override
+  Future<void> markAllRead() {
+    onMarkAll();
+    return gate.future;
   }
 }
 
