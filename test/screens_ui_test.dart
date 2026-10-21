@@ -15,13 +15,14 @@ import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  test('unread badge uses the server count and caps at 99', () {
+  test('unread badge uses the server count and shows 99+ above 99', () {
     expect(badgeLabel(null), isNull);
     expect(badgeLabel(0), isNull);
     expect(badgeLabel(1), '1');
     expect(badgeLabel(98), '98');
     expect(badgeLabel(99), '99');
-    expect(badgeLabel(140), '99');
+    expect(badgeLabel(100), '99+');
+    expect(badgeLabel(140), '99+');
   });
 
   testWidgets('login is RTL and does not offer an external account', (
