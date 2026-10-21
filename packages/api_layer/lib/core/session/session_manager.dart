@@ -67,6 +67,12 @@ class SessionManager {
       ValueNotifier<SessionState>(const SessionUnknown());
   bool _loggingOut = false;
 
+  /// Set for the whole of [logout] so a 401 from that call, or from other
+  /// requests finishing at the same time, still ends as reason `logout`.
+  bool _logoutRequested = false;
+  Future<void>? _wipeInFlight;
+  String? _wipeReason;
+
   Stream<SessionState> get states => _controller.stream;
 
   /// Always holds the latest state; late subscribers (e.g. go_router refreshListenable) get it immediately.
@@ -118,8 +124,10 @@ class SessionManager {
   }
 
   /// Calls the REAL logout endpoint first (needs cookie + CSRF), then wipes locally
-  /// even if the call failed.
+  /// even if the call failed. The reason is `logout`, not `session_expired`,
+  /// so the login screen does not show the expiry notice.
   Future<void> logout() async {
+    _logoutRequested = true;
     try {
       await _auth.logout();
     } catch (_) {
@@ -129,9 +137,27 @@ class SessionManager {
   }
 
   /// Called by AuthInterceptor on AUTH_REQUIRED / session expired.
-  Future<void> forceLogout(String reason) => _wipe(reason: reason);
+  ///
+  /// Many requests can 401 together. They share one wipe. An explicit
+  /// [logout] that overlaps those 401s keeps reason `logout`.
+  Future<void> forceLogout(String reason) =>
+      _wipe(reason: _logoutRequested ? 'logout' : reason);
 
-  Future<void> _wipe({required String reason}) async {
+  Future<void> _wipe({required String reason}) {
+    if (reason == 'logout') _wipeReason = 'logout';
+    _wipeReason ??= reason;
+    final inFlight = _wipeInFlight;
+    if (inFlight != null) return inFlight;
+    if (state is SessionUnauthenticated && !_logoutRequested) {
+      _wipeReason = null;
+      return Future<void>.value();
+    }
+    final run = _performWipe();
+    _wipeInFlight = run;
+    return run;
+  }
+
+  Future<void> _performWipe() async {
     if (_loggingOut) return;
     _loggingOut = true;
     try {
@@ -142,9 +168,14 @@ class SessionManager {
           await c();
         } catch (_) {}
       }
-      _emit(SessionUnauthenticated(reason: reason));
+      // Read the reason after the awaits so a logout that started while this
+      // wipe was already running can upgrade session_expired to logout.
+      _emit(SessionUnauthenticated(reason: _wipeReason ?? 'session_expired'));
     } finally {
       _loggingOut = false;
+      _wipeInFlight = null;
+      _wipeReason = null;
+      _logoutRequested = false;
     }
   }
 

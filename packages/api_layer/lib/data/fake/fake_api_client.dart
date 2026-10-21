@@ -19,14 +19,28 @@ import 'fake_fixtures.dart';
 /// Fake-only fixture switch by USERNAME (see FakeFixtures.meFor): `admin…` = admin like the real
 /// server today (empty permission list), `limited.admin…`, `flag.admin…`, `guest…`,
 /// `mustchange…`, else employee.
-/// Password "wrong" -> 401. Fixture pages stay canned. A successful mutation
-/// stores its result, and the next read returns that stored result.
+/// Password "wrong" -> 401 invalid credentials. A successful login sets a
+/// session cookie. There is no bearer token and no refresh token. Session
+/// lifetime is not known (🔶): this client does not run a local timer. Call
+/// [expireSession] to make the current cookie fail the next request.
+/// POST /api/auth/logout revokes that cookie. A missing, revoked, or expired
+/// cookie then gets 401 AUTH_REQUIRED on every authenticated call, and a
+/// stored `requestId` is not returned in place of that 401.
+/// Fixture pages stay canned. A successful mutation stores its result, and
+/// the next read returns that stored result.
 ///
 /// Section reads and writes are rejected with 403 unless the signed-in profile
 /// allows them. The check uses [PermissionService], which is the only place that
 /// matches the server role string. A successful business mutation is stored by
 /// `requestId` for that user; a later call with the same id returns that result
-/// and does not apply the operation again.
+/// and does not apply the operation again. Permission is checked before that
+/// replay, so a stored success cannot answer a call the profile may not make.
+///
+/// 🔶 Status choices below are not confirmed by the server:
+/// an employee who calls an admin, approve, reject, or other management route
+/// gets 403 `FORBIDDEN` (never an empty list); a route that names another
+/// employee's id gets 404 `NOT_FOUND`; an employee reads their own summary
+/// from the route that does not take an employee id. A missing session is 401.
 ///
 /// Creating, updating, or deleting a purchase entry on a day whose status is
 /// `finalized` is rejected with 409 [dayFinalizedCode]. The README and the
@@ -68,6 +82,12 @@ class FakeApiClient implements ApiClient {
   /// The next N proposed home reads fail so the app can use per-section data.
   int failHomeRemaining = 0;
 
+  /// The next N admin employee-totals reads fail after the permission check.
+  int failEmployeeTotalsRemaining = 0;
+
+  /// When set, admin employee-totals reads wait here after the permission check.
+  Completer<void>? pauseEmployeeTotals;
+
   /// The next N older-page reads (`before`) fail (tests).
   int failOlderRemaining = 0;
 
@@ -108,7 +128,19 @@ class FakeApiClient implements ApiClient {
 
   /// When non-null, suggestion reads return these items instead of `[]` (tests).
   List<Map<String, dynamic>>? suggestionItems;
-  bool _loggedIn = false;
+
+  /// Headers of the latest request, as the fake server saw them (tests).
+  Map<String, String> lastRequestHeaders = const {};
+
+  /// Server-side cookie sessions. The id is the `session` cookie value.
+  final Map<String, _FakeSession> _sessions = {};
+  int _sessionSeq = 0;
+  String? _jarId;
+  String? _latestSessionId;
+
+  /// When set, public calls go through the auth interceptor. [serveHttp] does not.
+  ApiClient? _gateway;
+
   final PermissionService _access = PermissionService();
   final Set<String> _passwordChangedUserIds = {};
   final Map<String, Object?> _completedMutations = {};
@@ -168,13 +200,29 @@ class FakeApiClient implements ApiClient {
   static const dayFinalizedMessage =
       'اليوم مرحّل. لا يمكن إضافة أو تعديل أو حذف بند.';
 
+  /// Routes later public calls through [gateway] (the auth interceptor).
+  void bindGateway(ApiClient gateway) => _gateway = gateway;
+
+  /// Drops the in-process cookie jar. The server session is left as it is.
+  void dropHeldCookie() => _jarId = null;
+
+  /// Marks the current session expired. The cookie is still presented; the
+  /// next authenticated request returns 401. There is no local timer.
+  void expireSession() {
+    final id = _jarId ?? _latestSessionId;
+    final session = id == null ? null : _sessions[id];
+    if (session == null) return;
+    session.expired = true;
+  }
+
   @override
   Future<ApiResponse> get(
     String path, {
     Map<String, dynamic>? query,
     ApiRequestOptions options = const ApiRequestOptions(),
   }) =>
-      _handle('GET', path, null, options, query: query);
+      _send('GET', path, null, options, query: query);
+
   @override
   Future<ApiResponse> post(
     String path, {
@@ -182,28 +230,97 @@ class FakeApiClient implements ApiClient {
     Map<String, dynamic>? query,
     ApiRequestOptions options = const ApiRequestOptions(),
   }) =>
-      _handle('POST', path, body, options);
+      _send('POST', path, body, options, query: query);
+
   @override
   Future<ApiResponse> put(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
   }) =>
-      _handle('PUT', path, body, options);
+      _send('PUT', path, body, options);
+
   @override
   Future<ApiResponse> patch(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
   }) =>
-      _handle('PATCH', path, body, options);
+      _send('PATCH', path, body, options);
+
   @override
   Future<ApiResponse> delete(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
   }) =>
-      _handle('DELETE', path, body, options);
+      _send('DELETE', path, body, options);
+
+  /// One HTTP exchange for the interceptor's adapter. Does not call [bindGateway].
+  Future<FakeHttpResult> serveHttp({
+    required String method,
+    required String path,
+    Object? data,
+    Map<String, dynamic>? query,
+    Map<String, String> headers = const {},
+    bool authenticated = true,
+  }) async {
+    final setCookie = <String>[];
+    try {
+      final response = await _handle(
+        method,
+        path,
+        data,
+        ApiRequestOptions(authenticated: authenticated, headers: headers),
+        query: query,
+        setCookie: setCookie,
+      );
+      return FakeHttpResult(
+        status: response.statusCode,
+        body: _successWire(response.data),
+        setCookie: setCookie,
+      );
+    } on ApiException catch (error) {
+      return FakeHttpResult(
+        status: error.statusCode ?? 401,
+        body: jsonEncode({
+          'ok': false,
+          'error': {
+            'code': error.code,
+            'message': error.message,
+            'details': error.details ?? <String, Object?>{},
+            'correlationId': error.correlationId ?? 'fake',
+          },
+        }),
+        setCookie: setCookie,
+      );
+    }
+  }
+
+  Future<ApiResponse> _send(
+    String method,
+    String path,
+    Object? body,
+    ApiRequestOptions options, {
+    Map<String, dynamic>? query,
+  }) {
+    final gateway = _gateway;
+    if (gateway == null) {
+      return _handle(method, path, body, options, query: query);
+    }
+    return switch (method) {
+      'GET' => gateway.get(path, query: query, options: options),
+      'POST' => gateway.post(path, body: body, query: query, options: options),
+      'PUT' => gateway.put(path, body: body, options: options),
+      'PATCH' => gateway.patch(path, body: body, options: options),
+      _ => gateway.delete(path, body: body, options: options),
+    };
+  }
+
+  String _successWire(Object? data) {
+    if (data == null) return '{"ok":true,"data":null}';
+    return '{"ok":true,"data":${jsonEncode(data)}}';
+  }
 
   ApiResponse _ok(Object? data, {int status = 200}) {
     ApiReachability.instance.recordSuccess();
@@ -215,19 +332,29 @@ class FakeApiClient implements ApiClient {
     );
   }
 
-  Never _fail(int status, String code, String message) {
+  Never _fail(
+    int status,
+    String code,
+    String message, {
+    bool authenticated = true,
+  }) {
     if (code == 'NETWORK_UNAVAILABLE' || code == 'TIMEOUT') {
       ApiReachability.instance.recordTransportFailure();
     }
-    throw _err.fromResponse(status, {
-      'ok': false,
-      'error': {
-        'code': code,
-        'message': message,
-        'details': {},
-        'correlationId': 'fake',
+    throw _err.fromResponse(
+      status,
+      {
+        'ok': false,
+        'error': {
+          'code': code,
+          'message': message,
+          'details': {},
+          'correlationId': 'fake',
+        },
       },
-    });
+      null,
+      authenticated,
+    );
   }
 
   void _requireMutationMeta(Map b) {
@@ -250,6 +377,279 @@ class FakeApiClient implements ApiClient {
 
   void _requireFullAccess() {
     if (!_access.fullAccess) _fail(403, 'FORBIDDEN', _adminOnly);
+  }
+
+  static const _notFound = 'العنصر غير موجود';
+
+  /// 🔶 Query names the fake treats as an employee id. Own data is not read
+  /// through these names.
+  static const _employeeQueryKeys = [
+    'employeeId',
+    'userId',
+    'employeeUserId',
+  ];
+
+  String? _queryEmployeeId(Map<String, dynamic>? query) {
+    if (query == null) return null;
+    for (final key in _employeeQueryKeys) {
+      final value = query[key];
+      if (value == null) continue;
+      final text = '$value';
+      if (text.isEmpty) continue;
+      return text;
+    }
+    return null;
+  }
+
+  /// Another employee's id is 404. The caller's own id on a route that should
+  /// not take an employee id is 403. 🔶
+  void _rejectEmployeeSelector(String? id) {
+    if (id == null) return;
+    if (id != _userId) _fail(404, 'NOT_FOUND', _notFound);
+    _fail(403, 'FORBIDDEN', _adminOnly);
+  }
+
+  void _rejectEmployeeQuery(Map<String, dynamic>? query) {
+    _rejectEmployeeSelector(_queryEmployeeId(query));
+  }
+
+  bool get _seesEveryCollection =>
+      _access.fullAccess || _access.canDo(ManagementAction.collectionsDecide);
+
+  bool get _managesPayroll =>
+      _access.fullAccess || _access.canDo(ManagementAction.payrollManage);
+
+  bool _managesDirectory(String head) {
+    if (_access.fullAccess) return true;
+    if (head == 'account-requests') {
+      return _access.canDo(ManagementAction.accountRequestsDecide);
+    }
+    return _access.canDo(ManagementAction.settingsManage);
+  }
+
+  /// Runs before idempotent replay and before the handler. A stored success
+  /// must not answer a forbidden call.
+  void _authorize(
+    String method,
+    List<String> seg,
+    String head,
+    Map<String, dynamic>? query,
+  ) {
+    switch (head) {
+      case 'home':
+      case 'event-changes':
+      case 'notification-preferences':
+        _rejectEmployeeQuery(query);
+        return;
+      case 'notifications':
+        _authorizeNotifications(seg, query);
+        return;
+      case 'customers':
+      case 'companies':
+      case 'libyan-deposits':
+      case 'egyptian-deposits':
+        _authorizeAccounts(method, head, seg, query);
+        return;
+      case 'collections':
+        _authorizeCollections(method, seg, query);
+        return;
+      case 'masraweya':
+        if (method == 'GET') {
+          _requireRead(SectionKey.masraweya);
+        } else {
+          _requireWrite(SectionKey.masraweya);
+        }
+        return;
+      case 'purchases':
+        _authorizePurchases(method, seg);
+        return;
+      case 'treasury':
+        if (method == 'GET') {
+          _requireRead(SectionKey.treasury);
+        } else {
+          _requireWrite(SectionKey.treasury);
+        }
+        return;
+      case 'reports':
+        if (method != 'GET') _requireWrite(SectionKey.reports);
+        _requireRead(SectionKey.reports);
+        return;
+      case 'statements':
+      case 'financial-ledger':
+        _requireFullAccess();
+        return;
+      case 'account-requests':
+      case 'users':
+      case 'staff':
+      case 'employees':
+      case 'admins':
+      case 'settings':
+      case 'audit':
+      case 'operations':
+        _authorizeAdminApi(head, seg, query);
+        return;
+    }
+  }
+
+  void _authorizeAccounts(
+    String method,
+    String head,
+    List<String> seg,
+    Map<String, dynamic>? query,
+  ) {
+    final section = _sectionFor(head);
+    _rejectEmployeeQuery(query);
+    if (method == 'GET') {
+      _requireRead(section);
+      return;
+    }
+    if (seg.length > 2 && seg[2] == 'zero-review') {
+      _requireAction(ManagementAction.customerZeroReview);
+      return;
+    }
+    _requireWrite(section);
+  }
+
+  void _authorizePurchases(String method, List<String> seg) {
+    if (method == 'GET') {
+      _requireRead(SectionKey.purchases);
+      return;
+    }
+    final finalize = seg.isNotEmpty && seg.last == 'finalize';
+    final correction =
+        method == 'PATCH' && seg.length >= 5 && seg.last == 'correction';
+    if (finalize || correction) {
+      if (!_access.canFinalizePurchases) _fail(403, 'FORBIDDEN', _denied);
+      return;
+    }
+    _requireWrite(SectionKey.purchases);
+  }
+
+  void _authorizeCollections(
+    String method,
+    List<String> seg,
+    Map<String, dynamic>? query,
+  ) {
+    if (_isSalaryPath(seg)) {
+      _authorizeSalary(seg[3]);
+      return;
+    }
+    if (seg.length > 3 && seg[1] == 'payroll' && seg.last == 'confirm') {
+      _requireAction(ManagementAction.payrollManage);
+      return;
+    }
+    if (method == 'GET' && seg.length > 1 && seg[1] == 'payroll') {
+      _rejectEmployeeQuery(query);
+      if (!_managesPayroll && !_access.canWrite(SectionKey.collections)) {
+        _fail(403, 'FORBIDDEN', _denied);
+      }
+      return;
+    }
+    if (method != 'GET') {
+      _requireCollectionMutation(seg);
+      return;
+    }
+    if (seg.length > 1 && seg[1] == 'assignees') {
+      _requireAction(ManagementAction.collectionsAssign);
+      return;
+    }
+    if (seg.length == 2 && seg[1] == 'assignments') {
+      _requireAction(ManagementAction.collectionsAssign);
+      return;
+    }
+    if (seg.length > 1 && seg[1] == 'link-candidates') {
+      _requireAction(ManagementAction.collectionsDecide);
+      return;
+    }
+    _rejectEmployeeQuery(query);
+    _requireRead(SectionKey.collections);
+  }
+
+  bool _isSalaryPath(List<String> seg) =>
+      seg.length >= 5 &&
+      seg[1] == 'payroll' &&
+      seg[2] == 'employees' &&
+      seg[4] == 'salary';
+
+  /// Salary-by-id is a payroll admin route. 🔶 An employee does not pass
+  /// their own id here; another employee's id is not found.
+  void _authorizeSalary(String employeeId) {
+    if (_managesPayroll) return;
+    if (employeeId != _userId) _fail(404, 'NOT_FOUND', _notFound);
+    _fail(403, 'FORBIDDEN', _adminOnly);
+  }
+
+  void _authorizeNotifications(List<String> seg, Map<String, dynamic>? query) {
+    _rejectEmployeeQuery(query);
+    if (seg.length < 2) return;
+    final id = seg[1];
+    if (id == 'read-all' || id == 'unread-count') return;
+    final owner = _notificationOwner(id);
+    if (owner != null && owner != _userId && !_access.fullAccess) {
+      _fail(404, 'NOT_FOUND', _notFound);
+    }
+  }
+
+  String? _notificationOwner(String id) {
+    for (final raw in FakeFixtures.notifications(0)['items'] as List) {
+      final item = raw as Map;
+      if ('${item['id']}' != id) continue;
+      final owner = item['recipientUserId'];
+      if (owner == null) return null;
+      return '$owner';
+    }
+    return null;
+  }
+
+  /// 🔶 Admin catalog paths are proposed. An id that belongs to someone else
+  /// is 404 before the 403 for the catalog itself.
+  void _authorizeAdminApi(
+    String head,
+    List<String> seg,
+    Map<String, dynamic>? query,
+  ) {
+    final pathId = _directoryUserId(head, seg);
+    if (!_managesDirectory(head)) {
+      if (pathId != null && pathId != _userId) {
+        _fail(404, 'NOT_FOUND', _notFound);
+      }
+      final queryId = _queryEmployeeId(query);
+      if (queryId != null && queryId != _userId) {
+        _fail(404, 'NOT_FOUND', _notFound);
+      }
+      _fail(403, 'FORBIDDEN', _adminOnly);
+    }
+  }
+
+  String? _directoryUserId(String head, List<String> seg) {
+    const directories = {'users', 'staff', 'employees', 'admins'};
+    if (!directories.contains(head) || seg.length < 2) return null;
+    return seg[1];
+  }
+
+  /// 🔶 GET /api/admin/employee-totals. Full admin only until DEF-002, via
+  /// [_requireFullAccess]. An employee, a limited admin, and any other
+  /// profile without full access gets 403 and never an empty list. `from`
+  /// and `to` are echoed by the fixture. `employeeId` is ignored.
+  Future<ApiResponse> _employeeTotals(
+    String method,
+    List<String> seg,
+    Map<String, dynamic>? query,
+  ) async {
+    if (method != 'GET' || seg.length != 2 || seg[1] != 'employee-totals') {
+      _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
+    }
+    _requireFullAccess();
+    final paused = pauseEmployeeTotals;
+    if (paused != null) await paused.future;
+    if (failEmployeeTotalsRemaining > 0) {
+      failEmployeeTotalsRemaining--;
+      _fail(500, 'SERVER_ERROR', 'تعذر تحميل إجماليات الموظفين.');
+    }
+    return _ok(FakeFixtures.employeeTotals(
+      from: _queryText(query, 'from'),
+      to: _queryText(query, 'to'),
+    ));
   }
 
   void _activate(Map<String, dynamic> me) {
@@ -390,10 +790,17 @@ class FakeApiClient implements ApiClient {
     Object? body,
     ApiRequestOptions options, {
     Map<String, dynamic>? query,
+    List<String>? setCookie,
   }) async {
     await Future<void>.delayed(latency);
+    lastRequestHeaders = Map<String, String>.from(options.headers);
     // Same serialization as the real client, then decoded like a server would.
-    lastWireBody = body == null ? null : WireJson.encode(body, rateWireFormat);
+    // The interceptor path already encoded the body.
+    if (body is String) {
+      lastWireBody = body;
+    } else {
+      lastWireBody = body == null ? null : WireJson.encode(body, rateWireFormat);
+    }
     final decoded = lastWireBody == null ? null : jsonDecode(lastWireBody!);
     final b = decoded is Map ? decoded : const {};
     final seg = path
@@ -405,18 +812,32 @@ class FakeApiClient implements ApiClient {
 
     if (method == 'POST' && path == '/api/auth/login') {
       if (b['password'] == 'wrong') {
-        _fail(401, 'INVALID_CREDENTIALS', 'بيانات الدخول غير صحيحة');
+        _fail(
+          401,
+          'INVALID_CREDENTIALS',
+          'بيانات الدخول غير صحيحة',
+          authenticated: false,
+        );
       }
-      _loggedIn = true;
+      final previous = _jarId;
+      if (previous != null) {
+        _sessions.remove(previous);
+      }
       _activate(FakeFixtures.meFor('${b['username']}'));
+      final id = 'fake-session-${++_sessionSeq}';
+      _sessions[id] = _FakeSession(id: id, me: _me);
+      _latestSessionId = id;
+      _jarId = id;
+      setCookie?.add('session=$id; Path=/; HttpOnly');
       return _ok({..._me, 'csrfToken': 'fake-csrf'});
     }
     if (path == '/api/auth/csrf') return _ok({'csrfToken': 'fake-csrf'});
-    if (options.authenticated && !_loggedIn) {
-      _fail(401, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
-    }
+    if (options.authenticated) _ensureSession(options);
     if (path == '/api/auth/logout') {
-      _loggedIn = false;
+      final id = _presentedSessionId(options);
+      if (id != null) _sessions.remove(id);
+      if (_jarId == id) _jarId = null;
+      _userId = null;
       _access.applyFromServer(const [], role: null);
       return _ok({});
     }
@@ -427,30 +848,98 @@ class FakeApiClient implements ApiClient {
       if (id != null) _passwordChangedUserIds.add('$id');
       return _ok({});
     }
-    if (path == '/api/me') return _ok(_me);
+    if (path == '/api/me') {
+      // Own profile. 🔶 An employee id on this route is not how own data is read.
+      _rejectEmployeeQuery(query);
+      return _ok(_me);
+    }
 
     if (method != 'GET' &&
         head != 'notifications' &&
         head != 'notification-preferences') {
-      return _mutate(b, path, () => _route(method, b, seg, head, query));
+      return _mutate(
+        b,
+        method,
+        path,
+        seg,
+        head,
+        query,
+        () => _route(method, b, seg, head, query),
+        () => _ensureSession(options),
+      );
     }
     return _route(method, b, seg, head, query);
   }
 
+  /// Cookie session check. A missing, revoked, or expired cookie is 401
+  /// before any permission decision.
+  void _ensureSession(ApiRequestOptions options) {
+    final id = _presentedSessionId(options);
+    final session = id == null ? null : _sessions[id];
+    if (session == null || session.expired) {
+      _fail(401, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
+    }
+    final user = session.me['user'];
+    if (user is Map && user['id'] != null) _userId = '${user['id']}';
+  }
+
+  String? _presentedSessionId(ApiRequestOptions options) {
+    if (_hasHeader(options, 'cookie')) {
+      return _sessionIdFromCookie(_header(options, 'cookie'));
+    }
+    return _jarId;
+  }
+
+  bool _hasHeader(ApiRequestOptions options, String name) =>
+      options.headers.keys.any((key) => key.toLowerCase() == name);
+
+  String? _header(ApiRequestOptions options, String name) {
+    for (final entry in options.headers.entries) {
+      if (entry.key.toLowerCase() == name) {
+        final value = entry.value.trim();
+        return value.isEmpty ? null : value;
+      }
+    }
+    return null;
+  }
+
+  String? _sessionIdFromCookie(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    for (final part in raw.split(';')) {
+      final piece = part.trim();
+      final eq = piece.indexOf('=');
+      if (eq <= 0) continue;
+      final name = piece.substring(0, eq).trim().toLowerCase();
+      if (name == 'session') return piece.substring(eq + 1).trim();
+    }
+    return null;
+  }
+
   /// A repeated [requestId] for this user returns the original success and
   /// does not apply the operation again. A failure is not remembered, so a
-  /// retry of the same id can still succeed. A purchase-entry write on a
-  /// finalized day is rejected here as well, so a stored success cannot skip
-  /// that check.
+  /// retry of the same id can still succeed. Each attempt checks the cookie
+  /// session first, then permission, then the stored success. A dead session
+  /// is checked again after [pauseMutations], so an in-flight write cannot
+  /// skip a 401. A purchase-entry write on a finalized day is rejected here
+  /// as well, so a stored success cannot skip that check.
   Future<ApiResponse> _mutate(
     Map b,
+    String method,
     String path,
+    List<String> seg,
+    String head,
+    Map<String, dynamic>? query,
     Future<ApiResponse> Function() send,
+    void Function() ensureSession,
   ) async {
     _requireMutationMeta(b);
+    ensureSession();
+    _authorize(method, seg, head, query);
     final requestId = '${b['requestId']}';
     final key = '${_userId ?? ''}|$requestId';
     if (_completedMutations.containsKey(key)) {
+      ensureSession();
+      _authorize(method, seg, head, query);
       _rejectFinalizedPurchaseEntry(path);
       return _ok(_completedMutations[key]);
     }
@@ -468,6 +957,7 @@ class FakeApiClient implements ApiClient {
     try {
       final paused = pauseMutations;
       if (paused != null) await paused.future;
+      ensureSession();
       if (failMutationsRemaining > 0) {
         failMutationsRemaining--;
         _fail(400, 'MUTATION_FAILED', 'تعذر تنفيذ الطلب.');
@@ -491,6 +981,7 @@ class FakeApiClient implements ApiClient {
     String head,
     Map<String, dynamic>? query,
   ) async {
+    _authorize(method, seg, head, query);
     switch (head) {
       case 'home': // 🔶 proposed endpoint, fake only
         if (failHomeRemaining > 0) {
@@ -583,7 +1074,7 @@ class FakeApiClient implements ApiClient {
         });
       case 'notifications':
         if (method == 'GET') {
-          final data = FakeFixtures.notifications(_unread);
+          final data = _notificationsForCaller();
           if (omitUnreadCount) data.remove('unreadCount');
           return _ok(data);
         }
@@ -597,6 +1088,19 @@ class FakeApiClient implements ApiClient {
         return _ok({'soundEnabled': true, 'speechEnabled': false});
       case 'event-changes':
         return _ok({'events': [], 'latest': 0, 'fullResync': false});
+      case 'account-requests':
+        return _accountRequests(seg, b);
+      case 'users':
+      case 'staff':
+      case 'employees':
+      case 'admins':
+      case 'settings':
+      case 'audit':
+      case 'operations':
+        // 🔶 Proposed admin catalogs. Reached only after [_authorize].
+        return _adminCatalog(head, seg);
+      case 'admin':
+        return _employeeTotals(method, seg, query);
     }
     _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
   }
@@ -704,22 +1208,43 @@ class FakeApiClient implements ApiClient {
     if (method == 'GET' && seg.length == 1) {
       _requireRead(SectionKey.collections);
       collectionOverviewReads++;
-      return _ok(_collectionsView());
+      return _ok(_collectionsForCaller());
+    }
+    if (method == 'GET' && _isSalaryPath(seg)) {
+      return _ok(_salaryRecord(seg[3]));
     }
     if (method == 'GET' && seg.length > 1 && seg[1] == 'payroll') {
-      if (!_access.canDo(ManagementAction.payrollManage) &&
-          !_access.canWrite(SectionKey.collections)) {
+      if (!_managesPayroll && !_access.canWrite(SectionKey.collections)) {
         _fail(403, 'FORBIDDEN', _denied);
       }
-      return _ok(FakeFixtures.payroll());
+      return _ok(_payrollForCaller());
     }
     if (method == 'GET' && seg.length > 1 && seg[1] == 'assignees') {
-      _requireRead(SectionKey.collections);
+      _requireAction(ManagementAction.collectionsAssign);
       return _ok({
         'items': [
-          {'id': 'u_12', 'displayName': 'موظف استلام تجريبي'},
+          {
+            'id': FakeFixtures.demoEmployeeId,
+            'displayName': 'موظف استلام تجريبي',
+          },
+          {
+            'id': FakeFixtures.otherEmployeeId,
+            'displayName': 'موظف آخر تجريبي',
+          },
         ],
       });
+    }
+    if (method == 'GET' && seg.length > 1 && seg[1] == 'link-candidates') {
+      _requireAction(ManagementAction.collectionsDecide);
+      return _ok({
+        'items': [
+          {'id': 'c_55', 'name': 'عميل تجريبي'},
+        ],
+      });
+    }
+    if (method == 'GET' && seg.length == 2 && seg[1] == 'assignments') {
+      _requireAction(ManagementAction.collectionsAssign);
+      return _ok({'items': _collectionsView()['assignments']});
     }
     if (method == 'GET') {
       _requireRead(SectionKey.collections);
@@ -771,10 +1296,7 @@ class FakeApiClient implements ApiClient {
       return;
     }
     if (seg.length > 3 && seg[1] == 'payroll' && last == 'confirm') {
-      if (!_access.canWrite(SectionKey.collections) &&
-          !_access.canDo(ManagementAction.payrollManage)) {
-        _fail(403, 'FORBIDDEN', _adminOnly);
-      }
+      _requireAction(ManagementAction.payrollManage);
       return;
     }
     if (seg.length == 2 && seg[1] == 'assignments') {
@@ -1164,11 +1686,8 @@ class FakeApiClient implements ApiClient {
   /// Idempotent replay enters here with the path only. [_mutate] is used for
   /// non-GET calls, so an entry-shaped path is a create, update, or delete.
   void _rejectFinalizedPurchaseEntry(String path) {
-    final seg = path
-        .split('/')
-        .where((part) => part.isNotEmpty)
-        .skip(1)
-        .toList();
+    final seg =
+        path.split('/').where((part) => part.isNotEmpty).skip(1).toList();
     if (seg.length < 2 || seg.first != 'purchases') return;
     final entryPath =
         seg.length == 2 || (seg.length >= 4 && seg[2] == 'entries');
@@ -1309,6 +1828,111 @@ class FakeApiClient implements ApiClient {
     return _ok({'id': entry['id'], 'version': version});
   }
 
+  Map<String, dynamic> _collectionsForCaller() {
+    final body = _collectionsView();
+    if (_seesEveryCollection) return body;
+    final id = _userId;
+    body['assignments'] = _owned(body['assignments'], 'assigneeUserId', id);
+    body['submissions'] = _owned(body['submissions'], 'submittedByUserId', id);
+    body['unlinkedReceipts'] =
+        _owned(body['unlinkedReceipts'], 'submittedByUserId', id);
+    body['employeeTotals'] = _owned(body['employeeTotals'], 'userId', id);
+    // 🔶 Own overview figures are stored literals, not a sum of the rows above.
+    if (id == FakeFixtures.demoEmployeeId) {
+      body['metrics'] =
+          Map<String, dynamic>.from(FakeFixtures.ownCollectionMetrics);
+      body['assignedCount'] = FakeFixtures.ownAssignedCount;
+    } else {
+      body['metrics'] = {
+        'collectedUnits': 0,
+        'dayTotalUnits': 0,
+        'pendingCount': 0,
+        'unlinkedPendingCount': 0,
+        'cashOutstandingUnits': 0,
+      };
+      body['assignedCount'] = 0;
+    }
+    return body;
+  }
+
+  List<Map<String, dynamic>> _owned(Object? raw, String field, String? id) {
+    if (raw is! List || id == null) return const [];
+    return [
+      for (final item in raw)
+        if (item is Map && '${item[field]}' == id)
+          Map<String, dynamic>.from(item),
+    ];
+  }
+
+  Map<String, dynamic> _payrollForCaller() {
+    final body = _copy(FakeFixtures.payroll());
+    if (_managesPayroll) return body;
+    body['employees'] = _owned(body['employees'], 'userId', _userId);
+    return body;
+  }
+
+  Map<String, dynamic> _salaryRecord(String employeeId) {
+    for (final raw in FakeFixtures.payroll()['employees'] as List) {
+      final row = Map<String, dynamic>.from(raw as Map);
+      if ('${row['userId']}' == employeeId) return {'employee': row};
+    }
+    _fail(404, 'NOT_FOUND', _notFound);
+  }
+
+  Map<String, dynamic> _notificationsForCaller() {
+    final data = FakeFixtures.notifications(_unread);
+    final items = <Map<String, dynamic>>[];
+    for (final raw in data['items'] as List) {
+      final item = Map<String, dynamic>.from(raw as Map);
+      final owner = item['recipientUserId'];
+      if (owner == null || _access.fullAccess || '$owner' == _userId) {
+        items.add(item);
+      }
+    }
+    data['items'] = items;
+    return data;
+  }
+
+  ApiResponse _accountRequests(List<String> seg, Map b) {
+    if (seg.length >= 3 && seg[2] == 'decision') {
+      return _ok({
+        'id': seg[1],
+        'status': '${b['decision'] ?? 'approved'}',
+      });
+    }
+    return _ok({
+      'items': [
+        {'id': 'ar_1', 'status': 'pending'},
+      ],
+    });
+  }
+
+  /// 🔶 Proposed admin catalog. Callers who fail [_authorize] never reach this.
+  ApiResponse _adminCatalog(String head, List<String> seg) {
+    final id = _directoryUserId(head, seg);
+    if (id != null) return _ok(_userRecord(id));
+    return _ok({
+      'items': [
+        {'id': 'row_1', 'kind': head},
+      ],
+    });
+  }
+
+  Map<String, dynamic> _userRecord(String id) {
+    const known = {
+      'u_1': 'مدير تجريبي',
+      'u_2': 'إداري محدود تجريبي',
+      'u_3': 'إداري بعلم صريح',
+      'u_4': 'مستخدم تغيير كلمة المرور',
+      'u_9': 'دور غير معروف',
+      FakeFixtures.demoEmployeeId: 'موظف استلام تجريبي',
+      FakeFixtures.otherEmployeeId: 'موظف آخر تجريبي',
+    };
+    final name = known[id];
+    if (name == null) _fail(404, 'NOT_FOUND', _notFound);
+    return {'id': id, 'displayName': name};
+  }
+
   Map<String, dynamic> _recordById(List items, String id, String missing) {
     for (final raw in items) {
       final item = raw as Map<String, dynamic>;
@@ -1316,6 +1940,28 @@ class FakeApiClient implements ApiClient {
     }
     _fail(404, 'NOT_FOUND', missing);
   }
+}
+
+/// One in-memory cookie session. Lifetime is not counted down locally.
+class _FakeSession {
+  _FakeSession({required this.id, required this.me});
+
+  final String id;
+  final Map<String, dynamic> me;
+  bool expired = false;
+}
+
+/// Wire body returned to the auth interceptor. Not an [ApiResponse].
+class FakeHttpResult {
+  const FakeHttpResult({
+    required this.status,
+    required this.body,
+    this.setCookie = const [],
+  });
+
+  final int status;
+  final String body;
+  final List<String> setCookie;
 }
 
 String? _queryText(Map<String, dynamic>? query, String key) {

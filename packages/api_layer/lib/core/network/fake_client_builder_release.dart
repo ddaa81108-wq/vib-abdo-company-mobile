@@ -1,6 +1,10 @@
+import '../auth/cookie_store.dart';
 import '../config/api_config.dart';
 import '../config/release_fake_api_guard.dart';
+import '../session/token_storage.dart';
 import 'fake_stack_parts.dart';
+
+Future<void> _ignoreLogout(String _) async {}
 
 /// Linked only when `dart.vm.product` is set (Flutter release).
 ///
@@ -9,6 +13,9 @@ import 'fake_stack_parts.dart';
 FakeStackParts buildFakeStack({
   required ApiConfig config,
   Duration? fakeLatency,
+  Future<void> Function(String reason) onForcedLogout = _ignoreLogout,
+  CookieStore? cookieStore,
+  TokenStorage? tokenStorage,
 }) {
   throw StateError(releaseFakeApiRejectedMessage);
 }

@@ -1,6 +1,8 @@
 /// Composition root for the API layer. UI (Riverpod providers) depends on what is exposed here.
 library;
 
+import 'package:dio/dio.dart';
+
 import 'core/auth/cookie_store.dart';
 import 'core/config/api_config.dart';
 import 'core/config/release_fake_api_guard.dart';
@@ -18,6 +20,7 @@ import 'core/session/token_storage.dart';
 import 'data/repositories/accounts_repository.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/collections_repository.dart';
+import 'data/repositories/employee_totals_repository.dart';
 import 'data/repositories/home_repository.dart';
 import 'data/repositories/masraweya_repository.dart';
 import 'data/repositories/notifications_repository.dart';
@@ -43,6 +46,7 @@ export 'core/session/token_storage.dart';
 export 'data/models/account_models.dart';
 export 'data/models/auth_models.dart';
 export 'data/models/collection_models.dart';
+export 'data/models/employee_totals_models.dart';
 export 'data/models/common.dart';
 export 'data/models/home_models.dart';
 export 'data/models/masraweya_models.dart';
@@ -64,6 +68,7 @@ class ApiLayer {
     required this.profile,
     required this.accounts,
     required this.collections,
+    required this.employeeTotals,
     required this.masraweya,
     required this.purchases,
     required this.treasury,
@@ -83,6 +88,7 @@ class ApiLayer {
   final ProfileRepository profile;
   final AccountsRepository accounts;
   final CollectionsRepository collections;
+  final EmployeeTotalsRepository employeeTotals;
   final MasraweyaRepository masraweya;
   final PurchasesRepository purchases;
   final TreasuryRepository treasury;
@@ -100,6 +106,7 @@ class ApiLayer {
     CookieStore? cookieStore,
     TokenStorage? tokenStorage,
     Duration? fakeLatency,
+    HttpClientAdapter? httpClientAdapter,
   }) {
     final cfg = config ?? ApiConfig.fromEnvironment();
     rejectFakeApiInRelease(cfg.useFakeApi);
@@ -115,6 +122,7 @@ class ApiLayer {
       cookieStore: cookieStore,
       tokenStorage: tokenStorage,
       fakeLatency: fakeLatency,
+      httpClientAdapter: httpClientAdapter,
     );
     final api = stack.client;
 
@@ -139,6 +147,9 @@ class ApiLayer {
       profileRepository: profile,
       permissionService: permissions,
       cleanups: [
+        // Bearer storage is unused (AUTH_BEARER stays off). Logout still
+        // clears it so a leftover token cannot outlive the cookie session.
+        if (tokenStorage != null) tokenStorage.clear,
         () async {
           await realtime.stop();
           cursor.reset();
@@ -161,6 +172,11 @@ class ApiLayer {
       profile: profile,
       accounts: RemoteAccountsRepository(api),
       collections: RemoteCollectionsRepository(api),
+      employeeTotals: RemoteEmployeeTotalsRepository(
+        api,
+        permissions: permissions,
+        source: cfg.employeeTotalsSource,
+      ),
       masraweya: RemoteMasraweyaRepository(api),
       purchases: RemotePurchasesRepository(api),
       treasury: RemoteTreasuryRepository(api),

@@ -7,4 +7,5 @@
 # See docs/TESTING.md.
 tags:
   screenshots:
+  # Included in the default run. Select with --tags permissions-negative.
   permissions-negative:

@@ -65,7 +65,8 @@ class PurchasesScreen extends ConsumerWidget {
           resetKey: book,
           onRetry: () => ref.invalidate(purchasesProvider),
           messageOf: (error) =>
-              ref.read(errorHandlerProvider).toFailure(error).message,
+              failureText(ref.read(errorHandlerProvider).toFailure(error)),
+          failureOf: (error) => ref.read(errorHandlerProvider).toFailure(error),
           loading: const Column(
             key: Key('purchases-loading'),
             children: [
@@ -327,7 +328,7 @@ class _DayCard extends ConsumerWidget {
       ref.invalidate(purchasesProvider);
       return null;
     } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
+      return failureText(ref.read(errorHandlerProvider).toFailure(error));
     }
   }
 
@@ -525,7 +526,7 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
       Navigator.of(context).pop();
       return null;
     } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
+      return failureText(ref.read(errorHandlerProvider).toFailure(error));
     }
   }
 }
@@ -868,7 +869,7 @@ class _Entry extends ConsumerWidget {
       ref.invalidate(purchasesProvider);
       return null;
     } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
+      return failureText(ref.read(errorHandlerProvider).toFailure(error));
     }
   }
 }

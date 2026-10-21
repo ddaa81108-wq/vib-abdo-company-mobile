@@ -35,6 +35,12 @@ void main() {
   );
   runApp(
     ProviderScope(
+      // A dead session is not fetched again. A 403 is not retried.
+      // Every other failure keeps Riverpod's own retry.
+      retry: (retryCount, error) {
+        if (error is SessionExpiredException) return null;
+        return retryUnlessForbidden(retryCount, error);
+      },
       overrides: [apiLayerProvider.overrideWithValue(layer)],
       child: const CompanyApp(),
     ),

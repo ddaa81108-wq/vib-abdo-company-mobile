@@ -17,9 +17,7 @@ class ErrorHandler {
 
   AppFailure toFailure(Object error) {
     if (error is ApiException) {
-      final message = error.message.trim().isEmpty
-          ? AppStrings.genericError
-          : error.message;
+      final message = _message(error);
       return AppFailure(
         message: message,
         code: error.code,
@@ -35,6 +33,23 @@ class ErrorHandler {
     );
   }
 
+  /// Top-level server text, plus each validation field the server named.
+  /// Field text is already a display string. Raw `details` are not copied.
+  static String _message(ApiException error) {
+    final message = error.message.trim().isEmpty
+        ? AppStrings.genericError
+        : error.message.trim();
+    if (error is! ValidationException || error.fieldErrors.isEmpty) {
+      return message;
+    }
+    final fields = error.fieldErrors
+        .map((field) => field.message.trim())
+        .where((text) => text.isNotEmpty && text != message)
+        .toList(growable: false);
+    if (fields.isEmpty) return message;
+    return '$message\n${fields.join('\n')}';
+  }
+
   /// Drops sensitive keys before a value could reach a log.
   Object? redact(Object? value) => _redactor.redact(value);
 
@@ -43,6 +58,15 @@ class ErrorHandler {
     // printed: frames can capture field values.
     debugPrint('api_error ${toFailure(error).diagnostic}');
   }
+}
+
+/// Riverpod retry for provider failures.
+///
+/// A FORBIDDEN result is not retried. Every other error keeps
+/// [ProviderContainer.defaultRetry].
+Duration? retryUnlessForbidden(int retryCount, Object error) {
+  if (const ErrorHandler().toFailure(error).isForbidden) return null;
+  return ProviderContainer.defaultRetry(retryCount, error);
 }
 
 final errorHandlerProvider = Provider<ErrorHandler>(

@@ -19,7 +19,9 @@
 # Two more jobs share this workflow. `Negative permission tests` runs the
 # `permissions-negative` tag only and fails if none ran. `Release build rejects
 # fake API` rejects USE_FAKE_API=true in a release compile and scans the
-# release APK for demo profiles. The job below is unchanged. See docs/TESTING.md.
+# release APK for demo profiles. The job below also runs
+# tool/staging_negative_tests/run.sh --dry-run (offline, no secrets).
+# See docs/TESTING.md.
 
 name: CI
 
@@ -109,6 +111,10 @@ jobs:
         run: |
           set -o pipefail
           flutter test --reporter expanded --dart-define=USE_FAKE_API=true | tee "$RUNNER_TEMP/test-api.log"
+
+      - name: Staging negative script dry-run
+        if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
+        run: bash tool/staging_negative_tests/run.sh --dry-run
 
       - name: Write check summary
         if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
@@ -250,9 +256,26 @@ jobs:
               raise SystemExit("android/gradle.properties jvmargs changed; update the CI heap override")
           path.write_text(text.replace(old, new, 1), encoding="utf-8")
           PY
+          # A real release build with the fake API must fail before an APK exists.
+          set +e
+          flutter build apk --release --dart-define=USE_FAKE_API=true \
+            >"$RUNNER_TEMP/release-fake-build.log" 2>&1
+          status=$?
+          set -e
+          if [[ "$status" -eq 0 ]]; then
+            echo "Release APK build accepted USE_FAKE_API=true."
+            exit 1
+          fi
+          if ! grep -q "Release builds cannot use the fake API" "$RUNNER_TEMP/release-fake-build.log"; then
+            echo "Release build with USE_FAKE_API=true failed for a different reason."
+            cat "$RUNNER_TEMP/release-fake-build.log"
+            exit 1
+          fi
+          echo "Release APK build rejected USE_FAKE_API=true."
           flutter build apk --release \
             --dart-define=USE_FAKE_API=false \
-            --dart-define=API_BASE=https://staging.example.invalid
+            --dart-define=API_BASE=https://staging.example.com
+          test -s build/app/outputs/flutter-apk/app-release.apk
           python3 tool/scan_release_apk.py build/app/outputs/flutter-apk/app-release.apk
           {
             echo "### Release fake-API scan"

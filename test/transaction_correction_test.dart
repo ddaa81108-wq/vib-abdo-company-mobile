@@ -605,6 +605,10 @@ Future<void> confirmSend(WidgetTester tester, FakeApiClient fake) async {
   await tester.pump();
   await tester.pump(const Duration(seconds: 5));
   await tester.pump(const Duration(milliseconds: 400));
+  // Dio delivers the fake response on a zero-duration timer, so the form's
+  // pop starts one frame later than a direct client call. One more frame
+  // lets that route leave the tree.
+  await tester.pump(const Duration(milliseconds: 400));
 }
 
 Future<void> go(WidgetTester tester, String path) async {

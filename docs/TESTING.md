@@ -59,11 +59,11 @@ Workflow name: `CI` (`.github/workflows/ci.yml`).
 
 | Job | Check name | What it does |
 | --- | --- | --- |
-| `analyze-test-apk` | `Analyze, test, and debug APK` | Unchanged. Analyze, full tests, debug APK with `USE_FAKE_API=true`. |
-| `permissions-negative` | `Negative permission tests` | Convention check, tagged tests for the app and the package, fail on zero tests. |
-| `release-no-fake-api` | `Release build rejects fake API` | Compile probe plus a release APK scan. Described below. |
+| `analyze-test-apk` | `Analyze, test, and debug APK` | Analyze, full tests, debug APK with `USE_FAKE_API=true`, then `tool/staging_negative_tests/run.sh --dry-run`. |
+| `permissions-negative` | `Negative permission tests` | Convention check, tagged tests for the app and the package, fail on zero tests, then the same dry-run. |
+| `release-no-fake-api` | `Release build rejects fake API` | Compile probe plus a release APK that must exist and scan clean. Described below. |
 
-The negative job also runs `tool/staging_negative_tests/run.sh --dry-run` **only when that file exists**. It is an offline self-check owned by the integration script. If the file is absent, the step prints a skip message and stays green. This repository does not add a second staging runner.
+`tool/staging_negative_tests/run.sh --dry-run` is an offline self-check. It does not read secrets and does not open a socket. The script is in this repo, so both CI jobs above run it and fail if it fails. The manual staging workflow is the only job that calls it without `--dry-run`. This repository does not add a second staging runner.
 
 ## Staging negative tests
 
@@ -75,7 +75,7 @@ The workflow calls `tool/staging_negative_tests/run.sh` when that file is on the
 
 `run.sh` contract, from the integration engineer:
 
-- `--dry-run` is an offline self-check. Regular CI runs it only when the script exists.
+- `--dry-run` is an offline self-check. Regular CI always runs it. The script is in the repo, so the step is not skipped.
 - `--junit <file>` writes JUnit XML. The manual workflow passes `staging-permissions-junit.xml` and uploads that file as the artifact `staging-permissions-junit` (missing file warns; a test failure still fails the job).
 - Non-zero exit if any test fails.
 - The script refuses to run when its config is missing. The workflow does not call it in that case: missing required secrets **skip** the job with the secret names (never the values), so a button press before accounts exist is not a red build.
@@ -134,7 +134,7 @@ Release builds cannot use the fake API. Pass --dart-define=USE_FAKE_API=false.
 
 Debug and profile do not set `dart.vm.product`, so they still compile the fake client. Profile is not a store build.
 
-`ApiStack` also calls `rejectFakeApiInRelease` before constructing a fake client, so a hand-built `ApiConfig(useFakeApi: true)` throws in release even if the define was false. The factory imports the fake client through a conditional import:
+`ApiStack` also calls `rejectFakeApiInRelease` before constructing a fake client, so a hand-built `ApiConfig(useFakeApi: true)` throws in release even if the define was false. The factory calls the debug builder only when `kReleaseMode` is false, so release AOT tree-shakes that library. It also imports the fake client through a conditional import:
 
 ```dart
 import 'fake_client_builder.dart'
@@ -154,7 +154,7 @@ flutter build appbundle --release \
   --dart-define=API_BASE=https://staging.example
 ```
 
-`API_BASE` stays the placeholder `https://staging.example.invalid` when the define is omitted. Release does not default that host to production. Application id stays `com.example.vib_abdo_company_mobile`. Signing stays whatever `android/app/build.gradle.kts` already does (debug keystore until the release-signing work lands). This change does not edit either.
+Real mode has no placeholder host. Omitting `API_BASE`, or passing a relative URL, a non-http(s) scheme, userinfo, a path, a query, or a fragment, throws `ApiConfigException` before a client is created. Fake mode ignores `API_BASE` and stores an empty `baseUrl`. Application id stays `com.example.vib_abdo_company_mobile`. Signing stays whatever `android/app/build.gradle.kts` already does (debug keystore until the release-signing work lands). This change does not edit either.
 
 When a release workflow is added, it must pass `--dart-define=USE_FAKE_API=false`. Without that, the const assert fails the Dart compile.
 
@@ -164,14 +164,17 @@ When a release workflow is added, it must pass `--dart-define=USE_FAKE_API=false
 
 1. `flutter test` the guard test with `--dart-define=dart.vm.product=true --dart-define=USE_FAKE_API=true` must fail, and the log must contain the message above.
 2. The same test with `USE_FAKE_API=false` must pass.
+3. `flutter build apk --release --dart-define=USE_FAKE_API=true` must fail with the same message, and must not be treated as a successful release build.
 
 The job then builds:
 
 ```bash
 flutter build apk --release \
   --dart-define=USE_FAKE_API=false \
-  --dart-define=API_BASE=https://staging.example.invalid
+  --dart-define=API_BASE=https://staging.example.com
 ```
+
+`https://staging.example.com` is an origin `ApiConfig.requireRealBaseUrl` accepts (https, host only, no userinfo, path, query, or fragment). It is not a live host and not a secret. The staging preflight still refuses `*.example` as a `STAGING_API_BASE` value; that check is separate from this compile-time define. The job fails if `build/app/outputs/flutter-apk/app-release.apk` is missing or empty.
 
 `tool/scan_release_apk.py` reads the APK and fails if any of these appear as UTF-8 or UTF-16LE: the fixture emails and display names in `fake_fixtures.dart`, `demo-only`, and the `*.demo` usernames. The fixture needles must still occur in `fake_fixtures.dart`, so a rename cannot empty the scan. The APK is not uploaded. It is not a Play artifact.
 
