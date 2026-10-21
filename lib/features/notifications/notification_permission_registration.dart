@@ -5,22 +5,45 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 
+import '../../notifications/android_notification_setup.dart';
 import '../../notifications/device_token_registrar.dart';
+import '../../notifications/notification_channels.dart';
 import '../../notifications/notification_permission_service.dart' as transport;
 import '../../notifications/push_providers.dart';
 import '../../state/session_providers.dart';
 import 'notification_permission.dart';
 
+/// Android SDK int. Tests replace this. Production reads the platform channel.
+final notificationSdkIntProvider = Provider<Future<int> Function()>(
+  (ref) => AndroidNotificationBridge.sdkInt,
+);
+
+/// Android 12 and older have no runtime notification permission.
+Future<bool> notificationRuntimePermissionIsImplicit(
+  Future<int> Function() readSdk,
+) async {
+  try {
+    final sdk = await readSdk();
+    return sdk < NotificationChannels.runtimePermissionSdk;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// His registrar reads [notificationPermissionProvider]. This adapter leaves
 /// that provider's default stub in place and reports the screen's choice.
+/// Below API 33 the choice is granted so registration does not wait for a
+/// request the platform will not show.
 class UiNotificationPermissionAdapter
     implements transport.NotificationPermissionService {
-  UiNotificationPermissionAdapter(this._ui);
+  UiNotificationPermissionAdapter(this._ui, this._readSdk);
 
   final NotificationPermissionService _ui;
+  final Future<int> Function() _readSdk;
 
   @override
   Future<bool> get granted async {
+    if (await notificationRuntimePermissionIsImplicit(_readSdk)) return true;
     final status = await _ui.status();
     return status == NotificationPermissionChoice.granted;
   }
@@ -32,6 +55,7 @@ Override notificationPermissionRegistrarOverride() {
   return notificationPermissionProvider.overrideWith(
     (ref) => UiNotificationPermissionAdapter(
       ref.watch(notificationPermissionServiceProvider),
+      ref.watch(notificationSdkIntProvider),
     ),
   );
 }
@@ -66,6 +90,14 @@ class NotificationPermissionSync
     required NotificationPermissionService permission,
     required DeviceTokenRegistrar registrar,
   }) async {
+    // Below API 33 his login path already registers, because [granted] is
+    // true. Do not ask again, and do not forget on resume.
+    if (await notificationRuntimePermissionIsImplicit(
+      ref.read(notificationSdkIntProvider),
+    )) {
+      state = NotificationPermissionChoice.granted;
+      return;
+    }
     final NotificationPermissionChoice status;
     try {
       status = await permission.status();

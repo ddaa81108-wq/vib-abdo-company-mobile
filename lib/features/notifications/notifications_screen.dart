@@ -38,11 +38,17 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   /// First visit to this screen in the provider scope. Already granted skips
-  /// the dialog. A denial explains first and requests only after agreement.
+  /// the dialog. Below Android 13 there is no request and no explanation.
+  /// A denial explains first and requests only after agreement.
   Future<void> _maybeExplain() async {
     if (!mounted) return;
     if (ref.read(notificationPermissionPromptedProvider)) return;
     ref.read(notificationPermissionPromptedProvider.notifier).mark();
+    if (await notificationRuntimePermissionIsImplicit(
+      ref.read(notificationSdkIntProvider),
+    )) {
+      return;
+    }
     final service = ref.read(notificationPermissionServiceProvider);
     final NotificationPermissionChoice status;
     try {

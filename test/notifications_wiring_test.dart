@@ -20,6 +20,7 @@ import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/foreground_notification_banner.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notification_permission.dart';
+import 'package:vib_abdo_company_mobile/features/notifications/notification_permission_registration.dart';
 import 'package:vib_abdo_company_mobile/notifications/device_registration_client.dart';
 import 'package:vib_abdo_company_mobile/notifications/device_token_registrar.dart';
 import 'package:vib_abdo_company_mobile/notifications/device_token_store.dart';
@@ -288,7 +289,7 @@ void main() {
       initial: NotificationPermissionChoice.denied,
       afterRequest: NotificationPermissionChoice.granted,
     );
-    final log = await _pumpDevicePost(tester, permission, token);
+    final log = await _pumpDevicePost(tester, permission, token, sdk: 33);
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
     expect(log.devicePosts, isEmpty);
 
@@ -308,7 +309,7 @@ void main() {
       initial: NotificationPermissionChoice.denied,
       afterRequest: NotificationPermissionChoice.granted,
     );
-    final log = await _pumpDevicePost(tester, permission, token);
+    final log = await _pumpDevicePost(tester, permission, token, sdk: 33);
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
     await go(tester, '/notifications');
     await tester.tap(find.byKey(const Key('notification-permission-agree')));
@@ -317,6 +318,59 @@ void main() {
 
     await resume(tester);
 
+    expect(log.devicePosts, [
+      {'token': token, 'platform': 'android'},
+    ]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('below Android 33 registers without asking', (tester) async {
+    const token = 'qa-device-token';
+    final permission = FakeNotificationPermissionService(
+      initial: NotificationPermissionChoice.denied,
+      afterRequest: NotificationPermissionChoice.granted,
+    );
+    final log = await _pumpDevicePost(tester, permission, token, sdk: 29);
+    await signIn(tester, username: 'employee.demo', password: 'demo-only');
+    expect(log.devicePosts, [
+      {'token': token, 'platform': 'android'},
+    ]);
+
+    await go(tester, '/notifications');
+    await resume(tester);
+
+    expect(
+      find.byKey(const Key('notification-permission-explain')),
+      findsNothing,
+    );
+    expect(permission.requested, isFalse);
+    expect(log.devicePosts, [
+      {'token': token, 'platform': 'android'},
+    ]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Android 33 asks before the device post', (tester) async {
+    const token = 'qa-device-token';
+    final permission = FakeNotificationPermissionService(
+      initial: NotificationPermissionChoice.denied,
+      afterRequest: NotificationPermissionChoice.granted,
+    );
+    final log = await _pumpDevicePost(tester, permission, token, sdk: 33);
+    await signIn(tester, username: 'employee.demo', password: 'demo-only');
+    await go(tester, '/notifications');
+
+    expect(
+      find.byKey(const Key('notification-permission-explain')),
+      findsOneWidget,
+    );
+    expect(permission.requested, isFalse);
+    expect(log.devicePosts, isEmpty);
+
+    await tester.tap(find.byKey(const Key('notification-permission-agree')));
+    await settle(tester);
+
+    expect(permission.requested, isTrue);
     expect(log.devicePosts, [
       {'token': token, 'platform': 'android'},
     ]);
@@ -443,8 +497,9 @@ class _ObservingGateway implements ApiClient {
 Future<_DevicePostLog> _pumpDevicePost(
   WidgetTester tester,
   FakeNotificationPermissionService permission,
-  String token,
-) async {
+  String token, {
+  int? sdk,
+}) async {
   tester.view.physicalSize = const Size(800, 1400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -481,6 +536,8 @@ Future<_DevicePostLog> _pumpDevicePost(
         shownNotificationStoreProvider.overrideWithValue(
           MemoryShownNotificationStore(),
         ),
+        if (sdk != null)
+          notificationSdkIntProvider.overrideWithValue(() async => sdk),
       ],
     ),
   );

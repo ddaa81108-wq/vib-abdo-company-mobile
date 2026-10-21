@@ -59,6 +59,8 @@ Future<ApiLayer> pumpFakeApp(
           notificationsPermission ?? const GrantedNotificationPermission(),
         ),
         notificationPermissionRegistrarOverride(),
+        // Widget tests have no platform channel. Android 13 keeps the dialog.
+        notificationSdkIntProvider.overrideWithValue(() async => 33),
         backgroundNotificationSchedulerProvider.overrideWithValue(
           const NoopBackgroundNotificationScheduler(),
         ),
