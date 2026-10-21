@@ -11,6 +11,10 @@ import 'notifications/app_push_service.dart';
 import 'secure_storage/app_secure_stores.dart';
 
 void main() {
+  // Compile-time rejection of USE_FAKE_API=true in release. Debug ignores it.
+  const ReleaseFakeApiGuard();
+  rejectFakeApiInRelease(kUseFakeApiFromEnvironment);
+
   WidgetsFlutterBinding.ensureInitialized();
   const errors = ErrorHandler();
   FlutterError.onError = (details) {

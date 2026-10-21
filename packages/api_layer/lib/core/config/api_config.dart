@@ -1,3 +1,5 @@
+import 'release_fake_api_guard.dart';
+
 /// Environment configuration. Values come from --dart-define, never hardcoded.
 enum AuthStrategyKind {
   /// Current real system: session cookie + X-CSRF-Token (default).
@@ -51,18 +53,31 @@ class ApiConfig {
 
   /// 🔶 Real base URL is intentionally NOT defaulted to production. The app must be
   /// pointed at a staging/test copy explicitly via --dart-define=API_BASE=...
-  factory ApiConfig.fromEnvironment() => const ApiConfig(
-        baseUrl: String.fromEnvironment('API_BASE',
-            defaultValue: 'https://staging.example.invalid'),
-        useFakeApi: bool.fromEnvironment('USE_FAKE_API', defaultValue: true),
-        enableDebugLogging: bool.fromEnvironment('API_DEBUG_LOG'),
-        authStrategy: bool.fromEnvironment('AUTH_BEARER')
-            ? AuthStrategyKind.bearerToken
-            : AuthStrategyKind.cookieCsrf,
-        moneyUnitScale:
-            int.fromEnvironment('MONEY_UNIT_SCALE', defaultValue: 0),
-        rateWireFormat: String.fromEnvironment('RATE_WIRE_FORMAT') == 'string'
-            ? RateWireFormat.string
-            : RateWireFormat.number,
-      );
+  ///
+  /// Release compilation rejects `USE_FAKE_API=true` (the default). Debug and
+  /// tests keep that default. See [ReleaseFakeApiGuard].
+  factory ApiConfig.fromEnvironment() {
+    const ReleaseFakeApiGuard();
+    final config = ApiConfig(
+      baseUrl: const String.fromEnvironment(
+        'API_BASE',
+        defaultValue: 'https://staging.example.invalid',
+      ),
+      useFakeApi: kUseFakeApiFromEnvironment,
+      enableDebugLogging: const bool.fromEnvironment('API_DEBUG_LOG'),
+      authStrategy: const bool.fromEnvironment('AUTH_BEARER')
+          ? AuthStrategyKind.bearerToken
+          : AuthStrategyKind.cookieCsrf,
+      moneyUnitScale: const int.fromEnvironment(
+        'MONEY_UNIT_SCALE',
+        defaultValue: 0,
+      ),
+      rateWireFormat:
+          const String.fromEnvironment('RATE_WIRE_FORMAT') == 'string'
+          ? RateWireFormat.string
+          : RateWireFormat.number,
+    );
+    rejectFakeApiInRelease(config.useFakeApi);
+    return config;
+  }
 }

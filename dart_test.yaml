@@ -1,5 +1,10 @@
 # The screenshot tag paints via RenderRepaintBoundary.toImage. Headless CI
 # excludes it. Refresh images with:
 #   flutter test --dart-define=CAPTURE_SCREENSHOTS=true --name screenshots
+#
+# permissions-negative is the Phase 5 gate. CI runs only these tests and fails
+# if none ran. The same tag is declared in packages/api_layer/dart_test.yaml.
+# See docs/TESTING.md.
 tags:
   screenshots:
+  permissions-negative:

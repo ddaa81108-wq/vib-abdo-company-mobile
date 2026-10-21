@@ -1,0 +1,5 @@
+# Negative permission tests. CI runs `flutter test --tags permissions-negative`
+# and fails the build if none ran. Declare the tag here and in the app
+# dart_test.yaml. See docs/TESTING.md.
+tags:
+  permissions-negative:

@@ -95,7 +95,9 @@ Point a build at a real host without committing the host:
 flutter run --dart-define=USE_FAKE_API=false --dart-define=API_BASE=https://your-host.example
 ```
 
-Other defines are listed in `packages/api_layer/README.md`.
+A release build (`flutter build apk --release` or `flutter build appbundle --release`) rejects `USE_FAKE_API=true`, including the default when the define is omitted. Pass `--dart-define=USE_FAKE_API=false` and a staging `API_BASE`. The release binary does not link the fake client or its demo profiles. Debug, profile, and `flutter test` still use the fake client. Application id and signing are unchanged. Details are in `docs/TESTING.md`.
+
+Other defines are listed in `packages/api_layer/README.md`. Negative permission tests use the tag `permissions-negative`. See `docs/TESTING.md`.
 
 ## Android
 

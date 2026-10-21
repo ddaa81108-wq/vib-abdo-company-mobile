@@ -3,6 +3,7 @@ library;
 
 import 'core/auth/cookie_store.dart';
 import 'core/config/api_config.dart';
+import 'core/config/release_fake_api_guard.dart';
 import 'core/money/money_formatter.dart';
 import 'core/network/api_client.dart';
 import 'core/network/api_client_factory.dart';
@@ -27,6 +28,7 @@ import 'data/repositories/treasury_repository.dart';
 
 export 'core/auth/cookie_store.dart';
 export 'core/config/api_config.dart';
+export 'core/config/release_fake_api_guard.dart';
 export 'core/money/money_formatter.dart';
 export 'core/network/api_exception.dart';
 export 'core/network/reachability.dart';
@@ -100,6 +102,7 @@ class ApiLayer {
     Duration? fakeLatency,
   }) {
     final cfg = config ?? ApiConfig.fromEnvironment();
+    rejectFakeApiInRelease(cfg.useFakeApi);
     final permissions = PermissionService();
 
     // Late-bound to break the cycle: interceptor -> session.forceLogout.
@@ -122,7 +125,10 @@ class ApiLayer {
         : ResilientRealtimeService(
             sse: SseRealtimeService(dio: dio, cursor: cursor),
             polling: PollingRealtimeService(
-                api: api, cursor: cursor, interval: cfg.pollingInterval),
+              api: api,
+              cursor: cursor,
+              interval: cfg.pollingInterval,
+            ),
           );
 
     final auth = RemoteAuthRepository(api);
