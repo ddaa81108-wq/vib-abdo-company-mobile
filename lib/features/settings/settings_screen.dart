@@ -31,7 +31,7 @@ const _adminLinks = <_AdminLink>[
   _AdminLink(
     tileKey: Key('settings-link-employees'),
     title: AppStrings.employeesTile,
-    path: '/settings/employees',
+    path: '/settings/employee-totals',
     icon: Icons.groups_outlined,
   ),
   _AdminLink(
