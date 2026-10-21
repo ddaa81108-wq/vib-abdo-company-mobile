@@ -131,15 +131,25 @@ void main() {
   testWidgets('each role only sees the account actions it may use', (
     tester,
   ) async {
-    await pumpFakeApp(tester, size: const Size(800, 2400));
+    final layer = await pumpFakeApp(tester, size: const Size(800, 2400));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    final customers = await tester.runAsync(
+      () => layer.accounts.list(AccountSection.customers),
+    );
+    final zeroCard = customers!.page.items.firstWhere(
+      (card) => card.balanceUnits == 0 && !card.systemManaged,
+    );
+    final zeroKey = ValueKey('zero-review-${zeroCard.id}');
     await _expectActions(
       tester,
       path: '/customers',
       add: true,
       assign: true,
       pin: true,
-      zero: true,
+      // #25 shows this only for a 0 balance with a pending review. The
+      // fixed fixture's 0-balance card has no pending review, so it stays hidden.
+      zero: false,
+      zeroKey: zeroKey,
       rate: false,
     );
     await _expectActions(
@@ -236,10 +246,7 @@ void main() {
     final pin = find.byKey(const Key('pin-c_55'));
     await tester.ensureVisible(pin);
     expect(tester.widget<IconButton>(pin).onPressed, isNull);
-    final zero = find.byKey(const Key('zero-review'));
-    expect(zero, findsWidgets);
-    await tester.ensureVisible(zero.first);
-    expect(tester.widget<TextButton>(zero.first).onPressed, isNull);
+    expect(find.byKey(const Key('zero-review')), findsNothing);
   });
 
   testWidgets('lists lay out at phone widths and large text', (tester) async {
@@ -280,11 +287,6 @@ void main() {
           );
           await _reveal(tester, find.byKey(const Key('pin-c_55')), list);
           if (path == '/customers') {
-            await _reveal(
-              tester,
-              find.byKey(const Key('zero-review')).first,
-              list,
-            );
             await _reveal(tester, find.byKey(const Key('assign-mode')), list);
           }
           if (path == '/egyptian-deposits') {
@@ -428,6 +430,7 @@ Future<void> _expectActions(
   required bool pin,
   required bool zero,
   required bool rate,
+  Key zeroKey = const Key('zero-review'),
 }) async {
   await go(tester, path);
   expect(find.byKey(Key('screen-${path.substring(1)}')), findsOneWidget);
@@ -444,10 +447,8 @@ Future<void> _expectActions(
     find.byKey(const Key('pin-c_55')),
     pin ? findsOneWidget : findsNothing,
   );
-  expect(
-    find.byKey(const Key('zero-review')),
-    zero ? findsWidgets : findsNothing,
-  );
+  expect(find.byKey(const Key('zero-review')), findsNothing);
+  expect(find.byKey(zeroKey), zero ? findsOneWidget : findsNothing);
   expect(
     find.byKey(const Key('save-rate')),
     rate ? findsOneWidget : findsNothing,

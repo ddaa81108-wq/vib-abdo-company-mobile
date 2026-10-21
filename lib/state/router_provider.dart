@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../api/api_providers.dart';
 import '../authentication/auth_gate.dart';
 import '../features/accounts/account_list_screen.dart';
+import '../features/accounts/edit_account_card_screen.dart';
 import '../features/accounts/ledger_screen.dart';
 import '../features/collections/collections_screen.dart';
 import '../features/home/home_dashboard.dart';
@@ -134,6 +135,15 @@ List<RouteBase> _accountRoutes(AccountSection section) => [
         path: ':id',
         builder: (context, state) =>
             LedgerScreen(section: section, id: state.pathParameters['id']!),
+        routes: [
+          GoRoute(
+            path: 'edit',
+            builder: (context, state) => EditAccountCardScreen(
+              section: section,
+              id: state.pathParameters['id']!,
+            ),
+          ),
+        ],
       ),
     ],
   ),

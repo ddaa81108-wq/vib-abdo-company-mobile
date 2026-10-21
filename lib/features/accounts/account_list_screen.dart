@@ -15,6 +15,8 @@ import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
+import 'account_list_logic.dart';
+import 'account_name_suggestions.dart';
 
 /// Customers, companies, Libyan deposits, and Egyptian deposits share this
 /// screen. [section] selects the repository path, currency, and labels.
@@ -30,7 +32,6 @@ class AccountListScreen extends ConsumerStatefulWidget {
 
 class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   final _search = TextEditingController();
-  final _extra = <AccountCardDto>[];
   var _assigning = false;
   var _showAllDebts = false;
   final _selected = <String>{};
@@ -51,6 +52,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       return const ForbiddenPane();
     }
     final page = ref.watch(accountsProvider(section));
+    final extra = ref.watch(accountExtraCardsProvider(section));
     final online = ref.watch(onlineProvider);
     final money = ref.watch(apiLayerProvider).money;
     final canWrite = permissions.canWrite(section.sectionKey);
@@ -84,14 +86,15 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
         ),
       ),
       builder: (data) {
-        final cards = [...data.page.items, ..._extra];
+        final cards = [...data.page.items, ...extra];
         return ListView(
           key: Key('screen-${section.path}'),
           padding: pagePadding(width),
           children: [
             ScreenTitle(sectionLabel(section.sectionKey)),
             const SizedBox(height: AppSpacing.md),
-            if (_showTicker) _ticker(home, money, width, cards),
+            if (_showTicker)
+              _ticker(home, money, width, cards, data.page.nextCursor),
             _SummaryStrip(
               summary: data.summary,
               currency: section.currency,
@@ -119,7 +122,9 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                       icon: const Icon(Icons.close),
                       onPressed: () {
                         _search.clear();
-                        setState(_extra.clear);
+                        ref
+                            .read(accountExtraCardsProvider(section).notifier)
+                            .clear();
                         ref.read(accountQueryProvider(section).notifier).state =
                             '';
                       },
@@ -128,7 +133,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                 ),
               ),
               onSubmitted: (value) {
-                setState(_extra.clear);
+                ref.read(accountExtraCardsProvider(section).notifier).clear();
                 ref.read(accountQueryProvider(section).notifier).state = value;
               },
             ),
@@ -157,7 +162,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             if (_assigning)
               _AssignSubmit(
                 section: section,
-                customerIds: _selected.toList(growable: false),
+                customerIds: assignmentTargetIds(_selected, cards),
                 online: online,
               ),
             if (_reply != null) ...[
@@ -192,16 +197,18 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                             onOpen: () =>
                                 context.go('/${section.path}/${card.id}'),
                             onToggle: () => setState(() {
+                              if (!canSelectAccountForAssignment(card)) return;
                               _selected.contains(card.id)
                                   ? _selected.remove(card.id)
                                   : _selected.add(card.id);
                             }),
                             onPin: (meta) => _pin(card, meta),
                             onZero:
-                                permissions.canDo(
-                                      ManagementAction.customerZeroReview,
-                                    ) &&
-                                    section == AccountSection.customers
+                                showCustomerZeroReview(
+                                  permissions: permissions,
+                                  section: section,
+                                  card: card,
+                                )
                                 ? (meta) => _zero(card, meta)
                                 : null,
                           ),
@@ -251,6 +258,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     MoneyFormatter money,
     double width,
     List<AccountCardDto> cards,
+    String? nextCursor,
   ) {
     final debts = home.asData?.value?.oldDebts;
     if (debts == null) return const SizedBox.shrink();
@@ -289,7 +297,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             alignment: AlignmentDirectional.centerStart,
             child: TextButton(
               key: const Key('show-all-debts'),
-              onPressed: () => setState(() => _showAllDebts = true),
+              onPressed: () => _showAll(nextCursor),
               child: const Text(AppStrings.showAll),
             ),
           ),
@@ -336,7 +344,38 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
           filter: filter,
         );
     if (!mounted) return;
-    setState(() => _extra.addAll(next.page.items));
+    if (ref.read(accountQueryProvider(section)).trim() != query) return;
+    if (ref.read(accountFilterProvider(section)) != filter) return;
+    ref
+        .read(accountExtraCardsProvider(section).notifier)
+        .append(next.page.items, nextCursor: next.page.nextCursor);
+  }
+
+  /// Phone «عرض الكل»: keep the bulletin's existing flag, and load every
+  /// remaining account page for the filter and search that are active now.
+  void _showAll(String? firstPageCursor) {
+    setState(() => _showAllDebts = true);
+    if (!ref.read(onlineProvider)) return;
+    final query = ref.read(accountQueryProvider(section)).trim();
+    final filter = ref.read(accountFilterProvider(section));
+    ref
+        .read(accountExtraCardsProvider(section).notifier)
+        .loadRemaining(
+          firstPageCursor: firstPageCursor,
+          fetch: (cursor) => ref
+              .read(apiLayerProvider)
+              .accounts
+              .list(
+                section,
+                cursor: cursor,
+                q: query.isEmpty ? null : query,
+                filter: filter,
+              ),
+          stillCurrent: () =>
+              mounted &&
+              ref.read(accountQueryProvider(section)).trim() == query &&
+              ref.read(accountFilterProvider(section)) == filter,
+        );
   }
 
   Future<void> _create(BuildContext context) async {
@@ -449,24 +488,7 @@ class _Tabs extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final current = ref.watch(accountFilterProvider(section));
-    final tabs = <(String?, String, int?)>[
-      (
-        null,
-        section == AccountSection.libyanDeposits
-            ? AppStrings.smartTab
-            : AppStrings.activeTab,
-        summary.activeCards,
-      ),
-      ('today', AppStrings.todayTab, null),
-      ('debts', AppStrings.debtsTab, null),
-      ('settled', AppStrings.settledTab, null),
-      ('pinned', AppStrings.pinnedTab, null),
-      if (section == AccountSection.customers)
-        ('pendingReview', AppStrings.zeroTab, summary.pendingReviewCount),
-    ];
-    if (section == AccountSection.egyptianDeposits) {
-      return const SizedBox.shrink();
-    }
+    final tabs = accountListFilters(section);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -475,17 +497,24 @@ class _Tabs extends ConsumerWidget {
             Padding(
               padding: const EdgeInsetsDirectional.only(end: AppSpacing.sm),
               child: ChoiceChip(
-                label: Text(tab.$3 == null ? tab.$2 : '${tab.$2} ${tab.$3}'),
-                selected: current == tab.$1,
+                key: ValueKey('account-filter-${tab.id ?? 'all'}'),
+                label: Text(_filterLabel(summary, tab)),
+                selected: current == tab.id,
                 onSelected: (_) {
                   ref.read(accountFilterProvider(section).notifier).state =
-                      tab.$1;
+                      tab.id;
                 },
               ),
             ),
         ],
       ),
     );
+  }
+
+  String _filterLabel(AccountsSummaryDto summary, AccountListFilter tab) {
+    final count = accountFilterCount(summary, tab.count);
+    if (count == null) return tab.label;
+    return '${tab.label} $count';
   }
 }
 
@@ -539,7 +568,8 @@ class _AccountCard extends StatelessWidget {
     );
     final showPin = canWrite;
     final showZero = onZero != null && !card.systemManaged;
-    final showActions = assigning || showPin || showZero;
+    final showAssign = assigning && canSelectAccountForAssignment(card);
+    final showActions = showAssign || showPin || showZero;
     return Material(
       key: Key('account-card-${card.id}'),
       color: colored
@@ -627,7 +657,7 @@ class _AccountCard extends StatelessWidget {
                       runSpacing: AppSpacing.xs,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        if (assigning)
+                        if (showAssign)
                           Checkbox(
                             value: selected,
                             onChanged: (_) => onToggle(),
@@ -651,7 +681,7 @@ class _AccountCard extends StatelessWidget {
                           ),
                         if (showZero)
                           GuardedMutation(
-                            buttonKey: const Key('zero-review'),
+                            buttonKey: ValueKey('zero-review-${card.id}'),
                             inputs: 'zero:${card.id}:${card.version}',
                             expectedVersion: card.version,
                             label: AppStrings.zeroReview,
@@ -840,6 +870,7 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
             isDense: false,
           ),
         ),
+        AccountNameSuggestions(section: widget.section, query: _name.text),
         const SizedBox(height: AppSpacing.md),
         TextField(
           controller: _phone,
@@ -875,13 +906,12 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
   };
 
   Future<String?> _submit(MutationMeta meta) async {
-    final opening = _opening.text.trim().isEmpty
-        ? null
-        : parseUnits(_opening.text);
-    if (_name.text.trim().isEmpty) return AppStrings.integerOnly;
-    if (_opening.text.trim().isNotEmpty && opening == null) {
-      return AppStrings.integerOnly;
-    }
+    final message = createAccountValidationMessage(
+      name: _name.text,
+      opening: _opening.text,
+    );
+    if (message != null) return message;
+    final opening = openingBalanceOrNull(_opening.text);
     try {
       final ack = await ref
           .read(apiLayerProvider)
@@ -1103,7 +1133,16 @@ class _TickerLine extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(debt.name, style: theme.textTheme.titleSmall),
+            RichText(
+              textDirection: Directionality.of(context),
+              textAlign: TextAlign.start,
+              text: TextSpan(
+                text: debt.name,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: scheme.onSurface,
+                ),
+              ),
+            ),
             const SizedBox(height: AppSpacing.xs),
             _StartAlignedText(
               amount,
