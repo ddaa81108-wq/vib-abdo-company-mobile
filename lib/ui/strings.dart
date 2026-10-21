@@ -40,7 +40,11 @@ abstract final class AppStrings {
   static const emptyTicker = 'لا توجد ديون تجاوزت 3 أيام';
   static const emptyLedger = 'لا توجد حركات';
   static const emptyCollections = 'لا توجد استلامات';
+  static const emptyAssignments = 'لا توجد كروت موجهة';
+  static const emptyEmployeeTotals = 'لا توجد إجماليات من الخادم';
+  static const emptyPayroll = 'لا توجد بيانات مرتبات';
   static const emptyReports = 'لا توجد بيانات';
+  static const emptyPurchases = 'لا توجد أيام مسجّلة في هذا الدفتر';
   static const online = 'متصل • جميع التغييرات محفوظة';
   static const offline = 'غير متصل — تُعرض آخر بيانات محمّلة للقراءة';
   static const more = 'المزيد';
@@ -84,6 +88,7 @@ abstract final class AppStrings {
   static const noNotifications = 'لا توجد إشعارات';
   static const refresh = 'تحديث';
   static const integerOnly = 'أدخل عددًا صحيحًا كما هو، بلا كسور.';
+  static const dateInvalid = 'أدخل التاريخ بصيغة سنة-شهر-يوم.';
   static const unitsHint =
       'عدد صحيح بالوحدة الصغرى التي يخزّنها الخادم. بلا فواصل وبلا كسور. التطبيق لا يحوّل هذا الرقم ولا يحسبه.';
   static const rateInvalid = 'أدخل السعر نصًا كما هو.';
@@ -95,8 +100,23 @@ abstract final class AppStrings {
   static const closeBatchConfirm = 'تأكيد إغلاق الدفعة ومسحها؟';
   static const finalizeDay = 'ترحيل اليوم';
   static const finalizeConfirm = 'تأكيد ترحيل اليوم؟';
+  static const purchaseOpening = 'الرصيد الافتتاحي';
+  static const previousVodafone = 'فودافون سابق';
+  static const saveOpening = 'حفظ الرصيد الافتتاحي';
+  static const saveDayConfirm =
+      'تأكيد حفظ اليوم؟ تُرسل القيم كما أدخلتها، وما يظهر بعد الحفظ هو رد الخادم.';
+  static const openingConfirm =
+      'تأكيد حفظ الرصيد الافتتاحي؟ يُرسل المبلغ كما أدخلته، والرصيد الجديد يظهر من الخادم فقط.';
+  static const openDayCorrection = 'فتح تصحيح اليوم';
+  static const closeDayCorrection = 'إغلاق تصحيح اليوم';
+  static const openCorrectionConfirm =
+      'تأكيد فتح تصحيح اليوم؟ بعد التأكيد يُرسل الطلب كما هو، وتظهر حالة اليوم من الخادم.';
+  static const closeCorrectionConfirm =
+      'تأكيد إغلاق تصحيح اليوم؟ بعد التأكيد يُرسل الطلب كما هو، وتظهر حالة اليوم من الخادم.';
+  static const correctionClosed = 'التصحيح مغلق';
   static const cashIn = 'دخول';
   static const cashOut = 'خروج';
+  static const cashMovements = 'حركات النقد';
   static const formulaCaption = 'ديون لنا + النشط + المصري − ديون علينا';
   static const pinnedColumn = 'التاريخ';
   static const changePassword = 'تغيير كلمة المرور';
@@ -131,6 +151,8 @@ abstract final class AppStrings {
   static const amount = 'المبلغ';
   static const date = 'التاريخ';
   static const name = 'الاسم';
+  static const nameRequired = 'أدخل الاسم.';
+  static const similarNames = 'أسماء مشابهة';
   static const phone = 'الهاتف';
   static const factor = 'المعامل';
   static const sinceDays = 'منذ';
@@ -160,6 +182,10 @@ abstract final class AppStrings {
   static const myPayroll = 'مرتبي';
   static const payroll = 'المرتبات';
   static const statementHidden = 'عمود الرصيد يظهر فقط عندما يرسله الخادم.';
+  static const customerLedger = 'سجل العميل';
+  static const companyLedger = 'سجل الشركة';
+  static const libyanLedger = 'سجل الأمانة الليبية';
+  static const egyptianLedger = 'سجل الأمانة المصرية';
   static const bell = 'الجرس';
   static const connection = 'حالة الاتصال';
   static const openSection = 'فتح القسم';
@@ -225,6 +251,8 @@ abstract final class AppStrings {
   static const purchases = 'المشتريات';
   static const purchasesValue = purchases;
   static const reports = 'التقارير الذكية';
+  static const reportsReadOnly = 'للقراءة فقط. الأرقام كما أرسلها الخادم.';
+  static const scrollColumns = 'اسحب أفقيًا لعرض بقية الأعمدة';
   static const treasury = 'الخزينة';
   static const adjustment = 'تسوية تاريخية';
   static const period = 'الفترة';
@@ -245,6 +273,19 @@ abstract final class AppStrings {
   static const prefsFailed = 'تعذر حفظ التفضيل. أُعيدت قيمة الخادم.';
   static const unreadFull = 'غير المقروء';
   static const homeError = 'تعذر تحميل الرئيسية.';
+  static const homeFallbackNote =
+      'تعذر مسار ملخص الرئيسية. الأرقام أدناه من أقسام الخادم كما هي، دون جمع أو تحويل.';
+  static const updatedAt = 'آخر تحديث';
+  static const serverCount = 'العدد من الخادم';
+  static const appearance = 'المظهر';
+  static const employeesEmpty =
+      'لا تتوفر قائمة الموظفين والإداريين من الخادم في تطبيق الجوال. لا يمكن إضافة حساب أو تعديل صلاحية من هنا.';
+  static const auditEmpty =
+      'لا تتوفر أحداث سجل التدقيق من الخادم في تطبيق الجوال. لا تُعرض سجلات من هذا الجهاز.';
+  static const operationsEmpty =
+      'لا تتوفر حالة مركز التشغيل من الخادم في تطبيق الجوال. لا توجد إجراءات تشغيل من هنا.';
+  static const readLabel = 'مقروء';
+  static const unreadLabel = 'غير مقروء';
   static const filterSearch = 'بحث بالاسم أو الهاتف';
   static const openingBalance = 'رصيد أول المدة';
   static const calculation = 'طريقة الحساب';
@@ -271,10 +312,33 @@ abstract final class AppStrings {
   static const chooseAssignee = 'اختر الموظف.';
   static const enterReference = 'أدخل المرجع.';
   static const edit = 'تعديل';
+  static const editCard = 'تعديل الكارت';
+  static const editCardTitle = 'تعديل بيانات الكارت';
+  static const editCardScope =
+      'يُحفظ الاسم والهاتف فقط. الرصيد والحركات تبقى كما يرسلها الخادم.';
+  static const editCardUnavailable = 'تعديل هذا الكارت غير متاح لهذا الحساب.';
+  static const cardVersionMissing =
+      'تعذر الحفظ قبل وصول إصدار الكارت من الخادم. أُعيد الجلب.';
   static const delete = 'حذف';
   static const confirmDelete = 'تأكيد حذف هذا السطر';
   static const confirmPayroll = 'تأكيد حركة المرتب';
   static const link = 'ربط';
   static const batch = 'الدفعة';
   static const toneNeutral = 'محايد';
+  static const correctTransaction = 'تصحيح الحركة';
+  static const confirmCorrect =
+      'تأكيد إرسال تصحيح هذه الحركة؟ المبلغ والرصيد بعد الحفظ يظهران من الخادم فقط.';
+  static const currentServerAmount = 'المبلغ الحالي من الخادم';
+  static const receipts = 'الاستلامات';
+  static const cashReceivedAt = 'تاريخ استلام النقد';
+  static const assignmentOpen = 'مفتوح';
+  static const openingCarry = 'رصيد مرحّل';
+  static const approvedCount = 'عدد المعتمد';
+
+  // Account-list presentation only. Grouped at the end so ledger and
+  // collections edits to the catalogue above can merge without overlap.
+  static const dayOne = 'يوم';
+  static const dayTwo = 'يومين';
+  static const dayMany = 'يومًا';
+  static const clearSearch = 'مسح البحث';
 }

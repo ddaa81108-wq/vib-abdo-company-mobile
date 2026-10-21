@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 flutter analyze
-flutter test
+flutter test --exclude-tags screenshots
 
 (
   cd packages/api_layer

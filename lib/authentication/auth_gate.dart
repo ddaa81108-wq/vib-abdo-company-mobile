@@ -44,8 +44,9 @@ String? permissionRedirect(String location, PermissionService permissions) {
       path == '/account/password') {
     return null;
   }
-  if (path == '/settings') {
+  if (path == '/settings' || path.startsWith('/settings/')) {
     final manage = permissions.canDo(ManagementAction.settingsManage);
+    if (path != '/settings') return manage ? null : '/';
     if (permissions.canViewFinancialLedger || manage) return null;
     return '/';
   }
@@ -64,7 +65,10 @@ SectionKey? sectionForLocation(String path) {
   return null;
 }
 
-/// Notice when the server ended the session. Other reasons stay silent.
+/// UI hook for session expiry. [SessionUnauthenticated.reason] is
+/// `session_expired` after the interceptor's `forceLogout`, and `logout`
+/// after [SessionManager.logout]. Only the expiry reason returns copy.
+/// The login screen shows this string; there is no second snackbar channel.
 String? signedOutNotice(SessionState session) {
   if (session is SessionUnauthenticated &&
       session.reason == 'session_expired') {

@@ -10,8 +10,13 @@ class ErrorMapper {
   const ErrorMapper();
 
   /// Codes treated as "session expired" -> forced logout (no refresh flow).
-  /// 🔶 Only AUTH_REQUIRED is observed. The others are defensive.
-  /// Authenticated HTTP 401 and HTTP 419 are also expiry unless the body is CSRF.
+  /// 🔶 Only AUTH_REQUIRED is observed. SESSION_EXPIRED, SESSION_REVOKED, and
+  /// PAGE_EXPIRED are defensive. PAGE_EXPIRED is the stand-in for a codeless
+  /// HTTP 419.
+  ///
+  /// Status wins after login: any authenticated 401, and any 419 that is not
+  /// a CSRF error, is session expiry even when the code is something else.
+  /// A 401 on the login request itself stays invalid credentials.
   static const sessionExpiredCodes = {
     'AUTH_REQUIRED',
     'SESSION_EXPIRED',
@@ -23,7 +28,7 @@ class ErrorMapper {
   /// containing "CSRF" (e.g. CSRF_INVALID, CSRF_TOKEN_INVALID) is treated as such.
   static bool isCsrfCode(String code) => code.toUpperCase().contains('CSRF');
 
-  /// Server-provided text, not a message this client invented.
+  /// 🔶 A CSRF failure may be named only in the server message.
   static bool isCsrfMessage(String? message) =>
       message != null && message.toUpperCase().contains('CSRF');
 
@@ -97,8 +102,8 @@ class ErrorMapper {
     final message = serverMessage ?? _defaultMessage(status);
     final details = err['details'] ?? (body is Map ? body['details'] : null);
 
-    // Code-first mapping (real codes), then status.
-    // CSRF is refreshed once. It must win over 419, which is otherwise expiry.
+    // CSRF wins over 419. A bare 419 is session expiry, not a token refresh.
+    // HTML and empty bodies stay on the client default (see [_serverMessage]).
     if (isCsrfCode(code) || isCsrfMessage(serverMessage)) {
       return CsrfInvalidException(
           code: isCsrfCode(code) ? code : 'CSRF_INVALID',
@@ -107,18 +112,25 @@ class ErrorMapper {
           correlationId: correlationId,
           details: details);
     }
-    // A public 401 is a rejected login, not a session that needs clearing.
+    // The login call is unauthenticated. Its 401 is rejected credentials,
+    // including when the body says AUTH_REQUIRED.
     if (status == 401 && !authenticated) {
       return InvalidCredentialsException(
           code: serverCode == null || serverCode.isEmpty
               ? 'INVALID_CREDENTIALS'
-              : code,
-          message: serverMessage ?? invalidCredentialsMessage,
+              : serverCode,
+          message: serverMessage == null || serverMessage.isEmpty
+              ? invalidCredentialsMessage
+              : serverMessage,
           statusCode: status,
           correlationId: correlationId,
           details: details);
     }
-    if (sessionExpiredCodes.contains(code) || status == 419) {
+    // After login, any 401 and any non-CSRF 419 end the session, whatever
+    // the code is. Named session codes do the same on other statuses.
+    if (sessionExpiredCodes.contains(code) ||
+        (authenticated && status == 401) ||
+        status == 419) {
       return SessionExpiredException(
           code: code,
           message: message,
@@ -160,15 +172,7 @@ class ErrorMapper {
             statusCode: status,
             correlationId: correlationId);
       case 401:
-        if (code.contains('CREDENTIALS') || code.contains('LOGIN')) {
-          return InvalidCredentialsException(
-              code: code,
-              message: message,
-              statusCode: status,
-              correlationId: correlationId,
-              details: details);
-        }
-        // 🔶 Any other 401 is treated as session expiry (cookie session has no refresh).
+        // Unauthenticated 401 already returned above. Anything left is expiry.
         return SessionExpiredException(
             code: code,
             message: message,
@@ -300,7 +304,7 @@ class ErrorMapper {
       };
 
   String _defaultMessage(int status) => switch (status) {
-        401 || 419 => 'انتهت الجلسة، يرجى تسجيل الدخول',
+        401 || 419 => 'يجب تسجيل الدخول أولًا.',
         403 => 'لا تملك صلاحية لهذا الإجراء',
         404 => 'العنصر غير موجود',
         408 => 'انتهت مهلة الاتصال',

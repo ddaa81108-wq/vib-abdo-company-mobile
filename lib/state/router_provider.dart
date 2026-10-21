@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../api/api_providers.dart';
 import '../authentication/auth_gate.dart';
 import '../features/accounts/account_list_screen.dart';
+import '../features/accounts/edit_account_card_screen.dart';
 import '../features/accounts/ledger_screen.dart';
 import '../features/collections/collections_screen.dart';
 import '../features/home/home_dashboard.dart';
@@ -19,7 +20,9 @@ import '../features/purchases/purchases_screen.dart';
 import '../features/reports/reports_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/settings/account_screen.dart';
+import '../features/settings/admin_placeholder_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../ui/strings.dart';
 import '../features/splash/splash_screen.dart';
 import '../features/treasury/treasury_screen.dart';
 
@@ -71,6 +74,33 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/settings',
             builder: (context, state) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: '/settings/employees',
+            builder: (context, state) => const AdminPlaceholderScreen(
+              title: AppStrings.employeesTile,
+              message: AppStrings.employeesEmpty,
+              icon: Icons.groups_outlined,
+              screenKey: Key('screen-settings-employees'),
+            ),
+          ),
+          GoRoute(
+            path: '/settings/audit',
+            builder: (context, state) => const AdminPlaceholderScreen(
+              title: AppStrings.auditTile,
+              message: AppStrings.auditEmpty,
+              icon: Icons.fact_check_outlined,
+              screenKey: Key('screen-settings-audit'),
+            ),
+          ),
+          GoRoute(
+            path: '/settings/operations',
+            builder: (context, state) => const AdminPlaceholderScreen(
+              title: AppStrings.operationsTile,
+              message: AppStrings.operationsEmpty,
+              icon: Icons.monitor_heart_outlined,
+              screenKey: Key('screen-settings-operations'),
+            ),
           ),
           GoRoute(
             path: '/account',
@@ -134,6 +164,15 @@ List<RouteBase> _accountRoutes(AccountSection section) => [
         path: ':id',
         builder: (context, state) =>
             LedgerScreen(section: section, id: state.pathParameters['id']!),
+        routes: [
+          GoRoute(
+            path: 'edit',
+            builder: (context, state) => EditAccountCardScreen(
+              section: section,
+              id: state.pathParameters['id']!,
+            ),
+          ),
+        ],
       ),
     ],
   ),

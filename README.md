@@ -45,7 +45,7 @@ packages/api_layer/    HTTP client, repositories, models, fake client, auth stra
 
 `packages/api_layer` is the client package this app started from. Screens call its repositories. They do not import the HTTP client.
 
-Secure storage is injected into that package. The real cookie-session path and the bearer-token stub write only through `flutter_secure_storage`. The default fake client keeps its session in memory and does not write the stores.
+Secure storage is injected into that package. The real cookie-session path and the bearer-token stub write only through `flutter_secure_storage`. The fake server keeps its cookie sessions in memory and does not run a local expiry timer. When the app injects a cookie jar and a token store, login stores the session cookie (not a bearer token) and logout clears that jar, the token store, and the in-memory CSRF token.
 
 Errors thrown by the client are `ApiException` values. `ErrorHandler` is the only place that turns one into text for the UI. It shows the server message when there is one. Logs contain the error code and correlation id, never `details`, passwords, or cookies.
 
@@ -75,7 +75,19 @@ Fake sign-in is not an account:
 - `limited.admin` is an admin limited to an explicit list
 - `flag.admin` is an admin with `fullAccess` false
 - `guest` is an unknown role and sees nothing
+- `mustchange` (for example `mustchange.demo`) is a collections employee with `mustChangePassword: true`. After a successful change-password on this fake client, later sign-ins for that fixture user no longer carry the flag
 - any other username is a collections employee
+
+The fake client rejects a section read or write the signed-in profile cannot do (HTTP 403). `GET /api/home` omits a summary, counter, or old-debt row when that profile cannot read the section. Hiding a control in the app is not what enforces that.
+
+Demo cards (ten per section; balances are canned server figures):
+
+- `c_55` is the original card in every section. Balance `320` LYD, or `15000` EGP on Egyptian deposits. Age is 4 days (`debtAgeDays` and `ageStatusLabel` both say 4; the home bulletin uses the same fields)
+- Home summary cards copy the section fixture, not one card: customers net `10635` and count `10`, Egyptian deposits net `23750`, treasury active cash `8000`, collections collected `0` (`metrics.collectedUnits`)
+- customers also include `c_56` … `c_63` and `c_masraweya_remainder` (`systemManaged: true`, `systemLinkKey: masraweya_remainder`)
+- companies use `c_co_02` … `c_co_10`
+- Libyan deposits use `c_ly_02` … `c_ly_10`
+- Egyptian deposits use `c_eg_02` … `c_eg_10`
 
 Point a build at a staging host without committing the host. `API_BASE` is required in that mode; a missing or invalid origin stops startup before any request. See [docs/staging.md](docs/staging.md).
 

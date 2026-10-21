@@ -71,6 +71,23 @@ void main() {
     );
   });
 
+  test(
+    'DAY_FINALIZED keeps the server message and is not a version conflict',
+    () {
+      const error = ConflictException(
+        code: 'DAY_FINALIZED',
+        message: 'اليوم مرحّل. لا يمكن إضافة أو تعديل أو حذف بند.',
+        statusCode: 409,
+        correlationId: 'corr-day',
+      );
+      final failure = handler.toFailure(error);
+      expect(failure.code, 'DAY_FINALIZED');
+      expect(failure.message, error.message);
+      expect(failure.correlationId, 'corr-day');
+      expect(error.isVersionConflict, isFalse);
+    },
+  );
+
   test('form errors stay user-facing and unknown errors stay generic', () {
     expect(
       handler.toFailure(const LoginFormError('أدخل الاسم')).message,

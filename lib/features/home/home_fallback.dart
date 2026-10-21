@@ -3,19 +3,34 @@ import 'package:flutter_api_layer/api_layer.dart';
 import '../../ui/section_labels.dart';
 import '../../ui/strings.dart';
 
+/// Result of the proposed home call, or the per-section substitute.
+class HomeLoad {
+  const HomeLoad({required this.home, required this.fromFallback});
+
+  final HomeDto home;
+
+  /// True when `GET /api/home` failed and [home] was built from section reads.
+  final bool fromFallback;
+}
+
 /// Proposed `GET /api/home`, then the existing per-section endpoints.
 ///
 /// A failed home call shows each section field that the server already returns.
 /// Values are not added together. Cards stay neutral (no tone).
 Future<HomeDto> loadHome(ApiLayer layer) async {
+  return (await loadHomeDetailed(layer)).home;
+}
+
+/// Same path as [loadHome], plus whether the proposed endpoint was skipped.
+Future<HomeLoad> loadHomeDetailed(ApiLayer layer) async {
   try {
-    return await layer.home.fetch();
+    return HomeLoad(home: await layer.home.fetch(), fromFallback: false);
   } catch (error, stack) {
     final fallback = await _fallback(layer);
     if (fallback.summaries.isEmpty) {
       Error.throwWithStackTrace(error, stack);
     }
-    return fallback;
+    return HomeLoad(home: fallback, fromFallback: true);
   }
 }
 
