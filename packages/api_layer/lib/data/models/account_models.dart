@@ -96,6 +96,51 @@ class AccountCardDto {
       );
 }
 
+/// How [readZeroReview] classified the server object.
+///
+/// TODO(pending server answer): `zeroReview` is stored as a raw object because
+/// its shape is not in the contract notes in this repo (🔶). Only the values
+/// documented on [readZeroReview] are recognized. [unknown] must not be treated
+/// as a pending review.
+enum ZeroReviewRead { pending, closed, unknown }
+
+const _zeroReviewPending = {'pending'};
+const _zeroReviewClosed = {'confirmed', 'reviewed', 'done', 'none'};
+
+/// Reads `zeroReview` without inventing a review.
+///
+/// Recognized, and only these, matched exactly:
+/// - `status` or `state`: `pending` → [ZeroReviewRead.pending];
+///   `confirmed`, `reviewed`, `done`, or `none` → [ZeroReviewRead.closed]
+/// - boolean `pending`
+///
+/// A missing object, an empty object, a non-boolean `pending`, an unknown
+/// status, or a status that disagrees with `pending` is [ZeroReviewRead.unknown].
+ZeroReviewRead readZeroReview(Json? zeroReview) {
+  if (zeroReview == null || zeroReview.isEmpty) return ZeroReviewRead.unknown;
+  final statusRaw = zeroReview['status'] ?? zeroReview['state'];
+  ZeroReviewRead? fromStatus;
+  if (statusRaw != null) {
+    final status = '$statusRaw';
+    if (_zeroReviewPending.contains(status)) {
+      fromStatus = ZeroReviewRead.pending;
+    } else if (_zeroReviewClosed.contains(status)) {
+      fromStatus = ZeroReviewRead.closed;
+    } else {
+      return ZeroReviewRead.unknown;
+    }
+  }
+  final pendingRaw = zeroReview['pending'];
+  if (pendingRaw != null && pendingRaw is! bool) return ZeroReviewRead.unknown;
+  final fromFlag = pendingRaw is bool
+      ? (pendingRaw ? ZeroReviewRead.pending : ZeroReviewRead.closed)
+      : null;
+  if (fromStatus != null && fromFlag != null && fromStatus != fromFlag) {
+    return ZeroReviewRead.unknown;
+  }
+  return fromStatus ?? fromFlag ?? ZeroReviewRead.unknown;
+}
+
 /// `summary` object of GET /api/{section} (per API contract):
 /// `data.summary = {netBalance, totalDebt, activeCards, pendingReviewCount}`.
 /// `netBalance`/`totalDebt` are integer money units WITHOUT the `Units` suffix on the wire.

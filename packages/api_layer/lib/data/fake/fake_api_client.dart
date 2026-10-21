@@ -54,6 +54,25 @@ class FakeApiClient implements ApiClient {
 
   /// When set, account-suggestion reads wait here (tests).
   Completer<void>? pauseSuggestions;
+
+  /// Account-list reads, in call order (tests). `filter` / `q` / `cursor` are
+  /// null when the request omitted them.
+  final List<AccountListQuery> accountListQueries = [];
+
+  /// When set, the first account-list page reports this `nextCursor` (tests).
+  String? accountNextCursor;
+
+  /// Items returned for an account-list read that sends `cursor` (tests).
+  List<Map<String, dynamic>> accountNextItems = const [];
+
+  /// When set, account-list reads wait here (tests).
+  Completer<void>? pauseAccountLists;
+
+  /// Suggestion reads, in call order (tests).
+  final List<AccountSuggestionQuery> suggestionQueries = [];
+
+  /// When non-null, suggestion reads return these items instead of `[]` (tests).
+  List<Map<String, dynamic>>? suggestionItems;
   bool _loggedIn = false;
   bool _admin = false;
   Map<String, dynamic> _me = FakeFixtures.me(admin: false);
@@ -185,16 +204,42 @@ class FakeApiClient implements ApiClient {
           return _ok({'egpPerLyd': '9.5', 'version': 2});
         }
         if (method == 'GET' && seg.length == 1) {
-          return _ok(FakeFixtures.accounts(egp: head == 'egyptian-deposits'));
+          final paused = pauseAccountLists;
+          if (paused != null) await paused.future;
+          final filter = _queryText(query, 'filter');
+          final q = _queryText(query, 'q');
+          final cursor = _queryText(query, 'cursor');
+          accountListQueries.add(AccountListQuery(
+            section: head,
+            filter: filter,
+            q: q,
+            cursor: cursor,
+          ));
+          final page = FakeFixtures.accounts(egp: head == 'egyptian-deposits');
+          if (cursor != null) {
+            return _ok({
+              ...page,
+              'items': accountNextItems,
+              'nextCursor': null,
+            });
+          }
+          if (accountNextCursor != null) {
+            return _ok({...page, 'nextCursor': accountNextCursor});
+          }
+          return _ok(page);
         }
         if (method == 'GET' && seg.length > 1 && seg[1] == 'suggestions') {
           final paused = pauseSuggestions;
           if (paused != null) await paused.future;
+          suggestionQueries.add(AccountSuggestionQuery(
+            section: head,
+            q: _queryText(query, 'q') ?? '',
+          ));
           if (failSuggestionsRemaining > 0) {
             failSuggestionsRemaining--;
             _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر البحث.');
           }
-          return _ok({'items': []});
+          return _ok({'items': suggestionItems ?? const []});
         }
         if (method == 'GET' && seg.length == 3 && seg[2] == 'ledger') {
           final before = query?['before']?.toString();
@@ -308,4 +353,35 @@ class FakeApiClient implements ApiClient {
     }
     _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
   }
+}
+
+String? _queryText(Map<String, dynamic>? query, String key) {
+  final value = query?[key];
+  if (value == null) return null;
+  final text = '$value';
+  if (text.isEmpty) return null;
+  return text;
+}
+
+/// One recorded `GET /api/{section}` (tests).
+class AccountListQuery {
+  const AccountListQuery({
+    required this.section,
+    this.filter,
+    this.q,
+    this.cursor,
+  });
+
+  final String section;
+  final String? filter;
+  final String? q;
+  final String? cursor;
+}
+
+/// One recorded `GET /api/{section}/suggestions` (tests).
+class AccountSuggestionQuery {
+  const AccountSuggestionQuery({required this.section, required this.q});
+
+  final String section;
+  final String q;
 }
