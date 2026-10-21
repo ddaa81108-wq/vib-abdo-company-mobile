@@ -771,6 +771,66 @@ class FakeFixtures {
         'version': 1,
       };
 
+  /// 🔶 Canned `GET /api/admin/employee-totals`.
+  ///
+  /// Literals already stored on the collections fixtures, not derived here:
+  /// `u_12` / `موظف استلام تجريبي` (payroll and assignees), `collectedUnits` 0,
+  /// `approvedCount` 0, `pendingCount` 1 (collections `employeeTotals`),
+  /// `pendingUnits` 100 (`metrics.dayTotalUnits`, also `sb_1.amountUnits`),
+  /// `cashOutstandingUnits` 250 (`metrics.cashOutstandingUnits`). The totals
+  /// row repeats those same stored literals. A window that misses
+  /// `2026-10-18` is a second canned payload (`items: []`, totals 0), not a
+  /// sum of the rows. `employeeId` is not a filter.
+  static Map<String, dynamic> employeeTotals({String? from, String? to}) {
+    const day = '2026-10-18';
+    final included = _dayWindowIncludes(day, from, to);
+    return {
+      'generatedAt': '2026-10-18T18:00:00+02:00',
+      'from': from,
+      'to': to,
+      'version': 1,
+      'currency': 'LYD',
+      'items': included ? _employeeTotalItems : const <Map<String, dynamic>>[],
+      'totals': included ? _employeeTotalTotals : _employeeTotalEmptyTotals,
+    };
+  }
+
+  static bool _dayWindowIncludes(String day, String? from, String? to) {
+    if (from != null && _isoDay.hasMatch(from) && from.compareTo(day) > 0) {
+      return false;
+    }
+    if (to != null && _isoDay.hasMatch(to) && to.compareTo(day) < 0) {
+      return false;
+    }
+    return true;
+  }
+
+  static final RegExp _isoDay = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+
+  static const _employeeTotalItems = [
+    {
+      'employeeId': 'u_12',
+      'employeeName': 'موظف استلام تجريبي',
+      'collectedUnits': 0,
+      'pendingUnits': 100,
+      'approvedCount': 0,
+      'rejectedCount': 0,
+      'pendingCount': 1,
+      'cashOutstandingUnits': 250,
+      'currency': 'LYD',
+    },
+  ];
+
+  static const _employeeTotalTotals = {
+    'collectedUnits': 0,
+    'pendingUnits': 100,
+  };
+
+  static const _employeeTotalEmptyTotals = {
+    'collectedUnits': 0,
+    'pendingUnits': 0,
+  };
+
   static Map<String, dynamic> payroll() => {
         'period': '2026-10',
         'employees': [

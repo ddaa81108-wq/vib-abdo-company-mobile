@@ -85,6 +85,12 @@ class ApiEndpoints {
   static const financialLedger = '/api/financial-ledger';
 
   // Admin (only the parts relevant to a mobile client)
+  /// 🔶 PROPOSED. This repo has no confirmed `/api/admin` prefix.
+  /// GET with optional `from` and `to` (`YYYY-MM-DD`). Full admin only until
+  /// DEF-002. The other unconfirmed source is `employeeTotals` on
+  /// GET /api/collections (contract gap 14). The repository chooses; the
+  /// provider does not. There is no `employeeId` query.
+  static const employeeTotals = '/api/admin/employee-totals';
   static const accountRequests = '/api/account-requests';
   static String accountRequestDecision(String id) =>
       '/api/account-requests/$id/decision';
