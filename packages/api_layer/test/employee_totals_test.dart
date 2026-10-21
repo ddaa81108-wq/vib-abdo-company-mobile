@@ -116,6 +116,40 @@ void main() {
   );
 
   test(
+    'collections source leaves omitted fields null, not zero',
+    () async {
+      final api = await login(
+        'admin.demo',
+        source: EmployeeTotalsSource.collections,
+      );
+      addTearDown(api.dispose);
+      final report = await api.employeeTotals.fetch(
+        from: '2026-10-01',
+        to: '2026-10-18',
+      );
+      final row = report.items.single;
+      const money = MoneyFormatter();
+
+      // 🔶 Not provided by this source. Null, not a fabricated 0, so the UI
+      // shows '—' rather than a zero amount or an invented id/date.
+      expect(row.employeeId, isNull);
+      expect(row.employeeId, isNot(0));
+      expect(row.pendingUnits, isNull);
+      expect(row.pendingUnits, isNot(0));
+      expect(report.from, isNull);
+      expect(report.from, isNot(0));
+      expect(report.to, isNull);
+      expect(report.to, isNot(0));
+      expect(money.formatOrDash(row.pendingUnits, row.currency), '—');
+      expect(money.formatOrDash(0, row.currency), isNot('—'));
+
+      // A zero the collections row actually sends stays zero.
+      expect(row.collectedUnits, 0);
+      expect(money.formatOrDash(row.collectedUnits, row.currency), isNot('—'));
+    },
+  );
+
+  test(
     'DTO round-trip keeps server totals that are not the sum of the rows',
     () {
       final original = EmployeeTotalsDto.fromStandalone({
