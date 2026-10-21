@@ -4,7 +4,7 @@ import '../ui/presentation.dart';
 import '../ui/strings.dart';
 import '../ui/theme.dart';
 
-/// Server unread count in the top bar. Zero draws no badge. 99 and above draw "99".
+/// Server unread count in the top bar. Zero draws no badge. Above 99 draws "99+".
 class UnreadBadge extends StatelessWidget {
   const UnreadBadge({required this.count, this.onPressed, super.key});
 
@@ -34,10 +34,14 @@ class UnreadBadge extends StatelessWidget {
               : Text(
                   label,
                   key: badgeKey,
-                  style: context.textExtras.badge.copyWith(color: colors.onStatus),
+                  style: context.textExtras.badge.copyWith(
+                    color: colors.onStatus,
+                  ),
                 ),
           child: Icon(
-            (count ?? 0) > 0 ? Icons.notifications_active_outlined : Icons.notifications_none,
+            (count ?? 0) > 0
+                ? Icons.notifications_active_outlined
+                : Icons.notifications_none,
             size: 19,
           ),
         ),

@@ -60,33 +60,17 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell> {
   var _collapsed = false;
-  int? _seenUnread;
 
   @override
   Widget build(BuildContext context) {
     final summary = ref.watch(homeSummaryProvider);
-    final unread = ref.watch(unreadCountProvider);
+    final unread = ref.watch(unreadNotificationsCountProvider);
     final online = ref.watch(onlineProvider);
     final width = MediaQuery.sizeOf(context).width;
     final phone = AppBreakpoints.isPhone(width);
     final rail = AppBreakpoints.isRail(width);
     final panel = AppBreakpoints.isPanel(width);
     final dark = ref.watch(themeModeProvider) == ThemeMode.dark;
-
-    ref.listen<AsyncValue<int?>>(unreadCountProvider, (previous, next) {
-      final count = next.asData?.value;
-      if (count == null) return;
-      final seen = _seenUnread;
-      _seenUnread = count;
-      if (seen != null && count > seen && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            duration: Duration(seconds: 8),
-            content: Text(AppStrings.notifications),
-          ),
-        );
-      }
-    });
 
     if (summary == null) {
       return const Scaffold(
