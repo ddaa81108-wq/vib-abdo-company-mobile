@@ -45,31 +45,56 @@ The transport whitelist is `notificationId`, `recipientUserId`,
 `operationType`, `relatedRef` (`type` and `id` only), `relatedRefType`,
 `relatedRefId`, `createdAt`, and `systemName`. It runs before
 `fromPushPayload`, which has its own allow list and drops `systemName`.
-The shade line reads `systemName` from the transport whitelist, then a fixed
-label. `employeeName`, title, body, amounts, phones, and tokens are discarded
-by both layers.
+`employeeName` stays off both lists. A push map is untrusted, and the name
+is personal data: copying it from the payload could put it on a locked
+screen before the server has confirmed the row. The tray reads the name
+only from the `AppNotification` returned by `GET /api/notifications`
+(after refresh). Title, body, amounts, phones, and tokens are discarded
+by both layers as well.
 
 ## Flags
 
 | Define | Default | Effect |
 |---|---|---|
 | `PUSH_TRANSPORT` | empty → noop | `fake` injects payloads in tests. `fcm` selects the stub, which returns no token. |
-| `BACKGROUND_NOTIFICATION_POLL` | `false` | When true, an in-process scheduler may poll. It is not WorkManager. |
+| `BACKGROUND_NOTIFICATION_POLL` | see below | When on, WorkManager polls. Release stays off until question 9. |
 
-Both are `--dart-define` values. Tests read the defaults.
+`BACKGROUND_NOTIFICATION_POLL` is a `--dart-define` string.
+
+- Explicit `true` turns the poll on, including in a release build, once question 9 is answered.
+- Explicit `false` turns it off, including in debug.
+- Unset and release (`kReleaseMode`): off.
+- Unset and debug (`kDebugMode`), or unset with `USE_FAKE_API=true` outside release: on.
+- Production and release builds leave it unset, so the poll stays off.
+
+`resolveBackgroundNotificationPoll` is the selector. The old const
+`kBackgroundNotificationPoll` is still false unless the define is true.
 
 ## What works in each app state
 
-| State | Today (no server push) | After the server adds push |
-|---|---|---|
-| Open, signed in | SSE `GET /api/events`, or `GET /api/event-changes` every 4 seconds while SSE is down. Stop on pause, hidden, detached, `401`, and `419`. After the connect resync, a signal coalesces into `refresh(announce: true)`. That refresh ingests the list before it fetches the unread count. | Same, plus `FakePushTransport` or a real FCM adapter calling `ingest` with `NotificationSource.push`. His ingest refetches the unread count and keeps the previous count if that route fails. |
-| Background, process alive | Realtime stops. The background flag is off, so nothing polls. | With the flag on, the in-process scheduler polls at 15 minutes or more, only while a user id is in memory. `401` / `419` cancels it. |
-| Process killed | Nothing is delivered. There is no push token and no OS worker. | Still nothing until a real FCM adapter and WorkManager are linked. The stub and the in-process scheduler do not survive process death. |
+True delivery while the app is closed is not supported until the server
+offers push. WorkManager only polls `GET /api/notifications` on a schedule.
+It is not a push channel.
 
-A local line, when a poll shows one, is `systemName` plus a fixed operation
-label (`VIB · اعتماد`). It does not include title, body, employee name, the
-related id, an amount, a phone, or a token. Opening the row loads the detail
-from the server.
+| State | What runs |
+|---|---|
+| Open, signed in | SSE `GET /api/events`, or `GET /api/event-changes` every 4 seconds while SSE is down. Stop on pause, hidden, detached, `401`, and `419`. After the connect resync, a signal coalesces into `refresh(announce: true)`. A push, when the flag-selected transport delivers one, refreshes and then posts the server row to the system tray. |
+| Background, process alive | Realtime stops. With the poll flag on, WorkManager runs the periodic GET. With the flag off, nothing polls. |
+| Swiped away from Recents | WorkManager usually keeps the periodic work and reschedules it. That is the common case, not a promise. |
+| Force-stopped | WorkManager stops. It stays stopped until the user opens the app again. |
+| After reboot | WorkManager reschedules the periodic work when the process is allowed to start. Force-stop still blocks that until the next open. |
+
+WorkManager limits, in production and in debug:
+
+- 15 minutes is the floor Android accepts for periodic work. The real gap is often longer. It is not a guarantee.
+- Doze defers runs.
+- OEM battery savers (Xiaomi, Huawei, Samsung, and others) may delay or kill the worker.
+- A swipe from Recents usually leaves the work registered. Force stop does not.
+- The worker posts nothing while logged out. A `401` or `419` cancels the unique work and clears the worker's dedup and cursor. It does not clear the foreground cookie jar.
+
+In production the flag stays off until question 9 is answered, so none of the rows above run the poll in a release build.
+
+The private tray line is the system name as the title, and the fixed operation label plus the server employee name as the body when that name is present. The lock-screen public version is the system name plus `إشعار جديد`. Amounts, customer names, phones, and tokens are not copied. Tapping uses `NotificationOpener` with origin `systemTray`, including a cold start.
 
 ## Device registration
 
@@ -96,26 +121,85 @@ token and no messages.
 
 ## Background poll and WorkManager
 
-`workmanager` is not a dependency. A worker that posts a shade notification
-would pull in a plugin whose manifest merger adds `POST_NOTIFICATIONS`, and
-that permission belongs to the UI dev.
+`WorkManagerBackgroundScheduler` is selected when the flag is on.
+`NoopBackgroundNotificationScheduler` is selected when it is off.
+`InProcessBackgroundNotificationScheduler` remains for tests. It does not
+survive process death and it is not the production scheduler.
 
-`NoopBackgroundNotificationScheduler` is what runs by default.
-`InProcessBackgroundNotificationScheduler` is selected only when the flag is
-on. Its period cannot be under 15 minutes. It does not run after the process
-dies. `InProcessBackgroundNotificationScheduler.tick` is the function a later
-WorkManager callback should call. Question 9 below has to be answered
-before the flag is turned on: the cookie may not be accepted from a
-background process that sends no `Origin` and no `X-CSRF-Token`.
+The periodic work uses unique name `vib.notification.poll`, an interval of
+at least 15 minutes, a connected-network constraint, and
+`ExistingPeriodicWorkPolicy.keep`. The worker isolate restores the cookie
+from secure storage, calls `GET /api/me` and `GET /api/notifications`, drops
+other users' rows, skips read rows and ids already shown, and posts through
+the same tray poster. Fake mode has no persisted cookie, so the production
+worker posts nothing there. Tests call `NotificationPollWorker.run` with an
+injected session.
 
-## Dependencies and the manifest
+Question 9 still has to be answered before the flag is turned on in
+production. The worker sends the cookie and does not send `X-CSRF-Token`
+(the call is a GET) or an `Origin` header.
 
-`flutter_secure_storage` is now a direct app dependency. The API layer
-already depended on it; the app imports it for `SecureDeviceTokenStore`.
+Logout, account switch, and the session-expiry wipe cancel that unique work
+and clear the tray dedup plus the poll cursor. A `401` or `419` inside the
+worker does the same cancel and clear, and leaves the foreground cookie
+store alone so it does not race a UI request.
 
-Not added: `firebase_messaging`, `workmanager`, `flutter_local_notifications`,
-`permission_handler`. No Android manifest change. `POST_NOTIFICATIONS` is
-not declared.
+## System tray
+
+`localNotificationPosterProvider` posts through
+`AndroidNotificationController.showPrivateAlert` on channel
+`vib_collections_alerts`. The activity method channel `app/system_tray`
+sets `VISIBILITY_PRIVATE` and `setPublicVersion` (the Flutter plugin cannot).
+The Android id is a stable hash of `notificationId`. The tag is
+`notificationId`, so a repeat replaces the existing notification.
+
+The same id is skipped when it is already in the transport LRU or the
+persisted tray store, or the row is already read. Push and poll share that
+dedup. The unread count stays the server's number; the same id is not added
+twice.
+
+A push waits for the refresh. If the signed-in user changed before the GET
+finishes, nothing is posted. A failed GET posts no employee name. A `404`
+posts nothing. A `401` posts nothing.
+
+The list and the banner call `notificationOpenSeamProvider`, which delegates
+to `NotificationOpener`. List taps use origin `list`. Tray taps use origin
+`systemTray`.
+
+## Dependencies, Gradle, and the manifest
+
+Direct dependencies added for this tray and poll:
+
+- `workmanager` ^0.10.10
+
+Already present from earlier PRs, and reused: `flutter_local_notifications`
+^22.3.2, `flutter_secure_storage` ^9.2.2, `permission_handler` 12.0.3,
+`shared_preferences`. Not added: `firebase_messaging`.
+
+App Gradle (`android/app/build.gradle.kts`):
+
+- `implementation("androidx.core:core-ktx:1.15.0")` so `MainActivity` can
+  call `NotificationCompat.setPublicVersion`.
+- No other app Gradle change. `minSdk`, desugaring, and the optional
+  Google Services plugin are unchanged.
+
+`workmanager_android` 0.10.9 pulls `androidx.work:work-runtime:2.11.2` on
+its own. That line is not in the app Gradle file.
+
+App source manifest (`android/app/src/main/AndroidManifest.xml`): no edit.
+`POST_NOTIFICATIONS` was already declared by the notification-channel change
+and is reused. `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`, and
+`USE_EXACT_ALARM` are still absent from that file.
+
+Plugin manifests that merge into the APK, and were not copied into the app
+manifest:
+
+- `workmanager_android` declares `POST_NOTIFICATIONS` (already on the app),
+  `FOREGROUND_SERVICE`, and `FOREGROUND_SERVICE_SHORT_SERVICE`. This poll
+  does not start a foreground service.
+- `androidx.work:work-runtime` merges its reschedule receiver, which is what
+  lets periodic work survive reboot. The app source does not declare
+  `RECEIVE_BOOT_COMPLETED`.
 
 ## Tap handling
 

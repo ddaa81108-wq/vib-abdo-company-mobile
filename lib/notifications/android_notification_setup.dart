@@ -28,7 +28,6 @@ class FlutterLocalNotificationsAdapter implements NotificationPlatform {
     : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
 
   final FlutterLocalNotificationsPlugin _plugin;
-  var _initialized = false;
 
   FlutterLocalNotificationsPlugin get plugin => _plugin;
 
@@ -38,14 +37,23 @@ class FlutterLocalNotificationsAdapter implements NotificationPlatform {
       >();
 
   @override
-  Future<void> initialize({required String androidIcon}) async {
-    if (_initialized) return;
+  Future<void> initialize({
+    required String androidIcon,
+    void Function(String? payload)? onSelect,
+  }) async {
     await _plugin.initialize(
       settings: InitializationSettings(
         android: AndroidInitializationSettings(androidIcon),
       ),
+      onDidReceiveNotificationResponse: onSelect == null
+          ? null
+          : (response) => onSelect(response.payload),
     );
-    _initialized = true;
+    if (onSelect == null) return;
+    final launch = await _plugin.getNotificationAppLaunchDetails();
+    if (launch?.didNotificationLaunchApp ?? false) {
+      onSelect(launch?.notificationResponse?.payload);
+    }
   }
 
   @override
@@ -101,19 +109,28 @@ class FlutterLocalNotificationsAdapter implements NotificationPlatform {
 ///
 /// Failures are reported and swallowed. The rest of the app still starts.
 abstract final class AndroidNotificationSetup {
+  static Future<void>? _chain;
+
   static Future<void> start({
     void Function(Object error, StackTrace stackTrace)? onError,
+    void Function(String? payload)? onSelect,
     NotificationPlatform? platform,
-  }) async {
-    try {
-      final resolved = platform ?? FlutterLocalNotificationsAdapter();
-      await AndroidNotificationController(platform: resolved).initialize();
-    } catch (error, stackTrace) {
-      if (onError != null) {
-        onError(error, stackTrace);
-      } else {
-        const ErrorHandler().report(error, stackTrace);
+  }) {
+    final previous = _chain ?? Future<void>.value();
+    final next = previous.then((_) async {
+      try {
+        final resolved = platform ?? FlutterLocalNotificationsAdapter();
+        await AndroidNotificationController(platform: resolved)
+            .initialize(onSelect: onSelect);
+      } catch (error, stackTrace) {
+        if (onError != null) {
+          onError(error, stackTrace);
+        } else {
+          const ErrorHandler().report(error, stackTrace);
+        }
       }
-    }
+    });
+    _chain = next;
+    return next;
   }
 }

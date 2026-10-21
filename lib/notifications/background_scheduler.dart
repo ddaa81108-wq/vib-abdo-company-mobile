@@ -2,10 +2,8 @@ import 'dart:async';
 
 /// Periodic notification poll. The default is a no-op.
 ///
-/// `workmanager` is not a dependency. A background isolate plus a shade
-/// plugin would pull `POST_NOTIFICATIONS` into the manifest, and that
-/// permission belongs to the UI dev. The flag
-/// `BACKGROUND_NOTIFICATION_POLL` stays off until backend question 9
+/// When the flag is on, [WorkManagerBackgroundScheduler] registers the
+/// periodic work. The flag stays off in release until backend question 9
 /// (a cookie from a background process with no Origin and no CSRF).
 abstract interface class BackgroundNotificationScheduler {
   bool get enabled;
@@ -35,7 +33,10 @@ class NoopBackgroundNotificationScheduler
   Future<void> cancel() async {}
 }
 
-/// In-process stand-in used only when the flag is on.
+/// Android's periodic floor. Schedulers must not use a shorter period.
+const kMinBackgroundPollInterval = Duration(minutes: 15);
+
+/// In-process stand-in for tests. Production uses WorkManager.
 ///
 /// It does not survive process death. A later WorkManager callback should
 /// call the same poll function and then [cancel] on 401 or 419.

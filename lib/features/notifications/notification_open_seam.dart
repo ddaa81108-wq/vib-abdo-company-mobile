@@ -3,6 +3,7 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../ui/strings.dart';
+import 'notification_opener.dart' as gate;
 
 /// Where a tap came from. Matches the opener the API engineer will add.
 enum NotificationOpenOrigin { list, banner, systemTray }
@@ -24,13 +25,11 @@ class NotificationOpenResult {
   final bool noTarget;
 }
 
-/// Tap entry used until `notification_opener.dart` exists.
+/// Tap entry for the list and the banner.
 ///
-/// TODO(notifications): when
-/// `lib/features/notifications/notification_opener.dart` lands, replace this
-/// provider with `notificationOpenerProvider` and call
-/// `NotificationOpener.open(note, origin: origin)`. Do not call `markRead`
-/// from the list or the banner. `open()` owns the read call and navigation.
+/// The default calls [gate.NotificationOpener.open]. List taps use origin
+/// `list`. The system tray calls the opener itself with origin `systemTray`.
+/// Do not call `markRead` from the list or the banner.
 abstract class NotificationOpenSeam {
   Future<NotificationOpenResult> open(
     AppNotification note, {
@@ -51,8 +50,49 @@ class PlaceholderNotificationOpenSeam implements NotificationOpenSeam {
   }
 }
 
+class OpenerNotificationSeam implements NotificationOpenSeam {
+  OpenerNotificationSeam(this._ref);
+
+  final Ref _ref;
+
+  @override
+  Future<NotificationOpenResult> open(
+    AppNotification note, {
+    required NotificationOpenOrigin origin,
+  }) async {
+    final result = await _ref
+        .read(gate.notificationOpenerProvider)
+        .open(
+          note,
+          origin: switch (origin) {
+            NotificationOpenOrigin.list => gate.NotificationOpenOrigin.list,
+            NotificationOpenOrigin.banner => gate.NotificationOpenOrigin.banner,
+            NotificationOpenOrigin.systemTray =>
+              gate.NotificationOpenOrigin.systemTray,
+          },
+        );
+    return switch (result) {
+      gate.NotificationOpenResult.opened => const NotificationOpenResult(
+        opened: true,
+      ),
+      gate.NotificationOpenResult.needsLogin => const NotificationOpenResult(
+        needsLogin: true,
+      ),
+      gate.NotificationOpenResult.forbidden => const NotificationOpenResult(
+        forbidden: true,
+      ),
+      gate.NotificationOpenResult.notFound => const NotificationOpenResult(
+        notFound: true,
+      ),
+      gate.NotificationOpenResult.noTarget => const NotificationOpenResult(
+        noTarget: true,
+      ),
+    };
+  }
+}
+
 final notificationOpenSeamProvider = Provider<NotificationOpenSeam>(
-  (ref) => const PlaceholderNotificationOpenSeam(),
+  OpenerNotificationSeam.new,
 );
 
 void showNotificationOpenResult(

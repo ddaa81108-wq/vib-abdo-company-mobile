@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_providers.dart';
 import '../state/notification_providers.dart';
 import '../state/session_providers.dart';
+import 'android_notification_controller.dart';
+import 'android_notification_setup.dart';
 import 'background_poll.dart';
 import 'background_scheduler.dart';
 import 'device_registration_client.dart';
@@ -15,6 +17,9 @@ import 'notification_ingress.dart';
 import 'notification_permission_service.dart';
 import 'push_drop_log.dart';
 import 'push_transport.dart';
+import 'shown_notification_store.dart';
+import 'system_tray_presenter.dart';
+import 'workmanager_scheduler.dart';
 
 final notificationDedupProvider = Provider<NotificationIdDedup>(
   (ref) => NotificationIdDedup(),
@@ -48,13 +53,20 @@ final deviceRegistrationClientProvider = Provider<DeviceRegistrationClient>(
   (ref) => HttpDeviceRegistrationClient(ref.watch(apiLayerProvider).client),
 );
 
-final localNotificationPosterProvider = Provider<LocalNotificationPoster>(
-  (ref) => const SilentLocalNotificationPoster(),
+final shownNotificationStoreProvider = Provider<ShownNotificationStore>(
+  (ref) => PreferencesShownNotificationStore(),
 );
 
-/// Off unless `BACKGROUND_NOTIFICATION_POLL=true`. Tests override the bool.
+final localNotificationPosterProvider = Provider<LocalNotificationPoster>(
+  (ref) => AndroidControllerPoster(
+    AndroidNotificationController(platform: FlutterLocalNotificationsAdapter()),
+  ),
+);
+
+/// Off in release. On in debug and in fake builds unless the define says
+/// otherwise. Tests pass explicit modes to [resolveBackgroundNotificationPoll].
 final backgroundPollEnabledProvider = Provider<bool>(
-  (ref) => kBackgroundNotificationPoll,
+  (ref) => resolveBackgroundNotificationPoll(),
 );
 
 final notificationIngressProvider = Provider<NotificationIngress>((ref) {
@@ -73,8 +85,32 @@ final notificationIngressProvider = Provider<NotificationIngress>((ref) {
   );
 });
 
+final systemTrayPresenterProvider = Provider<SystemTrayPresenter>((ref) {
+  return SystemTrayPresenter(
+    userId: () {
+      final session = ref.read(sessionStateProvider);
+      if (session is! SessionAuthenticated) return null;
+      return session.profile.id;
+    },
+    ingress: ref.watch(notificationIngressProvider),
+    poster: ref.watch(localNotificationPosterProvider),
+    shown: ref.watch(shownNotificationStoreProvider),
+    dedup: ref.watch(notificationDedupProvider),
+    reload: (id) async {
+      await ref.read(notificationsProvider.notifier).refresh();
+      final items =
+          ref.read(notificationsProvider).value?.appNotifications ??
+          const <AppNotification>[];
+      for (final item in items) {
+        if (item.notificationId == id) return item;
+      }
+      return null;
+    },
+  );
+});
+
 /// Poll and scheduler together. Building them in one place avoids a provider
-/// cycle: the poll cancels the scheduler, and the scheduler runs the poll.
+/// cycle: the poll cancels the scheduler. WorkManager runs its own isolate.
 final backgroundRuntimeProvider = Provider<_BackgroundRuntime>((ref) {
   final enabled = ref.watch(backgroundPollEnabledProvider);
   final ingress = ref.watch(notificationIngressProvider);
@@ -89,30 +125,15 @@ final backgroundRuntimeProvider = Provider<_BackgroundRuntime>((ref) {
   Future<NotificationsPage> load() =>
       ref.read(apiLayerProvider).notifications.list();
 
-  if (!enabled) {
-    return _BackgroundRuntime(
-      poll: BackgroundNotificationPoll(
-        enabled: false,
-        userId: user,
-        load: load,
-        ingress: ingress,
-        poster: poster,
-        cancelScheduler: () async {},
-      ),
-      scheduler: const NoopBackgroundNotificationScheduler(),
-    );
-  }
-
-  late final InProcessBackgroundNotificationScheduler scheduler;
+  final scheduler = buildBackgroundScheduler(enabled: enabled);
   final poll = BackgroundNotificationPoll(
-    enabled: true,
+    enabled: enabled,
     userId: user,
     load: load,
     ingress: ingress,
     poster: poster,
     cancelScheduler: () => scheduler.cancel(),
   );
-  scheduler = InProcessBackgroundNotificationScheduler(poll: poll.run);
   return _BackgroundRuntime(poll: poll, scheduler: scheduler);
 });
 
@@ -139,8 +160,12 @@ final deviceTokenRegistrarProvider = Provider<DeviceTokenRegistrar>((ref) {
     store: ref.watch(deviceTokenStoreProvider),
     client: ref.watch(deviceRegistrationClientProvider),
     dedup: ref.watch(notificationDedupProvider),
-    onCancelBackground: () =>
-        ref.read(backgroundNotificationSchedulerProvider).cancel(),
+    onCancelBackground: () async {
+      try {
+        await ref.read(shownNotificationStoreProvider).clear();
+      } catch (_) {}
+      await ref.read(backgroundNotificationSchedulerProvider).cancel();
+    },
   );
   final gate = ref.watch(pushSessionGateProvider);
   gate.onForget = registrar.forget;
