@@ -8,10 +8,18 @@ import '../theme.dart';
 import '../tokens.dart';
 
 class MoneyText extends StatelessWidget {
-  const MoneyText(this.text, {super.key, this.style});
+  const MoneyText(
+    this.text, {
+    super.key,
+    this.style,
+    this.align = TextAlign.start,
+  });
 
   final String text;
   final TextStyle? style;
+
+  /// Alignment inside the LTR amount. The default keeps existing callers.
+  final TextAlign align;
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +28,7 @@ class MoneyText extends StatelessWidget {
       textDirection: TextDirection.ltr,
       child: Text(
         text,
+        textAlign: align,
         softWrap: true,
         style: (style ?? extras.amount).copyWith(fontFamily: 'JetBrainsMono'),
       ),
@@ -299,17 +308,31 @@ class ReportStatusChip extends StatelessWidget {
 }
 
 Future<T?> showAppForm<T>(BuildContext context, Widget child) {
-  final wide = MediaQuery.sizeOf(context).width > AppBreakpoints.phone;
+  final size = MediaQuery.sizeOf(context);
+  final wide = size.width > AppBreakpoints.phone;
+  final maxHeight = size.height * 0.92;
+  // shrinkWrap keeps a short form at its own height. primary: false so the
+  // form does not steal the screen's PrimaryScrollController. A tall form,
+  // including large text, scrolls inside the cap instead of overflowing.
+  Widget sheet(EdgeInsetsGeometry padding) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: ListView(
+        primary: false,
+        shrinkWrap: true,
+        padding: padding,
+        children: [child],
+      ),
+    );
+  }
+
   if (wide) {
     return showDialog<T>(
       context: context,
       builder: (context) => Dialog(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
-          child: SingleChildScrollView(
-            padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-            child: child,
-          ),
+          child: sheet(const EdgeInsetsDirectional.all(AppSpacing.lg)),
         ),
       ),
     );
@@ -324,7 +347,7 @@ Future<T?> showAppForm<T>(BuildContext context, Widget child) {
         top: AppSpacing.lg,
         bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
       ),
-      child: SingleChildScrollView(child: child),
+      child: sheet(EdgeInsets.zero),
     ),
   );
 }
@@ -382,7 +405,7 @@ class UnitsField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         helperText: AppStrings.unitsHint,
-        helperMaxLines: 3,
+        helperMaxLines: 12,
       ),
     );
   }

@@ -84,6 +84,7 @@ abstract final class AppStrings {
   static const noNotifications = 'لا توجد إشعارات';
   static const refresh = 'تحديث';
   static const integerOnly = 'أدخل عددًا صحيحًا كما هو، بلا كسور.';
+  static const dateInvalid = 'أدخل التاريخ بصيغة سنة-شهر-يوم.';
   static const unitsHint =
       'عدد صحيح بالوحدة الصغرى التي يخزّنها الخادم. بلا فواصل وبلا كسور. التطبيق لا يحوّل هذا الرقم ولا يحسبه.';
   static const rateInvalid = 'أدخل السعر نصًا كما هو.';
@@ -97,6 +98,7 @@ abstract final class AppStrings {
   static const finalizeConfirm = 'تأكيد ترحيل اليوم؟';
   static const cashIn = 'دخول';
   static const cashOut = 'خروج';
+  static const cashMovements = 'حركات النقد';
   static const formulaCaption = 'ديون لنا + النشط + المصري − ديون علينا';
   static const pinnedColumn = 'التاريخ';
   static const changePassword = 'تغيير كلمة المرور';
@@ -131,6 +133,8 @@ abstract final class AppStrings {
   static const amount = 'المبلغ';
   static const date = 'التاريخ';
   static const name = 'الاسم';
+  static const nameRequired = 'أدخل الاسم.';
+  static const similarNames = 'أسماء مشابهة';
   static const phone = 'الهاتف';
   static const factor = 'المعامل';
   static const sinceDays = 'منذ';
@@ -225,6 +229,8 @@ abstract final class AppStrings {
   static const purchases = 'المشتريات';
   static const purchasesValue = purchases;
   static const reports = 'التقارير الذكية';
+  static const reportsReadOnly = 'للقراءة فقط. الأرقام كما أرسلها الخادم.';
+  static const scrollColumns = 'اسحب أفقيًا لعرض بقية الأعمدة';
   static const treasury = 'الخزينة';
   static const adjustment = 'تسوية تاريخية';
   static const period = 'الفترة';
@@ -284,10 +290,21 @@ abstract final class AppStrings {
   static const chooseAssignee = 'اختر الموظف.';
   static const enterReference = 'أدخل المرجع.';
   static const edit = 'تعديل';
+  static const editCard = 'تعديل الكارت';
+  static const editCardTitle = 'تعديل بيانات الكارت';
+  static const editCardScope =
+      'يُحفظ الاسم والهاتف فقط. الرصيد والحركات تبقى كما يرسلها الخادم.';
+  static const editCardUnavailable = 'تعديل هذا الكارت غير متاح لهذا الحساب.';
+  static const cardVersionMissing =
+      'تعذر الحفظ قبل وصول إصدار الكارت من الخادم. أُعيد الجلب.';
   static const delete = 'حذف';
   static const confirmDelete = 'تأكيد حذف هذا السطر';
   static const confirmPayroll = 'تأكيد حركة المرتب';
   static const link = 'ربط';
   static const batch = 'الدفعة';
   static const toneNeutral = 'محايد';
+  static const correctTransaction = 'تصحيح الحركة';
+  static const confirmCorrect =
+      'تأكيد إرسال تصحيح هذه الحركة؟ المبلغ والرصيد بعد الحفظ يظهران من الخادم فقط.';
+  static const currentServerAmount = 'المبلغ الحالي من الخادم';
 }
