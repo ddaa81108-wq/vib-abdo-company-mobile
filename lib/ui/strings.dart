@@ -103,6 +103,8 @@ abstract final class AppStrings {
   static const purchaseOpening = 'الرصيد الافتتاحي';
   static const previousVodafone = 'فودافون سابق';
   static const saveOpening = 'حفظ الرصيد الافتتاحي';
+  static const saveDayConfirm =
+      'تأكيد حفظ اليوم؟ تُرسل القيم كما أدخلتها، وما يظهر بعد الحفظ هو رد الخادم.';
   static const openingConfirm =
       'تأكيد حفظ الرصيد الافتتاحي؟ يُرسل المبلغ كما أدخلته، والرصيد الجديد يظهر من الخادم فقط.';
   static const openDayCorrection = 'فتح تصحيح اليوم';

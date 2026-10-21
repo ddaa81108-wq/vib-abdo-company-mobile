@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/section_providers.dart';
+import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/presentation.dart';
 import '../../ui/strings.dart';
@@ -185,6 +186,7 @@ class LedgerScreen extends ConsumerWidget {
       ref.invalidate(ledgerProvider((section, id)));
       ref.invalidate(accountCardProvider((section, id)));
       ref.invalidate(accountsProvider(section));
+      ref.invalidate(homeDashboardProvider);
     }
   }
 
@@ -212,6 +214,7 @@ class LedgerScreen extends ConsumerWidget {
       ref.invalidate(ledgerProvider((section, id)));
       ref.invalidate(accountCardProvider((section, id)));
       ref.invalidate(accountsProvider(section));
+      ref.invalidate(homeDashboardProvider);
       return null;
     } catch (error) {
       return ref.read(errorHandlerProvider).toFailure(error).message;
@@ -237,6 +240,7 @@ class LedgerScreen extends ConsumerWidget {
       ref.invalidate(ledgerProvider((section, id)));
       ref.invalidate(accountCardProvider((section, id)));
       ref.invalidate(accountsProvider(section));
+      ref.invalidate(homeDashboardProvider);
       return null;
     } catch (error) {
       final failure = ref.read(errorHandlerProvider).toFailure(error);
@@ -244,6 +248,7 @@ class LedgerScreen extends ConsumerWidget {
         ref.invalidate(ledgerProvider((section, id)));
         ref.invalidate(accountCardProvider((section, id)));
         ref.invalidate(accountsProvider(section));
+        ref.invalidate(homeDashboardProvider);
       }
       return failure.message;
     }

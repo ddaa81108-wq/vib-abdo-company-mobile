@@ -197,3 +197,23 @@ final masraweyaProvider = FutureProvider<MasraweyaDayDto>((ref) async {
   ref.watch(sessionStateProvider);
   return ref.read(apiLayerProvider).masraweya.getDay();
 });
+
+/// Sends a masraweya day through the API layer's save method.
+///
+/// [MutationMeta] is the one the save form's guarded submit keeps: the same
+/// request id while the inputs and expected version stay the same, and a new
+/// id when either changes.
+final masraweyaActionsProvider = Provider<MasraweyaActions>(
+  (ref) => MasraweyaActions(ref.watch(apiLayerProvider)),
+);
+
+class MasraweyaActions {
+  const MasraweyaActions(this._api);
+
+  final ApiLayer _api;
+
+  Future<MasraweyaDayDto> saveDay(
+    SaveMasraweyaDayRequest request,
+    MutationMeta meta,
+  ) => _api.masraweya.saveDay(request, meta);
+}
