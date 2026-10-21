@@ -7,7 +7,9 @@ import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
+import '../../ui/presentation.dart';
 import '../../ui/strings.dart';
+import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
@@ -71,19 +73,23 @@ class EditAccountCardButton extends ConsumerWidget {
     );
     if (!allowed) return const SizedBox.shrink();
     final online = ref.watch(onlineProvider);
+    final button = GatedButton(
+      buttonKey: const Key('edit-account-card'),
+      allowed: true,
+      online: online,
+      filled: false,
+      label: AppStrings.editCard,
+      onPressed: () => context.push('/${section.path}/${card.id}/edit'),
+    );
+    final tight = layoutIsTight(context);
     return Padding(
       padding: const EdgeInsetsDirectional.only(top: AppSpacing.sm),
-      child: Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: GatedButton(
-          buttonKey: const Key('edit-account-card'),
-          allowed: true,
-          online: online,
-          filled: false,
-          label: AppStrings.editCard,
-          onPressed: () => context.push('/${section.path}/${card.id}/edit'),
-        ),
-      ),
+      child: tight
+          ? SizedBox(
+              width: double.infinity,
+              child: Theme(data: _editStretchButtons(context), child: button),
+            )
+          : Align(alignment: AlignmentDirectional.centerStart, child: button),
     );
   }
 }
@@ -148,9 +154,23 @@ class _EditUnavailable extends StatelessWidget {
         _EditHeader(
           onBack: () => _leave(context, section: section, id: card.id),
         ),
-        Text(card.name, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppSpacing.md),
-        const Text(AppStrings.editCardUnavailable),
+        Card(
+          child: Padding(
+            padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(card.name, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  AppStrings.editCardUnavailable,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -213,6 +233,15 @@ class _EditAccountCardFormState extends ConsumerState<_EditAccountCardForm> {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final padding = pagePadding(width);
+    final colors = context.appColors;
+    final tight = layoutIsTight(context);
+    final save = GuardedMutation(
+      buttonKey: const Key('save-account-card'),
+      inputs: '${_name.text}|${_phone.text}',
+      expectedVersion: widget.card.version,
+      label: AppStrings.save,
+      onSubmit: _submit,
+    );
     return ListView(
       padding: padding.copyWith(
         bottom: padding.bottom + MediaQuery.viewInsetsOf(context).bottom,
@@ -222,31 +251,56 @@ class _EditAccountCardFormState extends ConsumerState<_EditAccountCardForm> {
           onBack: () =>
               _leave(context, section: widget.section, id: widget.card.id),
         ),
-        Text(
-          AppStrings.editCardScope,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(
-          key: const Key('edit-card-name'),
-          controller: _name,
-          decoration: const InputDecoration(labelText: AppStrings.name),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        TextField(
-          key: const Key('edit-card-phone'),
-          controller: _phone,
-          keyboardType: TextInputType.phone,
-          textDirection: TextDirection.ltr,
-          decoration: const InputDecoration(labelText: AppStrings.phone),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        GuardedMutation(
-          buttonKey: const Key('save-account-card'),
-          inputs: '${_name.text}|${_phone.text}',
-          expectedVersion: widget.card.version,
-          label: AppStrings.save,
-          onSubmit: _submit,
+        Card(
+          child: Padding(
+            padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colors.noteBg,
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    border: Border.all(color: colors.noteLine),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+                    child: Text(
+                      AppStrings.editCardScope,
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: colors.noteText),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                TextField(
+                  key: const Key('edit-card-name'),
+                  controller: _name,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(labelText: AppStrings.name),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  key: const Key('edit-card-phone'),
+                  controller: _phone,
+                  keyboardType: TextInputType.phone,
+                  textDirection: TextDirection.ltr,
+                  decoration: const InputDecoration(
+                    labelText: AppStrings.phone,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                if (tight)
+                  Theme(data: _editStretchButtons(context), child: save)
+                else
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: save,
+                  ),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -310,12 +364,29 @@ class _EditHeader extends StatelessWidget {
         Expanded(
           child: Text(
             AppStrings.editCardTitle,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
         ),
       ],
     );
   }
+}
+
+ThemeData _editStretchButtons(BuildContext context) {
+  final theme = Theme.of(context);
+  const min = WidgetStatePropertyAll(Size(double.infinity, 48));
+  return theme.copyWith(
+    filledButtonTheme: FilledButtonThemeData(
+      style: (theme.filledButtonTheme.style ?? const ButtonStyle()).copyWith(
+        minimumSize: min,
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: (theme.textButtonTheme.style ?? const ButtonStyle()).copyWith(
+        minimumSize: min,
+      ),
+    ),
+  );
 }
 
 void _leave(
