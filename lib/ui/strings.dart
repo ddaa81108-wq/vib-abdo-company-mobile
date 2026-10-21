@@ -319,4 +319,11 @@ abstract final class AppStrings {
   static const assignmentOpen = 'مفتوح';
   static const openingCarry = 'رصيد مرحّل';
   static const approvedCount = 'عدد المعتمد';
+
+  // Account-list presentation only. Grouped at the end so ledger and
+  // collections edits to the catalogue above can merge without overlap.
+  static const dayOne = 'يوم';
+  static const dayTwo = 'يومين';
+  static const dayMany = 'يومًا';
+  static const clearSearch = 'مسح البحث';
 }
