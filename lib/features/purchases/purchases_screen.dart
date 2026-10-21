@@ -37,20 +37,27 @@ class PurchasesScreen extends ConsumerWidget {
       children: [
         const ScreenTitle(AppStrings.purchases),
         const SizedBox(height: AppSpacing.md),
-        SegmentedButton<PurchaseBook>(
-          segments: const [
-            ButtonSegment(
-              value: PurchaseBook.alBayan,
-              label: Text(AppStrings.alBayan),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<PurchaseBook>(
+              key: const Key('purchase-books'),
+              segments: const [
+                ButtonSegment(
+                  value: PurchaseBook.alBayan,
+                  label: Text(AppStrings.alBayan),
+                ),
+                ButtonSegment(
+                  value: PurchaseBook.simsim,
+                  label: Text(AppStrings.simsim),
+                ),
+              ],
+              selected: {book},
+              onSelectionChanged: (value) =>
+                  ref.read(purchaseBookProvider.notifier).state = value.first,
             ),
-            ButtonSegment(
-              value: PurchaseBook.simsim,
-              label: Text(AppStrings.simsim),
-            ),
-          ],
-          selected: {book},
-          onSelectionChanged: (value) =>
-              ref.read(purchaseBookProvider.notifier).state = value.first,
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
         KeptData<PurchasesBookPage>(
@@ -59,10 +66,22 @@ class PurchasesScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(purchasesProvider),
           messageOf: (error) =>
               ref.read(errorHandlerProvider).toFailure(error).message,
-          loading: const SkeletonBox(key: Key('purchases-loading')),
+          loading: const Column(
+            key: Key('purchases-loading'),
+            children: [
+              SkeletonBox(),
+              SizedBox(height: AppSpacing.md),
+              SkeletonBox(),
+            ],
+          ),
           builder: (data) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (data.page.items.isEmpty)
+                const EmptyPane(
+                  key: Key('purchases-empty'),
+                  message: AppStrings.emptyPurchases,
+                ),
               for (final day in data.page.items)
                 _DayCard(
                   day: day,
@@ -77,21 +96,7 @@ class PurchasesScreen extends ConsumerWidget {
                 AppStrings.registerTotals,
                 style: Theme.of(context).textTheme.titleSmall,
               ),
-              _LifetimeLine(
-                AppStrings.resultFromServer,
-                data.lifetimeTotals?.resultUnits,
-                money,
-              ),
-              _LifetimeLine(
-                AppStrings.paid,
-                data.lifetimeTotals?.paidUnits,
-                money,
-              ),
-              _LifetimeLine(
-                AppStrings.remaining,
-                data.lifetimeTotals?.remainingUnits,
-                money,
-              ),
+              _LifetimeTotals(totals: data.lifetimeTotals, money: money),
             ],
           ),
         ),
@@ -100,16 +105,79 @@ class PurchasesScreen extends ConsumerWidget {
   }
 }
 
-class _LifetimeLine extends StatelessWidget {
-  const _LifetimeLine(this.label, this.units, this.money);
+class _LifetimeTotals extends StatelessWidget {
+  const _LifetimeTotals({required this.totals, required this.money});
 
-  final String label;
-  final int? units;
+  final PurchasesLifetimeTotalsDto? totals;
   final MoneyFormatter money;
 
   @override
   Widget build(BuildContext context) {
-    return Text('$label ${money.formatOrDash(units, Currency.lyd)}');
+    return Column(
+      key: const Key('purchases-lifetime'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _AmountLine(
+          AppStrings.resultFromServer,
+          totals?.resultUnits,
+          Currency.lyd,
+          money,
+        ),
+        _AmountLine(AppStrings.paid, totals?.paidUnits, Currency.lyd, money),
+        _AmountLine(
+          AppStrings.remaining,
+          totals?.remainingUnits,
+          Currency.lyd,
+          money,
+        ),
+      ],
+    );
+  }
+}
+
+/// Label and server figure. They sit on one line and wrap instead of clipping.
+class _AmountLine extends StatelessWidget {
+  const _AmountLine(this.label, this.units, this.currency, this.money);
+
+  final String label;
+  final int? units;
+  final Currency currency;
+  final MoneyFormatter money;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.xs),
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.xxs,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [Text(label), MoneyText(money.formatOrDash(units, currency))],
+      ),
+    );
+  }
+}
+
+class _RateLine extends StatelessWidget {
+  const _RateLine(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.xs),
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.xxs,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(label),
+          LtrText(value, style: context.textExtras.tableNumber),
+        ],
+      ),
+    );
   }
 }
 
@@ -137,6 +205,7 @@ class _DayCard extends ConsumerWidget {
     final editable = dayIsEditable(day.status);
     final caption = vodafoneCaption(day.vodafoneRemainingUnits);
     return Card(
+      key: Key('purchase-day-${day.day}'),
       color: band,
       margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
       child: Padding(
@@ -144,11 +213,18 @@ class _DayCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${AppStrings.todayTab} ${day.day}',
-              style: Theme.of(context).textTheme.titleSmall,
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  '${AppStrings.todayTab} ${day.day}',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                Text(dayStatusLabel(day.status)),
+              ],
             ),
-            Text(dayStatusLabel(day.status)),
             _line(AppStrings.previousDebt, day.previousDebtUnits, Currency.lyd),
             _line(AppStrings.todayResult, day.todayResultUnits, Currency.lyd),
             _line(AppStrings.todayPaid, day.todayPaidUnits, Currency.lyd),
@@ -159,26 +235,31 @@ class _DayCard extends ConsumerWidget {
               Currency.egp,
             ),
             if (caption != null) Text(caption),
-            if (canWrite && editable)
-              GatedButton(
-                buttonKey: const Key('add-purchase'),
-                allowed: true,
-                online: online,
-                label: AppStrings.add,
-                onPressed: () => showAppForm<void>(
-                  context,
-                  _PurchaseForm(book: book, version: day.version),
-                ),
-              ),
-            if (canFinalize && day.status == 'draft')
-              GuardedMutation(
-                buttonKey: const Key('finalize-day'),
-                inputs: 'finalize:${day.day}:${day.version}',
-                expectedVersion: day.version,
-                label: AppStrings.finalizeDay,
-                confirmText: AppStrings.finalizeConfirm,
-                onSubmit: (meta) => _finalize(context, ref, meta),
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (canWrite && editable)
+                  GatedButton(
+                    buttonKey: const Key('add-purchase'),
+                    allowed: true,
+                    online: online,
+                    label: AppStrings.add,
+                    onPressed: () => showAppForm<void>(
+                      context,
+                      _PurchaseForm(book: book, version: day.version),
+                    ),
+                  ),
+                if (canFinalize && day.status == 'draft')
+                  GuardedMutation(
+                    buttonKey: const Key('finalize-day'),
+                    inputs: 'finalize:${day.day}:${day.version}',
+                    expectedVersion: day.version,
+                    label: AppStrings.finalizeDay,
+                    confirmText: AppStrings.finalizeConfirm,
+                    onSubmit: (meta) => _finalize(context, ref, meta),
+                  ),
+              ],
+            ),
             for (final entry in day.entries)
               _Entry(
                 entry: entry,
@@ -195,12 +276,7 @@ class _DayCard extends ConsumerWidget {
   }
 
   Widget _line(String label, int? units, Currency currency) {
-    return Row(
-      children: [
-        Expanded(child: Text(label)),
-        MoneyText(money.formatOrDash(units, currency)),
-      ],
-    );
+    return _AmountLine(label, units, currency, money);
   }
 
   Future<String?> _finalize(
@@ -424,55 +500,88 @@ class _Entry extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsetsDirectional.only(top: AppSpacing.sm),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(entry.itemLabel ?? AppStrings.dash),
-          Text(
-            '${AppStrings.egpValue} ${money.formatOrDash(entry.egpValueUnits, Currency.egp)}',
-          ),
-          Text(
-            '${calculationLabel(entry.calculationMode)} ${entry.exchangeRate == null ? AppStrings.dash : money.formatDecimal(entry.exchangeRate!)}',
-          ),
-          Text(
-            '${AppStrings.resultFromServer} ${money.formatOrDash(entry.resultUnits, Currency.lyd)}',
-          ),
-          Text(
-            '${AppStrings.paid} ${money.formatOrDash(entry.paidUnits, Currency.lyd)}',
-          ),
-          Text(
-            '${AppStrings.remaining} ${money.formatOrDash(entry.remainingUnits, Currency.lyd)}',
-          ),
-          if (canWrite)
-            Wrap(
-              spacing: AppSpacing.sm,
-              children: [
-                GatedButton(
-                  buttonKey: Key('edit-${entry.id}'),
-                  allowed: true,
-                  online: online,
-                  filled: false,
-                  label: AppStrings.edit,
-                  onPressed: () => showAppForm<void>(
-                    context,
-                    _PurchaseForm(book: book, version: version, entry: entry),
-                  ),
+      key: Key('purchase-entry-${entry.id}'),
+      padding: const EdgeInsetsDirectional.only(top: AppSpacing.md),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: scheme.outlineVariant)),
+        ),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.only(top: AppSpacing.sm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                entry.itemLabel ?? AppStrings.dash,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              _AmountLine(
+                AppStrings.egpValue,
+                entry.egpValueUnits,
+                Currency.egp,
+                money,
+              ),
+              _RateLine(
+                calculationLabel(entry.calculationMode),
+                entry.exchangeRate == null
+                    ? AppStrings.dash
+                    : money.formatDecimal(entry.exchangeRate!),
+              ),
+              _AmountLine(
+                AppStrings.resultFromServer,
+                entry.resultUnits,
+                Currency.lyd,
+                money,
+              ),
+              _AmountLine(
+                AppStrings.paid,
+                entry.paidUnits,
+                Currency.lyd,
+                money,
+              ),
+              _AmountLine(
+                AppStrings.remaining,
+                entry.remainingUnits,
+                Currency.lyd,
+                money,
+              ),
+              if (canWrite)
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    GatedButton(
+                      buttonKey: Key('edit-${entry.id}'),
+                      allowed: true,
+                      online: online,
+                      filled: false,
+                      label: AppStrings.edit,
+                      onPressed: () => showAppForm<void>(
+                        context,
+                        _PurchaseForm(
+                          book: book,
+                          version: version,
+                          entry: entry,
+                        ),
+                      ),
+                    ),
+                    GuardedMutation(
+                      buttonKey: Key('delete-${entry.id}'),
+                      inputs: 'delete:${entry.id}:$version',
+                      expectedVersion: version,
+                      label: AppStrings.delete,
+                      filled: false,
+                      destructive: true,
+                      confirmText: AppStrings.confirmDelete,
+                      onSubmit: (meta) => _delete(context, ref, meta),
+                    ),
+                  ],
                 ),
-                GuardedMutation(
-                  buttonKey: Key('delete-${entry.id}'),
-                  inputs: 'delete:${entry.id}:$version',
-                  expectedVersion: version,
-                  label: AppStrings.delete,
-                  filled: false,
-                  destructive: true,
-                  confirmText: AppStrings.confirmDelete,
-                  onSubmit: (meta) => _delete(context, ref, meta),
-                ),
-              ],
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -41,6 +41,7 @@ abstract final class AppStrings {
   static const emptyLedger = 'لا توجد حركات';
   static const emptyCollections = 'لا توجد استلامات';
   static const emptyReports = 'لا توجد بيانات';
+  static const emptyPurchases = 'لا توجد أيام مسجّلة في هذا الدفتر';
   static const online = 'متصل • جميع التغييرات محفوظة';
   static const offline = 'غير متصل — تُعرض آخر بيانات محمّلة للقراءة';
   static const more = 'المزيد';
