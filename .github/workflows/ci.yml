@@ -16,6 +16,10 @@
 # Java is Temurin 17. AGP 9.1's minimum JDK is 17, Gradle 9.3.1 runs on
 # JVM 17+, and android/app/build.gradle.kts compiles with Java 17.
 #
+# Flutter 3.47.7's flutter.ndkVersion is not preinstalled on ubuntu-latest.
+# Jobs that run Gradle install that NDK before the build. sdkmanager retries
+# after deleting a truncated zip. See .github/actions/install-android-ndk.
+#
 # Two more jobs share this workflow. `Negative permission tests` runs the
 # `permissions-negative` tag only and fails if none ran. `Release build rejects
 # fake API` rejects USE_FAKE_API=true in a release compile and scans the
@@ -134,6 +138,10 @@ jobs:
             --test-app-log "$RUNNER_TEMP/test-app.log" \
             --test-api-log "$RUNNER_TEMP/test-api.log"
 
+      - name: Install Android NDK
+        if: success()
+        uses: ./.github/actions/install-android-ndk
+
       - name: Build debug APK
         if: success()
         run: |
@@ -239,6 +247,10 @@ jobs:
 
       - name: Reject USE_FAKE_API in a release compile
         run: tool/check_release_rejects_fake_api.sh
+
+      - name: Install Android NDK
+        if: success()
+        uses: ./.github/actions/install-android-ndk
 
       - name: Scan a release APK for demo profiles
         env:
