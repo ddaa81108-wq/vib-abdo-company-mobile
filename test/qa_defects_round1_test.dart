@@ -39,13 +39,13 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
 
-    expect(find.text('320 د.ل'), findsOneWidget);
+    expect(_headerAmount('320 د.ل'), findsOneWidget);
     await tester.ensureVisible(find.byKey(const Key('full-payment')));
     await tester.tap(find.byKey(const Key('full-payment')));
     await settle(tester);
 
-    expect(find.text('0 د.ل'), findsOneWidget);
-    expect(find.text('320 د.ل'), findsNothing);
+    expect(_headerAmount('0 د.ل'), findsOneWidget);
+    expect(_headerAmount('320 د.ل'), findsNothing);
 
     await go(tester, '/customers');
     expect(find.text('0 د.ل'), findsWidgets);
@@ -59,7 +59,7 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
 
-    expect(find.text('320 د.ل'), findsOneWidget);
+    expect(_headerAmount('320 د.ل'), findsOneWidget);
     final cancel = find.byKey(const Key('cancel-tx_2'));
     await tester.ensureVisible(cancel);
     await tester.tap(cancel);
@@ -68,8 +68,8 @@ void main() {
     await tester.tap(find.byKey(const Key('confirm-mutation')));
     await settle(tester);
 
-    expect(find.text('320 د.ل'), findsNothing);
-    expect(find.text('500 د.ل'), findsWidgets);
+    expect(_headerAmount('320 د.ل'), findsNothing);
+    expect(_headerAmount('500 د.ل'), findsOneWidget);
 
     await go(tester, '/customers');
     expect(find.text('500 د.ل'), findsWidgets);
@@ -138,5 +138,14 @@ Future<void> settle(WidgetTester tester) {
     const Duration(milliseconds: 50),
     EnginePhase.sendSemanticsUpdate,
     const Duration(seconds: 20),
+  );
+}
+
+/// The polished ledger also prints a line's balance-after as its own amount,
+/// so the card balance is read from the header.
+Finder _headerAmount(String text) {
+  return find.descendant(
+    of: find.byKey(const Key('ledger-header-balance')),
+    matching: find.text(text),
   );
 }

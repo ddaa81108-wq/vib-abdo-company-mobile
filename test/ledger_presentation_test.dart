@@ -56,7 +56,7 @@ void main() {
     await go(tester, '/customers/c_55');
 
     _expectHeaderGradient(tester, AppStatusColors.light.warningDebt);
-    expect(find.text('مرّ عليه 3 أيام'), findsWidgets);
+    expect(find.text('منذ 4 أيام'), findsWidgets);
 
     await _toggleDark(tester);
     _expectHeaderGradient(tester, AppStatusColors.dark.warningDebt);
