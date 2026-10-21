@@ -23,6 +23,7 @@ dependencies:
   # stays on compileSdk 36, so the pin is 12.0.3 (android plugin 13.0.1,
   # compileSdk 35, minSdk 19).
   permission_handler: 12.0.3
+  workmanager: ^0.10.10
 
 dev_dependencies:
   flutter_test:

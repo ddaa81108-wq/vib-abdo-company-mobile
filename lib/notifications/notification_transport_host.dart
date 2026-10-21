@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/notifications/notification_opener.dart';
 import '../state/session_providers.dart';
+import 'android_notification_setup.dart';
 import 'device_token_registrar.dart';
 import 'push_providers.dart';
+import 'system_tray_tap.dart';
 
 /// Binds the wipe gate, the push stream, and a cold-start tap.
 ///
@@ -45,38 +47,48 @@ class _NotificationTransportHostState
   void _bind() {
     ref.read(deviceTokenRegistrarProvider);
     _pushes ??= ref.read(pushTransportProvider).payloads.listen((payload) {
-      ref.read(notificationIngressProvider).acceptPush(payload);
+      unawaited(ref.read(systemTrayPresenterProvider).presentPush(payload));
     });
-    final session = ref.read(sessionStateProvider);
     unawaited(
-      syncPushRegistration(
-        previous: const SessionPhase.signedOut(),
-        next: phaseOf(session),
-        registrar: ref.read(deviceTokenRegistrarProvider),
+      AndroidNotificationSetup.start(
+        onSelect: (payload) {
+          if (!mounted) return;
+          unawaited(
+            ref.read(systemTrayTapHandlerProvider).openPayload(payload),
+          );
+        },
       ),
     );
-    if (session is SessionAuthenticated) {
-      unawaited(ref.read(backgroundNotificationSchedulerProvider).start());
-    }
+    final session = ref.read(sessionStateProvider);
+    unawaited(_sync(const SessionPhase.signedOut(), phaseOf(session), session));
+  }
+
+  Future<void> _sync(
+    SessionPhase previous,
+    SessionPhase next,
+    SessionState? state,
+  ) async {
+    await syncPushRegistration(
+      previous: previous,
+      next: next,
+      registrar: ref.read(deviceTokenRegistrarProvider),
+    );
+    if (!mounted) return;
+    if (state is! SessionAuthenticated) return;
+    await ref.read(backgroundNotificationSchedulerProvider).start();
   }
 
   @override
   Widget build(BuildContext context) {
     ref.listen(sessionStateProvider, (previous, next) {
-      unawaited(
-        syncPushRegistration(
-          previous: phaseOf(previous),
-          next: phaseOf(next),
-          registrar: ref.read(deviceTokenRegistrarProvider),
-        ),
-      );
+      unawaited(_sync(phaseOf(previous), phaseOf(next), next));
       if (next is! SessionAuthenticated) return;
-      unawaited(ref.read(backgroundNotificationSchedulerProvider).start());
       // After the router's own redirect, so a preserved tap is not overwritten
       // by the login → home redirect.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         unawaited(ref.read(notificationOpenerProvider).resumePending());
+        unawaited(ref.read(systemTrayTapHandlerProvider).resume());
       });
     });
     ref.listen(startupProvider, (previous, next) {
@@ -84,6 +96,7 @@ class _NotificationTransportHostState
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         unawaited(ref.read(notificationOpenerProvider).resumePending());
+        unawaited(ref.read(systemTrayTapHandlerProvider).resume());
       });
     });
     return widget.child;

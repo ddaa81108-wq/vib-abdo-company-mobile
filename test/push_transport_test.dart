@@ -295,9 +295,13 @@ void main() {
       );
 
       expect(await poll.run(), BackgroundPollResult.completed);
-      expect(poster.texts, ['VIB · اعتماد']);
-      expect(poster.texts.single.contains('سر'), isFalse);
-      expect(poster.texts.single.contains('091'), isFalse);
+      expect(poster.trays, hasLength(1));
+      expect(poster.trays.single.title, 'VIB');
+      expect(poster.trays.single.body, 'اعتماد · موظف سري');
+      expect(poster.trays.single.publicBody, 'إشعار جديد');
+      expect(poster.trays.single.publicBody.contains('سر'), isFalse);
+      expect(poster.trays.single.body.contains('091'), isFalse);
+      expect(poster.trays.single.publicTitle.contains('900'), isFalse);
       expect(sources, [NotificationSource.poll]);
       expect(cancelled, isFalse);
 

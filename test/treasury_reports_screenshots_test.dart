@@ -11,6 +11,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/app.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
+import 'package:vib_abdo_company_mobile/notifications/background_scheduler.dart';
+import 'package:vib_abdo_company_mobile/notifications/push_providers.dart';
+import 'package:vib_abdo_company_mobile/notifications/shown_notification_store.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
@@ -120,6 +123,12 @@ Future<void> _pump(WidgetTester tester, Size size) async {
         apiLayerProvider.overrideWithValue(layer),
         connectivityPortProvider.overrideWithValue(
           const FixedConnectivity(true),
+        ),
+        backgroundNotificationSchedulerProvider.overrideWithValue(
+          const NoopBackgroundNotificationScheduler(),
+        ),
+        shownNotificationStoreProvider.overrideWithValue(
+          MemoryShownNotificationStore(),
         ),
       ],
       child: const RepaintBoundary(key: _shot, child: CompanyApp()),

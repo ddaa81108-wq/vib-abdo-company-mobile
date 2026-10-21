@@ -98,7 +98,10 @@ class FakeNotificationPlatform implements NotificationPlatform {
   final shown = <AndroidNotificationRequest>[];
 
   @override
-  Future<void> initialize({required String androidIcon}) async {
+  Future<void> initialize({
+    required String androidIcon,
+    void Function(String? payload)? onSelect,
+  }) async {
     initializeCount += 1;
     icon = androidIcon;
   }
@@ -122,7 +125,10 @@ class FakeNotificationPlatform implements NotificationPlatform {
 
 class _ThrowingPlatform extends FakeNotificationPlatform {
   @override
-  Future<void> initialize({required String androidIcon}) {
+  Future<void> initialize({
+    required String androidIcon,
+    void Function(String? payload)? onSelect,
+  }) {
     throw StateError('plugin down');
   }
 }
