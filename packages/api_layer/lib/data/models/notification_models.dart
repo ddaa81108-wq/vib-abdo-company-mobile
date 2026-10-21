@@ -15,7 +15,8 @@ class NotificationDto {
       this.section,
       this.entityId,
       this.readAt,
-      this.createdAt});
+      this.createdAt,
+      this.recipientUserId});
   final String id;
   final String action; // audit event name, e.g. collection.submit
   final String? title;
@@ -24,6 +25,11 @@ class NotificationDto {
   final String? entityId;
   final DateTime? readAt;
   final DateTime? createdAt;
+
+  /// 🔶 Unconfirmed. This DTO uses camelCase names only (`entityId`, `readAt`),
+  /// so the JSON key is `recipientUserId`. `userId` and `recipient_user_id`
+  /// are not read.
+  final String? recipientUserId;
   bool get isRead => readAt != null;
 
   factory NotificationDto.fromJson(Json j) => NotificationDto(
@@ -35,6 +41,7 @@ class NotificationDto {
         entityId: strOrNull(j['entityId'] ?? j['aggregateId']),
         readAt: dateOrNull(j['readAt']),
         createdAt: dateOrNull(j['createdAt']),
+        recipientUserId: _text(j['recipientUserId']),
       );
 }
 
@@ -177,9 +184,28 @@ class AppNotification {
     );
   }
 
-  /// Push data payloads are flat string maps. Same tolerant parser as [fromJson].
-  factory AppNotification.fromPushPayload(Map<String, dynamic> payload) =>
-      AppNotification.fromJson(payload);
+  /// Push data is untrusted. Only these keys are read:
+  /// `id` or `notificationId`, `recipientUserId`, `operationType` or `action`,
+  /// `relatedRef` (object or JSON string) or `relatedRefType` + `relatedRefId`,
+  /// and `createdAt`. Display text and every other key are dropped; the next
+  /// server refresh supplies what the screen shows.
+  factory AppNotification.fromPushPayload(Map<String, dynamic> payload) {
+    const allowed = {
+      'id',
+      'notificationId',
+      'recipientUserId',
+      'operationType',
+      'action',
+      'relatedRef',
+      'relatedRefType',
+      'relatedRefId',
+      'createdAt',
+    };
+    return AppNotification.fromJson({
+      for (final entry in payload.entries)
+        if (allowed.contains(entry.key)) entry.key: entry.value,
+    });
+  }
 
   factory AppNotification.fromDto(NotificationDto dto) {
     final section = dto.section?.trim();
@@ -198,7 +224,7 @@ class AppNotification {
           hasRef ? NotificationRelatedRef(type: section, id: entity) : null,
       createdAt: dto.createdAt ?? DateTime.utc(1970),
       readAt: dto.readAt,
-      recipientUserId: null,
+      recipientUserId: _text(dto.recipientUserId),
       title: dto.title,
       body: dto.body,
     );
@@ -213,6 +239,7 @@ class AppNotification {
         entityId: relatedRef?.id,
         readAt: readAt,
         createdAt: createdAt,
+        recipientUserId: recipientUserId,
       );
 
   /// Incoming fields fill gaps. [readAt] is the later of the two timestamps.
