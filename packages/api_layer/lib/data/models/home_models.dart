@@ -7,7 +7,7 @@ import 'common.dart';
 ///
 /// { businessDate, generatedAt,
 ///   summaries: [{key, section, title, valueUnits, currency, tone, note, status, updatedAt}],
-///   counters:  {"<section>": <int>},
+///   counters:  `{"<section>": <int>}`,
 ///   oldDebts?: [{id, section, name, balanceUnits, currency, debtAgeDays, ageStatus, ageStatusLabel}] }
 
 /// Server-provided colour intent. Unknown/absent -> null = neutral colours.
