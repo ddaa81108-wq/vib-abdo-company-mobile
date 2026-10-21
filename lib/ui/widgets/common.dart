@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../error_handling/app_failure.dart';
+import '../../error_handling/error_handler.dart';
 import '../presentation.dart';
 import '../strings.dart';
 import '../theme.dart';
@@ -160,6 +162,20 @@ class SkeletonBox extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Provider failure. FORBIDDEN reuses [ForbiddenPane] and does not offer retry.
+Widget failurePane(
+  AppFailure failure, {
+  VoidCallback? onRetry,
+  Key? retryKey,
+}) {
+  if (failure.isForbidden) return const ForbiddenPane();
+  return ErrorPane(
+    message: failure.message,
+    onRetry: onRetry,
+    retryKey: retryKey,
+  );
 }
 
 class ForbiddenPane extends StatelessWidget {
@@ -486,6 +502,8 @@ class _KeptDataState<T> extends State<KeptData<T>> {
     }
 
     if (value.hasError && _hasLast) {
+      final failure = const ErrorHandler().toFailure(value.error!);
+      if (failure.isForbidden) return const ForbiddenPane();
       return _withError(widget.builder(_last as T), value.error!);
     }
 
@@ -493,8 +511,8 @@ class _KeptDataState<T> extends State<KeptData<T>> {
       skipLoadingOnReload: true,
       data: widget.builder,
       loading: () => widget.loading ?? const SkeletonBox(height: 88),
-      error: (error, _) => ErrorPane(
-        message: widget.messageOf(error),
+      error: (error, _) => failurePane(
+        const ErrorHandler().toFailure(error),
         onRetry: widget.onRetry,
         retryKey: widget.retryKey,
       ),
@@ -502,8 +520,8 @@ class _KeptDataState<T> extends State<KeptData<T>> {
   }
 
   Widget _withError(Widget body, Object error) {
-    final pane = ErrorPane(
-      message: widget.messageOf(error),
+    final pane = failurePane(
+      const ErrorHandler().toFailure(error),
       onRetry: widget.onRetry,
       retryKey: widget.retryKey,
     );

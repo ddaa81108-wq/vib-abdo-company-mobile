@@ -12,4 +12,7 @@ class AppFailure {
 
   /// Safe log line: code and correlation id only.
   String get diagnostic => 'code=$code correlationId=${correlationId ?? '-'}';
+
+  /// True when the server rejected the call with the existing FORBIDDEN code.
+  bool get isForbidden => code == 'FORBIDDEN';
 }

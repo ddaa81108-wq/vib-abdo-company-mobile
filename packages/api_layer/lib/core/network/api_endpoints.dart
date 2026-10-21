@@ -89,6 +89,17 @@ class ApiEndpoints {
   static String accountRequestDecision(String id) =>
       '/api/account-requests/$id/decision';
 
+  /// 🔶 Proposed admin catalogs. The fake rejects an ordinary employee with
+  /// 403. Paths are not confirmed by the server.
+  static const settings = '/api/settings';
+  static const users = '/api/users';
+  static String user(String id) => '/api/users/$id';
+  static const staff = '/api/staff';
+  static const employees = '/api/employees';
+  static const admins = '/api/admins';
+  static const audit = '/api/audit';
+  static const operations = '/api/operations';
+
   // Realtime & notifications
   static const events = '/api/events'; // SSE
   static const eventChanges = '/api/event-changes'; // polling fallback

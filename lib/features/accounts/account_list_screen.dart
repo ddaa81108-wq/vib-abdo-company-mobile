@@ -739,8 +739,8 @@ class _RateCardState extends ConsumerState<_RateCard> {
         padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
         child: rate.when(
           loading: () => const SkeletonBox(height: 72),
-          error: (error, _) => ErrorPane(
-            message: ref.read(errorHandlerProvider).toFailure(error).message,
+          error: (error, _) => failurePane(
+            ref.read(errorHandlerProvider).toFailure(error),
             onRetry: () => ref.invalidate(exchangeRateProvider),
           ),
           data: (data) {
@@ -960,8 +960,8 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
     final people = ref.watch(assigneesProvider);
     return people.when(
       loading: () => const SkeletonBox(height: 48),
-      error: (error, _) => ErrorPane(
-        message: ref.read(errorHandlerProvider).toFailure(error).message,
+      error: (error, _) => failurePane(
+        ref.read(errorHandlerProvider).toFailure(error),
         onRetry: () => ref.invalidate(assigneesProvider),
       ),
       data: (rows) {

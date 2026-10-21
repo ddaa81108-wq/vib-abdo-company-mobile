@@ -906,8 +906,8 @@ class _PayrollBlock extends ConsumerWidget {
         payroll.when(
           loading: () =>
               const SkeletonBox(key: Key('payroll-loading'), height: 88),
-          error: (error, _) => ErrorPane(
-            message: ref.read(errorHandlerProvider).toFailure(error).message,
+          error: (error, _) => failurePane(
+            ref.read(errorHandlerProvider).toFailure(error),
             onRetry: () => ref.invalidate(payrollProvider),
             retryKey: const Key('payroll-retry'),
           ),

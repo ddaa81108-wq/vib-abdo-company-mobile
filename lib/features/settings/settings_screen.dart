@@ -121,11 +121,8 @@ class _LedgerTile extends ConsumerWidget {
             const ExportPdfButton(),
             page.when(
               loading: () => const SkeletonBox(height: 48),
-              error: (error, _) => ErrorPane(
-                message: ref
-                    .read(errorHandlerProvider)
-                    .toFailure(error)
-                    .message,
+              error: (error, _) => failurePane(
+                ref.read(errorHandlerProvider).toFailure(error),
                 onRetry: online
                     ? () => ref.invalidate(financialLedgerProvider)
                     : null,
