@@ -12,6 +12,7 @@ import '../../ui/section_labels.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/logout_confirm.dart';
 import '../../ui/widgets/soft_tile.dart';
 
 class AccountScreen extends ConsumerWidget {
@@ -122,7 +123,7 @@ class AccountScreen extends ConsumerWidget {
             key: const Key('account-logout'),
             leading: mirrorInRtl(context, Icons.logout),
             title: AppStrings.logout,
-            onTap: () => ref.read(sessionStateProvider.notifier).logout(),
+            onTap: () => requestLogout(context, ref),
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
