@@ -502,8 +502,7 @@ class _KeptDataState<T> extends State<KeptData<T>> {
     }
 
     if (value.hasError && _hasLast) {
-      final failure = const ErrorHandler().toFailure(value.error!);
-      if (failure.isForbidden) return const ForbiddenPane();
+      if (_forbidden(value.error!)) return const ForbiddenPane();
       return _withError(widget.builder(_last as T), value.error!);
     }
 
@@ -511,17 +510,23 @@ class _KeptDataState<T> extends State<KeptData<T>> {
       skipLoadingOnReload: true,
       data: widget.builder,
       loading: () => widget.loading ?? const SkeletonBox(height: 88),
-      error: (error, _) => failurePane(
-        const ErrorHandler().toFailure(error),
-        onRetry: widget.onRetry,
-        retryKey: widget.retryKey,
-      ),
+      error: (error, _) {
+        if (_forbidden(error)) return const ForbiddenPane();
+        return ErrorPane(
+          message: widget.messageOf(error),
+          onRetry: widget.onRetry,
+          retryKey: widget.retryKey,
+        );
+      },
     );
   }
 
+  bool _forbidden(Object error) =>
+      const ErrorHandler().toFailure(error).isForbidden;
+
   Widget _withError(Widget body, Object error) {
-    final pane = failurePane(
-      const ErrorHandler().toFailure(error),
+    final pane = ErrorPane(
+      message: widget.messageOf(error),
       onRetry: widget.onRetry,
       retryKey: widget.retryKey,
     );
