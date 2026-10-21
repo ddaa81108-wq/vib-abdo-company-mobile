@@ -131,6 +131,14 @@ class FakeApiClient implements ApiClient {
   /// Collections day close. The next batch id is a stored successor.
   Map<String, dynamic>? _batchState;
 
+  /// Masraweya day after a successful PUT. Null until the first save.
+  ///
+  /// Submitted inputs replace the stored day. `workTotalUnits`,
+  /// `remainingUnits`, and `historicalAdjustmentUnits` stay as last stored
+  /// by the server fixture: this repo does not confirm a formula for them,
+  /// and the fake does not invent one.
+  Map<String, dynamic>? _masraweyaDay;
+
   /// Posted lines added by a direct partial payment. Keyed by section.
   final Map<String, List<Map<String, dynamic>>> _extraLedger = {};
   static const _err = ErrorMapper();
@@ -453,10 +461,11 @@ class FakeApiClient implements ApiClient {
       case 'masraweya':
         if (method == 'GET') {
           _requireRead(SectionKey.masraweya);
-        } else {
-          _requireWrite(SectionKey.masraweya);
+          return _ok(_masraweyaView());
         }
-        return _ok(FakeFixtures.masraweyaDay());
+        _requireWrite(SectionKey.masraweya);
+        if (method == 'PUT') return _saveMasraweyaDay(b);
+        return _ok(_masraweyaView());
       case 'purchases':
         if (method == 'GET') {
           _requireRead(SectionKey.purchases);
@@ -1052,6 +1061,41 @@ class FakeApiClient implements ApiClient {
       'version': day['version'],
       'status': open ? 'correction' : 'finalized',
     });
+  }
+
+  Map<String, dynamic> _masraweyaView() =>
+      _copy(_masraweyaDay ?? FakeFixtures.masraweyaDay());
+
+  /// Persists the submitted day. Version, idempotency, and the permission
+  /// check are the caller's: [_mutate] stores the first success for
+  /// `requestId`, and the route calls [_requireWrite] before this method.
+  /// A mismatched `expectedVersion` is 409 and does not change the stored day.
+  ApiResponse _saveMasraweyaDay(Map b) {
+    final current = _masraweyaView();
+    _requireVersion(b['expectedVersion'], current['version']);
+    final version = current['version'];
+    if (version is! int) {
+      _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
+    }
+    final next = _copy(current);
+    next['version'] = version + 1;
+    final businessDate = b['businessDate'];
+    if (businessDate != null) next['businessDate'] = '$businessDate';
+    if (b.containsKey('previousValueUnits')) {
+      next['previousValueUnits'] = b['previousValueUnits'];
+    }
+    if (b.containsKey('purchasesUnits')) {
+      next['purchasesUnits'] = b['purchasesUnits'];
+    }
+    final entries = b['entries'];
+    if (entries is List) {
+      next['entries'] = [
+        for (final raw in entries)
+          if (raw is Map) Map<String, dynamic>.from(raw),
+      ];
+    }
+    _masraweyaDay = next;
+    return _ok(next);
   }
 
   ApiResponse _applyFinalize(String book, Map b) {
