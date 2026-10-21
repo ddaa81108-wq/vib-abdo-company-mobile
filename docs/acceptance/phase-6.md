@@ -35,7 +35,7 @@
 
 طريقة التحقق واحدة من ثلاث: اختبار وحدة أو ودجت على Fake، أو مصفوفة محاكٍ في CI، أو جهاز حقيقي أو staging. ما لا يُغلق إلا بالجهاز أو staging معلَّم في الحالة وفي الجدول أسفل الخطة.
 
-الحكم الآن لكل معيار في جدول «من المعيار إلى الحكم»، ثم في إعادة اختبار فرع الصينية. المرحلة لم تُوقَّع. «غير مبني بعد» ليس عيبًا. DEF-017 فُتح على `82e0e8c` وأُغلق على `cc1bc83` على الفرع وليس على `main`. التالي الحر DEF-018.
+الحكم الآن لكل معيار في جدول «من المعيار إلى الحكم»، ثم في إعادة اختبار فرع الصينية. المرحلة لم تُوقَّع. «غير مبني بعد» ليس عيبًا. DEF-017 فُتح على `82e0e8c` وأُغلق على `cc1bc83` وما زال مغلقًا على #46 `f6fa327`، على الفرع وليس على `main`. تعليم القراءة عند `forbidden` لنفس المستخدم خيار لمدير المشروع وليس عيبًا. التالي الحر DEF-018.
 
 ---
 
@@ -1017,19 +1017,103 @@ DEF-017 مفتوح وغير مانع على هذا الرأس. التالي ال
 
 ---
 
+## إعادة اختبار #46 على `f6fa327`
+
+التاريخ 2026-10-21. الطلب [#46](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/46) على `cursor/phase6-system-tray-bg-poll` عند `f6fa327bc60e747804356c25ec1dd5b7179be0ae`. أبوه دمج `origin/main` `046708c` ثم «Mark the current user's forbidden notification read». لم يُدفع إلى فرع الطلب، ولم يُدمج إلى `main`، ولم يُمس كود الإنتاج. التوثيق على #12 فقط. المرحلة لم تُوقَّع.
+
+### البوابة وCI
+
+Flutter 3.47.7 / Dart 3.13.5. `bash tool/check.sh` على checkout مطابق لـ `f6fa327` خرج **0**. الادعاء يطابق التشغيل.
+
+| المجموعة | المدّعى | الفعلي |
+|---|---|---|
+| التطبيق | 358/0 | **358/0** |
+| الحزمة | 150/0 | **150/0** |
+| `--tags permissions-negative` التطبيق | 27 | **27/0** |
+| `--tags permissions-negative` الحزمة | 23 | **23/0** |
+
+فحوص CI على الرأس نفسه، التشغيل `39688260852`، كلها SUCCESS: Analyze, test, and debug APK؛ Negative permission tests؛ Release build rejects fake API.
+
+### الفرق منذ `cc1bc83`
+
+- `packages/api_layer/lib/data/fake/fake_api_client.dart` يبقي `failNextAuthenticatedStatus`. 419 ما زال `PAGE_EXPIRED` ويُنهي الجلسة وليس CSRF. الفرق عن `main` `046708c` إضافة هذا الخطاف و`failNextNotificationListStatus` وإعادة لف سطر `lastWireBody`. لا حذف لسلوك `main`.
+- `lib/notifications/realtime_lifecycle.dart` يطابق `main` بلا فرق. سطرا `invalidate(unreadNotificationsCountProvider)` اللذان كانا على `cc1bc83` غير موجودين.
+- `a failed GET or a 404 shows no name, and a 401 shows nothing` صار على المتحكّم الحقيقي: `_realPush` يقرأ `systemTrayPresenterProvider` ويضبط `failNextNotificationListStatus`. ليس `reload` محقونًا. 503 صينية بلا اسم وبلا `900`، و404 لا شيء، و401 `sessionEnded` مع `session_expired`.
+
+### الفتاحة: ممنوع لنفس المستخدم يُعلَّم، ومستلم آخر لا يُعلَّم
+
+اختبار المؤلف `permission forbidden marks the current user read, a different recipient does not` في `test/notification_opener_test.dart` على `notificationOpenerProvider` الحقيقي. صف `n-own` لمستخدم `u_12` وقسم `companies`: النتيجة `forbidden`، والمسار `/forbidden`، و`readAt` غير فارغ، والعدد 2→1، و`notificationMutationApplies` يزيد 1. صف `88` لمستخدم `u_20` لا يزيد الكتابة ولا العدد.
+
+المسبار المحلي غير المدفوع `test/qa_pr46_opener_probe_test.dart`: **3/0**.
+
+| السيناريو | النتيجة |
+|---|---|
+| `needsLogin` قبل الدخول | `needsLogin`. `notificationMutationApplies` يبقى 0. لا اسم |
+| ممنوع لنفس المستخدم (`companies` / `co_1`) | `/forbidden` والنص «القسم غير مصرح لهذا الحساب». لا شاشة الاستلامات. العدد 2→1 مرة واحدة و`readAt` يُضبط. النقرة الثانية تبقى على `/forbidden` والعدد يبقى 1. الكتابة الثانية تُرسل لأن محاولة القراءة المنتهية تُسقط معرّفها، والصف مقروء فلا ينقص العدد مرة أخرى |
+| حمولة مستخدم آخر `u_20` ومرجع `collection` يستطيع الموظف فتحه | `forbidden` ثم `/forbidden`، لا `/collections`، ولا الاسم `اسم_أجنبي_لا_يظهر`، والكتابة لا تزيد، والعدد لا يتغير، والصف غير موجود في قائمة الموظف |
+
+**ملاحظة لمدير المشروع، وليست عيبًا:** تعليم قراءة صف المستخدم الحالي عندما تكون النتيجة `forbidden` خيار سلوك. الخطة P6-39 تطلب المسار والنص وغياب شاشة القسم. لا تفتح DEF-018.
+
+### تراجع (a)–(f) وسيناريوهات DEF-017
+
+اختبارات المؤلف المعاد تشغيلها **21/0**: `test/system_tray_bg_poll_test.dart` و`test/system_tray_navigation_test.dart` و`test/notification_opener_test.dart` و`test/permissions/system_tray_permission_negative_test.dart`. المسبار المحلي `test/qa_def017_retest_probe_test.dart` **7/0** على المزوّد الموصول. المسباران بقيا في `/tmp` ولم يُنسخا إلى #12.
+
+| الفحص | الحكم |
+|---|---|
+| (a) تبديل الحساب قبل انتهاء GET | Pass. `account change before the GET finishes shows nothing` و`account switch cancels the periodic work` |
+| (b) 401 و419 وGET الفاشل | Pass. 401 و419 `PAGE_EXPIRED` يرجعان `sessionEnded`، بلا صينية، و`session_expired` مرة، والنداء الثاني `loggedOut`، و`onError` الفارغ لا يُستدعى. 419 CSRF يحدّث `/api/auth/csrf` مرة ولا يخرج. 500 صينية بلا اسم وبلا مبلغ. 404 لا شيء. 401 الدخول يبقى `INVALID_CREDENTIALS` ثم «بيانات الدخول غير صحيحة» |
+| (c) النسخة العامة | Pass على الوحدة. `the lock-screen public version has no name and no amount`. الظل المرسوم جهاز |
+| (d) الاستطلاع | Pass مع الملاحظة السابقة: `BACKGROUND_NOTIFICATION_POLL=true` الصريح يشغّل الاستطلاع في release. الجهاز غير مُختبَر |
+| (e) منع التكرار | Pass على Fake. `tray dedup is shared by push, poll, and the worker` و`the unread count does not increase twice for the same id` |
+| (f) الدرزة والفتاحة | Pass. المزوّد `OpenerNotificationSeam`. `needsLogin` لا يعلّم. `forbidden` لنفس المستخدم صار يعلّم، وهذا تغيّر عن `82e0e8c` وهو الملاحظة أعلاه |
+
+DEF-017 يبقى **Verified closed** على هذا الرأس، وليس على `main`.
+
+### الحالات
+
+| الحالة | الحكم على هذا الرأس | ما زال جهازًا أو staging |
+|---|---|---|
+| P6-02 | Partially على Fake. لم يتغير عن `cc1bc83` | الظل المرسوم |
+| P6-04 | Partially على الوحدة. استطلاع فقط، ومطفأ في الإصدار ما لم يُمرَّر المعرّف | الخلفية الحقيقية. المعيار (2) فجوة |
+| P6-06 | Not covered | نعم. المعيار (3) فجوة |
+| P6-07 | Partially داخل العملية | فتح عملية مقتولة |
+| P6-08 | Partially. العنوان `systemName` | الظل المرسوم |
+| P6-09 | Partially. القناة `vib_collections_alerts` والنص العام `إشعار جديد` | إعدادات النظام |
+| P6-23 | Pass على Fake للعدد والصينية داخل الاختبار | تكرار الظل على الجهاز |
+| P6-34 | Pass على Fake. لا اسم إن تغيّر المستخدم قبل GET | نقر الظل الحقيقي |
+| P6-35 | Pass على Fake. مستلم آخر لا يُعلَّم ولا يفتح المحتوى ولا يسرّب الاسم. المسار `/forbidden` | تسليم الجهاز |
+| P6-36 | Pass على Fake داخل العملية. `needsLogin` لا يعلّم | الظل بعد موت العملية |
+| P6-39 | Pass على Fake للمسار والنص «القسم غير مصرح لهذا الحساب» وغياب شاشة القسم. تعليم القراءة لنفس المستخدم خيار مدير المشروع المذكور أعلاه | لا، لهذا المسار على Fake |
+
+المعياران (2) و(3) والمعيار (12) فجوات جهاز أو staging. FCM غير مستخدم.
+
+### الدمج في `main`
+
+`046708c` سلف لـ `f6fa327`. `git merge-tree origin/main f6fa327` بلا تعارض، وشجرة الناتج `f6b1e2f` هي شجرة `f6fa327` نفسها. `check.sh` أعلاه هو نتيجة الدمج. لا تعارض جديد في `fake_api_client.dart` ولا `notification_transport_host.dart` لأن `main` داخل الفرع.
+
+### فرع التوصيل، تقرير فقط
+
+`origin/cursor/notifications-wiring-e77f` موجود عند `477363e` «Register the device when notification permission changes». قاعدة الدمج مع #46 هي `82e0e8c`. الفرع لا يحتوي `cc1bc83` ولا `f6fa327`. فتاحته لا تعلّم عند `forbidden`، و`presentPush` فيها يستدعي `acceptPush` خارج `try`. دمجه مع `main` الحالي يتعارض في `lib/app.dart` و`notification_open_seam.dart` و`notifications_screen.dart` و`pubspec.yaml` و`test/qa_round_test.dart` و`test/support/pump_app.dart`. لم يُدمج.
+
+### الحكم
+
+**نعم مع ملاحظات.** verified on #46 `f6fa327`, not on main. لا عيب جديد. DEF-017 يبقى مغلقًا على الفرع وليس على `main`. التالي الحر DEF-018. تعليم القراءة عند المنع خيار لمدير المشروع. (2) و(3) و(12) فجوات. المرحلة لم تُوقَّع.
+
+---
+
 ## توقيع قبول المرحلة 6
 
 | الحقل | القيمة |
 |---|---|
 | رقم المرحلة | 6 |
 | النطاق المُسلَّم | خطة إشعارات، 40 حالة، على `main` `8a52160`. لا تنفيذ جديد |
-| نتيجة كل معيار | لقطة الخطة في جدول «من المعيار إلى الحكم». لقطة الطلبات الخمسة في جدول التغطية. إعادة اختبار فرع الصينية `82e0e8c` تحدّث (2) و(3) و(12): (2) وحدة استطلاع فقط وما زال فجوة جهاز، (3) ما زال فجوة، (12) ما زال فجوة من الإذن إلى التسجيل. المرحلة لم تُوقَّع |
+| نتيجة كل معيار | لقطة الخطة في جدول «من المعيار إلى الحكم». لقطة الطلبات الخمسة في جدول التغطية. إعادة اختبار فرع الصينية `82e0e8c` ثم `cc1bc83` ثم #46 `f6fa327` تحدّث (2) و(3) و(12): (2) وحدة استطلاع فقط وما زال فجوة جهاز، (3) ما زال فجوة، (12) ما زال فجوة من الإذن إلى التسجيل. المرحلة لم تُوقَّع |
 | الاسم | وكيل القبول الآلي لهذه الجولة (بلا اسم شخص) |
 | الدور | مهندس قبول |
 | التاريخ | 2026-10-21 |
 | القرار | لم يُوقَّع |
-| العيوب المانعة المفتوحة | لا عيب مانع جديد. DEF-017 أُغلق على فرع الصينية `cc1bc83` وليس على `main` |
-| ملاحظات | إعادة اختبار `cursor/phase6-system-tray-bg-poll` عند `cc1bc83`: نعم مع ملاحظات. DEF-017 مغلق على الفرع. (2) و(3) و(12) فجوات جهاز أو staging. المرحلة لم تُوقَّع. القرار عند التوقيع أحد: مقبول / مقبول بشروط / مرفوض. التوقيع الإداري في الجدول التالي فارغ |
+| العيوب المانعة المفتوحة | لا عيب مانع جديد. DEF-017 مغلق على فرع الصينية حتى #46 `f6fa327` وليس على `main`. لم يُفتح DEF-018 |
+| ملاحظات | إعادة اختبار #46 عند `f6fa327`: نعم مع ملاحظات. تعليم القراءة عند `forbidden` لنفس المستخدم خيار لمدير المشروع. (2) و(3) و(12) فجوات جهاز أو staging. المرحلة لم تُوقَّع. القرار عند التوقيع أحد: مقبول / مقبول بشروط / مرفوض. التوقيع الإداري في الجدول التالي فارغ |
 
 توقيع الإدارة:
 
