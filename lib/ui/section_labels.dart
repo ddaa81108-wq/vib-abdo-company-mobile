@@ -30,6 +30,19 @@ IconData sectionIcon(SectionKey section) => switch (section) {
 
 String sectionPath(SectionKey section) => '/${section.key}';
 
+/// Route for «عرض الكل» on the bulletin that belongs to [section].
+///
+/// Null when the section is unknown or the user cannot read it. The control
+/// stays hidden in that case (DEF-010), including the collapsed phone tile.
+String? homeShowAllPath(String section, PermissionService permissions) {
+  for (final key in SectionKey.values) {
+    if (key.key != section) continue;
+    if (!permissions.canRead(key)) return null;
+    return sectionPath(key);
+  }
+  return null;
+}
+
 /// Route for a notification. Card sections open the entity when an id is present.
 String? notificationPath(String? section, String? entityId) {
   if (section == null || section.isEmpty) return null;

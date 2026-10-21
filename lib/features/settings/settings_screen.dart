@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
@@ -10,6 +11,42 @@ import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/export_pdf_button.dart';
+import '../../ui/widgets/soft_tile.dart';
+
+class _AdminLink {
+  const _AdminLink({
+    required this.tileKey,
+    required this.title,
+    required this.path,
+    required this.icon,
+  });
+
+  final Key tileKey;
+  final String title;
+  final String path;
+  final IconData icon;
+}
+
+const _adminLinks = <_AdminLink>[
+  _AdminLink(
+    tileKey: Key('settings-link-employees'),
+    title: AppStrings.employeesTile,
+    path: '/settings/employees',
+    icon: Icons.groups_outlined,
+  ),
+  _AdminLink(
+    tileKey: Key('settings-link-audit'),
+    title: AppStrings.auditTile,
+    path: '/settings/audit',
+    icon: Icons.fact_check_outlined,
+  ),
+  _AdminLink(
+    tileKey: Key('settings-link-operations'),
+    title: AppStrings.operationsTile,
+    path: '/settings/operations',
+    icon: Icons.monitor_heart_outlined,
+  ),
+];
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -22,41 +59,43 @@ class SettingsScreen extends ConsumerWidget {
     final manage = permissions.canDo(ManagementAction.settingsManage);
     final ledger = permissions.canViewFinancialLedger;
     if (!manage && !ledger) return const ForbiddenPane();
+    final width = MediaQuery.sizeOf(context).width;
     return ListView(
       key: screenKey,
-      padding: pagePadding(MediaQuery.sizeOf(context).width),
+      padding: pagePadding(width),
       children: [
         const ScreenTitle(AppStrings.settings),
         const SizedBox(height: AppSpacing.md),
-        if (manage) ...[
-          _Tile(title: AppStrings.employeesTile, body: AppStrings.unavailable),
-          _Tile(title: AppStrings.auditTile, body: AppStrings.unavailable),
-          _Tile(title: AppStrings.operationsTile, body: AppStrings.unavailable),
-        ],
+        if (manage)
+          for (final link in _adminLinks)
+            Card(
+              margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
+              clipBehavior: Clip.antiAlias,
+              child: SoftTile(
+                key: link.tileKey,
+                leading: Icon(link.icon),
+                title: link.title,
+                trailing: forwardChevron(context),
+                onTap: () => context.go(link.path),
+              ),
+            ),
         if (ledger) const _LedgerTile(),
         const SizedBox(height: AppSpacing.lg),
-        Text(AppStrings.noLanguage, style: Theme.of(context).textTheme.bodySmall),
+        Text(
+          AppStrings.noLanguage,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
       ],
     );
   }
 }
 
-class _Tile extends StatelessWidget {
-  const _Tile({required this.title, required this.body});
-
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
-      child: ListTile(
-        title: Text(title),
-        subtitle: Text(body),
-      ),
-    );
-  }
+/// Page total as an Arabic currency label. The server key (`LYD`, `EGP`) is
+/// not shown beside the symbol.
+String _ledgerTotal(MoneyFormatter money, String code, int units) {
+  final currency = Currency.fromCode(code);
+  if (currency == null) return money.formatNumber(units);
+  return money.formatOrDash(units, currency);
 }
 
 class _LedgerTile extends ConsumerWidget {
@@ -69,6 +108,8 @@ class _LedgerTile extends ConsumerWidget {
     }
     final page = ref.watch(financialLedgerProvider);
     final money = ref.watch(apiLayerProvider).money;
+    final online = ref.watch(onlineProvider);
+    final theme = Theme.of(context);
     return Card(
       key: const Key('financial-ledger'),
       child: Padding(
@@ -76,13 +117,18 @@ class _LedgerTile extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(AppStrings.financialLedger, style: Theme.of(context).textTheme.titleSmall),
+            Text(AppStrings.financialLedger, style: theme.textTheme.titleSmall),
             const ExportPdfButton(),
             page.when(
               loading: () => const SkeletonBox(height: 48),
               error: (error, _) => ErrorPane(
-                message: ref.read(errorHandlerProvider).toFailure(error).message,
-                onRetry: () => ref.invalidate(financialLedgerProvider),
+                message: ref
+                    .read(errorHandlerProvider)
+                    .toFailure(error)
+                    .message,
+                onRetry: online
+                    ? () => ref.invalidate(financialLedgerProvider)
+                    : null,
                 retryKey: const Key('settings-retry'),
               ),
               data: (data) => Column(
@@ -90,10 +136,17 @@ class _LedgerTile extends ConsumerWidget {
                 children: [
                   Text(AppStrings.pageTotals),
                   for (final entry in data.pageTotals.entries)
-                    Text(
-                      '${entry.key} ${money.formatOrDash(entry.value, Currency.fromCode(entry.key) ?? Currency.lyd)}',
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(
+                        top: AppSpacing.xs,
+                      ),
+                      child: Text(
+                        _ledgerTotal(money, entry.key, entry.value),
+                        key: Key('ledger-total-${entry.key}'),
+                      ),
                     ),
-                  if (data.page.items.isEmpty) const Text(AppStrings.emptyLedger),
+                  if (data.page.items.isEmpty)
+                    const EmptyPane(message: AppStrings.emptyLedger),
                 ],
               ),
             ),

@@ -68,6 +68,27 @@ void main() {
     expect(permissionRedirect('/collections', permissions), isNull);
     expect(permissionRedirect('/notifications', permissions), isNull);
     expect(permissionRedirect('/settings', permissions), '/');
+    expect(permissionRedirect('/settings/employees', permissions), '/');
+    expect(permissionRedirect('/settings/audit', permissions), '/');
+    expect(permissionRedirect('/settings/operations', permissions), '/');
+  });
+
+  test('settings.manage can open the empty admin routes', () {
+    final permissions = PermissionService()
+      ..applyFromServer(const ['settings.manage'], role: 'admin');
+    expect(permissionRedirect('/settings', permissions), isNull);
+    expect(permissionRedirect('/settings/employees', permissions), isNull);
+    expect(permissionRedirect('/settings/audit', permissions), isNull);
+    expect(permissionRedirect('/settings/operations', permissions), isNull);
+  });
+
+  test('full access opens settings and the admin routes', () {
+    final permissions = PermissionService()
+      ..applyFromServer(const [], role: 'admin');
+    expect(permissions.canViewFinancialLedger, isTrue);
+    expect(permissions.canDo(ManagementAction.settingsManage), isTrue);
+    expect(permissionRedirect('/settings', permissions), isNull);
+    expect(permissionRedirect('/settings/employees', permissions), isNull);
   });
 
   test('signed-out users can read the signup notice', () {

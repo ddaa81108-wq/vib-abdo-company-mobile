@@ -623,9 +623,13 @@ Future<void> pumpScaled(
   double textScale = 1.3,
   List<Override> overrides = const [],
 }) async {
-  tester.platformDispatcher.textScaleFactorTestValue = textScale;
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-  await pumpFakeApp(tester, size: size, overrides: overrides);
+  await pumpFakeApp(
+    tester,
+    size: size,
+    textScale: textScale,
+    overrides: overrides,
+  );
 }
 
 ThemeData themeOf(WidgetTester tester) {

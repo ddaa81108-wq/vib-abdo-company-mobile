@@ -298,9 +298,8 @@ void main() {
 }
 
 Future<void> pumpScaled(WidgetTester tester, Size size, double scale) async {
-  tester.platformDispatcher.textScaleFactorTestValue = scale;
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-  await pumpFakeApp(tester, size: size);
+  await pumpFakeApp(tester, size: size, textScale: scale);
 }
 
 ThemeData themeOf(WidgetTester tester) {
