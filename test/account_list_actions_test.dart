@@ -235,6 +235,17 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('account-filter-pinned')));
       await settle(tester);
 
+      // Ten cards make the phone list taller than the viewport, so opening
+      // the filter scrolls the bulletin away and its tile builds collapsed.
+      await tester.ensureVisible(
+        find.text(AppStrings.oldDebtsTitle, skipOffstage: false),
+      );
+      await settle(tester);
+      if (find.byKey(const Key('show-all-debts')).evaluate().isEmpty) {
+        await tester.tap(find.text(AppStrings.oldDebtsTitle));
+        await settle(tester);
+      }
+
       final before = fake.accountListQueries.length;
       await tester.ensureVisible(find.byKey(const Key('show-all-debts')));
       await tester.tap(find.byKey(const Key('show-all-debts')));
