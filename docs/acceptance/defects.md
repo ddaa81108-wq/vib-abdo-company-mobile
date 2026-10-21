@@ -13,7 +13,7 @@
 
 | التصنيف | المعرّفات |
 |---|---|
-| Pending PM decision | DEF-002. على `main` عند `451ec58` السلوك لم يتغير، والعيب لم يُغلق |
+| Pending PM decision | DEF-002. على `main` عند `451ec58` السلوك لم يتغير. أُعيد على #34 و#35 في 2026-10-21 وبقي Pending PM decision |
 | Blocking مفتوح على `main` | لا يبقى عيب مانع من DEF-013 أو DEF-014. هما verified on main 451ec58 |
 | Non-blocking مفتوح | DEF-010، DEF-012. DEF-012 ما زال Fail على `main` لأن #27 لم يُدمج |
 | verified on main 451ec58 | DEF-001، DEF-003، DEF-004، DEF-005، DEF-006، DEF-013، DEF-014، DEF-015، DEF-016 |
@@ -66,7 +66,7 @@
 | المرحلة | 3 |
 | الشدة | عالية |
 | التصنيف الأصلي | Blocking |
-| الحالة بعد إعادة الاختبار | Pending PM decision. الاتساق تحقق على #24 ولم يُغلق العيب |
+| الحالة بعد إعادة الاختبار | Pending PM decision. الاتساق تحقق على #24، وأُعيد على #34 و#35 في 2026-10-21، ولم يُغلق العيب |
 | الملفات | `packages/api_layer/lib/data/fake/fake_api_client.dart`؛ `lib/features/collections/collections_screen.dart` |
 
 **خطوات الإعادة**
@@ -94,6 +94,8 @@
 **إعادة الاختبار على `main` (2026-10-21، `dff1456`):** اختبار `DEF-002 limited admin has collections.decide and the server accepts it` ناجح ضمن 74. الإداري المحدود ما زال `canDo(collections.decide)` والاعتماد يخزّن `approved` والإصدار 2. الموظف ما زال بلا الصلاحية والاعتماد 403. السلوك لم يتغير. الحالة تبقى **Pending PM decision**. لم يُغلق.
 
 **على `main` (`451ec58`):** الاختبار نفسه ناجح ضمن 87. الحالة تبقى **Pending PM decision**.
+
+**على #34 (`5f530c3`) و#35 (`4a93595`)، 2026-10-21:** الإداري المحدود ما زال `canDo(collections.decide)`. على #35 اعتماد `sb_1` يعيد 200، و`approve-sb_1` و`reject-sb_1` ظاهران، ولوحة الإجماليات تضم `u_12` و`u_20`. مسار الإجماليات الجديد في #34 يرفضه بـ 403، وهذا باب آخر غير `collections.decide`. الحالة تبقى **Pending PM decision**. لم يُغلق. verified on #34 `5f530c377b89197982b1ae840e87f0b1ff6f567b` and #35 `4a93595d7d0783ef70637b4db82eeea70f8db554`, not on main.
 
 ---
 
