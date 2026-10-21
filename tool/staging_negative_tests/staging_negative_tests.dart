@@ -376,6 +376,71 @@ List<CaseResult> _selfTest() {
     }
     if (!xml.contains('skipped="1"')) throw StateError('skip not counted');
   });
+  check('short ids match owner fields exactly', () {
+    final other = _Session(
+      'cookie',
+      'csrf',
+      'u_20',
+      'موظف آخر',
+      employeeId: 'e_20',
+    );
+    String payload(Object value) => jsonEncode(value);
+    void expectLeak(Object value, String label) {
+      if (!_leaks(payload(value), other)) {
+        throw StateError('$label was missed');
+      }
+    }
+
+    void expectClean(Object value, String label) {
+      if (_leaks(payload(value), other)) {
+        throw StateError('$label was treated as a leak');
+      }
+    }
+
+    expectLeak({
+      'data': {
+        'employeeTotals': [
+          {'userId': 'u_20', 'employeeName': 'x'},
+        ],
+      },
+    }, 'employeeTotals userId u_20');
+    expectLeak({
+      'employeeTotals': [
+        {'employeeId': 'e_20'},
+      ],
+    }, 'employeeTotals employeeId');
+    expectLeak({
+      'assignments': [
+        {'assigneeUserId': 'u_20'},
+      ],
+    }, 'assigneeUserId');
+    expectLeak({
+      'submissions': [
+        {'submittedByUserId': 'u_20'},
+      ],
+    }, 'submittedByUserId');
+    expectLeak({
+      'employees': [
+        {'userId': 'u_20'},
+      ],
+    }, 'payroll userId');
+    expectLeak({
+      'entries': [
+        {'employeeUserId': 'e_20'},
+      ],
+    }, 'employeeUserId');
+    expectClean({
+      'employeeTotals': [
+        {'userId': 'u_3', 'note': 'u_20 appears only in text'},
+      ],
+      'message': 'hello u_20',
+    }, 'prose mention of u_20');
+    expectClean({
+      'employeeTotals': [
+        {'userId': 'u_200'},
+      ],
+    }, 'longer id u_200');
+  });
   return results;
 }
 
@@ -526,8 +591,9 @@ Future<CaseResult> _foreignIds(HttpClient http, StagingConfig config) async {
       );
     }
     // Whether the server must omit employeeTotals for an employee is an
-    // open question for Ali. A present array is not a failure. A name or
-    // user id from employee 2 still fails through _leaks above.
+    // open question for Ali. A present array is not a failure. An owner
+    // field equal to employee 2's userId or employeeId still fails
+    // through _leaks above, including ids shorter than 8 characters.
     if (ids.isEmpty) {
       return CaseResult(
         name,
@@ -707,11 +773,29 @@ Future<CaseResult> _limitedManager(
 }
 
 class _Session {
-  _Session(this.cookie, this.csrf, this.userId, this.displayName);
+  _Session(
+    this.cookie,
+    this.csrf,
+    this.userId,
+    this.displayName, {
+    this.employeeId = '',
+    Set<String>? identityIds,
+  }) : identityIds = identityIds ?? _identityFrom(userId, employeeId);
+
   final String cookie;
   final String csrf;
   final String userId;
   final String displayName;
+  final String employeeId;
+
+  /// Exact ids compared with row owner fields. Includes [userId] and
+  /// [employeeId] when the login payload sent both.
+  final Set<String> identityIds;
+
+  static Set<String> _identityFrom(String userId, String employeeId) => {
+    if (userId.isNotEmpty) userId,
+    if (employeeId.isNotEmpty) employeeId,
+  };
 }
 
 class _IdRef {
@@ -771,9 +855,28 @@ Future<_Session> _login(
   if (csrf.isEmpty) {
     throw _ProbeProblem('login response had no csrfToken');
   }
-  final id = user['id'] ?? user['userId'];
+  final identityIds = {
+    for (final key in const ['id', 'userId', 'employeeId'])
+      _scalarId(user[key]),
+  }..remove('');
+  final userId = _scalarId(user['userId'] ?? user['id']);
+  final employeeId = _scalarId(user['employeeId']);
   final name = user['displayName'] ?? user['name'] ?? user['username'];
-  return _Session(cookie, csrf, '$id', '$name');
+  return _Session(
+    cookie,
+    csrf,
+    userId,
+    name is String ? name : '',
+    employeeId: employeeId,
+    identityIds: identityIds,
+  );
+}
+
+String _scalarId(Object? value) {
+  if (value == null || value is Map || value is List) return '';
+  final text = value.toString().trim();
+  if (text.isEmpty || text == 'null') return '';
+  return text;
 }
 
 Future<ProbeResult> _send(
@@ -908,11 +1011,44 @@ List<_IdRef> _ids(String body) {
   ];
 }
 
+const _ownerFields = {
+  'userId',
+  'employeeId',
+  'assigneeUserId',
+  'submittedByUserId',
+  'recipientUserId',
+  'employeeUserId',
+};
+
+/// True when a structured owner field equals the other employee's user id
+/// or employee id. A short id such as `u_20` matches. Text that only
+/// mentions the id does not.
 bool _leaks(String body, _Session other) {
-  if (other.displayName.length >= 3 && body.contains(other.displayName)) {
-    return true;
+  if (other.identityIds.isEmpty) return false;
+  Object? decoded;
+  try {
+    decoded = jsonDecode(body);
+  } on FormatException {
+    return false;
   }
-  if (other.userId.length >= 8 && body.contains(other.userId)) return true;
+  return _ownerMatches(decoded, other.identityIds);
+}
+
+bool _ownerMatches(Object? node, Set<String> ids) {
+  if (node is Map) {
+    for (final field in _ownerFields) {
+      if (!node.containsKey(field)) continue;
+      final text = _scalarId(node[field]);
+      if (text.isNotEmpty && ids.contains(text)) return true;
+    }
+    for (final value in node.values) {
+      if (_ownerMatches(value, ids)) return true;
+    }
+  } else if (node is List) {
+    for (final value in node) {
+      if (_ownerMatches(value, ids)) return true;
+    }
+  }
   return false;
 }
 
