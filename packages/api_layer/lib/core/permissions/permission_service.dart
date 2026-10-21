@@ -129,6 +129,11 @@ class PermissionService extends ChangeNotifier {
   /// per API contract. No permission code opens it.
   bool get canViewFinancialLedger => _fullAccess;
 
+  /// 🔶 Admin employee-totals dashboard. FULL ACCESS ONLY until DEF-002 decides
+  /// whether a limited admin may open it. No permission code opens it, and
+  /// there is no `employeeId` scope for an employee. Same gate as full access.
+  bool get canViewEmployeeTotals => _fullAccess;
+
   /// PDF export — FULL ACCESS ONLY, per API contract.
   bool get canExportPdf => _fullAccess;
 

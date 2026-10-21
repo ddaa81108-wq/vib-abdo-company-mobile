@@ -60,6 +60,15 @@ class ErrorHandler {
   }
 }
 
+/// Riverpod retry for provider failures.
+///
+/// A FORBIDDEN result is not retried. Every other error keeps
+/// [ProviderContainer.defaultRetry].
+Duration? retryUnlessForbidden(int retryCount, Object error) {
+  if (const ErrorHandler().toFailure(error).isForbidden) return null;
+  return ProviderContainer.defaultRetry(retryCount, error);
+}
+
 final errorHandlerProvider = Provider<ErrorHandler>(
   (ref) => const ErrorHandler(),
 );

@@ -13,6 +13,7 @@ import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
+import 'package:vib_abdo_company_mobile/ui/widgets/logout_confirm.dart';
 
 import '../support/pump_app.dart';
 
@@ -53,8 +54,7 @@ void main() {
             .state =
         'secret-admin';
 
-    await tester.tap(find.byKey(HomeShell.logoutKey));
-    await settle(tester);
+    await confirmLogout(tester);
 
     expect(find.byKey(LoginScreen.submitKey), findsOneWidget);
     expect(find.text(AppStrings.sessionExpired), findsNothing);
@@ -91,8 +91,7 @@ void main() {
             .state =
         'secret-admin';
 
-    await tester.tap(find.byKey(HomeShell.logoutKey));
-    await settle(tester);
+    await confirmLogout(tester);
     await signIn(tester, username: 'guest.demo', password: 'demo-only');
 
     expect(find.text('دور غير معروف'), findsOneWidget);
@@ -157,6 +156,17 @@ void main() {
       expect(fake.mutationRequestIds, [requestId, requestId]);
     },
   );
+}
+
+/// #36 asks before logout. Cancel is not this path: the confirm button
+/// is what ends the session.
+Future<void> confirmLogout(WidgetTester tester) async {
+  await tester.tap(find.byKey(HomeShell.logoutKey));
+  await tester.pump();
+  expect(find.byKey(LogoutConfirmDialog.dialogKey), findsOneWidget);
+  expect(find.text(AppStrings.logoutConfirm), findsOneWidget);
+  await tester.tap(find.byKey(LogoutConfirmDialog.confirmKey));
+  await settle(tester);
 }
 
 Future<void> enterAmount(WidgetTester tester, String value) async {

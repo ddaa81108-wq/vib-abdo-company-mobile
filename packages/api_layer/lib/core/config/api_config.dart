@@ -7,6 +7,20 @@ enum AuthStrategyKind {
   bearerToken,
 }
 
+/// 🔶 Which body `EmployeeTotalsRepository` reads. The provider never branches
+/// on this. `docs/api-contract-gaps.md` is not in this repo; item 14 names the
+/// collections array and is still unconfirmed, as is `/api/admin/employee-totals`.
+///
+/// `--dart-define=EMPLOYEE_TOTALS_SOURCE=collections` selects the collections
+/// array. Any other value, including empty, stays on the standalone endpoint.
+enum EmployeeTotalsSource {
+  /// GET /api/admin/employee-totals (proposed; no `/api/admin` prefix is confirmed).
+  standalone,
+
+  /// `employeeTotals` inside GET /api/collections (contract gap 14, unconfirmed).
+  collections,
+}
+
 /// How rate/factor values (`DecimalString`) are encoded ON THE WIRE only.
 /// Inside the app they are always decimal text with no operations.
 enum RateWireFormat {
@@ -39,6 +53,7 @@ class ApiConfig {
     this.pollingInterval = const Duration(seconds: 4),
     this.moneyUnitScale = 0,
     this.rateWireFormat = RateWireFormat.number,
+    this.employeeTotalsSource = EmployeeTotalsSource.standalone,
   });
 
   /// Origin only, e.g. https://host — paths in ApiEndpoints already start with /api.
@@ -60,6 +75,11 @@ class ApiConfig {
   /// Wire encoding for DecimalString values in request bodies (serialization layer only).
   final RateWireFormat rateWireFormat;
 
+  /// 🔶 Source for the admin employee-totals dashboard. See [EmployeeTotalsSource].
+  /// Changing this is the only switch when the server confirms a body. The
+  /// provider and the UI call `EmployeeTotalsRepository.fetch` either way.
+  final EmployeeTotalsSource employeeTotalsSource;
+
   /// Compile-time defines. Fake mode is the default and does not read a host.
   /// Real mode (`USE_FAKE_API=false`) throws [ApiConfigException] when `API_BASE`
   /// is missing or not an origin. The value is never given a placeholder host.
@@ -70,6 +90,7 @@ class ApiConfig {
     const bearer = bool.fromEnvironment('AUTH_BEARER');
     const scale = int.fromEnvironment('MONEY_UNIT_SCALE', defaultValue: 0);
     const rate = String.fromEnvironment('RATE_WIRE_FORMAT');
+    const totals = String.fromEnvironment('EMPLOYEE_TOTALS_SOURCE');
     return ApiConfig.fromDefines(
       useFakeApi: useFakeApi,
       apiBase: apiBase,
@@ -79,6 +100,9 @@ class ApiConfig {
       moneyUnitScale: scale,
       rateWireFormat:
           rate == 'string' ? RateWireFormat.string : RateWireFormat.number,
+      employeeTotalsSource: totals == 'collections'
+          ? EmployeeTotalsSource.collections
+          : EmployeeTotalsSource.standalone,
     );
   }
 
@@ -91,6 +115,7 @@ class ApiConfig {
     AuthStrategyKind authStrategy = AuthStrategyKind.cookieCsrf,
     int moneyUnitScale = 0,
     RateWireFormat rateWireFormat = RateWireFormat.number,
+    EmployeeTotalsSource employeeTotalsSource = EmployeeTotalsSource.standalone,
     Duration connectTimeout = const Duration(seconds: 15),
     Duration receiveTimeout = const Duration(seconds: 30),
     Duration pollingInterval = const Duration(seconds: 4),
@@ -106,6 +131,7 @@ class ApiConfig {
       pollingInterval: pollingInterval,
       moneyUnitScale: moneyUnitScale,
       rateWireFormat: rateWireFormat,
+      employeeTotalsSource: employeeTotalsSource,
     );
   }
 

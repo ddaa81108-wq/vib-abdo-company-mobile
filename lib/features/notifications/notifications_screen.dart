@@ -56,7 +56,8 @@ class NotificationsScreen extends ConsumerWidget {
           retryKey: retryKey,
           onRetry: online ? () => ref.invalidate(notificationsProvider) : null,
           messageOf: (error) =>
-              ref.read(errorHandlerProvider).toFailure(error).message,
+              failureText(ref.read(errorHandlerProvider).toFailure(error)),
+          failureOf: (error) => ref.read(errorHandlerProvider).toFailure(error),
           loading: const SkeletonBox(
             key: Key('notifications-loading'),
             height: 72,
@@ -95,7 +96,7 @@ class NotificationsScreen extends ConsumerWidget {
       await ref.read(apiLayerProvider).notifications.markRead(item.id);
     } catch (error) {
       return (
-        error: ref.read(errorHandlerProvider).toFailure(error).message,
+        error: failureText(ref.read(errorHandlerProvider).toFailure(error)),
         path: null,
       );
     }
@@ -108,11 +109,8 @@ class NotificationsScreen extends ConsumerWidget {
     try {
       await ref.read(apiLayerProvider).notifications.markAllRead();
     } catch (error) {
-      final message = ref.read(errorHandlerProvider).toFailure(error).message;
-      if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(message)));
-      }
+      final failure = ref.read(errorHandlerProvider).toFailure(error);
+      if (context.mounted) showFailureSnackBar(context, failure);
       return;
     }
     ref.invalidate(notificationsProvider);

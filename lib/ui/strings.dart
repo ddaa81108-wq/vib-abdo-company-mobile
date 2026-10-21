@@ -16,6 +16,7 @@ abstract final class AppStrings {
   static const sessionExpired = 'انتهت الجلسة، يرجى تسجيل الدخول';
   static const homeTitle = 'الرئيسية';
   static const logout = 'تسجيل الخروج';
+  static const logoutConfirm = 'هل تريد تسجيل الخروج؟';
   static const signedInAs = 'الحساب';
   static const roleAdmin = 'مدير النظام';
   static const roleEmployee = 'موظف';
@@ -341,4 +342,9 @@ abstract final class AppStrings {
   static const dayTwo = 'يومين';
   static const dayMany = 'يومًا';
   static const clearSearch = 'مسح البحث';
+
+  // Employee totals screen. After the account-list block so those edits merge.
+  static const pendingUnits = 'المبلغ المنتظر';
+  static const rejectedCount = 'عدد المرفوض';
+  static const serverTotals = 'الإجمالي من الخادم';
 }

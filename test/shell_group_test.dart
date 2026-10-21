@@ -4,10 +4,12 @@ import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
+import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notifications_screen.dart';
+import 'package:vib_abdo_company_mobile/features/settings/employee_totals_screen.dart';
 import 'package:vib_abdo_company_mobile/features/splash/splash_screen.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
@@ -294,10 +296,12 @@ void main() {
     await settle(tester);
 
     await go(tester, '/settings');
-    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+    expect(find.byKey(HomeDashboard.screenKey), findsNothing);
     await go(tester, '/settings/employees');
     expect(find.byKey(const Key('screen-settings-employees')), findsNothing);
-    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+    expect(find.byKey(HomeDashboard.screenKey), findsNothing);
     await go(tester, '/account');
     expect(find.byKey(const Key('screen-account')), findsOneWidget);
     expectRtl(tester);
@@ -319,7 +323,8 @@ void main() {
       }
       await go(tester, '/settings/audit');
       expect(find.byKey(const Key('screen-settings-audit')), findsNothing);
-      expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+      expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+      expect(find.byKey(HomeDashboard.screenKey), findsNothing);
     }
   });
 
@@ -354,9 +359,10 @@ void main() {
 
     await tester.tap(find.byKey(const Key('settings-link-employees')));
     await settle(tester);
-    expect(find.byKey(const Key('screen-settings-employees')), findsOneWidget);
-    expect(find.text(AppStrings.employeesEmpty), findsOneWidget);
-    expect(find.byIcon(Icons.groups_outlined), findsOneWidget);
+    expect(find.byKey(EmployeeTotalsScreen.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
+    expect(find.text(AppStrings.employeesEmpty), findsNothing);
+    expect(find.text('موظف استلام تجريبي'), findsNothing);
 
     await go(tester, '/settings/audit');
     expect(find.byKey(const Key('screen-settings-audit')), findsOneWidget);

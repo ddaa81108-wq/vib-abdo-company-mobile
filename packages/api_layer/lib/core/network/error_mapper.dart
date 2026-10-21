@@ -12,7 +12,7 @@ class ErrorMapper {
   /// Codes treated as "session expired" -> forced logout (no refresh flow).
   /// 🔶 Only AUTH_REQUIRED is observed. SESSION_EXPIRED, SESSION_REVOKED, and
   /// PAGE_EXPIRED are defensive. PAGE_EXPIRED is the stand-in for a codeless
-  /// HTTP 419.
+  /// HTTP 419, same as the open staging client (PR #9).
   ///
   /// Status wins after login: any authenticated 401, and any 419 that is not
   /// a CSRF error, is session expiry even when the code is something else.
@@ -94,12 +94,11 @@ class ErrorMapper {
             statusCode: status, correlationId: correlationId);
       }
     }
-    final serverCode = err['code'] is String ? err['code'] as String : null;
+    final code = (err['code'] as String?) ?? _defaultCode(status);
     final serverMessage = _serverMessage(err, body);
-    final code = (serverCode == null || serverCode.isEmpty)
-        ? _defaultCode(status)
-        : serverCode;
-    final message = serverMessage ?? _defaultMessage(status);
+    final message = (serverMessage == null || serverMessage.isEmpty)
+        ? _defaultMessage(status)
+        : serverMessage;
     final details = err['details'] ?? (body is Map ? body['details'] : null);
 
     // CSRF wins over 419. A bare 419 is session expiry, not a token refresh.
@@ -115,10 +114,11 @@ class ErrorMapper {
     // The login call is unauthenticated. Its 401 is rejected credentials,
     // including when the body says AUTH_REQUIRED.
     if (status == 401 && !authenticated) {
+      final serverCode = err['code'];
       return InvalidCredentialsException(
-          code: serverCode == null || serverCode.isEmpty
-              ? 'INVALID_CREDENTIALS'
-              : serverCode,
+          code: serverCode is String && serverCode.isNotEmpty
+              ? serverCode
+              : 'INVALID_CREDENTIALS',
           message: serverMessage == null || serverMessage.isEmpty
               ? invalidCredentialsMessage
               : serverMessage,
