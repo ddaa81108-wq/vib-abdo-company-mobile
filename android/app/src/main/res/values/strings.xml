@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_channel_id" translatable="false">vib_collections_alerts</string>
+    <string name="notification_channel_name">تنبيهات VIB</string>
+    <string name="notification_channel_description">تنبيهات عامة وتنبيهات التحصيل</string>
+</resources>
