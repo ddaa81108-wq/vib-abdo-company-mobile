@@ -3,4 +3,5 @@
 #   flutter test --dart-define=CAPTURE_SCREENSHOTS=true --name screenshots
 tags:
   screenshots:
+  # Included in the default run. Select with --tags permissions-negative.
   permissions-negative:

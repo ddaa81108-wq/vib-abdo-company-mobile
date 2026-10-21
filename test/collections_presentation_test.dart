@@ -8,6 +8,7 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/collections/collections_screen.dart';
+import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
@@ -88,13 +89,15 @@ void main() {
 
     await relog(tester, 'flag.admin.demo');
     await go(tester, '/collections');
-    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+    expect(find.byKey(HomeDashboard.screenKey), findsNothing);
     expect(find.byKey(CollectionsScreen.screenKey), findsNothing);
     expect(find.byKey(const Key('submit-as_1')), findsNothing);
 
     await relog(tester, 'guest.demo');
     await go(tester, '/collections');
-    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+    expect(find.byKey(HomeDashboard.screenKey), findsNothing);
     expect(find.byKey(CollectionsScreen.screenKey), findsNothing);
     expect(find.byKey(const Key('unlinked-collection')), findsNothing);
   });
@@ -447,6 +450,8 @@ Future<void> reveal(WidgetTester tester, Key key) async {
 
 Future<void> relog(WidgetTester tester, String username) async {
   await tester.tap(find.byKey(HomeShell.logoutKey));
+  await settle(tester);
+  await tester.tap(find.byKey(const Key('logout-confirm')));
   await settle(tester);
   await signIn(tester, username: username, password: 'demo-only');
 }

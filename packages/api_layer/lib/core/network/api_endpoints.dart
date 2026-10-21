@@ -85,9 +85,26 @@ class ApiEndpoints {
   static const financialLedger = '/api/financial-ledger';
 
   // Admin (only the parts relevant to a mobile client)
+  /// 🔶 PROPOSED. This repo has no confirmed `/api/admin` prefix.
+  /// GET with optional `from` and `to` (`YYYY-MM-DD`). Full admin only until
+  /// DEF-002. The other unconfirmed source is `employeeTotals` on
+  /// GET /api/collections (contract gap 14). The repository chooses; the
+  /// provider does not. There is no `employeeId` query.
+  static const employeeTotals = '/api/admin/employee-totals';
   static const accountRequests = '/api/account-requests';
   static String accountRequestDecision(String id) =>
       '/api/account-requests/$id/decision';
+
+  /// 🔶 Proposed admin catalogs. The fake rejects an ordinary employee with
+  /// 403. Paths are not confirmed by the server.
+  static const settings = '/api/settings';
+  static const users = '/api/users';
+  static String user(String id) => '/api/users/$id';
+  static const staff = '/api/staff';
+  static const employees = '/api/employees';
+  static const admins = '/api/admins';
+  static const audit = '/api/audit';
+  static const operations = '/api/operations';
 
   // Realtime & notifications
   static const events = '/api/events'; // SSE

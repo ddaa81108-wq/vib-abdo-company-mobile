@@ -9,6 +9,7 @@ import '../features/accounts/account_list_screen.dart';
 import '../features/accounts/edit_account_card_screen.dart';
 import '../features/accounts/ledger_screen.dart';
 import '../features/collections/collections_screen.dart';
+import '../features/forbidden/forbidden_screen.dart';
 import '../features/home/home_dashboard.dart';
 import '../features/home/home_shell.dart';
 import '../features/login/change_password_screen.dart';
@@ -21,6 +22,7 @@ import '../features/reports/reports_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/settings/account_screen.dart';
 import '../features/settings/admin_placeholder_screen.dart';
+import '../features/settings/employee_totals_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../ui/strings.dart';
 import '../features/splash/splash_screen.dart';
@@ -76,6 +78,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const SettingsScreen(),
           ),
           GoRoute(
+            path: '/settings/employee-totals',
+            builder: (context, state) => const EmployeeTotalsScreen(),
+          ),
+          GoRoute(
             path: '/settings/employees',
             builder: (context, state) => const AdminPlaceholderScreen(
               title: AppStrings.employeesTile,
@@ -105,6 +111,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/account',
             builder: (context, state) => const AccountScreen(),
+          ),
+          GoRoute(
+            path: forbiddenLocation,
+            builder: (context, state) => const ForbiddenScreen(),
           ),
           GoRoute(
             path: '/collections',
