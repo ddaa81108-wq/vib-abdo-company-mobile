@@ -156,6 +156,23 @@ warning • Unused import: 'package:flutter_riverpod/flutter_riverpod.dart'. Try
 
 فلترة الرئيسية ونسخ الإجماليات مغطاة في اختبار الحزمة واختبار الدخول. إعادة إنتاج محلية للأدوار الخمسة أكدت الجدول في `defects.md` ثم حُذف المسبار. P2-01 تبقى **Partially**: الأرقام تطابق صفحات الأقسام الموجودة في الحمولة، ولا مقارنة مع الويب.
 
+## إعادة اختبار DEF-002 إلى DEF-005 على PR #24
+
+التاريخ: 2026-10-21. الفرع: `cursor/fix-qa-blocking-defects-3aad`. الالتزام: `4260c16`. الأساس `main` عند `ba44462`، وليس فرع #17.
+
+الأمر: `bash tool/check.sh` من جذر المستودع، مع Flutter 3.47.7 / Dart 3.13.5 على `PATH`.
+
+**رمز الخروج: 0.**
+
+| الخطوة داخل السكربت | النتيجة الفعلية |
+|---|---|
+| `flutter analyze` للتطبيق | `No issues found! (ran in 2.8s)` |
+| `flutter test` للتطبيق | `+83: All tests passed!` — **83 ناجح، 0 فاشل** |
+| `flutter analyze` في `packages/api_layer` | `No issues found! (ran in 0.5s)` |
+| `flutter test` في `packages/api_layer` | `+56: All tests passed!` — **56 ناجح، 0 فاشل** |
+
+DEF-003 وDEF-004 وDEF-005: **Verified**. DEF-002: **Pending PM decision** بعد ثبوت الاتساق. التفاصيل في `defects.md`.
+
 ## خلاصة خط الأساس
 
 | البند | القيمة |
@@ -171,3 +188,4 @@ warning • Unused import: 'package:flutter_riverpod/flutter_riverpod.dart'. Try
 | DEF-001 على PR #15 (`56156a8`) | Fixed in #15 — verified. `tool/check.sh` خروج 0: تحليل التطبيق والحزمة بلا مشكلات، 72 و52 اختبارًا ناجحة |
 | PR #17 (`350e051`) | `tool/check.sh` خروج 0: تحليل التطبيق والحزمة بلا مشكلات، 74 و56 اختبارًا ناجحة. DEF-006 وDEF-008 وDEF-009 وDEF-011: Verified |
 | PR #17 (`c4edd59`) | `tool/check.sh` خروج 0: تحليل بلا مشكلات، 74 و57 اختبارًا ناجحة. فلترة الرئيسية ونسخ 10635 / 10 و23750 و8000: Verified. P2-01: Partially |
+| PR #24 (`4260c16`) | `tool/check.sh` خروج 0: تحليل بلا مشكلات، 83 و56 اختبارًا ناجحة. DEF-003 وDEF-004 وDEF-005: Verified. DEF-002: Pending PM decision |
