@@ -1,0 +1,110 @@
+# Notification permission on Android emulators.
+#
+# Heavy: three API levels, each boots an AVD. It does not run on pull requests.
+# Dispatch it, or wait for the nightly schedule. Debug builds use USE_FAKE_API=true
+# and do not need google-services.json or any secret.
+#
+# The required check "Analyze, test, and debug APK" is unchanged. Unit tests for
+# the channel and for posting when notifications are disabled run there via
+# flutter test. The emulator grants and revokes with adb; this repo does not
+# request the runtime permission.
+
+name: Android notification emulator
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
+
+concurrency:
+  group: android-notifications-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  emulator:
+    name: API ${{ matrix.api }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 33, 34]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            **/*.gradle*
+            **/gradle.properties
+            **/gradle-wrapper.properties
+            **/pubspec.lock
+
+      - name: Set up Flutter 3.47.7
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          flutter-version: "3.47.7"
+          cache: true
+          pub-cache: true
+
+      - name: Verify Flutter and Dart versions
+        run: |
+          flutter --version
+          flutter --version | grep -q 'Flutter 3.47.7'
+          dart --version
+          dart --version | grep -q '3.13.5'
+
+      - name: Resolve packages
+        run: flutter pub get
+
+      - name: Enable KVM
+        run: |
+          if [[ ! -e /dev/kvm ]]; then
+            echo "/dev/kvm is missing. Hardware acceleration is required."
+            exit 1
+          fi
+          sudo chmod 666 /dev/kvm
+          ls -l /dev/kvm
+
+      - name: Cache AVD
+        uses: actions/cache@v4.2.3
+        with:
+          path: |
+            ~/.android/avd
+            ~/.android/adb*
+          key: avd-api-${{ matrix.api }}-x86_64-google_apis-nexus6-v1
+
+      - name: Notification permission tests
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          cores: 2
+          ram-size: 2048M
+          heap-size: 512M
+          force-avd-creation: false
+          emulator-boot-timeout: 600
+          disable-animations: true
+          disable-linux-hw-accel: auto
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -wipe-data
+          script: bash tool/android_notification_emulator_test.sh
+
+      - name: Record API result
+        if: always()
+        run: |
+          {
+            echo "### API ${{ matrix.api }}"
+            echo
+            echo "Job status: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"

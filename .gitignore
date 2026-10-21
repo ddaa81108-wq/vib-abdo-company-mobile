@@ -54,3 +54,8 @@ staging-permissions-junit.xml
 .env.*
 *.jks
 *.keystore
+
+# Firebase Android config is per environment and is not committed.
+# CI decodes GOOGLE_SERVICES_JSON_BASE64 when that secret is set.
+android/app/google-services.json
+**/google-services.json
