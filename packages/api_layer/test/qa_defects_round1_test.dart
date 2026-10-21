@@ -55,12 +55,15 @@ void main() {
     () async {
       final api = await login('admin@example.invalid');
       final before = await api.accounts.list(AccountSection.customers);
-      expect(before.page.items.single.balanceUnits, 320);
+      expect(before.totalItems, 10);
+      expect(before.summary.netBalanceUnits, 10635);
+      final demo = before.page.items.firstWhere((card) => card.id == 'c_55');
+      expect(demo.balanceUnits, 320);
       final ack = await api.accounts.addTransaction(
         AccountSection.customers,
         'c_55',
         AccountTransactionRequest.fullPayment(date: DateTime(2026, 10, 19)),
-        MutationMeta(expectedVersion: before.page.items.single.version),
+        MutationMeta(expectedVersion: demo.version),
       );
       expect(ack.version, 5);
 
@@ -68,9 +71,13 @@ void main() {
       expect(card.balanceUnits, 0);
       expect(card.version, 5);
       final after = await api.accounts.list(AccountSection.customers);
-      expect(after.page.items.single.balanceUnits, 0);
-      expect(after.summary.netBalanceUnits, 0);
-      expect(after.summary.totalDebtUnits, 0);
+      expect(
+        after.page.items.firstWhere((item) => item.id == 'c_55').balanceUnits,
+        0,
+      );
+      // The fixture summary is 10635. The stored change is 320 -> 0.
+      expect(after.summary.netBalanceUnits, 10315);
+      expect(after.summary.totalDebtUnits, 10315);
 
       await expectLater(
         api.accounts.addTransaction(
@@ -116,8 +123,12 @@ void main() {
       // tx_1 already stores balanceAfterUnits 500. The fake copies that value.
       expect(card.balanceUnits, 500);
       final page = await api.accounts.list(AccountSection.customers);
-      expect(page.page.items.single.balanceUnits, 500);
-      expect(page.summary.netBalanceUnits, 500);
+      expect(
+        page.page.items.firstWhere((item) => item.id == 'c_55').balanceUnits,
+        500,
+      );
+      // The fixture summary is 10635. The stored change is 320 -> 500.
+      expect(page.summary.netBalanceUnits, 10815);
       final again = await api.accounts.ledger(AccountSection.customers, 'c_55');
       expect(
         again.page.items.firstWhere((entry) => entry.id == 'tx_2').status,
@@ -200,9 +211,13 @@ void main() {
     expect(card.balanceUnits, 220);
     expect(card.version, 5);
     final page = await api.accounts.list(AccountSection.customers);
-    expect(page.page.items.single.balanceUnits, 220);
-    expect(page.summary.netBalanceUnits, 220);
-    expect(page.summary.totalDebtUnits, 220);
+    expect(
+      page.page.items.firstWhere((item) => item.id == 'c_55').balanceUnits,
+      220,
+    );
+    // The fixture summary is 10635. The stored change is 320 -> 220.
+    expect(page.summary.netBalanceUnits, 10535);
+    expect(page.summary.totalDebtUnits, 10535);
 
     await expectLater(
       api.accounts.addTransaction(
