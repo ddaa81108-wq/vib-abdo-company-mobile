@@ -13,6 +13,12 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 3 * * *"
+  # workflow_dispatch is rejected until this file is on the default branch.
+  # This push filter runs the matrix for this branch only. It is not a
+  # pull-request trigger and is removed before merge.
+  push:
+    branches:
+      - cursor/android-notification-platform-0368
 
 concurrency:
   group: android-notifications-${{ github.ref }}
