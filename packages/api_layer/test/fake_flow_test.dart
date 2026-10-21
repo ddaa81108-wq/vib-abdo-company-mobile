@@ -73,7 +73,10 @@ void main() {
         throwsArgumentError);
     final ack = await api.collections.markCashReceived(
         'sb_2', MutationMeta(expectedVersion: approved.version));
-    expect(ack.version, 1);
+    expect(ack.version, 4);
+    final afterCash = await api.collections.overview();
+    expect(afterCash.submissions.firstWhere((s) => s.id == 'sb_2').cashStatus,
+        CashStatus.received);
     await api.session.logout();
   });
 

@@ -66,8 +66,17 @@ class FakeApiClient implements ApiClient {
   final Map<String, int> _txVersion = {};
   final Set<String> _reversedTx = {};
 
-  /// Submission fields changed by a decision. Keyed by submission id.
+  /// Submission fields changed by a decision or cash receipt. Keyed by id.
   final Map<String, Map<String, dynamic>> _submissionState = {};
+
+  /// Unlinked receipt fields changed by a decision or cash receipt. Keyed by id.
+  final Map<String, Map<String, dynamic>> _unlinkedState = {};
+
+  /// Purchase day fields changed by finalize. Keyed by book|day.
+  final Map<String, Map<String, dynamic>> _purchaseDays = {};
+
+  /// Posted lines added by a direct partial payment. Keyed by section.
+  final Map<String, List<Map<String, dynamic>>> _extraLedger = {};
   static const _err = ErrorMapper();
 
   @override
@@ -223,6 +232,9 @@ class FakeApiClient implements ApiClient {
             b['paymentMode'] == 'full') {
           return _applyFullPayment(head, seg[1], b);
         }
+        if (method == 'POST' && seg.length == 3 && seg[2] == 'transactions') {
+          return _applyMovement(head, seg[1], b);
+        }
         if (method == 'POST' &&
             seg.length == 5 &&
             seg[2] == 'transactions' &&
@@ -271,11 +283,31 @@ class FakeApiClient implements ApiClient {
             seg[3] == 'decision') {
           return _applyDecision(seg[2], b);
         }
+        if (seg.length == 4 &&
+            seg[1] == 'submissions' &&
+            seg[3] == 'cash-received') {
+          return _applyCash(seg[2], b, unlinked: false);
+        }
+        if (seg.length == 4 &&
+            seg[1] == 'unlinked-receipts' &&
+            seg[3] == 'decision') {
+          return _applyUnlinkedDecision(seg[2], b);
+        }
+        if (seg.length == 4 &&
+            seg[1] == 'unlinked-receipts' &&
+            seg[3] == 'cash-received') {
+          return _applyCash(seg[2], b, unlinked: true);
+        }
         return _ok({'id': 'ok', 'version': 1});
       case 'masraweya':
         return _ok(FakeFixtures.masraweyaDay());
       case 'purchases':
-        if (method == 'GET') return _ok(FakeFixtures.purchases());
+        if (method == 'GET') {
+          return _ok(_purchasesView(seg.length > 1 ? seg[1] : ''));
+        }
+        if (seg.length == 3 && seg[2] == 'finalize') {
+          return _applyFinalize(seg[1], b);
+        }
         final entryWrite = (method == 'POST' && seg.length == 2) ||
             ((method == 'POST' || method == 'PATCH') &&
                 seg.length > 3 &&
@@ -380,24 +412,28 @@ class FakeApiClient implements ApiClient {
     final body =
         _copy(FakeFixtures.accounts(egp: section == 'egyptian-deposits'));
     final items = <Map<String, dynamic>>[];
+    // Shift the stored summary by each card's stored balance change.
+    // The fixture total stays the base. Cards are not added together.
+    var delta = 0;
     for (final raw in body['items'] as List) {
       final card = Map<String, dynamic>.from(raw as Map);
       final state = _cardState['$section|${card['id']}'];
+      final previous = card['balanceUnits'];
+      final next = state?['balanceUnits'];
+      if (previous is int && next is int) delta += next - previous;
       if (state != null) card.addAll(state);
       items.add(card);
     }
     body['items'] = items;
-    // The one-card fixture summary is that card's stored balance.
-    // A longer list is left as the fixture sent it (no summing here).
-    if (items.length == 1) {
-      final state = _cardState['$section|${items.single['id']}'];
-      final balance = state?['balanceUnits'];
-      if (balance != null) {
-        final summary = Map<String, dynamic>.from(body['summary'] as Map);
-        summary['netBalance'] = balance;
-        summary['totalDebt'] = balance;
-        body['summary'] = summary;
+    if (delta != 0) {
+      final summary = Map<String, dynamic>.from(body['summary'] as Map);
+      if (summary['netBalance'] is int) {
+        summary['netBalance'] = (summary['netBalance'] as int) + delta;
       }
+      if (summary['totalDebt'] is int) {
+        summary['totalDebt'] = (summary['totalDebt'] as int) + delta;
+      }
+      body['summary'] = summary;
     }
     return body;
   }
@@ -416,6 +452,9 @@ class FakeApiClient implements ApiClient {
       if (version != null) entry['version'] = version;
       items.add(entry);
     }
+    for (final extra in _extraLedger[section] ?? const []) {
+      items.add(Map<String, dynamic>.from(extra));
+    }
     body['items'] = items;
     return body;
   }
@@ -429,6 +468,45 @@ class FakeApiClient implements ApiClient {
       'balanceUnits': 0,
       'version': version,
     };
+    return _ok({'id': 'tx_new', 'version': version});
+  }
+
+  /// Debt or partial payment. The version is the card's stored version.
+  ///
+  /// A direct partial payment stores the previous card balance with the
+  /// received `inputValue` applied. That result is what later reads return.
+  /// The app does not calculate it. A rate-based movement only bumps the
+  /// version; this fake does not turn a factor into an amount.
+  ApiResponse _applyMovement(String section, String id, Map b) {
+    final card = _cardView(section, id);
+    _requireVersion(b['expectedVersion'], card['version']);
+    final version = (card['version'] as int) + 1;
+    final state = <String, dynamic>{'version': version};
+    final previous = card['balanceUnits'];
+    final entered = b['inputValue'];
+    if (b['type'] == 'payment' &&
+        b['paymentMode'] == 'partial' &&
+        b['calculationMode'] == 'direct' &&
+        previous is int &&
+        entered is int) {
+      final stored = previous - entered;
+      state['balanceUnits'] = stored;
+      _extraLedger.putIfAbsent(section, () => []).add({
+        'id': 'tx_partial_$version',
+        'sequence': version,
+        'type': 'payment',
+        'status': 'posted',
+        'paymentMode': 'partial',
+        'date': b['date'],
+        'amountUnits': entered,
+        'inputValue': entered,
+        'calculationMode': 'direct',
+        'balanceAfterUnits': stored,
+        'createdByName': 'مدير تجريبي',
+        'version': 1,
+      });
+    }
+    _cardState['$section|${card['id']}'] = state;
     return _ok({'id': 'tx_new', 'version': version});
   }
 
@@ -475,6 +553,14 @@ class FakeApiClient implements ApiClient {
       items.add(item);
     }
     body['submissions'] = items;
+    final receipts = <Map<String, dynamic>>[];
+    for (final raw in body['unlinkedReceipts'] as List) {
+      final item = Map<String, dynamic>.from(raw as Map);
+      final state = _unlinkedState['${item['id']}'];
+      if (state != null) item.addAll(state);
+      receipts.add(item);
+    }
+    body['unlinkedReceipts'] = receipts;
     return body;
   }
 
@@ -494,7 +580,91 @@ class FakeApiClient implements ApiClient {
     };
     if (status == null) _fail(400, 'VALIDATION_ERROR', 'قرار غير معروف');
     final version = (submission['version'] as int) + 1;
-    _submissionState[id] = {'status': status, 'version': version};
+    _submissionState[id] = {
+      ...?_submissionState[id],
+      'status': status,
+      'version': version,
+    };
     return _ok({'id': 'ok', 'version': version});
+  }
+
+  ApiResponse _applyCash(String id, Map b, {required bool unlinked}) {
+    final view = _collectionsView();
+    final items =
+        (unlinked ? view['unlinkedReceipts'] : view['submissions']) as List;
+    final current = _recordById(
+      items,
+      id,
+      unlinked ? 'الإيصال غير موجود' : 'الاستلام غير موجود',
+    );
+    _requireVersion(b['expectedVersion'], current['version']);
+    final version = (current['version'] as int) + 1;
+    final store = unlinked ? _unlinkedState : _submissionState;
+    store[id] = {
+      ...?store[id],
+      'cashStatus': 'received',
+      'cashPending': false,
+      'version': version,
+    };
+    return _ok({'id': 'ok', 'version': version});
+  }
+
+  ApiResponse _applyUnlinkedDecision(String id, Map b) {
+    final current = _recordById(
+      _collectionsView()['unlinkedReceipts'] as List,
+      id,
+      'الإيصال غير موجود',
+    );
+    _requireVersion(b['expectedVersion'], current['version']);
+    final decision = b['decision'];
+    final status = switch (decision) {
+      'approve' => 'approved',
+      'reject' => 'rejected',
+      _ => null,
+    };
+    if (status == null) _fail(400, 'VALIDATION_ERROR', 'قرار غير معروف');
+    final version = (current['version'] as int) + 1;
+    final customerId = b['customerId'];
+    _unlinkedState[id] = {
+      ...?_unlinkedState[id],
+      'status': status,
+      'version': version,
+      if (customerId != null) 'customerId': customerId,
+    };
+    return _ok({'id': 'ok', 'version': version});
+  }
+
+  Map<String, dynamic> _purchasesView(String book) {
+    final body = _copy(FakeFixtures.purchases());
+    final days = <Map<String, dynamic>>[];
+    for (final raw in body['days'] as List) {
+      final day = Map<String, dynamic>.from(raw as Map);
+      final state = _purchaseDays['$book|${day['day']}'];
+      if (state != null) day.addAll(state);
+      days.add(day);
+    }
+    body['days'] = days;
+    return body;
+  }
+
+  ApiResponse _applyFinalize(String book, Map b) {
+    final days = _purchasesView(book)['days'] as List;
+    if (days.isEmpty) _fail(404, 'NOT_FOUND', 'اليوم غير موجود');
+    final day = days.first as Map<String, dynamic>;
+    _requireVersion(b['expectedDayVersion'], day['version']);
+    final version = (day['version'] as int) + 1;
+    _purchaseDays['$book|${day['day']}'] = {
+      'status': 'finalized',
+      'version': version,
+    };
+    return _ok({'id': 'ok', 'version': version});
+  }
+
+  Map<String, dynamic> _recordById(List items, String id, String missing) {
+    for (final raw in items) {
+      final item = raw as Map<String, dynamic>;
+      if (item['id'] == id) return item;
+    }
+    _fail(404, 'NOT_FOUND', missing);
   }
 }
