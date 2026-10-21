@@ -56,7 +56,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ),
         if (_busy) const SkeletonBox(key: Key('search-loading'), height: 48),
         if (_failure != null)
-          failurePane(
+          presentFailure(
             _failure!,
             onRetry: _run,
             retryKey: const Key('search-retry'),
@@ -68,7 +68,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           const EmptyPane(message: AppStrings.noResults),
         for (final entry in _results.entries)
           if (entry.value.isNotEmpty) ...[
-            Text(sectionLabel(entry.key), style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              sectionLabel(entry.key),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
             for (final item in entry.value)
               ListTile(
                 title: Text(item.name),
@@ -91,7 +94,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     try {
       for (final section in _sections) {
         if (!permissions.canRead(section.sectionKey)) continue;
-        final items = await ref.read(apiLayerProvider).accounts.suggestions(section, query);
+        final items = await ref
+            .read(apiLayerProvider)
+            .accounts
+            .suggestions(section, query);
         _results[section.sectionKey] = items;
       }
     } catch (error) {

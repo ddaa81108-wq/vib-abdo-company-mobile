@@ -22,6 +22,7 @@ import '../features/reports/reports_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/settings/account_screen.dart';
 import '../features/settings/admin_placeholder_screen.dart';
+import '../features/settings/employee_totals_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../ui/strings.dart';
 import '../features/splash/splash_screen.dart';
@@ -75,6 +76,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/settings',
             builder: (context, state) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: '/settings/employee-totals',
+            builder: (context, state) => const EmployeeTotalsScreen(),
           ),
           GoRoute(
             path: '/settings/employees',

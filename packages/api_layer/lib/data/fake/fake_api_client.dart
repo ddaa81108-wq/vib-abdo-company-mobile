@@ -75,6 +75,12 @@ class FakeApiClient implements ApiClient {
   /// The next N proposed home reads fail so the app can use per-section data.
   int failHomeRemaining = 0;
 
+  /// The next N admin employee-totals reads fail after the permission check.
+  int failEmployeeTotalsRemaining = 0;
+
+  /// When set, admin employee-totals reads wait here after the permission check.
+  Completer<void>? pauseEmployeeTotals;
+
   /// The next N older-page reads (`before`) fail (tests).
   int failOlderRemaining = 0;
 
@@ -294,8 +300,7 @@ class FakeApiClient implements ApiClient {
   }
 
   bool get _seesEveryCollection =>
-      _access.fullAccess ||
-      _access.canDo(ManagementAction.collectionsDecide);
+      _access.fullAccess || _access.canDo(ManagementAction.collectionsDecide);
 
   bool get _managesPayroll =>
       _access.fullAccess || _access.canDo(ManagementAction.payrollManage);
@@ -506,6 +511,31 @@ class FakeApiClient implements ApiClient {
     const directories = {'users', 'staff', 'employees', 'admins'};
     if (!directories.contains(head) || seg.length < 2) return null;
     return seg[1];
+  }
+
+  /// 🔶 GET /api/admin/employee-totals. Full admin only until DEF-002, via
+  /// [_requireFullAccess]. An employee, a limited admin, and any other
+  /// profile without full access gets 403 and never an empty list. `from`
+  /// and `to` are echoed by the fixture. `employeeId` is ignored.
+  Future<ApiResponse> _employeeTotals(
+    String method,
+    List<String> seg,
+    Map<String, dynamic>? query,
+  ) async {
+    if (method != 'GET' || seg.length != 2 || seg[1] != 'employee-totals') {
+      _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
+    }
+    _requireFullAccess();
+    final paused = pauseEmployeeTotals;
+    if (paused != null) await paused.future;
+    if (failEmployeeTotalsRemaining > 0) {
+      failEmployeeTotalsRemaining--;
+      _fail(500, 'SERVER_ERROR', 'تعذر تحميل إجماليات الموظفين.');
+    }
+    return _ok(FakeFixtures.employeeTotals(
+      from: _queryText(query, 'from'),
+      to: _queryText(query, 'to'),
+    ));
   }
 
   void _activate(Map<String, dynamic> me) {
@@ -882,6 +912,8 @@ class FakeApiClient implements ApiClient {
       case 'operations':
         // 🔶 Proposed admin catalogs. Reached only after [_authorize].
         return _adminCatalog(head, seg);
+      case 'admin':
+        return _employeeTotals(method, seg, query);
     }
     _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
   }
@@ -1467,11 +1499,8 @@ class FakeApiClient implements ApiClient {
   /// Idempotent replay enters here with the path only. [_mutate] is used for
   /// non-GET calls, so an entry-shaped path is a create, update, or delete.
   void _rejectFinalizedPurchaseEntry(String path) {
-    final seg = path
-        .split('/')
-        .where((part) => part.isNotEmpty)
-        .skip(1)
-        .toList();
+    final seg =
+        path.split('/').where((part) => part.isNotEmpty).skip(1).toList();
     if (seg.length < 2 || seg.first != 'purchases') return;
     final entryPath =
         seg.length == 2 || (seg.length >= 4 && seg[2] == 'entries');

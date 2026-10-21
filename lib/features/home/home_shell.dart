@@ -16,6 +16,7 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/logout_confirm.dart';
 import '../../ui/widgets/soft_tile.dart';
 
 class NavItem {
@@ -162,7 +163,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           IconButton(
             key: HomeShell.logoutKey,
             tooltip: AppStrings.logout,
-            onPressed: () => ref.read(sessionStateProvider.notifier).logout(),
+            onPressed: () => requestLogout(context, ref),
             icon: const Icon(Icons.logout),
           ),
         ],
@@ -273,6 +274,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     if (location == '/' || location.isEmpty) return AppStrings.homeTitle;
     if (location.startsWith('/notifications')) return AppStrings.notifications;
     if (location.startsWith(forbiddenLocation)) return AppStrings.forbidden;
+    if (location.startsWith('/settings/employee-totals')) {
+      return AppStrings.employeeTotals;
+    }
     if (location.startsWith('/settings/employees')) {
       return AppStrings.employeesTile;
     }

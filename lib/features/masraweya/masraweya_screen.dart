@@ -34,7 +34,7 @@ class MasraweyaScreen extends ConsumerWidget {
         const ScreenTitle('صفحة المصراوية'),
         day.when(
           loading: () => const SkeletonBox(height: 120),
-          error: (error, _) => failurePane(
+          error: (error, _) => presentFailure(
             ref.read(errorHandlerProvider).toFailure(error),
             onRetry: () => ref.invalidate(masraweyaProvider),
           ),

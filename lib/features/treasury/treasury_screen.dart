@@ -63,7 +63,8 @@ class TreasuryScreen extends ConsumerWidget {
           resetKey: 'treasury',
           onRetry: () => ref.invalidate(treasuryProvider),
           messageOf: (error) =>
-              ref.read(errorHandlerProvider).toFailure(error).message,
+              failureText(ref.read(errorHandlerProvider).toFailure(error)),
+          failureOf: (error) => ref.read(errorHandlerProvider).toFailure(error),
           loading: const SkeletonBox(key: Key('treasury-loading'), height: 180),
           builder: (data) => _Cards(data: data, money: money),
         ),
@@ -78,7 +79,8 @@ class TreasuryScreen extends ConsumerWidget {
           resetKey: 'cash',
           onRetry: () => ref.invalidate(cashLedgerProvider),
           messageOf: (error) =>
-              ref.read(errorHandlerProvider).toFailure(error).message,
+              failureText(ref.read(errorHandlerProvider).toFailure(error)),
+          failureOf: (error) => ref.read(errorHandlerProvider).toFailure(error),
           loading: const SkeletonBox(height: 80),
           builder: (page) =>
               _Movements(page: page, money: money, online: online),
@@ -232,7 +234,7 @@ class _CashFormState extends ConsumerState<_CashForm> {
     } catch (error) {
       final failure = ref.read(errorHandlerProvider).toFailure(error);
       if (failure.code == 'VERSION_CONFLICT') _refreshCashViews();
-      return failure.message;
+      return failureText(failure);
     }
   }
 
@@ -537,7 +539,7 @@ class _LoadOlderCashState extends ConsumerState<_LoadOlderCash> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = ref.read(errorHandlerProvider).toFailure(error).message;
+        _error = failureText(ref.read(errorHandlerProvider).toFailure(error));
       });
     }
   }

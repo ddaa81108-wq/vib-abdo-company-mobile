@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_providers.dart';
+import '../../error_handling/app_failure.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/section_providers.dart';
 import '../../state/session_providers.dart';
@@ -69,6 +70,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       expand: true,
       onRetry: () => ref.invalidate(accountsProvider(section)),
       messageOf: _message,
+      failureOf: _failure,
       loading: const Padding(
         key: Key('accounts-loading'),
         padding: EdgeInsetsDirectional.all(AppSpacing.lg),
@@ -325,11 +327,10 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     return null;
   }
 
-  String _message(Object error) {
-    final failure = ref.read(errorHandlerProvider).toFailure(error);
-    if (failure.code == 'FORBIDDEN') return AppStrings.forbidden;
-    return failure.message;
-  }
+  AppFailure _failure(Object error) =>
+      ref.read(errorHandlerProvider).toFailure(error);
+
+  String _message(Object error) => failureText(_failure(error));
 
   Future<void> _more(String cursor) async {
     final query = ref.read(accountQueryProvider(section)).trim();
@@ -400,9 +401,11 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       return null;
     } catch (error) {
       if (!mounted) {
-        return ref.read(errorHandlerProvider).toFailure(error).message;
+        return failureText(ref.read(errorHandlerProvider).toFailure(error));
       }
-      final message = ref.read(errorHandlerProvider).toFailure(error).message;
+      final message = failureText(
+        ref.read(errorHandlerProvider).toFailure(error),
+      );
       setState(() => _reply = message);
       return message;
     }
@@ -420,9 +423,11 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       return null;
     } catch (error) {
       if (!mounted) {
-        return ref.read(errorHandlerProvider).toFailure(error).message;
+        return failureText(ref.read(errorHandlerProvider).toFailure(error));
       }
-      final message = ref.read(errorHandlerProvider).toFailure(error).message;
+      final message = failureText(
+        ref.read(errorHandlerProvider).toFailure(error),
+      );
       setState(() => _reply = message);
       ref.invalidate(accountsProvider(section));
       return message;
@@ -739,7 +744,7 @@ class _RateCardState extends ConsumerState<_RateCard> {
         padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
         child: rate.when(
           loading: () => const SkeletonBox(height: 72),
-          error: (error, _) => failurePane(
+          error: (error, _) => presentFailure(
             ref.read(errorHandlerProvider).toFailure(error),
             onRetry: () => ref.invalidate(exchangeRateProvider),
           ),
@@ -815,7 +820,9 @@ class _RateCardState extends ConsumerState<_RateCard> {
       );
       return null;
     } catch (error) {
-      final message = ref.read(errorHandlerProvider).toFailure(error).message;
+      final message = failureText(
+        ref.read(errorHandlerProvider).toFailure(error),
+      );
       if (mounted) setState(() => _message = message);
       return message;
     }
@@ -932,7 +939,7 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
       Navigator.of(context).pop(true);
       return null;
     } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
+      return failureText(ref.read(errorHandlerProvider).toFailure(error));
     }
   }
 }
@@ -960,7 +967,7 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
     final people = ref.watch(assigneesProvider);
     return people.when(
       loading: () => const SkeletonBox(height: 48),
-      error: (error, _) => failurePane(
+      error: (error, _) => presentFailure(
         ref.read(errorHandlerProvider).toFailure(error),
         onRetry: () => ref.invalidate(assigneesProvider),
       ),
@@ -1028,7 +1035,7 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
       ref.invalidate(accountsProvider(widget.section));
       return null;
     } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
+      return failureText(ref.read(errorHandlerProvider).toFailure(error));
     }
   }
 }

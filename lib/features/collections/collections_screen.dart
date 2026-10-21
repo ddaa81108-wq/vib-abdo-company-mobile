@@ -47,7 +47,8 @@ class CollectionsScreen extends ConsumerWidget {
           resetKey: 'collections',
           onRetry: () => ref.invalidate(collectionsProvider),
           messageOf: (error) =>
-              ref.read(errorHandlerProvider).toFailure(error).message,
+              failureText(ref.read(errorHandlerProvider).toFailure(error)),
+          failureOf: (error) => ref.read(errorHandlerProvider).toFailure(error),
           loading: const _CollectionsLoading(),
           builder: (data) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -906,7 +907,7 @@ class _PayrollBlock extends ConsumerWidget {
         payroll.when(
           loading: () =>
               const SkeletonBox(key: Key('payroll-loading'), height: 88),
-          error: (error, _) => failurePane(
+          error: (error, _) => presentFailure(
             ref.read(errorHandlerProvider).toFailure(error),
             onRetry: () => ref.invalidate(payrollProvider),
             retryKey: const Key('payroll-retry'),

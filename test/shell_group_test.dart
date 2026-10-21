@@ -9,6 +9,7 @@ import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notifications_screen.dart';
+import 'package:vib_abdo_company_mobile/features/settings/employee_totals_screen.dart';
 import 'package:vib_abdo_company_mobile/features/splash/splash_screen.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
@@ -358,9 +359,10 @@ void main() {
 
     await tester.tap(find.byKey(const Key('settings-link-employees')));
     await settle(tester);
-    expect(find.byKey(const Key('screen-settings-employees')), findsOneWidget);
-    expect(find.text(AppStrings.employeesEmpty), findsOneWidget);
-    expect(find.byIcon(Icons.groups_outlined), findsOneWidget);
+    expect(find.byKey(EmployeeTotalsScreen.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
+    expect(find.text(AppStrings.employeesEmpty), findsNothing);
+    expect(find.text('موظف استلام تجريبي'), findsNothing);
 
     await go(tester, '/settings/audit');
     expect(find.byKey(const Key('screen-settings-audit')), findsOneWidget);

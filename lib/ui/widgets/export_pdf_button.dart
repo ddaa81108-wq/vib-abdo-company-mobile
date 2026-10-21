@@ -5,6 +5,7 @@ import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/theme_controller.dart';
 import '../strings.dart';
+import 'common.dart';
 
 /// Proposed PDF control. Shown only for full access while the fake client is
 /// in use. Real mode hides it and never calls GET /api/statements/pdf.
@@ -50,9 +51,9 @@ class _ExportPdfButtonState extends ConsumerState<ExportPdfButton> {
       await layer.reports.statementPdf();
     } catch (error) {
       if (!mounted) return;
-      final message = ref.read(errorHandlerProvider).toFailure(error).message;
+      final failure = ref.read(errorHandlerProvider).toFailure(error);
       ref.read(errorHandlerProvider).report(error);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      showFailureSnackBar(context, failure);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
