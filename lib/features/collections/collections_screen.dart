@@ -108,6 +108,7 @@ class CollectionsScreen extends ConsumerWidget {
                   label: AppStrings.closeBatch,
                   confirmText: AppStrings.closeBatchConfirm,
                   destructive: true,
+                  onVersionConflict: () => ref.invalidate(collectionsProvider),
                   onSubmit: (meta) => _close(context, ref, data.batchId!, meta),
                 ),
               if (write || payroll) const _PayrollBlock(),
@@ -128,21 +129,17 @@ class CollectionsScreen extends ConsumerWidget {
     String batchId,
     MutationMeta meta,
   ) async {
-    try {
-      final ack = await ref
-          .read(apiLayerProvider)
-          .collections
-          .closeDay(batchId: batchId, meta: meta);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-        );
-      }
-      ref.invalidate(collectionsProvider);
-      return null;
-    } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
+    final ack = await ref
+        .read(apiLayerProvider)
+        .collections
+        .closeDay(batchId: batchId, meta: meta);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+      );
     }
+    ref.invalidate(collectionsProvider);
+    return null;
   }
 }
 
@@ -194,6 +191,7 @@ class _UnlinkedFormState extends ConsumerState<_UnlinkedForm> {
           buttonKey: const Key('save-unlinked'),
           inputs: '${_name.text}|${_amount.text}',
           label: AppStrings.save,
+          onVersionConflict: () => ref.invalidate(collectionsProvider),
           onSubmit: _submit,
         ),
       ],
@@ -205,25 +203,21 @@ class _UnlinkedFormState extends ConsumerState<_UnlinkedForm> {
     if (units == null || _name.text.trim().isEmpty) {
       return AppStrings.integerOnly;
     }
-    try {
-      final ack = await ref
-          .read(apiLayerProvider)
-          .collections
-          .createUnlinkedReceipt(
-            customerName: _name.text.trim(),
-            amountUnits: units,
-            meta: meta,
-          );
-      if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
-      ref.invalidate(collectionsProvider);
-      Navigator.of(context).pop();
-      return null;
-    } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
-    }
+    final ack = await ref
+        .read(apiLayerProvider)
+        .collections
+        .createUnlinkedReceipt(
+          customerName: _name.text.trim(),
+          amountUnits: units,
+          meta: meta,
+        );
+    if (!mounted) return null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+    );
+    ref.invalidate(collectionsProvider);
+    Navigator.of(context).pop();
+    return null;
   }
 }
 
@@ -369,6 +363,7 @@ class _AssignmentFormState extends ConsumerState<_AssignmentForm> {
           buttonKey: const Key('save-assignment'),
           inputs: '$_full|${_amount.text}',
           label: AppStrings.save,
+          onVersionConflict: () => ref.invalidate(collectionsProvider),
           onSubmit: _submit,
         ),
       ],
@@ -378,26 +373,22 @@ class _AssignmentFormState extends ConsumerState<_AssignmentForm> {
   Future<String?> _submit(MutationMeta meta) async {
     final units = _full ? null : parseUnits(_amount.text);
     if (!_full && units == null) return AppStrings.integerOnly;
-    try {
-      final ack = await ref
-          .read(apiLayerProvider)
-          .collections
-          .submit(
-            widget.assignmentId,
-            mode: _full ? 'full' : 'partial',
-            amountUnits: units,
-            meta: meta,
-          );
-      if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
-      ref.invalidate(collectionsProvider);
-      Navigator.of(context).pop();
-      return null;
-    } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
-    }
+    final ack = await ref
+        .read(apiLayerProvider)
+        .collections
+        .submit(
+          widget.assignmentId,
+          mode: _full ? 'full' : 'partial',
+          amountUnits: units,
+          meta: meta,
+        );
+    if (!mounted) return null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+    );
+    ref.invalidate(collectionsProvider);
+    Navigator.of(context).pop();
+    return null;
   }
 }
 
@@ -452,6 +443,8 @@ class _Submission extends ConsumerWidget {
                     inputs: 'approve:${submission.id}:${submission.version}',
                     expectedVersion: submission.version,
                     label: AppStrings.approve,
+                    onVersionConflict: () =>
+                        ref.invalidate(collectionsProvider),
                     onSubmit: (meta) =>
                         _decide(context, ref, CollectionDecision.approve, meta),
                   ),
@@ -461,6 +454,8 @@ class _Submission extends ConsumerWidget {
                     expectedVersion: submission.version,
                     label: AppStrings.reject,
                     filled: false,
+                    onVersionConflict: () =>
+                        ref.invalidate(collectionsProvider),
                     onSubmit: (meta) =>
                         _decide(context, ref, CollectionDecision.reject, meta),
                   ),
@@ -472,6 +467,7 @@ class _Submission extends ConsumerWidget {
                 inputs: 'cash:${submission.id}:${submission.version}',
                 expectedVersion: submission.version,
                 label: AppStrings.cashReceived,
+                onVersionConflict: () => ref.invalidate(collectionsProvider),
                 onSubmit: (meta) => _cash(context, ref, meta),
               ),
           ],
@@ -486,21 +482,17 @@ class _Submission extends ConsumerWidget {
     CollectionDecision decision,
     MutationMeta meta,
   ) async {
-    try {
-      final ack = await ref
-          .read(apiLayerProvider)
-          .collections
-          .decide(submission.id, decision, meta: meta);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-        );
-      }
-      ref.invalidate(collectionsProvider);
-      return null;
-    } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
+    final ack = await ref
+        .read(apiLayerProvider)
+        .collections
+        .decide(submission.id, decision, meta: meta);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+      );
     }
+    ref.invalidate(collectionsProvider);
+    return null;
   }
 
   Future<String?> _cash(
@@ -508,21 +500,17 @@ class _Submission extends ConsumerWidget {
     WidgetRef ref,
     MutationMeta meta,
   ) async {
-    try {
-      final ack = await ref
-          .read(apiLayerProvider)
-          .collections
-          .markCashReceived(submission.id, meta);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-        );
-      }
-      ref.invalidate(collectionsProvider);
-      return null;
-    } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
+    final ack = await ref
+        .read(apiLayerProvider)
+        .collections
+        .markCashReceived(submission.id, meta);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+      );
     }
+    ref.invalidate(collectionsProvider);
+    return null;
   }
 }
 
@@ -574,6 +562,8 @@ class _Unlinked extends ConsumerWidget {
                     inputs: 'ulink:${receipt.id}:${receipt.version}',
                     expectedVersion: receipt.version,
                     label: AppStrings.approve,
+                    onVersionConflict: () =>
+                        ref.invalidate(collectionsProvider),
                     onSubmit: (meta) =>
                         _decide(context, ref, CollectionDecision.approve, meta),
                   ),
@@ -601,21 +591,17 @@ class _Unlinked extends ConsumerWidget {
     CollectionDecision decision,
     MutationMeta meta,
   ) async {
-    try {
-      final ack = await ref
-          .read(apiLayerProvider)
-          .collections
-          .decideUnlinked(receipt.id, decision: decision, meta: meta);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-        );
-      }
-      ref.invalidate(collectionsProvider);
-      return null;
-    } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
+    final ack = await ref
+        .read(apiLayerProvider)
+        .collections
+        .decideUnlinked(receipt.id, decision: decision, meta: meta);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+      );
     }
+    ref.invalidate(collectionsProvider);
+    return null;
   }
 }
 
@@ -658,6 +644,7 @@ class _LinkFormState extends ConsumerState<_LinkForm> {
           inputs: 'link:${widget.receipt.id}:${_customer.text}',
           expectedVersion: widget.receipt.version,
           label: AppStrings.link,
+          onVersionConflict: () => ref.invalidate(collectionsProvider),
           onSubmit: _submit,
         ),
       ],
@@ -667,26 +654,22 @@ class _LinkFormState extends ConsumerState<_LinkForm> {
   Future<String?> _submit(MutationMeta meta) async {
     final customerId = _customer.text.trim();
     if (customerId.isEmpty) return AppStrings.enterReference;
-    try {
-      final ack = await ref
-          .read(apiLayerProvider)
-          .collections
-          .decideUnlinked(
-            widget.receipt.id,
-            decision: CollectionDecision.approve,
-            customerId: customerId,
-            meta: meta,
-          );
-      if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
-      ref.invalidate(collectionsProvider);
-      Navigator.of(context).pop();
-      return null;
-    } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
-    }
+    final ack = await ref
+        .read(apiLayerProvider)
+        .collections
+        .decideUnlinked(
+          widget.receipt.id,
+          decision: CollectionDecision.approve,
+          customerId: customerId,
+          meta: meta,
+        );
+    if (!mounted) return null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+    );
+    ref.invalidate(collectionsProvider);
+    Navigator.of(context).pop();
+    return null;
   }
 }
 
