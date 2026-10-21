@@ -134,11 +134,7 @@ abstract final class AppStrings {
   static const phone = 'الهاتف';
   static const factor = 'المعامل';
   static const sinceDays = 'منذ';
-  static const dayOne = 'يوم';
-  static const dayTwo = 'يومان';
   static const days = 'أيام';
-  static const dayMany = 'يومًا';
-  static const clearSearch = 'مسح البحث';
   static const activeTab = 'نشطة';
   static const smartTab = 'الذكية';
   static const todayTab = 'اليوم';
@@ -281,4 +277,11 @@ abstract final class AppStrings {
   static const link = 'ربط';
   static const batch = 'الدفعة';
   static const toneNeutral = 'محايد';
+
+  // Account-list presentation only. Grouped at the end so ledger and
+  // collections edits to the catalogue above can merge without overlap.
+  static const dayOne = 'يوم';
+  static const dayTwo = 'يومين';
+  static const dayMany = 'يومًا';
+  static const clearSearch = 'مسح البحث';
 }

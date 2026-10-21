@@ -19,16 +19,21 @@ String formatIsoDate(DateTime? value) {
   return '$y-$m-$d';
 }
 
-/// Arabic count for a server day integer. This is not a debt-age status.
+/// Shared day count for the ledger and the home row: always «منذ N أيام».
 ///
-/// 1 → يوم، 2 → يومان، 3–10 → أيام، every other count → يومًا.
+/// List cards use [ageCountPhrase] instead, so this wording stays stable for
+/// every existing caller.
 String sinceDays(int? days) {
   if (days == null) return AppStrings.dash;
+  return '${AppStrings.sinceDays} $days ${AppStrings.days}';
+}
+
+/// List-only Arabic count. 1 → منذ يوم، 2 → منذ يومين، 3–10 → منذ N أيام،
+/// and every other count (including 0 and negatives) → منذ N يومًا.
+String ageCountPhrase(int days) {
   if (days == 1) return '${AppStrings.sinceDays} ${AppStrings.dayOne}';
   if (days == 2) return '${AppStrings.sinceDays} ${AppStrings.dayTwo}';
-  final unit = days.abs() >= 3 && days.abs() <= 10
-      ? AppStrings.days
-      : AppStrings.dayMany;
+  final unit = days >= 3 && days <= 10 ? AppStrings.days : AppStrings.dayMany;
   return '${AppStrings.sinceDays} $days $unit';
 }
 
@@ -49,7 +54,7 @@ String? singleAgeText({
   if (ready != null && ready.isNotEmpty) return serverLabel;
   final named = _fallbackLabel(ageStatus, section);
   if (named != null) return named;
-  if (debtAgeDays != null) return sinceDays(debtAgeDays);
+  if (debtAgeDays != null) return ageCountPhrase(debtAgeDays);
   return null;
 }
 

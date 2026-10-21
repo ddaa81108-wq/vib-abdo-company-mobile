@@ -39,18 +39,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   AccountSection get section => widget.section;
 
   @override
-  void initState() {
-    super.initState();
-    _search.addListener(_onSearchChanged);
-  }
-
-  void _onSearchChanged() {
-    if (mounted) setState(() {});
-  }
-
-  @override
   void dispose() {
-    _search.removeListener(_onSearchChanged);
     _search.dispose();
     super.dispose();
   }
@@ -120,21 +109,23 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                 labelText: AppStrings.filterSearch,
                 isDense: false,
                 prefixIcon: const Icon(Icons.search),
-                suffixIcon: _search.text.isEmpty
-                    ? null
-                    : IconButton(
-                        key: const Key('clear-account-search'),
-                        tooltip: AppStrings.clearSearch,
-                        icon: const Icon(Icons.close),
-                        onPressed: () {
-                          _search.clear();
-                          setState(_extra.clear);
-                          ref
-                                  .read(accountQueryProvider(section).notifier)
-                                  .state =
-                              '';
-                        },
-                      ),
+                suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _search,
+                  builder: (context, value, _) {
+                    if (value.text.isEmpty) return const SizedBox.shrink();
+                    return IconButton(
+                      key: const Key('clear-account-search'),
+                      tooltip: AppStrings.clearSearch,
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        _search.clear();
+                        setState(_extra.clear);
+                        ref.read(accountQueryProvider(section).notifier).state =
+                            '';
+                      },
+                    );
+                  },
+                ),
               ),
               onSubmitted: (value) {
                 setState(_extra.clear);

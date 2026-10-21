@@ -323,31 +323,26 @@ class _DebtRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visual = ageVisual(
+      colors: context.statusColors,
+      ageStatus: debt.ageStatus,
+      section: null,
+      serverLabel: debt.ageStatusLabel,
+    );
     final amount = debt.currency == null
         ? AppStrings.dash
         : money.formatOrDash(debt.balanceUnits, debt.currency!);
-    final age = singleAgeText(
-      serverLabel: debt.ageStatusLabel,
-      ageStatus: debt.ageStatus,
-      debtAgeDays: debt.debtAgeDays,
-    );
-    final theme = Theme.of(context);
     return Card(
       key: Key('old-debt-${debt.id}'),
       margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(debt.name, style: theme.textTheme.titleSmall),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              [amount, ?age].join(' · '),
-              key: Key('old-debt-age-${debt.id}'),
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
+      child: ListTile(
+        title: Text(debt.name),
+        subtitle: Text(
+          [
+            amount,
+            if (visual.label != null) visual.label!,
+            if (debt.debtAgeDays != null) sinceDays(debt.debtAgeDays),
+          ].join(' · '),
         ),
       ),
     );

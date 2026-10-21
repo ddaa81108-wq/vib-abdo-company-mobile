@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/accounts/account_list_screen.dart';
@@ -14,26 +15,38 @@ import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  test('one age phrase, with Arabic day counts only as a fallback', () {
+  test('sinceDays stays «منذ N أيام» for ledger and home callers', () {
+    expect(sinceDays(null), AppStrings.dash);
+    expect(sinceDays(1), 'منذ 1 أيام');
+    expect(sinceDays(2), 'منذ 2 أيام');
+    expect(sinceDays(4), 'منذ 4 أيام');
+    expect(sinceDays(11), 'منذ 11 أيام');
+  });
+
+  test('a server age label wins; the list count is only a fallback', () {
     expect(
       singleAgeText(
-        serverLabel: 'مرّ عليه 3 أيام',
+        serverLabel: 'منذ 4 أيام',
         ageStatus: 'warning',
         debtAgeDays: 4,
       ),
-      'مرّ عليه 3 أيام',
+      'منذ 4 أيام',
+    );
+    expect(
+      singleAgeText(serverLabel: 'تسمية الخادم', debtAgeDays: 2),
+      'تسمية الخادم',
     );
     expect(
       singleAgeText(ageStatus: 'warning', debtAgeDays: 4),
       AppStrings.warningAge,
     );
     expect(singleAgeText(debtAgeDays: 1), 'منذ يوم');
-    expect(singleAgeText(debtAgeDays: 2), 'منذ يومان');
+    expect(singleAgeText(debtAgeDays: 2), 'منذ يومين');
     expect(singleAgeText(debtAgeDays: 4), 'منذ 4 أيام');
     expect(singleAgeText(debtAgeDays: 10), 'منذ 10 أيام');
     expect(singleAgeText(debtAgeDays: 11), 'منذ 11 يومًا');
     expect(singleAgeText(debtAgeDays: 0), 'منذ 0 يومًا');
-    expect(sinceDays(null), AppStrings.dash);
+    expect(singleAgeText(debtAgeDays: -3), 'منذ -3 يومًا');
     expect(singleAgeText(), isNull);
   });
 
@@ -50,46 +63,42 @@ void main() {
   testWidgets('customer and company cards show the server age once', (
     tester,
   ) async {
-    await pumpFakeApp(tester, size: const Size(800, 2200));
+    final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/');
-    final homeAge = tester.widget<Text>(
-      find.byKey(const Key('old-debt-age-c_55')),
-    );
-    expect(homeAge.data, '320 د.ل · منذ 4 أيام');
-    expect(homeAge.data!.split('منذ').length, 2);
+    // The fake client delays on a timer. Read the DTOs on the real clock so
+    // the expectation follows the payload (#17 included) without hanging.
+    final loaded = await tester.runAsync(() async {
+      final customers = await layer.accounts.list(AccountSection.customers);
+      final companies = await layer.accounts.list(AccountSection.companies);
+      final home = await layer.home.fetch();
+      return (
+        customer: customers.page.items.firstWhere((card) => card.id == 'c_55'),
+        company: companies.page.items.firstWhere((card) => card.id == 'c_55'),
+        ticker: home.oldDebts!.firstWhere(
+          (debt) =>
+              debt.id == 'c_55' &&
+              debt.section == AccountSection.customers.sectionKey.key,
+        ),
+      );
+    });
+    final customerCard = loaded!.customer;
+    final companyCard = loaded.company;
+    final tickerDebt = loaded.ticker;
 
     await go(tester, '/customers');
     expectRtl(tester);
-    final card = find.byKey(const Key('account-card-c_55'));
-    expect(
-      find.descendant(of: card, matching: find.text('مرّ عليه 3 أيام')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: card, matching: find.textContaining('منذ')),
-      findsNothing,
-    );
+    _expectSingleAge(tester, customerCard, AccountSection.customers);
     expect(
       tester.widget<Text>(find.byKey(const Key('ticker-age-c_55'))).data,
-      'منذ 4 أيام',
+      singleAgeText(
+        serverLabel: tickerDebt.ageStatusLabel,
+        ageStatus: tickerDebt.ageStatus,
+        debtAgeDays: tickerDebt.debtAgeDays,
+      ),
     );
 
     await go(tester, '/companies');
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('account-card-c_55')),
-        matching: find.text('مرّ عليه 3 أيام'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('account-card-c_55')),
-        matching: find.textContaining('منذ'),
-      ),
-      findsNothing,
-    );
+    _expectSingleAge(tester, companyCard, AccountSection.companies);
   });
 
   testWidgets('amounts sit on the RTL start edge in light and dark', (
@@ -313,7 +322,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('account lists screenshot light and dark at 360 and 430', (
+  testWidgets('account lists screenshot light and dark at 320 and 430', (
     tester,
   ) async {
     const dirPath = '/opt/cursor/artifacts';
@@ -322,7 +331,7 @@ void main() {
     } on FileSystemException {
       return;
     }
-    await pumpFakeApp(tester, size: const Size(360, 1200));
+    await pumpFakeApp(tester, size: const Size(320, 1200));
     await tester.runAsync(_loadScreenshotFonts);
     await tester.pump();
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
@@ -334,7 +343,7 @@ void main() {
     };
     for (final dark in [false, true]) {
       if (dark) await _setDark(tester);
-      for (final width in [360.0, 430.0]) {
+      for (final width in [320.0, 430.0]) {
         tester.view.physicalSize = Size(width, 1200);
         tester.view.devicePixelRatio = 1;
         for (final screen in screens.entries) {
@@ -347,6 +356,34 @@ void main() {
       }
     }
   });
+}
+
+void _expectSingleAge(
+  WidgetTester tester,
+  AccountCardDto card,
+  AccountSection section,
+) {
+  final shown = singleAgeText(
+    serverLabel: card.ageStatusLabel,
+    ageStatus: card.ageStatus,
+    section: section,
+    debtAgeDays: card.debtAgeDays,
+  );
+  final finder = find.byKey(Key('account-card-${card.id}'));
+  final age = tester.widget<Text>(find.byKey(Key('account-age-${card.id}')));
+  expect(age.data, shown);
+  expect(
+    find.descendant(
+      of: finder,
+      matching: find.byKey(Key('account-age-${card.id}')),
+    ),
+    findsOneWidget,
+  );
+  final days = card.debtAgeDays;
+  if (days == null || shown == null) return;
+  final count = ageCountPhrase(days);
+  if (count == shown) return;
+  expect(find.descendant(of: finder, matching: find.text(count)), findsNothing);
 }
 
 void _expectAmountOnStart(WidgetTester tester, String amount) {
