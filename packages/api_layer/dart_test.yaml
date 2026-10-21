@@ -1,0 +1,4 @@
+# Declared so `flutter test --tags permissions-negative` does not warn.
+# The app root dart_test.yaml is not visible when this package is the cwd.
+tags:
+  permissions-negative:

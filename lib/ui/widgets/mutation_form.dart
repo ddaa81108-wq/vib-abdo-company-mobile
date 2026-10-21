@@ -185,8 +185,10 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
   }
 
   /// Maps a thrown write error. Version conflicts refetch and show the shared
-  /// conflict copy; every other error keeps the mapped server message.
+  /// conflict copy. Session expiry says the write was not saved and keeps the
+  /// request id for a manual retry. Every other error keeps the server message.
   String _presentFailure(Object error) {
+    if (error is SessionExpiredException) return AppStrings.writeNotSaved;
     final failure = ref.read(errorHandlerProvider).toFailure(error);
     if (failure.code != 'VERSION_CONFLICT') return failure.message;
     _announceConflict();

@@ -101,7 +101,7 @@ class DioApiClient implements ApiClient {
           },
         ),
       );
-      final normalized = _normalize(res);
+      final normalized = _normalize(res, options.authenticated);
       ApiReachability.instance.recordSuccess();
       return normalized;
     } on ApiException catch (error) {
@@ -119,7 +119,7 @@ class DioApiClient implements ApiClient {
   }
 
   /// Unwraps `{ok:true, data}`. Anything else is an error, like the web client.
-  ApiResponse _normalize(Response<Object?> res) {
+  ApiResponse _normalize(Response<Object?> res, bool authenticated) {
     final status = res.statusCode ?? 200;
     final cid = res.headers.value('x-correlation-id');
     final body = res.data;
@@ -131,7 +131,7 @@ class DioApiClient implements ApiClient {
           statusCode: status, data: body['data'], correlationId: cid);
     }
     if (body is Map && body['ok'] == false) {
-      throw _errorMapper.fromResponse(status, body, res.headers);
+      throw _errorMapper.fromResponse(status, body, res.headers, authenticated);
     }
     throw InvalidServerResponseException(
         statusCode: status, correlationId: cid);

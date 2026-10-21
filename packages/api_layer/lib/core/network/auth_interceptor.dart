@@ -3,13 +3,15 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 
 import '../auth/auth_strategy.dart';
+import 'api_exception.dart';
 import 'error_mapper.dart';
 
 /// Delegates credentials to the active [AuthStrategy].
 /// - onRequest: strategy.attach (cookies + X-CSRF-Token, or Bearer).
 /// - onResponse/onError: strategy.capture (Set-Cookie).
 /// - onError: maps the error; CSRF invalid -> strategy refetches token -> replay ONCE;
-///   AUTH_REQUIRED -> forced logout (no refresh flow on the cookie session).
+///   authenticated 401 / non-CSRF 419 -> forced logout. That path never replays,
+///   including writes. There is no refresh token.
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required AuthStrategy strategy,
@@ -61,6 +63,11 @@ class AuthInterceptor extends Interceptor {
         await _onForcedLogout('session_expired');
         return handler.next(err);
       case AuthErrorAction.retryOnce:
+        // Session expiry is logout, never a replay, even if a strategy asks.
+        if (mapped is SessionExpiredException) {
+          if (_authenticated(req)) await _onForcedLogout('session_expired');
+          return handler.next(err);
+        }
         if (req.extra['authRetried'] == true) return handler.next(err);
         req.extra['authRetried'] = true;
         try {

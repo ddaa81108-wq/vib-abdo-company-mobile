@@ -41,8 +41,11 @@ typedef SessionCleanup = Future<void> Function();
 /// Cookie-session lifecycle for the real system:
 ///   login    POST /api/auth/login {username,password} -> {user, csrfToken}; then GET /api/me
 ///   restore  GET /api/me then GET /api/auth/csrf (same order as the web client's resume)
-///   logout   POST /api/auth/logout (with X-CSRF-Token) -> wipe cookies + CSRF + caches
-///   expiry   any AUTH_REQUIRED -> forceLogout (there is NO refresh flow)
+///   logout   POST /api/auth/logout (with X-CSRF-Token) invalidates the server
+///            session, then the client wipes the cookie jar, the token store,
+///            and the in-memory CSRF token even if that call failed
+///   expiry   authenticated 401, or 419 that is not a CSRF failure -> forceLogout
+///            (there is NO refresh token and no local lifetime timer)
 class SessionManager {
   SessionManager({
     required AuthStrategy authStrategy,

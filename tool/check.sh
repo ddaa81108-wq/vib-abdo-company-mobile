@@ -5,9 +5,13 @@ cd "$(dirname "$0")/.."
 
 flutter analyze
 flutter test --exclude-tags screenshots
+flutter test --tags permissions-negative
 
 (
   cd packages/api_layer
   flutter analyze
   flutter test
+  flutter test --tags permissions-negative
 )
+
+tool/staging_negative_tests/run.sh --dry-run
