@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
 import '../api/api_providers.dart';
+import '../error_handling/app_failure.dart';
+import '../ui/strings.dart';
 import 'session_providers.dart';
 
 /// Optional `YYYY-MM-DD` window. There is no `employeeId` field: an employee
@@ -56,12 +58,22 @@ class EmployeeTotalsReady extends EmployeeTotalsState {
   final EmployeeTotalsDto report;
 }
 
-/// HTTP 403 `FORBIDDEN` (or the same [ForbiddenException] from the client).
-/// The body is not an empty totals list. Show the server message and no rows.
+/// HTTP 403. The body is not an empty totals list.
+///
+/// [failure] is the unified forbidden copy: [AppFailure.isForbidden] and
+/// [AppStrings.forbidden], the same sentence `ForbiddenPane` shows. The
+/// server envelope text is not stored on this state. The screen reads
+/// [message]. The underlying provider error still throws
+/// `ForbiddenException`; that envelope message stays off this state.
 class EmployeeTotalsForbidden extends EmployeeTotalsState {
-  const EmployeeTotalsForbidden(this.error);
+  const EmployeeTotalsForbidden();
 
-  final ForbiddenException error;
+  final AppFailure failure = const AppFailure(
+    message: AppStrings.forbidden,
+    code: 'FORBIDDEN',
+  );
+
+  String get message => failure.message;
 }
 
 /// Any other failure (network, 401, 5xx, invalid money). Not a 403.
@@ -76,7 +88,7 @@ EmployeeTotalsState employeeTotalsStateOf(AsyncValue<EmployeeTotalsDto> value) {
     loading: () => const EmployeeTotalsLoading(),
     data: EmployeeTotalsReady.new,
     error: (error, _) => error is ForbiddenException
-        ? EmployeeTotalsForbidden(error)
+        ? const EmployeeTotalsForbidden()
         : EmployeeTotalsFailure(error),
   );
 }

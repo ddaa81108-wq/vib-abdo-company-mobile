@@ -369,7 +369,7 @@ class _TransactionCorrectionFormState
         ref.invalidate(accountsProvider(widget.section));
         return AppStrings.versionConflict;
       }
-      return failure.message;
+      return failureText(failure);
     }
   }
 }

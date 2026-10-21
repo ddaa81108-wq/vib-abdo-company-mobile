@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/state/employee_totals_provider.dart';
+import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 void main() {
   Future<ProviderContainer> signedIn(String username) async {
@@ -39,8 +40,11 @@ void main() {
     expect(state, isA<EmployeeTotalsForbidden>());
     expect(state, isNot(isA<EmployeeTotalsReady>()));
     final forbidden = state as EmployeeTotalsForbidden;
-    expect(forbidden.error.statusCode, 403);
-    expect(forbidden.error.message, 'هذا الإجراء للإدارة فقط');
+    expect(forbidden.failure.isForbidden, isTrue);
+    expect(forbidden.message, AppStrings.forbidden);
+    expect(forbidden.failure.message, AppStrings.forbidden);
+    expect(forbidden.message, isNot('هذا الإجراء للإدارة فقط'));
+    expect(forbidden.failure.correlationId, isNull);
   });
 
   test('limited admin provider state is forbidden until DEF-002', () async {

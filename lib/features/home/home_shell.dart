@@ -15,6 +15,7 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/logout_confirm.dart';
 import '../../ui/widgets/soft_tile.dart';
 
 class NavItem {
@@ -161,7 +162,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           IconButton(
             key: HomeShell.logoutKey,
             tooltip: AppStrings.logout,
-            onPressed: () => ref.read(sessionStateProvider.notifier).logout(),
+            onPressed: () => requestLogout(context, ref),
             icon: const Icon(Icons.logout),
           ),
         ],

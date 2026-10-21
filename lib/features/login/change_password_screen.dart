@@ -5,6 +5,7 @@ import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
+import '../../ui/widgets/common.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 
@@ -190,7 +191,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
       if (!mounted) return;
       setState(() {
         _saved = false;
-        _message = ref.read(errorHandlerProvider).toFailure(error).message;
+        _message = failureText(ref.read(errorHandlerProvider).toFailure(error));
       });
     } finally {
       if (mounted) setState(() => _busy = false);
