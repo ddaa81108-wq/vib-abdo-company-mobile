@@ -12,7 +12,7 @@ tool/staging_negative_tests/run.sh --dry-run --junit "$RUNNER_TEMP/staging-negat
 
 `--dry-run` is a self-test. It does not read credentials and does not open a socket. It checks that missing env is refused, that production and non-staging hosts are refused, that the live case list is intact, and that JUnit XML escapes text. The workflow does not set any `STAGING_*` variable.
 
-Live mode also refuses to run when `CI=true`, so a workflow edit cannot point this suite at a network by dropping `--dry-run`.
+[PR #32](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/32) runs this same entrypoint. Its negative-permission job calls `tool/staging_negative_tests/run.sh --dry-run` when the file exists. Its manual workflow `Staging negative permission tests` calls `run.sh --junit staging-permissions-junit.xml` and uploads that file as the artifact `staging-permissions-junit`. That live call happens on GitHub Actions, so this script does not refuse `CI=true`. The dry-run is what keeps ordinary CI off the network.
 
 `flutter test --tags permissions-negative` is a separate CI step for the in-process tests. A failure fails the job. Those tests use the fake client and an in-process HTTP adapter.
 
@@ -46,7 +46,14 @@ tool/staging_negative_tests/run.sh --junit /tmp/staging-negative.xml
 
 There is no default host. The process exits 2 when a required variable is missing.
 
-`STAGING_API_BASE` must be `https` and the host must contain `staging`, or it must be loopback (`localhost`, `127.0.0.1`, `::1`) over `http` or `https`. A host label `prod` or `production` is refused even if the name also contains `staging`. Userinfo, a path, a query, and a fragment are refused. Redirects are not followed.
+`run.sh` accepts the same origins as `classify_origin` in PR #32's `tool/staging_negative_tests/preflight.py`. It is not a stricter check.
+
+- `https` only. No userinfo, path, query, or fragment. A non-default port is allowed.
+- Placeholder hosts are refused: `*.invalid`, `*.example`, `example.com`, `localhost`, or a host containing `placeholder`, `changeme`, or `replace-me`. `https://staging.example.invalid` is refused. Loopback is refused.
+- A DNS label other than the final label (the TLD) must be `staging`, `stage`, `test`, or `testing`, or contain `staging` / `testing`, or start with `stage-` / `test-`, or end with `-stage` / `-test`. The TLD does not count, so `https://api.company.test` is refused. Examples that pass: `https://staging.company.test`, `https://api-staging.company.test`, `https://test.company.test`.
+- A label of `prod`, `production`, or `live`, a label containing `production`, or a label starting with `prod-` / `production-` / `live-` or ending with `-prod` / `-production` / `-live` is refused even when another label says staging.
+
+Redirects are not followed. The value of the origin is not printed on refusal.
 
 ## Cases
 

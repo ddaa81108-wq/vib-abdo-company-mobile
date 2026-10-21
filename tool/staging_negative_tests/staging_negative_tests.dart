@@ -1,8 +1,11 @@
 // Staging negative checks for the permission matrix.
 //
-// CI runs: tool/staging_negative_tests/run.sh --dry-run
-// That path does not open a socket. Live mode refuses CI=true and any host
-// that is not loopback or an https host whose name contains "staging".
+// Normal CI runs: tool/staging_negative_tests/run.sh --dry-run
+// That path does not open a socket. The manual workflow in PR #32 calls
+// `run.sh --junit staging-permissions-junit.xml` and uploads the artifact
+// `staging-permissions-junit`. Live mode uses the same origin rules as
+// `classify_origin` in that preflight: https only, a non-TLD label of
+// staging/stage/test/testing, and no *.invalid placeholder.
 // ignore_for_file: avoid_print
 
 import 'dart:async';
@@ -84,12 +87,6 @@ Future<void> main(List<String> args) async {
     }
     exit(results.any((row) => row.failed) ? 1 : 0);
   }
-  if (Platform.environment['CI'] == 'true') {
-    stderr.writeln(
-      'Refusing to contact a network because CI=true. CI runs this suite with --dry-run only.',
-    );
-    exit(2);
-  }
   late final StagingConfig config;
   try {
     config = requireConfig(Platform.environment);
@@ -164,46 +161,87 @@ StagingConfig requireConfig(Map<String, String> env) {
   );
 }
 
-Uri _requireStagingBase(String raw) {
-  final uri = Uri.tryParse(raw);
-  if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-    throw ConfigProblem('STAGING_API_BASE must be an absolute origin.');
+/// Same accept/reject set as `classify_origin` in PR #32's preflight.
+/// `ok` may run. `prod` and `not-staging` are refused. A non-default port is ok.
+String classifyOrigin(String raw) {
+  final uri = Uri.tryParse(raw.trim());
+  if (uri == null || !uri.hasScheme) return 'not-staging';
+  final host = uri.host.toLowerCase().replaceAll(RegExp(r'\.$'), '');
+  final labels = host.split('.').where((label) => label.isNotEmpty).toList();
+  if (labels.any(_prodLabel)) return 'prod';
+  if (uri.scheme != 'https') return 'not-staging';
+  if (uri.userInfo.isNotEmpty) return 'not-staging';
+  if (uri.query.isNotEmpty || uri.fragment.isNotEmpty) return 'not-staging';
+  if (uri.path.isNotEmpty && uri.path != '/') return 'not-staging';
+  if (host.isEmpty || _placeholder(host) || labels.isEmpty) {
+    return 'not-staging';
   }
-  if (uri.userInfo.isNotEmpty) {
-    throw ConfigProblem('STAGING_API_BASE must not contain user info.');
-  }
-  if (uri.query.isNotEmpty || uri.fragment.isNotEmpty) {
-    throw ConfigProblem(
-      'STAGING_API_BASE must not contain a query or fragment.',
-    );
-  }
-  if (uri.path.isNotEmpty && uri.path != '/') {
-    throw ConfigProblem('STAGING_API_BASE must be an origin with no path.');
-  }
-  final host = uri.host.toLowerCase();
-  if (_productionLabel(host)) {
-    throw ConfigProblem(
-      'Refusing host "$host": a production label is never a target.',
-    );
-  }
-  final loopback = host == 'localhost' || host == '127.0.0.1' || host == '::1';
-  if (loopback) {
-    if (uri.scheme != 'http' && uri.scheme != 'https') {
-      throw ConfigProblem('Loopback STAGING_API_BASE must be http or https.');
-    }
-    return uri;
-  }
-  if (uri.scheme != 'https' || !host.contains('staging')) {
-    throw ConfigProblem(
-      'Refusing host "$host". Live mode allows https hosts whose name contains "staging", or loopback.',
-    );
-  }
-  return uri;
+  // The final label is the TLD. `api.company.test` is not a staging origin.
+  final markers = labels.sublist(0, labels.length - 1);
+  if (markers.any(_stagingLabel)) return 'ok';
+  return 'not-staging';
 }
 
-bool _productionLabel(String host) {
-  final labels = host.split(RegExp(r'[.\-]'));
-  return labels.any((label) => label == 'prod' || label == 'production');
+bool _prodLabel(String label) {
+  if (label == 'prod' || label == 'production' || label == 'live') return true;
+  if (label.contains('production')) return true;
+  return label.startsWith('prod-') ||
+      label.startsWith('production-') ||
+      label.startsWith('live-') ||
+      label.endsWith('-prod') ||
+      label.endsWith('-production') ||
+      label.endsWith('-live');
+}
+
+bool _stagingLabel(String label) {
+  if (label == 'staging' ||
+      label == 'stage' ||
+      label == 'test' ||
+      label == 'testing') {
+    return true;
+  }
+  if (label.contains('staging') || label.contains('testing')) return true;
+  return label.startsWith('stage-') ||
+      label.startsWith('test-') ||
+      label.endsWith('-stage') ||
+      label.endsWith('-test');
+}
+
+bool _placeholder(String host) {
+  if (host == 'example.com' ||
+      host == 'example.org' ||
+      host == 'example.net' ||
+      host == 'localhost') {
+    return true;
+  }
+  if (host.endsWith('.example') ||
+      host.endsWith('.invalid') ||
+      host.endsWith('.example.com') ||
+      host.endsWith('.localhost')) {
+    return true;
+  }
+  return host.contains('placeholder') ||
+      host.contains('changeme') ||
+      host.contains('replace-me') ||
+      host.contains('replace_me');
+}
+
+Uri _requireStagingBase(String raw) {
+  final kind = classifyOrigin(raw);
+  if (kind == 'prod') {
+    throw ConfigProblem(
+      'Refusing STAGING_API_BASE: a production label is never a target.',
+    );
+  }
+  if (kind != 'ok') {
+    throw ConfigProblem(
+      'Refusing STAGING_API_BASE. Live mode allows https origins whose host '
+      'has a non-TLD label of staging, stage, test, or testing. '
+      'Placeholders such as *.invalid are refused. '
+      'This matches classify_origin in the staging preflight.',
+    );
+  }
+  return Uri.parse(raw.trim());
 }
 
 List<CaseResult> _selfTest() {
@@ -251,12 +289,18 @@ List<CaseResult> _selfTest() {
     };
     for (final host in const [
       'https://api.example.com',
+      'https://api.company.test',
       'https://production.example.com',
-      'https://prod.example.com',
-      'http://staging.example.com',
-      'https://user:pw@staging.example.com',
-      'https://staging.example.com/api',
-      'https://staging.prod.example.com',
+      'https://prod.company.test',
+      'https://live.company.test',
+      'https://api.production.company.test',
+      'https://staging.prod.company.test',
+      'http://staging.company.test',
+      'https://user:pw@staging.company.test',
+      'https://staging.company.test/api',
+      'https://staging.example.invalid',
+      'http://127.0.0.1:9',
+      'https://localhost',
     ]) {
       var threw = false;
       try {
@@ -267,9 +311,9 @@ List<CaseResult> _selfTest() {
       if (!threw) throw StateError('accepted $host');
     }
   });
-  check('staging https and loopback are accepted', () {
+  check('staging and test hosts are accepted', () {
     final staging = requireConfig({
-      'STAGING_API_BASE': 'https://staging.example.invalid',
+      'STAGING_API_BASE': 'https://staging.company.test',
       'STAGING_ADMIN_USERNAME': 'a',
       'STAGING_ADMIN_PASSWORD': 'a',
       'STAGING_EMPLOYEE_USERNAME': 'e',
@@ -277,14 +321,33 @@ List<CaseResult> _selfTest() {
       'STAGING_EMPLOYEE2_USERNAME': 'e2',
       'STAGING_EMPLOYEE2_PASSWORD': 'e2',
     });
-    if (staging.base.host != 'staging.example.invalid') {
+    if (staging.base.host != 'staging.company.test') {
       throw StateError('host mutated');
     }
     if (staging.limitedUsername != null) {
       throw StateError('limited manager should be unset');
     }
-    final loopback = requireConfig({
-      'STAGING_API_BASE': 'http://127.0.0.1:9',
+    for (final host in const [
+      'https://api-staging.company.test:8443',
+      'https://test.company.com',
+      'https://testing.company.test',
+      'https://stage.company.test',
+    ]) {
+      final accepted = requireConfig({
+        'STAGING_API_BASE': host,
+        'STAGING_ADMIN_USERNAME': 'a',
+        'STAGING_ADMIN_PASSWORD': 'a',
+        'STAGING_EMPLOYEE_USERNAME': 'e',
+        'STAGING_EMPLOYEE_PASSWORD': 'e',
+        'STAGING_EMPLOYEE2_USERNAME': 'e2',
+        'STAGING_EMPLOYEE2_PASSWORD': 'e2',
+      });
+      if (accepted.base.scheme != 'https') {
+        throw StateError('scheme changed for $host');
+      }
+    }
+    final limited = requireConfig({
+      'STAGING_API_BASE': 'https://test.company.test',
       'STAGING_ADMIN_USERNAME': 'a',
       'STAGING_ADMIN_PASSWORD': 'a',
       'STAGING_EMPLOYEE_USERNAME': 'e',
@@ -294,8 +357,11 @@ List<CaseResult> _selfTest() {
       'STAGING_LIMITED_MANAGER_USERNAME': 'm',
       'STAGING_LIMITED_MANAGER_PASSWORD': 'm',
     });
-    if (loopback.limitedUsername != 'm') {
+    if (limited.limitedUsername != 'm') {
       throw StateError('limited manager was dropped');
+    }
+    if (classifyOrigin('https://api-staging.company.test:8443') != 'ok') {
+      throw StateError('ported staging host was rejected');
     }
   });
   check('junit records a failure', () {

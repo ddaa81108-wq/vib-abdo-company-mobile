@@ -18,20 +18,19 @@ Unsafe methods (`POST`, `PUT`, `PATCH`, `DELETE`) send `X-CSRF-Token` when the i
 
 Only `AUTH_REQUIRED` has been observed. `SESSION_EXPIRED`, `SESSION_REVOKED`, and `PAGE_EXPIRED` are defensive.
 
-Classification matches the staging client:
+The implementation is open [PR #38](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/38) (`cursor/session-expiry-logout-2f57`). This branch merges that code and does not keep a second expiry mapper.
 
 | Response | Result |
 |---|---|
-| Authenticated 401, any code except one that contains `CREDENTIALS` or `LOGIN` | Session expiry |
-| Authenticated 401 whose code contains `CREDENTIALS` or `LOGIN` | Invalid credentials, session kept (wrong current password must not look like expiry if the server uses that code) |
-| Public login 401, any code | Invalid credentials |
+| Authenticated 401, any code | Session expiry |
+| Public login 401, any code, including `AUTH_REQUIRED` | Invalid credentials |
 | 419 whose code or message contains `CSRF` | CSRF refresh, one replay |
 | Any other 419, including a non-JSON body | Session expiry (`PAGE_EXPIRED` when the server sends no code) |
 | `AUTH_REQUIRED`, `SESSION_EXPIRED`, `SESSION_REVOKED`, or `PAGE_EXPIRED` on another status | Session expiry |
 
-Expiry calls `SessionManager.forceLogout('session_expired')`. The router shows "انتهت الجلسة، يرجى تسجيل الدخول" and sends the user to `/login`. SSE and the 4-second poll stop on 401/419. They do not reconnect on a dead cookie.
+Expiry calls `SessionManager.forceLogout`. Many 401s share one wipe. An explicit logout that overlaps those 401s keeps reason `logout`, so the login screen does not show the expiry notice. The router shows "انتهت الجلسة، يرجى تسجيل الدخول" only for reason `session_expired` and sends the user to `/login`.
 
-`GET` / `HEAD` transport retries still skip 401 and 419. They never retry `POST`, `PUT`, `PATCH`, or `DELETE`.
+`GET` / `HEAD` transport retries skip 401 and 419. They never retry `POST`, `PUT`, `PATCH`, or `DELETE`.
 
 ## Logout and local wipe
 
@@ -41,20 +40,20 @@ Expiry calls `SessionManager.forceLogout('session_expired')`. The router shows "
 - the token store (`TokenStorage.clear`), including a bearer token left from a stub experiment
 - the in-memory CSRF token
 
-The same wipe runs on expiry. A later authenticated request has no cookie and no CSRF token. The fake server answers 401 `AUTH_REQUIRED` once its logged-in flag is cleared. The real server must do the same for a replayed cookie (question 55). If logout never reached the server, the server session can live until its own lifetime; the app will not send the cookie again.
+`SessionManager` runs that wipe single-flight. Logout's own 401 does not announce `session_expired`. The same wipe runs on expiry. A later authenticated request has no cookie and no CSRF token. The fake answers 401 once `expireSession` has marked the cookie dead, and again after logout. The real server must do the same for a replayed cookie (question 8 in the totals proposal). If logout never reached the server, the server session can live until its own lifetime; the app will not send the cookie again.
 
 ## In-flight write at expiry
 
 A write that is in flight when the session dies is **not** retried, and it is **not** replayed after the next login.
 
-The interceptor logs the user out and surfaces the error. `GuardedMutation` shows "لم يُحفظ. انتهت الجلسة. أعد المحاولة بعد تسجيل الدخول." and does not start a new `requestId` while that same form is still mounted. A manual retry of the unchanged form sends the original `requestId`. The router then replaces the screen with `/login`, so the form is usually disposed and the id is not stored on disk. The client will not send the write by itself after login. A later new submission is a new user action and a new id.
+`pendingMutationProvider` keeps the `requestId`, the inputs, and the expected version for that user. The protected route is disposed by the login redirect, so the form's controllers are gone. The next `GuardedMutation` for the same user, the same inputs, and the same expected version reuses that `requestId`. A different user drops the snapshot. A successful send clears it. Nothing sends the write by itself after login.
 
-The CSRF replay above is the only automatic replay of a write, and only when the server said the token was rejected. The body, including `requestId`, is unchanged. Question 56 asks the server to treat `requestId` as idempotent if a write was applied and then the session died.
+The CSRF replay above is the only automatic replay of a write, and only when the server said the token was rejected. The body, including `requestId`, is unchanged. Question 9 in the totals proposal asks the server to treat `requestId` as idempotent if a write was applied and then the session died.
 
 ## What the code does
 
-Verified in `CookieCsrfAuthStrategy`, `AuthInterceptor`, `GetRetryInterceptor`, `ErrorMapper`, `SessionManager`, and `ApiStack`:
+Verified against PR #38's `SessionManager`, `AuthInterceptor`, `ErrorMapper`, `ApiStack`, and `pendingMutationProvider`:
 
-- Cookie mode clears the cookie jar and the CSRF token. `ApiStack` also clears the token store on every logout and expiry, in fake mode and in real mode.
+- Fake mode and cookie mode both clear the cookie jar, the token store, and the in-memory CSRF token on logout and on expiry.
 - Bearer mode remains a stub and is not selected unless `AUTH_BEARER` is set. It has no refresh call.
-- Tests: `packages/api_layer/test/permissions/session_wipe_permission_negative_test.dart` and the write-not-saved case in `test/guarded_mutation_test.dart`.
+- Tests: `packages/api_layer/test/permissions/session_permission_negative_test.dart` (from PR #38) and `packages/api_layer/test/permissions/session_wipe_permission_negative_test.dart`.
