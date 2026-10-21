@@ -3,7 +3,6 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../error_handling/error_handler.dart';
-import '../../notifications/notification_registration.dart';
 import '../../notifications/push_providers.dart';
 import '../../state/notification_providers.dart';
 import '../../state/session_providers.dart';
@@ -16,6 +15,7 @@ import '../../ui/widgets/soft_tile.dart';
 import 'notification_content.dart';
 import 'notification_open_seam.dart';
 import 'notification_permission.dart';
+import 'notification_permission_registration.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -99,12 +99,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     if (next != NotificationPermissionChoice.granted) await _showDenied();
   }
 
-  /// Grant registers the device. Denial and a later revocation unregister it.
+  /// A grant registers. A denial unregisters. The opener still owns mark-read.
   Future<void> _syncRegistration() {
-    return syncNotificationRegistration(
-      session: ref.read(sessionStateProvider),
+    final session = ref.read(sessionStateProvider);
+    return registerForNotificationPermission(
+      signedIn: session is SessionAuthenticated,
+      permission: ref.read(notificationPermissionServiceProvider),
       registrar: ref.read(deviceTokenRegistrarProvider),
-      permission: ref.read(notificationPermissionProvider),
     );
   }
 
