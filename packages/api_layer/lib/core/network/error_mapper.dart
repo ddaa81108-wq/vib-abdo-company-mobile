@@ -9,17 +9,30 @@ import 'api_exception.dart';
 class ErrorMapper {
   const ErrorMapper();
 
-  /// Codes treated as "session expired" -> forced logout (no refresh flow exists).
-  /// 🔶 Only AUTH_REQUIRED is observed; the others are defensive guesses.
+  /// Codes treated as "session expired" -> forced logout (no refresh flow).
+  /// 🔶 Only AUTH_REQUIRED is observed. SESSION_EXPIRED, SESSION_REVOKED, and
+  /// PAGE_EXPIRED are defensive. PAGE_EXPIRED is the stand-in for a codeless
+  /// HTTP 419, same as the open staging client (PR #9).
+  ///
+  /// Status wins after login: any authenticated 401, and any 419 that is not
+  /// a CSRF error, is session expiry even when the code is something else.
+  /// A 401 on the login request itself stays invalid credentials.
   static const sessionExpiredCodes = {
     'AUTH_REQUIRED',
     'SESSION_EXPIRED',
-    'SESSION_REVOKED'
+    'SESSION_REVOKED',
+    'PAGE_EXPIRED',
   };
 
   /// 🔶 The real CSRF error code is NOT visible in the frontend code. Any code
   /// containing "CSRF" (e.g. CSRF_INVALID, CSRF_TOKEN_INVALID) is treated as such.
   static bool isCsrfCode(String code) => code.toUpperCase().contains('CSRF');
+
+  /// 🔶 A CSRF failure may be named only in the server message.
+  static bool isCsrfMessage(String? message) =>
+      message != null && message.toUpperCase().contains('CSRF');
+
+  static const invalidCredentialsMessage = 'بيانات الدخول غير صحيحة';
 
   ApiException map(Object error) {
     if (error is ApiException) return error;
@@ -50,11 +63,21 @@ class ErrorMapper {
 
     final response = error.response;
     if (response == null) return const NetworkException();
+    final authenticated = error.requestOptions.extra['skipAuth'] != true;
     return fromResponse(
-        response.statusCode ?? 0, response.data, response.headers);
+      response.statusCode ?? 0,
+      response.data,
+      response.headers,
+      authenticated,
+    );
   }
 
-  ApiException fromResponse(int status, Object? body, [Headers? headers]) {
+  ApiException fromResponse(
+    int status,
+    Object? body, [
+    Headers? headers,
+    bool authenticated = true,
+  ]) {
     final hasEnvelope =
         body is Map && body['ok'] == false && body['error'] is Map;
     final err = hasEnvelope
@@ -70,20 +93,43 @@ class ErrorMapper {
       }
     }
     final code = (err['code'] as String?) ?? _defaultCode(status);
-    final message = (err['message'] as String?) ?? _defaultMessage(status);
+    final serverMessage =
+        err['message'] is String ? (err['message'] as String).trim() : null;
+    final message = (serverMessage == null || serverMessage.isEmpty)
+        ? _defaultMessage(status)
+        : serverMessage;
     final details = err['details'];
 
-    // Code-first mapping (real codes), then status.
-    if (sessionExpiredCodes.contains(code)) {
-      return SessionExpiredException(
-          code: code,
+    // CSRF wins over 419. A bare 419 is session expiry, not a token refresh.
+    if (isCsrfCode(code) || isCsrfMessage(serverMessage)) {
+      return CsrfInvalidException(
+          code: isCsrfCode(code) ? code : 'CSRF_INVALID',
           message: message,
           statusCode: status,
           correlationId: correlationId,
           details: details);
     }
-    if (isCsrfCode(code)) {
-      return CsrfInvalidException(
+    // The login call is unauthenticated. Its 401 is rejected credentials,
+    // including when the body says AUTH_REQUIRED.
+    if (status == 401 && !authenticated) {
+      final serverCode = err['code'];
+      return InvalidCredentialsException(
+          code: serverCode is String && serverCode.isNotEmpty
+              ? serverCode
+              : 'INVALID_CREDENTIALS',
+          message: serverMessage == null || serverMessage.isEmpty
+              ? invalidCredentialsMessage
+              : serverMessage,
+          statusCode: status,
+          correlationId: correlationId,
+          details: details);
+    }
+    // After login, any 401 and any non-CSRF 419 end the session, whatever
+    // the code is. Named session codes do the same on other statuses.
+    if (sessionExpiredCodes.contains(code) ||
+        (authenticated && status == 401) ||
+        status == 419) {
+      return SessionExpiredException(
           code: code,
           message: message,
           statusCode: status,
@@ -108,15 +154,7 @@ class ErrorMapper {
             correlationId: correlationId,
             details: details);
       case 401:
-        if (code.contains('CREDENTIALS') || code.contains('LOGIN')) {
-          return InvalidCredentialsException(
-              code: code,
-              message: message,
-              statusCode: status,
-              correlationId: correlationId,
-              details: details);
-        }
-        // 🔶 Any other 401 is treated as session expiry (cookie session has no refresh).
+        // Unauthenticated 401 already returned above. Anything left is expiry.
         return SessionExpiredException(
             code: code,
             message: message,
@@ -225,6 +263,7 @@ class ErrorMapper {
         403 => 'FORBIDDEN',
         404 => 'NOT_FOUND',
         409 => 'VERSION_CONFLICT',
+        419 => 'PAGE_EXPIRED',
         422 => 'VALIDATION_ERROR',
         429 => 'RATE_LIMITED',
         _ when status >= 500 => 'SERVER_ERROR',
@@ -232,7 +271,7 @@ class ErrorMapper {
       };
 
   String _defaultMessage(int status) => switch (status) {
-        401 => 'يجب تسجيل الدخول أولًا.',
+        401 || 419 => 'يجب تسجيل الدخول أولًا.',
         403 => 'لا تملك صلاحية لهذا الإجراء',
         404 => 'العنصر غير موجود',
         409 => 'تغيرت البيانات على الخادم، يرجى التحديث',

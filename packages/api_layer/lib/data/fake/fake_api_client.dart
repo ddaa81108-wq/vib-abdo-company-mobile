@@ -19,8 +19,15 @@ import 'fake_fixtures.dart';
 /// Fake-only fixture switch by USERNAME (see FakeFixtures.meFor): `admin…` = admin like the real
 /// server today (empty permission list), `limited.admin…`, `flag.admin…`, `guest…`,
 /// `mustchange…`, else employee.
-/// Password "wrong" -> 401. Fixture pages stay canned. A successful mutation
-/// stores its result, and the next read returns that stored result.
+/// Password "wrong" -> 401 invalid credentials. A successful login sets a
+/// session cookie. There is no bearer token and no refresh token. Session
+/// lifetime is not known (🔶): this client does not run a local timer. Call
+/// [expireSession] to make the current cookie fail the next request.
+/// POST /api/auth/logout revokes that cookie. A missing, revoked, or expired
+/// cookie then gets 401 AUTH_REQUIRED on every authenticated call, and a
+/// stored `requestId` is not returned in place of that 401.
+/// Fixture pages stay canned. A successful mutation stores its result, and
+/// the next read returns that stored result.
 ///
 /// Section reads and writes are rejected with 403 unless the signed-in profile
 /// allows them. The check uses [PermissionService], which is the only place that
@@ -121,7 +128,19 @@ class FakeApiClient implements ApiClient {
 
   /// When non-null, suggestion reads return these items instead of `[]` (tests).
   List<Map<String, dynamic>>? suggestionItems;
-  bool _loggedIn = false;
+
+  /// Headers of the latest request, as the fake server saw them (tests).
+  Map<String, String> lastRequestHeaders = const {};
+
+  /// Server-side cookie sessions. The id is the `session` cookie value.
+  final Map<String, _FakeSession> _sessions = {};
+  int _sessionSeq = 0;
+  String? _jarId;
+  String? _latestSessionId;
+
+  /// When set, public calls go through the auth interceptor. [serveHttp] does not.
+  ApiClient? _gateway;
+
   final PermissionService _access = PermissionService();
   final Set<String> _passwordChangedUserIds = {};
   final Map<String, Object?> _completedMutations = {};
@@ -181,13 +200,29 @@ class FakeApiClient implements ApiClient {
   static const dayFinalizedMessage =
       'اليوم مرحّل. لا يمكن إضافة أو تعديل أو حذف بند.';
 
+  /// Routes later public calls through [gateway] (the auth interceptor).
+  void bindGateway(ApiClient gateway) => _gateway = gateway;
+
+  /// Drops the in-process cookie jar. The server session is left as it is.
+  void dropHeldCookie() => _jarId = null;
+
+  /// Marks the current session expired. The cookie is still presented; the
+  /// next authenticated request returns 401. There is no local timer.
+  void expireSession() {
+    final id = _jarId ?? _latestSessionId;
+    final session = id == null ? null : _sessions[id];
+    if (session == null) return;
+    session.expired = true;
+  }
+
   @override
   Future<ApiResponse> get(
     String path, {
     Map<String, dynamic>? query,
     ApiRequestOptions options = const ApiRequestOptions(),
   }) =>
-      _handle('GET', path, null, options, query: query);
+      _send('GET', path, null, options, query: query);
+
   @override
   Future<ApiResponse> post(
     String path, {
@@ -195,28 +230,97 @@ class FakeApiClient implements ApiClient {
     Map<String, dynamic>? query,
     ApiRequestOptions options = const ApiRequestOptions(),
   }) =>
-      _handle('POST', path, body, options);
+      _send('POST', path, body, options, query: query);
+
   @override
   Future<ApiResponse> put(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
   }) =>
-      _handle('PUT', path, body, options);
+      _send('PUT', path, body, options);
+
   @override
   Future<ApiResponse> patch(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
   }) =>
-      _handle('PATCH', path, body, options);
+      _send('PATCH', path, body, options);
+
   @override
   Future<ApiResponse> delete(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
   }) =>
-      _handle('DELETE', path, body, options);
+      _send('DELETE', path, body, options);
+
+  /// One HTTP exchange for the interceptor's adapter. Does not call [bindGateway].
+  Future<FakeHttpResult> serveHttp({
+    required String method,
+    required String path,
+    Object? data,
+    Map<String, dynamic>? query,
+    Map<String, String> headers = const {},
+    bool authenticated = true,
+  }) async {
+    final setCookie = <String>[];
+    try {
+      final response = await _handle(
+        method,
+        path,
+        data,
+        ApiRequestOptions(authenticated: authenticated, headers: headers),
+        query: query,
+        setCookie: setCookie,
+      );
+      return FakeHttpResult(
+        status: response.statusCode,
+        body: _successWire(response.data),
+        setCookie: setCookie,
+      );
+    } on ApiException catch (error) {
+      return FakeHttpResult(
+        status: error.statusCode ?? 401,
+        body: jsonEncode({
+          'ok': false,
+          'error': {
+            'code': error.code,
+            'message': error.message,
+            'details': error.details ?? <String, Object?>{},
+            'correlationId': error.correlationId ?? 'fake',
+          },
+        }),
+        setCookie: setCookie,
+      );
+    }
+  }
+
+  Future<ApiResponse> _send(
+    String method,
+    String path,
+    Object? body,
+    ApiRequestOptions options, {
+    Map<String, dynamic>? query,
+  }) {
+    final gateway = _gateway;
+    if (gateway == null) {
+      return _handle(method, path, body, options, query: query);
+    }
+    return switch (method) {
+      'GET' => gateway.get(path, query: query, options: options),
+      'POST' => gateway.post(path, body: body, query: query, options: options),
+      'PUT' => gateway.put(path, body: body, options: options),
+      'PATCH' => gateway.patch(path, body: body, options: options),
+      _ => gateway.delete(path, body: body, options: options),
+    };
+  }
+
+  String _successWire(Object? data) {
+    if (data == null) return '{"ok":true,"data":null}';
+    return '{"ok":true,"data":${jsonEncode(data)}}';
+  }
 
   ApiResponse _ok(Object? data, {int status = 200}) {
     ApiReachability.instance.recordSuccess();
@@ -228,19 +332,29 @@ class FakeApiClient implements ApiClient {
     );
   }
 
-  Never _fail(int status, String code, String message) {
+  Never _fail(
+    int status,
+    String code,
+    String message, {
+    bool authenticated = true,
+  }) {
     if (code == 'NETWORK_UNAVAILABLE' || code == 'TIMEOUT') {
       ApiReachability.instance.recordTransportFailure();
     }
-    throw _err.fromResponse(status, {
-      'ok': false,
-      'error': {
-        'code': code,
-        'message': message,
-        'details': {},
-        'correlationId': 'fake',
+    throw _err.fromResponse(
+      status,
+      {
+        'ok': false,
+        'error': {
+          'code': code,
+          'message': message,
+          'details': {},
+          'correlationId': 'fake',
+        },
       },
-    });
+      null,
+      authenticated,
+    );
   }
 
   void _requireMutationMeta(Map b) {
@@ -676,10 +790,17 @@ class FakeApiClient implements ApiClient {
     Object? body,
     ApiRequestOptions options, {
     Map<String, dynamic>? query,
+    List<String>? setCookie,
   }) async {
     await Future<void>.delayed(latency);
+    lastRequestHeaders = Map<String, String>.from(options.headers);
     // Same serialization as the real client, then decoded like a server would.
-    lastWireBody = body == null ? null : WireJson.encode(body, rateWireFormat);
+    // The interceptor path already encoded the body.
+    if (body is String) {
+      lastWireBody = body;
+    } else {
+      lastWireBody = body == null ? null : WireJson.encode(body, rateWireFormat);
+    }
     final decoded = lastWireBody == null ? null : jsonDecode(lastWireBody!);
     final b = decoded is Map ? decoded : const {};
     final seg = path
@@ -691,18 +812,32 @@ class FakeApiClient implements ApiClient {
 
     if (method == 'POST' && path == '/api/auth/login') {
       if (b['password'] == 'wrong') {
-        _fail(401, 'INVALID_CREDENTIALS', 'بيانات الدخول غير صحيحة');
+        _fail(
+          401,
+          'INVALID_CREDENTIALS',
+          'بيانات الدخول غير صحيحة',
+          authenticated: false,
+        );
       }
-      _loggedIn = true;
+      final previous = _jarId;
+      if (previous != null) {
+        _sessions.remove(previous);
+      }
       _activate(FakeFixtures.meFor('${b['username']}'));
+      final id = 'fake-session-${++_sessionSeq}';
+      _sessions[id] = _FakeSession(id: id, me: _me);
+      _latestSessionId = id;
+      _jarId = id;
+      setCookie?.add('session=$id; Path=/; HttpOnly');
       return _ok({..._me, 'csrfToken': 'fake-csrf'});
     }
     if (path == '/api/auth/csrf') return _ok({'csrfToken': 'fake-csrf'});
-    if (options.authenticated && !_loggedIn) {
-      _fail(401, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
-    }
+    if (options.authenticated) _ensureSession(options);
     if (path == '/api/auth/logout') {
-      _loggedIn = false;
+      final id = _presentedSessionId(options);
+      if (id != null) _sessions.remove(id);
+      if (_jarId == id) _jarId = null;
+      _userId = null;
       _access.applyFromServer(const [], role: null);
       return _ok({});
     }
@@ -730,15 +865,62 @@ class FakeApiClient implements ApiClient {
         head,
         query,
         () => _route(method, b, seg, head, query),
+        () => _ensureSession(options),
       );
     }
     return _route(method, b, seg, head, query);
   }
 
+  /// Cookie session check. A missing, revoked, or expired cookie is 401
+  /// before any permission decision.
+  void _ensureSession(ApiRequestOptions options) {
+    final id = _presentedSessionId(options);
+    final session = id == null ? null : _sessions[id];
+    if (session == null || session.expired) {
+      _fail(401, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
+    }
+    final user = session.me['user'];
+    if (user is Map && user['id'] != null) _userId = '${user['id']}';
+  }
+
+  String? _presentedSessionId(ApiRequestOptions options) {
+    if (_hasHeader(options, 'cookie')) {
+      return _sessionIdFromCookie(_header(options, 'cookie'));
+    }
+    return _jarId;
+  }
+
+  bool _hasHeader(ApiRequestOptions options, String name) =>
+      options.headers.keys.any((key) => key.toLowerCase() == name);
+
+  String? _header(ApiRequestOptions options, String name) {
+    for (final entry in options.headers.entries) {
+      if (entry.key.toLowerCase() == name) {
+        final value = entry.value.trim();
+        return value.isEmpty ? null : value;
+      }
+    }
+    return null;
+  }
+
+  String? _sessionIdFromCookie(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    for (final part in raw.split(';')) {
+      final piece = part.trim();
+      final eq = piece.indexOf('=');
+      if (eq <= 0) continue;
+      final name = piece.substring(0, eq).trim().toLowerCase();
+      if (name == 'session') return piece.substring(eq + 1).trim();
+    }
+    return null;
+  }
+
   /// A repeated [requestId] for this user returns the original success and
   /// does not apply the operation again. A failure is not remembered, so a
-  /// retry of the same id can still succeed. Permission is checked before
-  /// that replay. A purchase-entry write on a finalized day is rejected here
+  /// retry of the same id can still succeed. Each attempt checks the cookie
+  /// session first, then permission, then the stored success. A dead session
+  /// is checked again after [pauseMutations], so an in-flight write cannot
+  /// skip a 401. A purchase-entry write on a finalized day is rejected here
   /// as well, so a stored success cannot skip that check.
   Future<ApiResponse> _mutate(
     Map b,
@@ -748,12 +930,16 @@ class FakeApiClient implements ApiClient {
     String head,
     Map<String, dynamic>? query,
     Future<ApiResponse> Function() send,
+    void Function() ensureSession,
   ) async {
     _requireMutationMeta(b);
+    ensureSession();
     _authorize(method, seg, head, query);
     final requestId = '${b['requestId']}';
     final key = '${_userId ?? ''}|$requestId';
     if (_completedMutations.containsKey(key)) {
+      ensureSession();
+      _authorize(method, seg, head, query);
       _rejectFinalizedPurchaseEntry(path);
       return _ok(_completedMutations[key]);
     }
@@ -771,6 +957,7 @@ class FakeApiClient implements ApiClient {
     try {
       final paused = pauseMutations;
       if (paused != null) await paused.future;
+      ensureSession();
       if (failMutationsRemaining > 0) {
         failMutationsRemaining--;
         _fail(400, 'MUTATION_FAILED', 'تعذر تنفيذ الطلب.');
@@ -1753,6 +1940,28 @@ class FakeApiClient implements ApiClient {
     }
     _fail(404, 'NOT_FOUND', missing);
   }
+}
+
+/// One in-memory cookie session. Lifetime is not counted down locally.
+class _FakeSession {
+  _FakeSession({required this.id, required this.me});
+
+  final String id;
+  final Map<String, dynamic> me;
+  bool expired = false;
+}
+
+/// Wire body returned to the auth interceptor. Not an [ApiResponse].
+class FakeHttpResult {
+  const FakeHttpResult({
+    required this.status,
+    required this.body,
+    this.setCookie = const [],
+  });
+
+  final int status;
+  final String body;
+  final List<String> setCookie;
 }
 
 String? _queryText(Map<String, dynamic>? query, String key) {

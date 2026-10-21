@@ -12,7 +12,8 @@ const forbiddenLocation = '/forbidden';
 ///
 /// When [permissions] is set, a signed-in user who opens a section they cannot
 /// read is sent to [forbiddenLocation]. Search, notifications, the account
-/// screen, and [forbiddenLocation] itself stay open.
+/// screen, and [forbiddenLocation] itself stay open. An unauthenticated
+/// session is sent to `/login` before that permission decision.
 String? authRedirect(
   SessionState session,
   String location, {
@@ -71,7 +72,10 @@ SectionKey? sectionForLocation(String path) {
   return null;
 }
 
-/// Notice when the server ended the session. Other reasons stay silent.
+/// UI hook for session expiry. [SessionUnauthenticated.reason] is
+/// `session_expired` after the interceptor's `forceLogout`, and `logout`
+/// after [SessionManager.logout]. Only the expiry reason returns copy.
+/// The login screen shows this string; there is no second snackbar channel.
 String? signedOutNotice(SessionState session) {
   if (session is SessionUnauthenticated &&
       session.reason == 'session_expired') {

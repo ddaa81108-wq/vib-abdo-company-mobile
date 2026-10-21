@@ -8,6 +8,7 @@ import 'notifications/realtime_lifecycle.dart';
 import 'state/router_provider.dart';
 import 'state/session_providers.dart';
 import 'state/theme_controller.dart';
+import 'state/user_scope.dart';
 import 'ui/strings.dart';
 import 'ui/theme.dart';
 
@@ -24,6 +25,9 @@ class CompanyApp extends ConsumerWidget {
       return _material(themeMode: themeMode, child: const SplashScreen());
     }
     final router = ref.watch(routerProvider);
+    ref.listen(sessionStateProvider, (previous, next) {
+      onSessionTransition(ref, previous, next);
+    });
     return _material(themeMode: themeMode, router: router);
   }
 
