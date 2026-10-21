@@ -58,22 +58,21 @@ class ApiConfig {
   /// tests keep that default. See [ReleaseFakeApiGuard].
   factory ApiConfig.fromEnvironment() {
     const ReleaseFakeApiGuard();
-    final config = ApiConfig(
-      baseUrl: const String.fromEnvironment(
+    const config = ApiConfig(
+      baseUrl: String.fromEnvironment(
         'API_BASE',
         defaultValue: 'https://staging.example.invalid',
       ),
       useFakeApi: kUseFakeApiFromEnvironment,
-      enableDebugLogging: const bool.fromEnvironment('API_DEBUG_LOG'),
-      authStrategy: const bool.fromEnvironment('AUTH_BEARER')
+      enableDebugLogging: bool.fromEnvironment('API_DEBUG_LOG'),
+      authStrategy: bool.fromEnvironment('AUTH_BEARER')
           ? AuthStrategyKind.bearerToken
           : AuthStrategyKind.cookieCsrf,
-      moneyUnitScale: const int.fromEnvironment(
+      moneyUnitScale: int.fromEnvironment(
         'MONEY_UNIT_SCALE',
         defaultValue: 0,
       ),
-      rateWireFormat:
-          const String.fromEnvironment('RATE_WIRE_FORMAT') == 'string'
+      rateWireFormat: String.fromEnvironment('RATE_WIRE_FORMAT') == 'string'
           ? RateWireFormat.string
           : RateWireFormat.number,
     );

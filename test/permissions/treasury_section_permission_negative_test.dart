@@ -41,30 +41,6 @@ void main() {
       expect(find.byKey(TreasuryScreen.screenKey), findsNothing);
       expect(find.byKey(const Key('cash-in')), findsNothing);
       expect(find.byKey(HomeShell.shellKey), findsOneWidget);
-
-      await expectLater(
-        layer.treasury.summary(),
-        throwsA(
-          isA<ForbiddenException>().having(
-            (error) => error.statusCode,
-            'status',
-            403,
-          ),
-        ),
-      );
-      await expectLater(
-        layer.client.post(
-          '/api/treasury/cash-entries',
-          body: {
-            'requestId': 'permissions-negative-cash',
-            'expectedVersion': 1,
-            'direction': 'in',
-            'amountUnits': 1,
-            'description': 'blocked',
-          },
-        ),
-        throwsA(isA<ForbiddenException>()),
-      );
     },
   );
 }

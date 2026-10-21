@@ -48,8 +48,8 @@ Flutter exits 0 when the tag matches nothing (`No tests ran` or `+0`). This gate
 
 The seed tests use the existing fake profiles (not new accounts):
 
-- App: `test/permissions/treasury_section_permission_negative_test.dart`. `employee.demo` has no treasury code, so the home shell hides the section and the cash-in control, a direct `/treasury` route does not open the screen, and the fake client returns 403 for a treasury read and a cash entry.
-- Package: `packages/api_layer/test/permissions/treasury_section_permission_negative_test.dart`. The same profile is rejected by `FakeApiClient` with `ForbiddenException` (HTTP 403).
+- App: `test/permissions/treasury_section_permission_negative_test.dart`. `employee.demo` has no treasury code, so the home shell hides the section and the cash-in control, and a direct `/treasury` route does not open the screen.
+- Package: `packages/api_layer/test/permissions/treasury_section_permission_negative_test.dart`. The same profile is rejected by `FakeApiClient` with `ForbiddenException` (HTTP 403) on a treasury read and a cash entry.
 
 Add further cases the same way. Do not retag the older permission tests unless the file also moves to this name or directory.
 
