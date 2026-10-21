@@ -15,6 +15,7 @@
 |---|---|
 | Pending PM decision | DEF-002. على `main` عند `8a52160` السلوك لم يتغير. الإداري المحدود ما زال `collections.decide`، ومسار الإجماليات المخصص يرفضه بـ 403 |
 | Blocking مفتوح على `main` | لا يبقى عيب مانع من DEF-013 أو DEF-014. هما verified on main 451ec58 |
+| Blocking على فرع وليس على `main` | DEF-018 على #47 `3f8e009`. موافقة الإذن لا ترسل `POST /api/mobile-push/devices` |
 | Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `8a52160` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل |
 | أُغلق على فرع وليس على `main` | DEF-017. Verified closed on `cursor/phase6-system-tray-bg-poll` `cc1bc83` and still closed on #46 `f6fa327`, not on main. كان مفتوحًا على `82e0e8c` |
 | verified on main 8a52160 | DEF-010. «عرض الكل» يتبع قسم النشرة |
@@ -529,7 +530,7 @@
 
 ### DEF-017 — 401 أثناء ابتلاع الدفع يخرج من `presentPush` بلا `sessionEnded`
 
-**الحالة:** Verified closed on `cursor/phase6-system-tray-bg-poll` `cc1bc83b81e4b996cd0a974121e5b057b182726a`, and still closed on #46 `f6fa327bc60e747804356c25ec1dd5b7179be0ae`, not on main. كان Open على `82e0e8c`. غير مانع حين كان مفتوحًا. التالي الحر DEF-018.
+**الحالة:** Verified closed on `cursor/phase6-system-tray-bg-poll` `cc1bc83b81e4b996cd0a974121e5b057b182726a`, and still closed on #46 `f6fa327bc60e747804356c25ec1dd5b7179be0ae`, not on main. كان Open على `82e0e8c`. غير مانع حين كان مفتوحًا. التالي الحر DEF-019 بعد DEF-018.
 
 | الحقل | القيمة |
 |---|---|
@@ -550,7 +551,36 @@
 
 **إعادة الاختبار على `cc1bc83`:** `presentPush` يلف `acceptPush` داخل `try`. 401 و419 غير CSRF يرجعان `TrayDelivery.sessionEnded` من المزوّد الحقيقي `systemTrayPresenterProvider`، بلا صينية، وبلا خطأ منطقة، و`session_expired` مرة واحدة، والنداء الثاني `loggedOut`. خروج الجلسة يحدث في `AuthInterceptor` قبل رجوع الدالة، و`onError` الفارغ في المضيف لا يُستدعى على هذا المسار فلا يبتلع خروجًا. 419 الذي يحمل `CSRF` يحدّث الرمز مرة ولا يخرج. 401 على الدخول يبقى `INVALID_CREDENTIALS`. فشل جلب الصف صينية بلا اسم، و404 لا شيء. الحكم: **Verified closed** على هذا الرأس، وليس على `main`.
 
-**إعادة الاختبار على #46 `f6fa327`:** نفس سيناريوهات المسبار (401، و419 `PAGE_EXPIRED`، و419 CSRF، و500، و404، و401 الدخول) ما زالت Pass على المزوّد الموصول. `realtime_lifecycle.dart` طابق `main`، وخطاف 419 بقي. الحكم يبقى **Verified closed** على الفرع وليس على `main`. تعليم القراءة عند `forbidden` لنفس المستخدم خيار لمدير المشروع وليس إعادة فتح لهذا العيب ولا DEF-018.
+**إعادة الاختبار على #46 `f6fa327`:** نفس سيناريوهات المسبار (401، و419 `PAGE_EXPIRED`، و419 CSRF، و500، و404، و401 الدخول) ما زالت Pass على المزوّد الموصول. `realtime_lifecycle.dart` طابق `main`، وخطاف 419 بقي. الحكم يبقى **Verified closed** على الفرع وليس على `main`. تعليم القراءة عند `forbidden` لنفس المستخدم خيار لمدير المشروع وليس إعادة فتح لهذا العيب.
+
+**على #47 `3f8e009`:** سيناريوهات DEF-017 ما زالت Pass. لم يُعد فتح DEF-017. التالي الحر صار DEF-019 بعد فتح DEF-018.
+
+---
+
+### DEF-018 — موافقة إذن الإشعار لا ترسل تسجيل الجهاز
+
+**الحالة:** Open on #47 `3f8e009943f3cdfea6ab60c28cc77b3b62c1303d`, not on main. Blocking لقبول هذا الطلب. التالي الحر DEF-019.
+
+| الحقل | القيمة |
+|---|---|
+| المرحلة | 6 |
+| الشدة | عالية |
+| التصنيف | Blocking لـ #47، وليس على `main` |
+| الملفات | `lib/app.dart` (`ProviderScope` الداخلي يبدّل `notificationPermissionProvider`)؛ `lib/notifications/push_providers.dart` (`deviceTokenRegistrarProvider` بلا `dependencies`)؛ `lib/notifications/device_token_registrar.dart` (`registerIfReady` يرجع إن لم يكن `permission.granted`)؛ `lib/features/notifications/notification_permission_registration.dart` |
+
+**خطوات الإعادة**
+
+1. على #47 ادخل `employee.demo`.
+2. اجعل نقل الدفع `FakePushTransport` برمز غير فارغ، والإذن يبدأ `denied` ثم يصير `granted` بعد الموافقة.
+3. لا تستبدل `deviceTokenRegistrarProvider`.
+4. افتح `/notifications` واضغط موافقة الإذن.
+5. اقرأ `permission.granted` على المسجّل الذي تراه الشاشة، وعدّ استدعاءات `DeviceRegistrationClient.register`.
+
+**المتوقع:** طلب واحد إلى `POST /api/mobile-push/devices` يحمل ذلك الرمز.
+
+**الفعلي:** المسجّل في الجذر وفي الشاشة هو نفسه، والنقل `fake`، و`permission.granted` يبقى false لأن الحاوية الجذر ما زالت على `StubNotificationPermissionService`. `registered` فارغة. اختبارات المؤلف تمر لأنها تستبدل المسجّل ولا تفحص الإرسال.
+
+على المسجّل مباشرة، إذا مُنح الإذن في بنائه: النداء مرتين يرسل الرمز نفسه مرتين بلا مقارنة مع المخزن. 401 بعد ذلك يعطي `session_expired` مرة. 403 يبقي الجلسة ولا يطبع الرمز. فشل الشبكة طلب POST واحد بلا إعادة. هذه المسارات لا تصل من زر الموافقة اليوم.
 
 ---
 
@@ -600,3 +630,4 @@
 - إعادة اختبار فرع الصينية `cursor/phase6-system-tray-bg-poll` عند `82e0e8c` فتحت DEF-017 أعلاه. التالي الحر صار DEF-018. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
 - إعادة اختبار الإصلاح على `cc1bc83` أغلقت DEF-017 على الفرع وليس على `main`. التالي الحر يبقى DEF-018.
 - إعادة اختبار #46 عند `f6fa327` لم تفتح DEF-018. DEF-017 يبقى مغلقًا على الفرع. تعليم قراءة صف المستخدم الحالي عندما ترجع الفتاحة `forbidden` خيار لمدير المشروع: المسار `/forbidden` والنص «القسم غير مصرح لهذا الحساب» قائمان، والنقرة الثانية لا تنقص العدد. مستلم آخر لا يُعلَّم ولا يفتح المحتوى ولا يسرّب الاسم. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
+- إعادة اختبار #47 عند `3f8e009` فتحت DEF-018 أعلاه. التالي الحر DEF-019. DEF-017 لم يُعد فتحه. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
