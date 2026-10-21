@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/notification_providers.dart';
-import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/presentation.dart';
 import '../../ui/section_labels.dart';

@@ -172,7 +172,7 @@ void main() {
   ) async {
     final layer = await pumpFakeApp(tester, size: const Size(800, 1400));
     final fake = layer.client as FakeApiClient;
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await signIn(tester, username: 'employee.demo', password: 'demo-only');
     await go(tester, '/notifications');
     await tester.tap(find.byKey(const Key('notice-77')));
     await settle(tester);

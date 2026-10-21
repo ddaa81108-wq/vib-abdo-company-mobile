@@ -94,6 +94,9 @@ class FakeApiClient implements ApiClient {
   /// The next N notification writes fail (tests).
   int failNotificationWritesRemaining = 0;
 
+  /// Notification writes that changed state. A requestId replay is not counted.
+  int notificationMutationApplies = 0;
+
   /// The next N versioned collection mutations fail with VERSION_CONFLICT (tests).
   int versionConflictRemaining = 0;
 
@@ -147,7 +150,15 @@ class FakeApiClient implements ApiClient {
   final Map<String, Completer<Object?>> _pendingMutations = {};
   String? _userId;
   Map<String, dynamic> _me = FakeFixtures.me(admin: false);
-  int _unread = 1; // canned server-side state, set (not computed) per action
+
+  /// Per-user notification rows and the server unread counter.
+  /// The counter is a stored literal that mark-read decrements. It is not
+  /// derived by counting rows on the client.
+  bool _noticesReady = false;
+  final Map<String, List<Map<String, dynamic>>> _notices = {};
+  final Map<String, int> _unreadByUser = {};
+  final Map<String, Map<String, dynamic>> _notificationReplays = {};
+  static const _noticeReadStamp = '2026-10-21T18:00:00Z';
 
   /// Card fields changed by a full payment or a cancel. Keyed by section|id.
   final Map<String, Map<String, dynamic>> _cardState = {};
@@ -584,19 +595,20 @@ class FakeApiClient implements ApiClient {
     if (seg.length < 2) return;
     final id = seg[1];
     if (id == 'read-all' || id == 'unread-count') return;
+    // 🔶 404 for an id the caller does not own, including an id that does not
+    // exist. Same body either way. Full access does not see another user's row.
     final owner = _notificationOwner(id);
-    if (owner != null && owner != _userId && !_access.fullAccess) {
+    if (owner == null || owner != _userId) {
       _fail(404, 'NOT_FOUND', _notFound);
     }
   }
 
   String? _notificationOwner(String id) {
-    for (final raw in FakeFixtures.notifications(0)['items'] as List) {
-      final item = raw as Map;
-      if ('${item['id']}' != id) continue;
-      final owner = item['recipientUserId'];
-      if (owner == null) return null;
-      return '$owner';
+    _ensureNotices();
+    for (final entry in _notices.entries) {
+      for (final item in entry.value) {
+        if ('${item['id']}' == id) return entry.key;
+      }
     }
     return null;
   }
@@ -1073,17 +1085,7 @@ class FakeApiClient implements ApiClient {
           'scopeTotals': {'LYD': 0, 'EGP': 0},
         });
       case 'notifications':
-        if (method == 'GET') {
-          final data = _notificationsForCaller();
-          if (omitUnreadCount) data.remove('unreadCount');
-          return _ok(data);
-        }
-        if (failNotificationWritesRemaining > 0) {
-          failNotificationWritesRemaining--;
-          _fail(500, 'SERVER_ERROR', 'تعذر تحديث الإشعار.');
-        }
-        _unread = 0; // fake server state reset (single notification fixture)
-        return _ok({});
+        return _notifications(method, seg, b, query);
       case 'notification-preferences':
         return _ok({'soundEnabled': true, 'speechEnabled': false});
       case 'event-changes':
@@ -1879,18 +1881,145 @@ class FakeApiClient implements ApiClient {
     _fail(404, 'NOT_FOUND', _notFound);
   }
 
-  Map<String, dynamic> _notificationsForCaller() {
-    final data = FakeFixtures.notifications(_unread);
-    final items = <Map<String, dynamic>>[];
-    for (final raw in data['items'] as List) {
-      final item = Map<String, dynamic>.from(raw as Map);
-      final owner = item['recipientUserId'];
-      if (owner == null || _access.fullAccess || '$owner' == _userId) {
-        items.add(item);
-      }
+  ApiResponse _notifications(
+    String method,
+    List<String> seg,
+    Map b,
+    Map<String, dynamic>? query,
+  ) {
+    _ensureNotices();
+    if (seg.length > 1 && seg[1] == 'unread-count') {
+      if (method != 'GET') _fail(404, 'NOT_FOUND', _notFound);
+      // 🔶 Response shape is proposed.
+      return _ok({'unreadCount': _unreadByUser[_userId] ?? 0});
     }
-    data['items'] = items;
-    return data;
+    if (method == 'GET') {
+      final data = _notificationsPage(query);
+      if (omitUnreadCount) data.remove('unreadCount');
+      return _ok(data);
+    }
+    if (method == 'POST' && seg.length > 1 && seg[1] == 'read-all') {
+      return _ok(_markAllRead(b));
+    }
+    if (method == 'PATCH' && seg.length > 2 && seg[2] == 'read') {
+      return _ok(_markOneRead(seg[1], b));
+    }
+    _fail(404, 'NOT_FOUND', _notFound);
+  }
+
+  void _ensureNotices() {
+    if (_noticesReady) return;
+    _noticesReady = true;
+    for (final raw in FakeFixtures.notificationCatalog()) {
+      final item = Map<String, dynamic>.from(raw);
+      final owner = '${item['recipientUserId']}';
+      (_notices[owner] ??= []).add(item);
+    }
+    _unreadByUser.addAll(FakeFixtures.notificationUnreadCounts);
+  }
+
+  Map<String, dynamic> _notificationsPage(Map<String, dynamic>? query) {
+    final own = _notices[_userId] ?? const <Map<String, dynamic>>[];
+    final sorted = [...own]..sort(_noticeOrder);
+    final before = query?['before']?.toString();
+    var page = sorted;
+    if (before != null && before.isNotEmpty) {
+      final index = sorted.indexWhere((item) => '${item['id']}' == before);
+      page = index < 0
+          ? const <Map<String, dynamic>>[]
+          : sorted.skip(index + 1).toList(growable: false);
+    }
+    return {
+      'items': [
+        for (final item in page) Map<String, dynamic>.from(item),
+      ],
+      'unreadCount': _unreadByUser[_userId] ?? 0,
+      // 🔶 No extra page in the fixture, so the cursor is absent.
+      'nextBefore': null,
+    };
+  }
+
+  int _noticeOrder(Map<String, dynamic> a, Map<String, dynamic> b) {
+    final at = DateTime.tryParse('${a['createdAt']}') ?? DateTime.utc(1970);
+    final bt = DateTime.tryParse('${b['createdAt']}') ?? DateTime.utc(1970);
+    final byTime = bt.compareTo(at);
+    if (byTime != 0) return byTime;
+    return '${a['id']}'.compareTo('${b['id']}');
+  }
+
+  Map<String, dynamic> _markOneRead(String id, Map b) {
+    final stored = _storedNotificationReplay(b);
+    if (stored != null) return stored;
+    _failNextNotificationWrite();
+    final found = _ownNotice(id);
+    if (found == null) _fail(404, 'NOT_FOUND', _notFound);
+    final item = found;
+    if (item['readAt'] == null) {
+      item['readAt'] = _noticeReadStamp;
+      _decrementUnread(_userId!);
+    }
+    notificationMutationApplies++;
+    final result = <String, dynamic>{
+      'unreadCount': _unreadByUser[_userId] ?? 0,
+      'readAt': item['readAt'],
+      'notification': Map<String, dynamic>.from(item),
+    };
+    _storeNotificationReplay(b, result);
+    return result;
+  }
+
+  Map<String, dynamic> _markAllRead(Map b) {
+    final stored = _storedNotificationReplay(b);
+    if (stored != null) return stored;
+    _failNextNotificationWrite();
+    final own = _notices[_userId] ?? const <Map<String, dynamic>>[];
+    for (final item in own) {
+      if (item['readAt'] == null) item['readAt'] = _noticeReadStamp;
+    }
+    _unreadByUser[_userId!] = 0;
+    notificationMutationApplies++;
+    final result = <String, dynamic>{
+      'unreadCount': 0,
+      'readAt': _noticeReadStamp,
+    };
+    _storeNotificationReplay(b, result);
+    return result;
+  }
+
+  void _failNextNotificationWrite() {
+    if (failNotificationWritesRemaining <= 0) return;
+    failNotificationWritesRemaining--;
+    _fail(500, 'SERVER_ERROR', 'تعذر تحديث الإشعار.');
+  }
+
+  void _decrementUnread(String userId) {
+    final current = _unreadByUser[userId] ?? 0;
+    _unreadByUser[userId] = current > 0 ? current - 1 : 0;
+  }
+
+  Map<String, dynamic>? _ownNotice(String id) {
+    final own = _notices[_userId];
+    if (own == null) return null;
+    for (final item in own) {
+      if ('${item['id']}' == id) return item;
+    }
+    return null;
+  }
+
+  /// 🔶 Honored only when the caller includes requestId. The repository does not.
+  Map<String, dynamic>? _storedNotificationReplay(Map b) {
+    final requestId = b['requestId'];
+    if (requestId == null || '$requestId'.isEmpty) return null;
+    final stored = _notificationReplays['${_userId ?? ''}|$requestId'];
+    if (stored == null) return null;
+    return jsonDecode(jsonEncode(stored)) as Map<String, dynamic>;
+  }
+
+  void _storeNotificationReplay(Map b, Map<String, dynamic> result) {
+    final requestId = b['requestId'];
+    if (requestId == null || '$requestId'.isEmpty) return;
+    _notificationReplays['${_userId ?? ''}|$requestId'] =
+        jsonDecode(jsonEncode(result)) as Map<String, dynamic>;
   }
 
   ApiResponse _accountRequests(List<String> seg, Map b) {
