@@ -227,3 +227,25 @@ DEF-003 وDEF-004 وDEF-005: **Verified**. DEF-002: **Pending PM decision** بع
 | PR #17 (`5b51ef3`) | `tool/check.sh` خروج 0: 74 و58. الرئيسية تطابق صفحة القائمة. لا رصيد مخزَّن بعد السداد |
 | PR #25 (`e53a8b1`) | `tool/check.sh` خروج 0: 86 و56. قائمة الكروت مطابقة. كتابة القسم مع `debts.zero_review`: سؤال مفتوح وليس عيبًا |
 | `main` (`dff1456`) | `tool/check.sh` خروج **0** في 2026-10-21. تحليل التطبيق بلا مشكلات (5.6s) و**247/0**. تحليل `packages/api_layer` بلا مشكلات (0.8s) و**74/0**. الالتزام `dff145630a534c73defd0602096ba97d5c648c14`. اختبار القبول `test/acceptance/phase_1_3_fake_test.dart` على الفرع بعد دمج `main`: **4/4**. المرحلة 4: مرفوض (DEF-013 وDEF-014). DEF-002: Pending PM decision |
+| `main` (`8a52160`) | `tool/check.sh` خروج **0** في 2026-10-21. تحليل التطبيق بلا مشكلات (4.0s) و**291/0/0**. تحليل الحزمة بلا مشكلات (0.6s) و**139/0/0**. الوسم `permissions-negative`: التطبيق **12/0/0** والحزمة **21/0/0**. `run.sh --dry-run` **6/0/0**. مسبار الإصدار رفض `USE_FAKE_API=true` وقبل `false` ثم 4/0. اختبارات القبول على فرع التوثيق بعد الدمج: **18/0**. المرحلة 5: مقبول بشروط. DEF-002: Pending PM decision. DEF-012: Fail. DEF-010: verified |
+
+## `main` عند `8a52160`
+
+التاريخ: 2026-10-21. الالتزام: `8a5216002a5e1e5fe0d8ad8cb508791abb3a1cac`. Flutter 3.47.7 / Dart 3.13.5. السكربت على هذا الالتزام يشغّل التحليل والاختبار ثم `tool/run_permissions_negative_tests.sh` ثم `preflight_test.sh` ثم `scan_release_apk.py --self-test` ثم `tool/check_release_rejects_fake_api.sh`.
+
+**رمز الخروج: 0.**
+
+| الخطوة | النتيجة |
+|---|---|
+| `flutter analyze` للتطبيق | `No issues found! (ran in 4.0s)` |
+| `flutter test --exclude-tags screenshots` | 291 ناجح، 0 فاشل، 0 متخطى |
+| `flutter analyze` في `packages/api_layer` | `No issues found! (ran in 0.6s)` |
+| `flutter test` في `packages/api_layer` | 139 ناجح، 0 فاشل، 0 متخطى |
+| `--tags permissions-negative` في التطبيق | 12 ناجح، 0 فاشل، 0 متخطى |
+| `--tags permissions-negative` في الحزمة | 21 ناجح، 0 فاشل، 0 متخطى |
+| `run.sh --dry-run` | 6 ناجح، 0 فاشل، 0 متخطى |
+| الفحص المسبق ومسح APK الذاتي | `preflight_test ok` و`scan_release_apk self-test ok` |
+| `USE_FAKE_API=true` في الإصدار | رُفضت الترجمة |
+| `USE_FAKE_API=false` ثم اختبارات الحارس | تُرجمت، ثم 4 ناجح و0 فاشل |
+
+وسم `screenshots` مستبعد، فلم يُحسب داخل 291. الوسم السالب خطوة لاحقة في السكربت نفسه، وأرقامه منفصلة عن 291 و139. CI على GitHub للالتزام نفسه أخضر (التشغيل `39635021270`).
