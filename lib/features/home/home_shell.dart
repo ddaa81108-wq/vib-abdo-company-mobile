@@ -271,6 +271,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   String _title(String location) {
     if (location == '/' || location.isEmpty) return AppStrings.homeTitle;
     if (location.startsWith('/notifications')) return AppStrings.notifications;
+    if (location.startsWith('/settings/employee-totals')) {
+      return AppStrings.employeeTotals;
+    }
     if (location.startsWith('/settings/employees')) {
       return AppStrings.employeesTile;
     }

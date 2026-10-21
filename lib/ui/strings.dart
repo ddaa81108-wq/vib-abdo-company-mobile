@@ -341,4 +341,9 @@ abstract final class AppStrings {
   static const dayTwo = 'يومين';
   static const dayMany = 'يومًا';
   static const clearSearch = 'مسح البحث';
+
+  // Employee totals screen. After the account-list block so those edits merge.
+  static const pendingUnits = 'المبلغ المنتظر';
+  static const rejectedCount = 'عدد المرفوض';
+  static const serverTotals = 'الإجمالي من الخادم';
 }
