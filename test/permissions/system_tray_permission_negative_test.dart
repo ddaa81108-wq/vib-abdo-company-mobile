@@ -1,10 +1,14 @@
 @Tags(['permissions-negative'])
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_api_layer/api_layer.dart';
+import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/notifications/android_notification_controller.dart';
 import 'package:vib_abdo_company_mobile/notifications/background_poll.dart';
 import 'package:vib_abdo_company_mobile/notifications/background_scheduler.dart';
@@ -19,12 +23,14 @@ import 'package:vib_abdo_company_mobile/notifications/notification_permission_se
 import 'package:vib_abdo_company_mobile/notifications/notification_poll_worker.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_drop_log.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_payload.dart';
+import 'package:vib_abdo_company_mobile/notifications/push_providers.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_transport.dart';
 import 'package:vib_abdo_company_mobile/notifications/shown_notification_store.dart';
 import 'package:vib_abdo_company_mobile/notifications/system_tray_platform.dart';
 import 'package:vib_abdo_company_mobile/notifications/tray_notification.dart';
 import 'package:vib_abdo_company_mobile/notifications/system_tray_presenter.dart';
 import 'package:vib_abdo_company_mobile/notifications/workmanager_scheduler.dart';
+import 'package:vib_abdo_company_mobile/state/notification_providers.dart';
 
 void main() {
   AppNotification row({
@@ -375,6 +381,92 @@ void main() {
       throwsA(isA<StateError>()),
     );
   });
+
+  for (final failure
+      in <({String name, void Function(FakeApiClient client) fail})>[
+        (
+          name: 'a real push ingest that gets 401 posts nothing and does not escape',
+          fail: (client) => client.expireSession(),
+        ),
+        (
+          name: 'a real push ingest that gets a non-CSRF 419 posts nothing and does not escape',
+          fail: (client) => client.failNextAuthenticatedStatus = 419,
+        ),
+      ]) {
+    test(failure.name, () async {
+      final layer = ApiLayer.create(
+        config: const ApiConfig(
+          baseUrl: 'https://fake.invalid',
+          useFakeApi: true,
+        ),
+        fakeLatency: Duration.zero,
+      );
+      addTearDown(layer.dispose);
+      await layer.session.login(username: 'employee.demo', password: 'x');
+      final poster = RecordingLocalNotificationPoster();
+      final container = ProviderContainer(
+        retry: (_, _) => null,
+        overrides: [
+          apiLayerProvider.overrideWithValue(layer),
+          localNotificationPosterProvider.overrideWithValue(poster),
+          shownNotificationStoreProvider.overrideWithValue(
+            MemoryShownNotificationStore(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(notificationsProvider.future);
+
+      final reasons = <String>[];
+      final states = layer.session.states.listen((state) {
+        if (state is SessionUnauthenticated) {
+          reasons.add(state.reason ?? '');
+        }
+      });
+      addTearDown(states.cancel);
+      failure.fail(layer.client as FakeApiClient);
+
+      final errors = <Object>[];
+      final done = Completer<TrayDelivery>();
+      runZonedGuarded(
+        () {
+          unawaited(
+            container
+                .read(systemTrayPresenterProvider)
+                .presentPush(const {
+                  'notificationId': 'n-session',
+                  'recipientUserId': 'u_12',
+                  'operationType': 'approve',
+                  'systemName': 'VIB',
+                  'createdAt': '2026-10-18T12:00:00Z',
+                  'employeeName': 'لا يُعرض',
+                })
+                .then(done.complete),
+          );
+        },
+        (error, stack) {
+          errors.add(error);
+          if (!done.isCompleted) done.completeError(error, stack);
+        },
+      );
+
+      final delivery = await done.future;
+      await Future<void>.delayed(Duration.zero);
+      expect(errors, isEmpty);
+      expect(delivery, TrayDelivery.sessionEnded);
+      expect(poster.trays, isEmpty);
+      expect(poster.texts, isEmpty);
+      expect(reasons, ['session_expired']);
+      expect(
+        layer.session.state,
+        isA<SessionUnauthenticated>().having(
+          (state) => state.reason,
+          'reason',
+          'session_expired',
+        ),
+      );
+    });
+  }
 }
 
 class _EnabledPlatform implements NotificationPlatform {

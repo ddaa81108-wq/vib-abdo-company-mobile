@@ -47,7 +47,12 @@ class _NotificationTransportHostState
   void _bind() {
     ref.read(deviceTokenRegistrarProvider);
     _pushes ??= ref.read(pushTransportProvider).payloads.listen((payload) {
-      unawaited(ref.read(systemTrayPresenterProvider).presentPush(payload));
+      final present = ref
+          .read(systemTrayPresenterProvider)
+          .presentPush(payload);
+      // presentPush returns a delivery for session errors. This still swallows
+      // a throw so the unawaited call cannot surface an uncaught async error.
+      unawaited(present.then<void>((_) {}, onError: (_, _) {}));
     });
     unawaited(
       AndroidNotificationSetup.start(

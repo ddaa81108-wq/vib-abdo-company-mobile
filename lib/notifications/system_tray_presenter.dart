@@ -48,14 +48,18 @@ class SystemTrayPresenter {
     if (started == null || started.isEmpty) return TrayDelivery.loggedOut;
     final id = _notificationId(raw);
     if (id.isEmpty) return TrayDelivery.dropped;
-    if (dedup.contains(id) || await shown.contains(id)) {
-      return TrayDelivery.duplicate;
-    }
-    final accepted = await ingress.acceptPush(raw);
-    if (!accepted) return TrayDelivery.dropped;
-    if (userId() != started) return TrayDelivery.accountChanged;
-
+    // acceptPush ingests and then resolves the unread count. A 401/419 throws
+    // from that path. It has to stay inside this try: the host does not await
+    // presentPush, so a throw becomes an uncaught async error.
+    var accepted = false;
     try {
+      if (dedup.contains(id) || await shown.contains(id)) {
+        return TrayDelivery.duplicate;
+      }
+      accepted = await ingress.acceptPush(raw);
+      if (!accepted) return TrayDelivery.dropped;
+      if (userId() != started) return TrayDelivery.accountChanged;
+
       final server = await reload(id);
       if (userId() != started) return TrayDelivery.accountChanged;
       if (server == null) return TrayDelivery.notFound;
@@ -68,9 +72,10 @@ class SystemTrayPresenter {
       await _post(server);
       return TrayDelivery.posted;
     } catch (error) {
-      if (userId() != started) return TrayDelivery.accountChanged;
       if (isUnrecoverableSessionError(error)) return TrayDelivery.sessionEnded;
+      if (userId() != started) return TrayDelivery.accountChanged;
       if (_isNotFound(error)) return TrayDelivery.notFound;
+      if (!accepted) return TrayDelivery.dropped;
       await _post(_nameless(raw));
       return TrayDelivery.nameless;
     }

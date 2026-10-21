@@ -113,6 +113,10 @@ class FakeApiClient implements ApiClient {
   /// The next N GET /api/notifications/unread-count calls answer 404 (tests).
   int failUnreadCountRemaining = 0;
 
+  /// The next authenticated request fails with this status, once (tests).
+  /// 419 uses `PAGE_EXPIRED`, which ends the session and is not a CSRF error.
+  int? failNextAuthenticatedStatus;
+
   /// Omit `unreadCount` from mark-read and mark-all responses (tests).
   bool omitNotificationWriteUnreadCount = false;
 
@@ -817,7 +821,8 @@ class FakeApiClient implements ApiClient {
     if (body is String) {
       lastWireBody = body;
     } else {
-      lastWireBody = body == null ? null : WireJson.encode(body, rateWireFormat);
+      lastWireBody =
+          body == null ? null : WireJson.encode(body, rateWireFormat);
     }
     final decoded = lastWireBody == null ? null : jsonDecode(lastWireBody!);
     final b = decoded is Map ? decoded : const {};
@@ -892,6 +897,14 @@ class FakeApiClient implements ApiClient {
   /// Cookie session check. A missing, revoked, or expired cookie is 401
   /// before any permission decision.
   void _ensureSession(ApiRequestOptions options) {
+    final forced = failNextAuthenticatedStatus;
+    if (forced != null) {
+      failNextAuthenticatedStatus = null;
+      if (forced == 419) {
+        _fail(419, 'PAGE_EXPIRED', 'يجب تسجيل الدخول أولًا.');
+      }
+      _fail(forced, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
+    }
     final id = _presentedSessionId(options);
     final session = id == null ? null : _sessions[id];
     if (session == null || session.expired) {
