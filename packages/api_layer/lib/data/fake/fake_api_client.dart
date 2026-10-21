@@ -42,6 +42,12 @@ class FakeApiClient implements ApiClient {
   /// A replay of a request id that already succeeded is not added again.
   final List<String> mutationRequestIds = [];
 
+  /// Paths of those mutations, in the same order (tests).
+  final List<String> mutationPaths = [];
+
+  /// Wire bodies of those mutations, in the same order (tests).
+  final List<String> mutationBodies = [];
+
   /// The next N business mutations fail before they change fake state (tests).
   int failMutationsRemaining = 0;
 
@@ -344,7 +350,7 @@ class FakeApiClient implements ApiClient {
     if (method != 'GET' &&
         head != 'notifications' &&
         head != 'notification-preferences') {
-      return _mutate(b, () => _route(method, b, seg, head, query));
+      return _mutate(b, path, () => _route(method, b, seg, head, query));
     }
     return _route(method, b, seg, head, query);
   }
@@ -354,6 +360,7 @@ class FakeApiClient implements ApiClient {
   /// retry of the same id can still succeed.
   Future<ApiResponse> _mutate(
     Map b,
+    String path,
     Future<ApiResponse> Function() send,
   ) async {
     _requireMutationMeta(b);
@@ -371,6 +378,8 @@ class FakeApiClient implements ApiClient {
     _pendingMutations[key] = gate;
     gate.future.ignore();
     mutationRequestIds.add(requestId);
+    mutationPaths.add(path);
+    if (lastWireBody != null) mutationBodies.add(lastWireBody!);
     try {
       final paused = pauseMutations;
       if (paused != null) await paused.future;
