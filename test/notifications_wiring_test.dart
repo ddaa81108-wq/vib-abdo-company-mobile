@@ -7,6 +7,7 @@ import 'package:flutter_api_layer/data/fake/fake_fixtures.dart';
 import 'package:flutter_api_layer/data/repositories/notifications_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/features/collections/collections_screen.dart';
 import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
@@ -274,6 +275,49 @@ void main() {
     expect(tester.widget<Text>(find.byKey(UnreadBadge.badgeKey)).data, '1');
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('allow posts the device token once', (tester) async {
+    const token = 'qa-device-token';
+    final permission = FakeNotificationPermissionService(
+      initial: NotificationPermissionChoice.denied,
+      afterRequest: NotificationPermissionChoice.granted,
+    );
+    final log = await _pumpDevicePost(tester, permission, token);
+    await signIn(tester, username: 'employee.demo', password: 'demo-only');
+    expect(log.registerBodies, isEmpty);
+
+    await go(tester, '/notifications');
+    await tester.tap(find.byKey(const Key('notification-permission-agree')));
+    await settle(tester);
+
+    expect(log.registerBodies, hasLength(1));
+    expect(log.registerBodies.single, contains(token));
+    expect(log.registerBodies.single, contains('"platform":"android"'));
+    expect(log.registerBodies.single, isNot(contains('unregister')));
+    expect(log.unregisterBodies, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('grant then resume posts the device token once', (tester) async {
+    const token = 'qa-device-token';
+    final permission = FakeNotificationPermissionService(
+      initial: NotificationPermissionChoice.denied,
+      afterRequest: NotificationPermissionChoice.granted,
+    );
+    final log = await _pumpDevicePost(tester, permission, token);
+    await signIn(tester, username: 'employee.demo', password: 'demo-only');
+    await go(tester, '/notifications');
+    await tester.tap(find.byKey(const Key('notification-permission-agree')));
+    await settle(tester);
+    expect(log.registerBodies, hasLength(1));
+
+    await resume(tester);
+
+    expect(log.registerBodies, hasLength(1));
+    expect(log.registerBodies.single, contains(token));
+    expect(log.unregisterBodies, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 AppNotification _ownedCollection({
@@ -295,6 +339,56 @@ AppNotification _ownedCollection({
     title: 'استلام جديد بانتظار المراجعة',
     body: 'افتح قسم الاستلامات',
   );
+}
+
+class _DevicePostLog implements DeviceRegistrationClient {
+  _DevicePostLog(this._http, this._fake);
+
+  final HttpDeviceRegistrationClient _http;
+  final FakeApiClient _fake;
+  final List<String?> registerBodies = [];
+  final List<String?> unregisterBodies = [];
+
+  @override
+  Future<void> register({required String token}) async {
+    try {
+      await _http.register(token: token);
+    } catch (_) {
+      // The fake has no devices route. The POST still reached it.
+    }
+    registerBodies.add(_fake.lastWireBody);
+  }
+
+  @override
+  Future<void> unregister({required String token}) async {
+    try {
+      await _http.unregister(token: token);
+    } catch (_) {}
+    unregisterBodies.add(_fake.lastWireBody);
+  }
+}
+
+Future<_DevicePostLog> _pumpDevicePost(
+  WidgetTester tester,
+  FakeNotificationPermissionService permission,
+  String token,
+) async {
+  final transport = FakePushTransport(token: token);
+  addTearDown(transport.dispose);
+  _DevicePostLog? log;
+  await pumpFakeApp(
+    tester,
+    notificationsPermission: permission,
+    overrides: [
+      pushTransportProvider.overrideWithValue(transport),
+      deviceRegistrationClientProvider.overrideWith((ref) {
+        final fake = ref.watch(apiLayerProvider).client as FakeApiClient;
+        log = _DevicePostLog(HttpDeviceRegistrationClient(fake), fake);
+        return log!;
+      }),
+    ],
+  );
+  return log!;
 }
 
 class RecordingDeviceTokenRegistrar extends DeviceTokenRegistrar {

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'api/api_providers.dart';
 import 'app.dart';
 import 'error_handling/error_handler.dart';
+import 'features/notifications/notification_permission_registration.dart';
 import 'notifications/android_notification_setup.dart';
 import 'notifications/app_push_service.dart';
 import 'notifications/device_token_registrar.dart';
@@ -58,6 +59,7 @@ void main() {
         apiLayerProvider.overrideWithValue(layer),
         pushSessionGateProvider.overrideWithValue(pushGate),
         deviceTokenStoreProvider.overrideWithValue(SecureDeviceTokenStore()),
+        notificationPermissionRegistrarOverride(),
       ],
       child: const CompanyApp(),
     ),

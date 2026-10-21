@@ -102,11 +102,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   /// A grant registers. A denial unregisters. The opener still owns mark-read.
   Future<void> _syncRegistration() {
     final session = ref.read(sessionStateProvider);
-    return registerForNotificationPermission(
-      signedIn: session is SessionAuthenticated,
-      permission: ref.read(notificationPermissionServiceProvider),
-      registrar: ref.read(deviceTokenRegistrarProvider),
-    );
+    return ref
+        .read(notificationPermissionSyncProvider.notifier)
+        .sync(
+          signedIn: session is SessionAuthenticated,
+          permission: ref.read(notificationPermissionServiceProvider),
+          registrar: ref.read(deviceTokenRegistrarProvider),
+        );
   }
 
   Future<void> _showDenied() {

@@ -4,11 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'features/notifications/foreground_notification_banner.dart';
-import 'features/notifications/notification_permission.dart';
 import 'features/notifications/notification_permission_registration.dart';
 import 'features/splash/splash_screen.dart';
 import 'notifications/notification_transport_host.dart';
-import 'notifications/push_providers.dart';
 import 'notifications/realtime_lifecycle.dart';
 import 'state/router_provider.dart';
 import 'state/session_providers.dart';
@@ -27,32 +25,13 @@ class CompanyApp extends ConsumerWidget {
     // The router is created only after restore settles. Building it while the
     // session is still unknown can miss that notification and stay on splash.
     if (!startup.hasValue) {
-      return _notificationPermission(
-        _material(themeMode: themeMode, child: const SplashScreen()),
-      );
+      return _material(themeMode: themeMode, child: const SplashScreen());
     }
     final router = ref.watch(routerProvider);
     ref.listen(sessionStateProvider, (previous, next) {
       onSessionTransition(ref, previous, next);
     });
-    return _notificationPermission(
-      _material(themeMode: themeMode, router: router),
-    );
-  }
-
-  /// His provider stays a stub that is not granted. This scope reports the
-  /// screen permission service to the device registrar.
-  Widget _notificationPermission(Widget child) {
-    return ProviderScope(
-      overrides: [
-        notificationPermissionProvider.overrideWith(
-          (ref) => UiNotificationPermissionAdapter(
-            ref.watch(notificationPermissionServiceProvider),
-          ),
-        ),
-      ],
-      child: child,
-    );
+    return _material(themeMode: themeMode, router: router);
   }
 
   Widget _material({
