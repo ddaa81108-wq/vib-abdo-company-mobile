@@ -14,6 +14,7 @@ import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
+import '../../ui/widgets/soft_tile.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
@@ -189,7 +190,7 @@ class _NoticeTileState extends State<_NoticeTile> {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right),
+              forwardChevron(context),
             ],
           ),
         ),

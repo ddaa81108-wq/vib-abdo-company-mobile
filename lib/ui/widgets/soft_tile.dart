@@ -12,6 +12,12 @@ Widget mirrorInRtl(BuildContext context, IconData icon, {double? size}) {
   return Transform.flip(flipX: true, child: child);
 }
 
+/// Disclosure chevron. [Icons.chevron_right] follows [Directionality], so in
+/// Arabic it points toward the start of the line.
+Widget forwardChevron(BuildContext context) {
+  return Icon(Icons.chevron_right, textDirection: Directionality.of(context));
+}
+
 /// A tappable row whose title and subtitle wrap instead of clipping.
 ///
 /// ListTile keeps a fixed height and overflows at large text scales.

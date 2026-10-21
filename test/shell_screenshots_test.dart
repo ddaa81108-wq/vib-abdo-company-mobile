@@ -9,6 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
+import 'package:vib_abdo_company_mobile/features/splash/splash_screen.dart';
+import 'package:vib_abdo_company_mobile/state/session_providers.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import 'support/pump_app.dart';
@@ -17,6 +19,21 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('save light and dark shots at 360 and 430', (tester) async {
+    await pumpFakeApp(
+      tester,
+      size: const Size(360, 900),
+      overrides: [
+        startupProvider.overrideWith((ref) async {
+          throw StateError('startup failed');
+        }),
+      ],
+    );
+    await tester.runAsync(loadScreenshotFonts);
+    await tester.pump();
+    expect(find.byKey(SplashScreen.retryKey), findsOneWidget);
+    expect(find.text(AppStrings.retry), findsOneWidget);
+    await saveShot(tester, 'splash-error-light-360');
+
     const emptyStates = <String, (String, String)>{
       '/settings/employees': ('settings-employees', AppStrings.employeesEmpty),
       '/settings/audit': ('settings-audit', AppStrings.auditEmpty),

@@ -8,9 +8,11 @@ import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notifications_screen.dart';
+import 'package:vib_abdo_company_mobile/features/splash/splash_screen.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'package:vib_abdo_company_mobile/state/session_providers.dart';
+import 'package:vib_abdo_company_mobile/state/theme_controller.dart';
 import 'package:vib_abdo_company_mobile/ui/presentation.dart';
 import 'package:vib_abdo_company_mobile/ui/section_labels.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
@@ -139,6 +141,105 @@ void main() {
         await go(tester, '/notifications');
         expect(find.byKey(NotificationsScreen.screenKey), findsOneWidget);
       }
+    }
+  });
+
+  testWidgets('admin bottom bar stays on one row at 320 and 360', (
+    tester,
+  ) async {
+    for (final width in [320.0, 360.0]) {
+      for (final scale in [1.0, 2.0]) {
+        await pumpFakeApp(
+          tester,
+          size: Size(width, scale >= 2 ? 1200 : 900),
+          textScale: scale,
+        );
+        await signIn(tester, username: 'admin.demo', password: 'demo-only');
+        final bar = tester.widget<PhoneBottomNav>(find.byType(PhoneBottomNav));
+        expect(bar.tabs, hasLength(5));
+        final tops = [
+          for (final tab in bar.tabs)
+            tester.getRect(find.byKey(Key('bottom-tab-${tab.id}'))).top,
+        ];
+        expect(
+          tops.toSet(),
+          hasLength(1),
+          reason: 'width $width scale $scale tops $tops',
+        );
+      }
+    }
+  });
+
+  testWidgets('disclosure chevrons mirror in RTL', (tester) async {
+    await pumpFakeApp(tester, size: const Size(360, 1400));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    expectRtl(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(HomeShell.sectionKey(SectionKey.customers)),
+      300,
+      scrollable: find.descendant(
+        of: find.byKey(HomeDashboard.screenKey),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expectChevronMirrors(
+      tester,
+      find.byKey(HomeShell.sectionKey(SectionKey.customers)),
+    );
+
+    await go(tester, '/settings');
+    expectChevronMirrors(
+      tester,
+      find.byKey(const Key('settings-link-employees')),
+    );
+    expectChevronMirrors(tester, find.byKey(const Key('settings-link-audit')));
+    expectChevronMirrors(
+      tester,
+      find.byKey(const Key('settings-link-operations')),
+    );
+
+    await go(tester, '/');
+    await tester.ensureVisible(find.byKey(const Key('bottom-tab-more')));
+    await tester.tap(find.byKey(const Key('bottom-tab-more')));
+    await settle(tester);
+    expectChevronMirrors(tester, find.byKey(const Key('more-settings')));
+    expectChevronMirrors(tester, find.byKey(const Key('more-account')));
+  });
+
+  testWidgets('a failed startup offers retry on the splash', (tester) async {
+    for (final dark in [false, true]) {
+      var attempts = 0;
+      await pumpFakeApp(
+        tester,
+        size: const Size(360, 900),
+        overrides: [
+          if (dark) themeModeProvider.overrideWith(_DarkTheme.new),
+          startupProvider.overrideWith((ref) async {
+            attempts++;
+            if (attempts < 2) throw StateError('restore failed');
+            final session = ref.read(apiLayerProvider).session;
+            if (session.state is SessionUnknown) {
+              await session.restore();
+            }
+          }),
+        ],
+      );
+      expect(find.byKey(SplashScreen.screenKey), findsOneWidget);
+      expect(find.byKey(SplashScreen.retryKey), findsOneWidget);
+      expect(find.text(AppStrings.retry), findsOneWidget);
+      expect(find.text(AppStrings.loading), findsNothing);
+      expectRtl(tester);
+      final context = tester.element(find.byKey(SplashScreen.retryKey));
+      final theme = Theme.of(context);
+      expect(theme.brightness, dark ? Brightness.dark : Brightness.light);
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.error_outline)).color,
+        theme.colorScheme.error,
+      );
+      await tester.tap(find.byKey(SplashScreen.retryKey));
+      await settle(tester);
+      expect(find.byKey(LoginScreen.screenKey), findsOneWidget);
+      expect(find.byKey(SplashScreen.retryKey), findsNothing);
     }
   });
 
@@ -663,6 +764,29 @@ Future<void> _openGroup(
 void expectRtl(WidgetTester tester) {
   final context = tester.element(find.byType(Scaffold).first);
   expect(Directionality.of(context), TextDirection.rtl);
+}
+
+void expectChevronMirrors(WidgetTester tester, Finder scope) {
+  final icons = find.descendant(
+    of: scope,
+    matching: find.byWidgetPredicate(
+      (widget) => widget is Icon && widget.icon == Icons.chevron_right,
+    ),
+  );
+  expect(icons, findsOneWidget);
+  final icon = tester.widget<Icon>(icons);
+  expect(icon.textDirection, TextDirection.rtl);
+  final transform = find.descendant(
+    of: icons,
+    matching: find.byType(Transform),
+  );
+  expect(transform, findsOneWidget);
+  expect(tester.widget<Transform>(transform).transform.storage[0], lessThan(0));
+}
+
+class _DarkTheme extends ThemeModeController {
+  @override
+  ThemeMode build() => ThemeMode.dark;
 }
 
 Future<void> go(WidgetTester tester, String path) async {

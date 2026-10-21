@@ -111,7 +111,7 @@ class AccountScreen extends ConsumerWidget {
             key: const Key('account-password'),
             leading: const Icon(Icons.password_outlined),
             title: AppStrings.changePassword,
-            trailing: const Icon(Icons.chevron_right),
+            trailing: forwardChevron(context),
             onTap: online ? () => context.push('/account/password') : null,
           ),
         ),

@@ -75,7 +75,7 @@ class SettingsScreen extends ConsumerWidget {
                 key: link.tileKey,
                 leading: Icon(link.icon),
                 title: link.title,
-                trailing: const Icon(Icons.chevron_right),
+                trailing: forwardChevron(context),
                 onTap: () => context.go(link.path),
               ),
             ),

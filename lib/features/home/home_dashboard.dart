@@ -14,6 +14,7 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/soft_tile.dart';
 import 'home_shell.dart';
 
 /// Readable debt sections in first-seen order. Each one gets its own control.
@@ -304,7 +305,7 @@ class HomeDashboard extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right),
+                  forwardChevron(context),
                 ],
               ),
             ),

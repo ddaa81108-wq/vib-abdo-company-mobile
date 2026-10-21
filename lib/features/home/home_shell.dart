@@ -571,8 +571,8 @@ class _NavList extends ConsumerWidget {
   }
 }
 
-/// Phone destinations. Long Arabic labels wrap onto extra rows instead of
-/// being ellipsized. [tabs] always ends with the "more" item.
+/// Phone destinations in one row of equal slots. Labels wrap to two lines.
+/// [tabs] always ends with the "more" item.
 class PhoneBottomNav extends StatelessWidget {
   const PhoneBottomNav({
     required this.tabs,
@@ -598,44 +598,32 @@ class PhoneBottomNav extends StatelessWidget {
     final safeIndex = tabs.isEmpty
         ? 0
         : selectedIndex.clamp(0, tabs.length - 1);
-    final tabsWrap = Padding(
-      padding: const EdgeInsetsDirectional.symmetric(
-        horizontal: AppSpacing.xs,
-        vertical: AppSpacing.xs,
-      ),
-      child: Wrap(
-        alignment: WrapAlignment.spaceEvenly,
-        spacing: AppSpacing.xs,
-        runSpacing: AppSpacing.xs,
-        children: [
-          for (var i = 0; i < tabs.length; i++)
-            _PhoneTab(
-              key: Key('bottom-tab-${tabs[i].id}'),
-              item: tabs[i],
-              selected: i == safeIndex,
-              indicator: indicator,
-              selectedColor: selectedColor,
-              idleColor: idleColor,
-              onTap: () => onSelected(i),
-            ),
-        ],
-      ),
-    );
-    final scale = MediaQuery.textScalerOf(context).scale(1);
-    if (scale < 1.25) {
-      return Material(
-        color: background,
-        child: SafeArea(top: false, child: tabsWrap),
-      );
-    }
-    final cap = MediaQuery.sizeOf(context).height * 0.34;
     return Material(
       color: background,
       child: SafeArea(
         top: false,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: cap),
-          child: SingleChildScrollView(child: tabsWrap),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: AppSpacing.xs,
+            vertical: AppSpacing.xs,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < tabs.length; i++)
+                Expanded(
+                  child: _PhoneTab(
+                    key: Key('bottom-tab-${tabs[i].id}'),
+                    item: tabs[i],
+                    selected: i == safeIndex,
+                    indicator: indicator,
+                    selectedColor: selectedColor,
+                    idleColor: idleColor,
+                    onTap: () => onSelected(i),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -677,10 +665,10 @@ class _PhoneTab extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppRadii.lg),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            constraints: const BoxConstraints(minHeight: 48),
             child: Padding(
               padding: const EdgeInsetsDirectional.symmetric(
-                horizontal: AppSpacing.md,
+                horizontal: AppSpacing.xxs,
                 vertical: AppSpacing.xs,
               ),
               child: Column(
@@ -691,6 +679,8 @@ class _PhoneTab extends StatelessWidget {
                   Text(
                     item.label,
                     textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: style.copyWith(color: color),
                   ),
                 ],
@@ -791,7 +781,7 @@ class _BottomBar extends StatelessWidget {
                           key: Key('more-${item.id}'),
                           leading: Icon(item.icon),
                           title: item.label,
-                          trailing: const Icon(Icons.chevron_right),
+                          trailing: forwardChevron(sheetBodyContext),
                           onTap: () {
                             Navigator.of(sheetContext).pop();
                             context.go(item.path);
