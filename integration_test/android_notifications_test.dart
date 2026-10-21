@@ -6,6 +6,13 @@ import 'package:vib_abdo_company_mobile/notifications/android_notification_contr
 import 'package:vib_abdo_company_mobile/notifications/android_notification_setup.dart';
 import 'package:vib_abdo_company_mobile/notifications/notification_channels.dart';
 
+/// Host-driven permission check.
+///
+/// `tool/android_notification_emulator_test.sh` installs the APK and then
+/// grants or revokes `POST_NOTIFICATIONS` with `adb shell pm` (and appops)
+/// before `flutter test`. This file does not request the permission and does
+/// not use a permission service. `NOTIF_CASE` is `implicit`, `denied`, or
+/// `granted`.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -28,7 +35,6 @@ void main() {
     final plugin = FlutterLocalNotificationsPlugin();
     final controller = AndroidNotificationController(
       platform: FlutterLocalNotificationsAdapter(plugin),
-      sdkInt: sdk,
     );
     await controller.initialize();
 
@@ -49,11 +55,6 @@ void main() {
       if (sdk < 33) {
         expect(caseName, 'implicit');
         expect(enabled, isTrue);
-        expect(await android.requestNotificationsPermission(), isTrue);
-        expect(
-          await controller.requestPermission(),
-          NotificationReadiness.implicitlyGranted,
-        );
         expect(
           await controller.showCollectionsAlert(
             id: id,
@@ -65,7 +66,6 @@ void main() {
         );
         expect(await _posted(plugin, id), isTrue);
       } else if (caseName == 'denied') {
-        // The plugin request opens a system dialog. adb already denied it.
         expect(enabled, isFalse);
         expect(
           await controller.showCollectionsAlert(
@@ -79,11 +79,6 @@ void main() {
         expect(await _posted(plugin, id), isFalse);
       } else if (caseName == 'granted') {
         expect(enabled, isTrue);
-        expect(await android.requestNotificationsPermission(), isTrue);
-        expect(
-          await controller.requestPermission(),
-          NotificationReadiness.granted,
-        );
         expect(
           await controller.showCollectionsAlert(
             id: id,

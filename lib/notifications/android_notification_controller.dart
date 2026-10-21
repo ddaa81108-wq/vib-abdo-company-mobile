@@ -1,12 +1,13 @@
 import 'notification_channels.dart';
 
 /// Android notification operations the controller can run without the plugin.
+///
+/// Checking and posting only. Requesting `POST_NOTIFICATIONS` is a separate
+/// change and is not part of this interface.
 abstract class NotificationPlatform {
   Future<void> initialize({required String androidIcon});
 
   Future<void> createAndroidChannel(NotificationChannelSpec channel);
-
-  Future<bool?> requestAndroidPermission();
 
   Future<bool?> androidNotificationsEnabled();
 
@@ -15,27 +16,15 @@ abstract class NotificationPlatform {
   Future<void> cancel(int id);
 }
 
-/// Channel creation, the API 33 permission branch, and posting an alert.
+/// Creates the collections channel and posts an alert when the system allows it.
 class AndroidNotificationController {
-  AndroidNotificationController({required this.platform, required this.sdkInt});
+  AndroidNotificationController({required this.platform});
 
   final NotificationPlatform platform;
-  final int sdkInt;
 
   Future<void> initialize() async {
     await platform.initialize(androidIcon: NotificationChannels.smallIcon);
     await platform.createAndroidChannel(NotificationChannels.collections);
-  }
-
-  Future<NotificationReadiness> requestPermission() async {
-    if (!NotificationPermissionPolicy.runtimeRequestRequired(sdkInt)) {
-      return NotificationReadiness.implicitlyGranted;
-    }
-    final granted = await platform.requestAndroidPermission();
-    return NotificationPermissionPolicy.readinessFor(
-      sdkInt: sdkInt,
-      pluginGranted: granted,
-    );
   }
 
   /// Posts on the collections channel when the system allows notifications.

@@ -5,166 +5,88 @@ import 'package:vib_abdo_company_mobile/notifications/android_notification_setup
 import 'package:vib_abdo_company_mobile/notifications/notification_channels.dart';
 
 void main() {
-  test('API 29 does not request a runtime permission', () async {
-    final platform = FakeNotificationPlatform()..enabled = true;
-    final controller = AndroidNotificationController(
-      platform: platform,
-      sdkInt: 29,
-    );
-
-    await controller.initialize();
-    final readiness = await controller.requestPermission();
-
-    expect(readiness, NotificationReadiness.implicitlyGranted);
-    expect(platform.requestCount, 0);
-    expect(platform.icon, NotificationChannels.smallIcon);
-    expect(platform.channel, NotificationChannels.collections);
-    expect(NotificationPermissionPolicy.runtimeRequestRequired(32), isFalse);
-    expect(NotificationPermissionPolicy.runtimeRequestRequired(33), isTrue);
-  });
-
-  test('API 33 maps grant, deny, and a missing answer', () async {
-    final granted = FakeNotificationPlatform()..permissionResult = true;
-    expect(
-      await AndroidNotificationController(
-        platform: granted,
-        sdkInt: 33,
-      ).requestPermission(),
-      NotificationReadiness.granted,
-    );
-    expect(granted.requestCount, 1);
-
-    final denied = FakeNotificationPlatform()..permissionResult = false;
-    expect(
-      await AndroidNotificationController(
-        platform: denied,
-        sdkInt: 34,
-      ).requestPermission(),
-      NotificationReadiness.denied,
-    );
-
-    final missing = FakeNotificationPlatform();
-    expect(
-      await AndroidNotificationController(
-        platform: missing,
-        sdkInt: 35,
-      ).requestPermission(),
-      NotificationReadiness.denied,
-    );
-  });
-
   test(
-    'a disabled system skips the post and an enabled one keeps the badge',
+    'initialize creates the collections channel and the status icon',
     () async {
-      final blocked = FakeNotificationPlatform()..enabled = false;
-      final blockedController = AndroidNotificationController(
-        platform: blocked,
-        sdkInt: 33,
-      );
-      final blockedShown = await blockedController.showCollectionsAlert(
-        id: NotificationChannels.probeNotificationId,
-        title: 'تنبيه',
-        body: 'تحصيل',
-        badgeCount: 2,
-      );
-      expect(blockedShown, isFalse);
-      expect(blocked.shown, isEmpty);
+      final platform = FakeNotificationPlatform();
+      await AndroidNotificationController(platform: platform).initialize();
 
-      final allowed = FakeNotificationPlatform()..enabled = true;
-      final shown =
-          await AndroidNotificationController(
-            platform: allowed,
-            sdkInt: 29,
-          ).showCollectionsAlert(
-            id: NotificationChannels.probeNotificationId,
-            title: 'تنبيه',
-            body: 'تحصيل',
-            badgeCount: -3,
-          );
-      expect(shown, isTrue);
-      expect(allowed.shown, hasLength(1));
-      final request = allowed.shown.single;
-      expect(request.id, NotificationChannels.probeNotificationId);
-      expect(request.channel.id, NotificationChannels.collectionsId);
-      expect(request.icon, NotificationChannels.smallIcon);
-      expect(request.channel.showBadge, isTrue);
-      expect(request.badgeCount, isNull);
+      expect(platform.initializeCount, 1);
+      expect(platform.icon, NotificationChannels.smallIcon);
+      expect(platform.channel, NotificationChannels.collections);
+      expect(platform.channel?.showBadge, isTrue);
+      expect(platform.channel?.name, NotificationChannels.collectionsName);
     },
   );
 
-  test('start reports an init failure and still requests on API 33', () async {
+  test('a disabled system skips the post and an enabled one drops a negative badge', () async {
+    final blocked = FakeNotificationPlatform()..enabled = false;
+    final blockedShown = await AndroidNotificationController(platform: blocked)
+        .showCollectionsAlert(
+          id: NotificationChannels.probeNotificationId,
+          title: 'تنبيه',
+          body: 'تحصيل',
+          badgeCount: 2,
+        );
+    expect(blockedShown, isFalse);
+    expect(blocked.shown, isEmpty);
+
+    final allowed = FakeNotificationPlatform()..enabled = true;
+    final shown = await AndroidNotificationController(platform: allowed)
+        .showCollectionsAlert(
+          id: NotificationChannels.probeNotificationId,
+          title: 'تنبيه',
+          body: 'تحصيل',
+          badgeCount: -3,
+        );
+    expect(shown, isTrue);
+    expect(allowed.shown, hasLength(1));
+    final request = allowed.shown.single;
+    expect(request.id, NotificationChannels.probeNotificationId);
+    expect(request.channel.id, NotificationChannels.collectionsId);
+    expect(request.icon, NotificationChannels.smallIcon);
+    expect(request.channel.showBadge, isTrue);
+    expect(request.badgeCount, isNull);
+  });
+
+  test('start reports an init failure and does not throw', () async {
     Object? reported;
     await AndroidNotificationSetup.start(
       platform: _ThrowingPlatform(),
-      sdkInt: 33,
       onError: (error, stackTrace) {
         reported = error;
       },
     );
     expect(reported, isA<StateError>());
 
-    final platform = FakeNotificationPlatform()..permissionResult = true;
-    await AndroidNotificationSetup.start(platform: platform, sdkInt: 33);
+    final platform = FakeNotificationPlatform();
+    await AndroidNotificationSetup.start(platform: platform);
     expect(platform.initializeCount, 1);
-    expect(platform.requestCount, 1);
-
-    final older = FakeNotificationPlatform();
-    await AndroidNotificationSetup.start(platform: older, sdkInt: 29);
-    expect(older.requestCount, 0);
-    expect(older.initializeCount, 1);
+    expect(platform.channel?.id, NotificationChannels.collectionsId);
   });
 
-  testWidgets('permission flow shows denied then granted', (tester) async {
-    final platform = FakeNotificationPlatform()
-      ..permissionResult = false
-      ..enabled = false;
-    final controller = AndroidNotificationController(
-      platform: platform,
-      sdkInt: 33,
-    );
+  testWidgets('showing an alert follows the enabled flag', (tester) async {
+    final platform = FakeNotificationPlatform()..enabled = false;
+    final controller = AndroidNotificationController(platform: platform);
     await controller.initialize();
 
     await tester.pumpWidget(
-      MaterialApp(home: _FlowHarness(controller: controller)),
+      MaterialApp(home: _ShowHarness(controller: controller)),
     );
-    await tester.tap(find.text('تشغيل'));
+    await tester.tap(find.text('إظهار'));
     await tester.pumpAndSettle();
 
-    expect(find.text('denied'), findsOneWidget);
     expect(find.text('shown=false'), findsOneWidget);
     expect(platform.shown, isEmpty);
 
-    platform
-      ..permissionResult = true
-      ..enabled = true;
-    await tester.tap(find.text('تشغيل'));
+    platform.enabled = true;
+    await tester.tap(find.text('إظهار'));
     await tester.pumpAndSettle();
 
-    expect(find.text('granted'), findsOneWidget);
     expect(find.text('shown=true'), findsOneWidget);
     expect(platform.shown, hasLength(1));
     expect(platform.shown.single.badgeCount, 2);
     expect(platform.shown.single.channel.showBadge, isTrue);
-  });
-
-  testWidgets('API 29 flow is implicitly granted and posts', (tester) async {
-    final platform = FakeNotificationPlatform()..enabled = true;
-    final controller = AndroidNotificationController(
-      platform: platform,
-      sdkInt: 29,
-    );
-    await controller.initialize();
-
-    await tester.pumpWidget(
-      MaterialApp(home: _FlowHarness(controller: controller)),
-    );
-    await tester.tap(find.text('تشغيل'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('implicitlyGranted'), findsOneWidget);
-    expect(find.text('shown=true'), findsOneWidget);
-    expect(platform.requestCount, 0);
-    expect(platform.channel?.name, NotificationChannels.collectionsName);
   });
 }
 
@@ -172,8 +94,6 @@ class FakeNotificationPlatform implements NotificationPlatform {
   String? icon;
   NotificationChannelSpec? channel;
   var initializeCount = 0;
-  var requestCount = 0;
-  bool? permissionResult;
   bool? enabled;
   final shown = <AndroidNotificationRequest>[];
 
@@ -186,12 +106,6 @@ class FakeNotificationPlatform implements NotificationPlatform {
   @override
   Future<void> createAndroidChannel(NotificationChannelSpec channel) async {
     this.channel = channel;
-  }
-
-  @override
-  Future<bool?> requestAndroidPermission() async {
-    requestCount += 1;
-    return permissionResult;
   }
 
   @override
@@ -213,17 +127,16 @@ class _ThrowingPlatform extends FakeNotificationPlatform {
   }
 }
 
-class _FlowHarness extends StatefulWidget {
-  const _FlowHarness({required this.controller});
+class _ShowHarness extends StatefulWidget {
+  const _ShowHarness({required this.controller});
 
   final AndroidNotificationController controller;
 
   @override
-  State<_FlowHarness> createState() => _FlowHarnessState();
+  State<_ShowHarness> createState() => _ShowHarnessState();
 }
 
-class _FlowHarnessState extends State<_FlowHarness> {
-  NotificationReadiness? readiness;
+class _ShowHarnessState extends State<_ShowHarness> {
   bool? shown;
 
   @override
@@ -231,11 +144,9 @@ class _FlowHarnessState extends State<_FlowHarness> {
     return Scaffold(
       body: Column(
         children: [
-          Text(readiness?.name ?? 'unknown'),
           Text('shown=${shown ?? false}'),
           TextButton(
             onPressed: () async {
-              final next = await widget.controller.requestPermission();
               final didShow = await widget.controller.showCollectionsAlert(
                 id: NotificationChannels.probeNotificationId,
                 title: 'تنبيه',
@@ -243,11 +154,10 @@ class _FlowHarnessState extends State<_FlowHarness> {
                 badgeCount: 2,
               );
               setState(() {
-                readiness = next;
                 shown = didShow;
               });
             },
-            child: const Text('تشغيل'),
+            child: const Text('إظهار'),
           ),
         ],
       ),

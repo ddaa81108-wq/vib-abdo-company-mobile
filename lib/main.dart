@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/widgets.dart';
@@ -27,6 +28,12 @@ void main() {
     return true;
   };
 
+  // Channel only, after the activity exists. The runtime permission request
+  // lives in another change.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(AndroidNotificationSetup.start(onError: errors.report));
+  });
+
   final stores = AppSecureStores();
   final layer = ApiLayer.create(
     config: ApiConfig.fromEnvironment(),
@@ -43,10 +50,7 @@ void main() {
         return retryUnlessForbidden(retryCount, error);
       },
       overrides: [apiLayerProvider.overrideWithValue(layer)],
-      child: AndroidNotificationsBootstrap(
-        onError: errors.report,
-        child: const CompanyApp(),
-      ),
+      child: const CompanyApp(),
     ),
   );
 }

@@ -6,7 +6,11 @@ There is no `docs/RELEASE.md`. Release builds that must reject the fake API are 
 
 ## Permission
 
-`android.permission.POST_NOTIFICATIONS` is in the manifest. On API 33 and newer the app asks with `flutter_local_notifications` (`requestNotificationsPermission`) after the first frame. On API 32 and older, including Android 10 (API 29), the permission is implicit and the plugin is not asked.
+`android.permission.POST_NOTIFICATIONS` is declared in the manifest. This change does not request it at runtime, does not add `permission_handler`, and does not ship a permission-request service or dialog.
+
+A separate change adds `permission_handler` and the runtime request behind `NotificationPermissionService`. That change should leave the manifest permission alone so the two edits do not conflict.
+
+On API 32 and older, including Android 10 (API 29), `POST_NOTIFICATIONS` does not exist. Notifications are allowed unless the user turned them off in system settings. On API 33 and newer the permission stays denied until something else grants it.
 
 Alerts are not scheduled. `RECEIVE_BOOT_COMPLETED`, exact-alarm permissions, and the boot receivers are not added.
 
@@ -30,7 +34,29 @@ Launcher badges use the channel flag and, when a count is passed, `NotificationC
 
 Flutter 3.47.7 sets `minSdk` 24, `compileSdk` 36, and `targetSdk` 36. The app keeps the Flutter compile and target SDK (36 is the current value for this toolchain, above the 34/35 floor). `minSdk` is `minOf(flutter.minSdkVersion, 29)`, which stays 24 and cannot rise above Android 10.
 
+| | This app |
+| --- | --- |
+| Android Gradle Plugin | 9.1.0 |
+| Gradle | 9.3.1 |
+| Kotlin | 2.4.0 |
+| compileSdk | 36 |
+| targetSdk | 36 |
+| minSdk | 24 |
+
 The application id is still `com.example.vib_abdo_company_mobile`. This work does not change it.
+
+### `permission_handler` 13.0.2 (not added here)
+
+Checked against the current release (published 2026-09-04), which depends on `permission_handler_android` 14.1.0. That Android plugin sets `minSdk` 24, `compileSdk` 37, buildscript AGP 9.0.1, and Kotlin 2.3.20. Its example app uses Gradle 9.1.0, AGP 9.0.1, Kotlin 2.3.20, `compileSdk` 37, and `targetSdk` 35. Version 14.0.0 of the Android plugin is a breaking change that requires the app `compileSdk` to be 37.
+
+| Check | Result |
+| --- | --- |
+| minSdk 24 | Matches the plugin. Compatible. |
+| targetSdk 36 | The plugin does not constrain the app target. Its example uses 35. Compatible. |
+| AGP 9.1.0 | Newer than the plugin buildscript 9.0.1. Compatible. |
+| Gradle 9.3.1 | Newer than the plugin example 9.1.0. Compatible. |
+| Kotlin 2.4.0 | Newer than the plugin 2.3.20. Compatible. |
+| compileSdk 36 | Not compatible. The plugin compiles against SDK 37, and its changelog tells the app to set `compileSdk` to 37. Flutter logs that mismatch from `ValidateCompileSdkVersionTask` and prints the fix; the task itself does not fail the build. The plugin module still needs the Android 37 platform installed. This PR leaves compileSdk at Flutter's 36. The change that adds `permission_handler` needs `compileSdk` 37. |
 
 ## Firebase is optional
 
@@ -66,10 +92,14 @@ The API contract still says the server speaks web push, not FCM. `AppPushService
 
 `.github/workflows/android-notifications-emulator.yml` (`Android notification emulator`) runs on `workflow_dispatch` and nightly at 03:00 UTC. It does not run on pull requests.
 
+`workflow_dispatch` is rejected until this workflow file is on the default branch. A temporary `push` filter lists only `cursor/android-notification-platform-0368`, so pushes to that branch run the matrix. It is not a `pull_request` trigger. Remove that filter before merge.
+
 Matrix: API 29, 33, and 34, `google_apis` / `x86_64`, KVM, AVD cache. Debug builds pass `USE_FAKE_API=true`.
 
-- API 29: notifications are allowed without a prompt, and a local alert is posted.
-- API 33 and 34: `adb shell pm revoke` then the denied path (nothing is posted), then `adb shell pm grant` and the granted path (an alert is posted). The plugin permission call runs only when the permission is already granted, so the test does not sit on the system dialog.
+The integration test does not call a permission API and does not use `NotificationPermissionService`. `tool/android_notification_emulator_test.sh` installs the debug APK, then drives the case with adb before `flutter test`:
+
+- API 29: `NOTIF_CASE=implicit`. No grant. `areNotificationsEnabled` is true, the collections channel is present (Arabic name, high importance, badge on), and a probe alert is posted.
+- API 33 and 34: `adb shell pm revoke` plus `appops set … POST_NOTIFICATION deny`, then `NOTIF_CASE=denied` (`areNotificationsEnabled` is false and nothing is posted). Then `pm grant` plus `appops set … POST_NOTIFICATION allow`, then `NOTIF_CASE=granted` (enabled is true, the same channel is still high importance with the badge flag, and a probe alert is posted).
 
 Dispatch it from the branch:
 
@@ -87,4 +117,4 @@ gh workflow run android-notifications-emulator.yml --ref <branch>
 6. **Channel importance and extra channels.** One high-importance channel covers general and collections alerts. A quieter channel is a product choice.
 7. **Scheduled local reminders.** Not built. Boot and exact-alarm permissions stay off until someone asks for them.
 8. **Numeric badges on vendor launchers.** The channel badge is on. A badge-count plugin is not, because unsupported launchers crash.
-9. **When to show the permission prompt.** It runs on the first frame. Moving it to after sign-in is a product choice.
+9. **When to show the permission prompt.** Not this change. `NotificationPermissionService` owns the request. Whether that runs on the first frame, after sign-in, or later is still a product choice.

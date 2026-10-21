@@ -1,4 +1,7 @@
-/// Stable Android notification ids and the permission rules around them.
+/// Stable Android notification ids.
+///
+/// Runtime permission requests are not made here. `POST_NOTIFICATIONS` is
+/// declared in the manifest; another change asks for it.
 ///
 /// Channel ids are part of the device install. Renaming one creates a second
 /// channel and leaves the old one in system settings.
@@ -48,8 +51,6 @@ abstract final class NotificationChannels {
 
 enum NotificationImportance { high }
 
-enum NotificationReadiness { implicitlyGranted, granted, denied, unavailable }
-
 class NotificationChannelSpec {
   const NotificationChannelSpec({
     required this.id,
@@ -86,23 +87,6 @@ class AndroidNotificationRequest {
 
   /// Passed to `NotificationCompat.setNumber` when the launcher supports it.
   final int? badgeCount;
-}
-
-/// When the system asks the user, and what a plugin answer means.
-abstract final class NotificationPermissionPolicy {
-  static bool runtimeRequestRequired(int sdkInt) =>
-      sdkInt >= NotificationChannels.runtimePermissionSdk;
-
-  static NotificationReadiness readinessFor({
-    required int sdkInt,
-    required bool? pluginGranted,
-  }) {
-    if (!runtimeRequestRequired(sdkInt)) {
-      return NotificationReadiness.implicitlyGranted;
-    }
-    if (pluginGranted == true) return NotificationReadiness.granted;
-    return NotificationReadiness.denied;
-  }
 }
 
 /// Launcher badge count. Unsupported launchers ignore the number; this does

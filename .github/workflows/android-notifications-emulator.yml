@@ -5,7 +5,9 @@
 # and do not need google-services.json or any secret.
 #
 # The required check "Analyze, test, and debug APK" is unchanged. Unit tests for
-# the channel and the permission flow run there via flutter test.
+# the channel and for posting when notifications are disabled run there via
+# flutter test. The emulator grants and revokes with adb; this repo does not
+# request the runtime permission.
 
 name: Android notification emulator
 
