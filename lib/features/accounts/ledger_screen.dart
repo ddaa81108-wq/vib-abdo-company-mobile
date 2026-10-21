@@ -13,6 +13,7 @@ import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
+import 'edit_account_card_screen.dart';
 import 'transaction_correction_form.dart';
 
 /// Ledger for one card. Customers, companies, Libyan deposits, and Egyptian
@@ -81,6 +82,7 @@ class LedgerScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  EditAccountCardButton(section: section, card: loadedCard),
                   if (canWrite)
                     Wrap(
                       spacing: AppSpacing.sm,
