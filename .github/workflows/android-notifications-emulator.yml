@@ -8,6 +8,9 @@
 # the channel and for posting when notifications are disabled run there via
 # flutter test. The emulator grants and revokes with adb; this repo does not
 # request the runtime permission.
+#
+# The debug APK build uses Flutter's ndkVersion. That package is installed
+# with the same action as the CI APK jobs, before the emulator boots.
 
 name: Android notification emulator
 
@@ -22,6 +25,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   emulator:
@@ -65,6 +69,9 @@ jobs:
 
       - name: Resolve packages
         run: flutter pub get
+
+      - name: Install Android NDK
+        uses: ./.github/actions/install-android-ndk
 
       - name: Enable KVM
         run: |
