@@ -17,6 +17,10 @@ import 'package:vib_abdo_company_mobile/ui/theme.dart';
 
 import 'support/pump_app.dart';
 
+/// Headless `flutter test` does not paint `toImage` reliably. The capture
+/// stays tagged `screenshots` and is skipped unless this define is set.
+const _captureScreenshots = bool.fromEnvironment('CAPTURE_SCREENSHOTS');
+
 void main() {
   testWidgets('purchases renders RTL in light and dark', (tester) async {
     await pumpFakeApp(tester, size: const Size(800, 1600));
@@ -58,8 +62,8 @@ void main() {
         expect(find.byKey(const Key('purchase-day-12')), findsOneWidget);
         expect(find.byKey(const Key('purchase-entry-pe_1')), findsOneWidget);
         expect(find.byKey(const Key('purchases-lifetime')), findsOneWidget);
-        expect(find.byKey(const Key('add-purchase')), findsOneWidget);
-        expect(find.byKey(const Key('finalize-day')), findsOneWidget);
+        expect(find.byKey(const Key('add-purchase-12')), findsOneWidget);
+        expect(find.byKey(const Key('finalize-day-12')), findsOneWidget);
         expect(find.byKey(const Key('edit-pe_1')), findsOneWidget);
         expect(find.byKey(const Key('delete-pe_1')), findsOneWidget);
         expect(tester.takeException(), isNull);
@@ -106,8 +110,8 @@ void main() {
 
     expect(find.byKey(const Key('purchases-empty')), findsOneWidget);
     expect(find.text(AppStrings.emptyPurchases), findsOneWidget);
-    expect(find.byKey(const Key('add-purchase')), findsNothing);
-    expect(find.byKey(const Key('finalize-day')), findsNothing);
+    expect(find.byKey(const Key('add-purchase-12')), findsNothing);
+    expect(find.byKey(const Key('finalize-day-12')), findsNothing);
     final lifetime = find.byKey(const Key('purchases-lifetime'));
     expect(
       find.descendant(of: lifetime, matching: find.textContaining('10')),
@@ -129,7 +133,7 @@ void main() {
     await go(tester, '/purchases');
 
     expect(find.byKey(const Key('purchases-loading')), findsOneWidget);
-    expect(find.byKey(const Key('add-purchase')), findsNothing);
+    expect(find.byKey(const Key('add-purchase-12')), findsNothing);
     expect(find.byKey(const Key('purchases-empty')), findsNothing);
 
     pending.complete(
@@ -166,13 +170,13 @@ void main() {
     await go(tester, '/purchases');
 
     expect(find.text(AppStrings.retry), findsOneWidget);
-    expect(find.byKey(const Key('add-purchase')), findsNothing);
-    expect(find.byKey(const Key('finalize-day')), findsNothing);
+    expect(find.byKey(const Key('add-purchase-12')), findsNothing);
+    expect(find.byKey(const Key('finalize-day-12')), findsNothing);
 
     failing = false;
     await tester.tap(find.text(AppStrings.retry));
     await settle(tester);
-    expect(find.byKey(const Key('add-purchase')), findsOneWidget);
+    expect(find.byKey(const Key('add-purchase-12')), findsOneWidget);
     expect(find.text(AppStrings.retry), findsNothing);
   });
 
@@ -183,17 +187,17 @@ void main() {
     await pumpFakeApp(tester, size: const Size(360, 900), connectivity: link);
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
-    expect(pressed(tester, const Key('add-purchase')), isNotNull);
-    expect(pressed(tester, const Key('finalize-day')), isNotNull);
+    expect(pressed(tester, const Key('add-purchase-12')), isNotNull);
+    expect(pressed(tester, const Key('finalize-day-12')), isNotNull);
 
     link.setOnline(false);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.byKey(const Key('offline-banner')), findsOneWidget);
-    expect(find.byKey(const Key('add-purchase')), findsOneWidget);
-    expect(find.byKey(const Key('finalize-day')), findsOneWidget);
-    expect(pressed(tester, const Key('add-purchase')), isNull);
-    expect(pressed(tester, const Key('finalize-day')), isNull);
+    expect(find.byKey(const Key('add-purchase-12')), findsOneWidget);
+    expect(find.byKey(const Key('finalize-day-12')), findsOneWidget);
+    expect(pressed(tester, const Key('add-purchase-12')), isNull);
+    expect(pressed(tester, const Key('finalize-day-12')), isNull);
     expect(pressed(tester, const Key('edit-pe_1')), isNull);
     expect(pressed(tester, const Key('delete-pe_1')), isNull);
   });
@@ -211,38 +215,86 @@ void main() {
 
     expect(find.byKey(PurchasesScreen.screenKey), findsOneWidget);
     expect(find.byKey(const Key('purchase-day-12')), findsOneWidget);
-    expect(find.byKey(const Key('add-purchase')), findsNothing);
-    expect(find.byKey(const Key('finalize-day')), findsNothing);
+    expect(find.byKey(const Key('add-purchase-12')), findsNothing);
+    expect(find.byKey(const Key('finalize-day-12')), findsNothing);
     expect(find.byKey(const Key('edit-pe_1')), findsNothing);
     expect(find.byKey(const Key('delete-pe_1')), findsNothing);
   });
 
-  testWidgets('screenshots of purchases in light and dark at 360 and 430', (
-    tester,
-  ) async {
-    await pumpFakeApp(tester, size: const Size(360, 844));
-    await tester.runAsync(loadScreenshotFonts);
-    await tester.pump();
+  testWidgets('add and finalize keys are unique per day', (tester) async {
+    await pumpFakeApp(
+      tester,
+      size: const Size(360, 900),
+      overrides: [
+        purchasesProvider.overrideWith((ref) async {
+          return PurchasesBookPage.fromData({
+            'days': [
+              for (final id in ['1', '2'])
+                {
+                  'day': id,
+                  'version': 1,
+                  'status': 'draft',
+                  'entries': <Map<String, dynamic>>[],
+                  'totals': {
+                    'previousDebtUnits': 1,
+                    'todayResultUnits': 1,
+                    'todayPaidUnits': 1,
+                    'totalDebtUnits': 1,
+                    'vodafoneRemainingUnits': 0,
+                  },
+                },
+            ],
+            'lifetimeTotals': {
+              'resultUnits': 1,
+              'paidUnits': 1,
+              'remainingUnits': 0,
+            },
+          });
+        }),
+      ],
+    );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
-    await capturePurchases(tester, 'purchases-light-360');
 
-    tester.view.physicalSize = const Size(430, 932);
-    tester.view.devicePixelRatio = 1;
-    await settle(tester);
-    await capturePurchases(tester, 'purchases-light-430');
-
-    await go(tester, '/account');
-    await tester.tap(find.byKey(const Key('theme-switch')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await go(tester, '/purchases');
-    await capturePurchases(tester, 'purchases-dark-430');
-
-    tester.view.physicalSize = const Size(360, 844);
-    await settle(tester);
-    await capturePurchases(tester, 'purchases-dark-360');
+    expect(find.byKey(const Key('add-purchase-1')), findsOneWidget);
+    expect(find.byKey(const Key('add-purchase-2')), findsOneWidget);
+    expect(find.byKey(const Key('finalize-day-1')), findsOneWidget);
+    expect(find.byKey(const Key('finalize-day-2')), findsOneWidget);
+    expect(find.byKey(const Key('add-purchase')), findsNothing);
+    expect(find.byKey(const Key('finalize-day')), findsNothing);
+    expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'screenshots of purchases in light and dark at 360 and 430',
+    (tester) async {
+      await pumpFakeApp(tester, size: const Size(360, 844));
+      await tester.runAsync(loadScreenshotFonts);
+      await tester.pump();
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/purchases');
+      await capturePurchases(tester, 'purchases-light-360');
+
+      tester.view.physicalSize = const Size(430, 932);
+      tester.view.devicePixelRatio = 1;
+      await settle(tester);
+      await capturePurchases(tester, 'purchases-light-430');
+
+      await go(tester, '/account');
+      await tester.tap(find.byKey(const Key('theme-switch')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await go(tester, '/purchases');
+      await capturePurchases(tester, 'purchases-dark-430');
+
+      tester.view.physicalSize = const Size(360, 844);
+      await settle(tester);
+      await capturePurchases(tester, 'purchases-dark-360');
+    },
+    tags: const ['screenshots'],
+    // Headless flutter test skips this unless CAPTURE_SCREENSHOTS is set.
+    skip: !_captureScreenshots,
+  );
 }
 
 Future<void> pumpScaled(WidgetTester tester, Size size, double scale) async {

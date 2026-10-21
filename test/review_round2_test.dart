@@ -114,7 +114,7 @@ void main() {
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
-    await tester.tap(find.byKey(const Key('add-purchase')));
+    await tester.tap(find.byKey(const Key('add-purchase-12')));
     await settle(tester);
     await tester.tap(find.byKey(const Key('purchase-kind-custom')));
     await tester.pump();
@@ -186,7 +186,7 @@ void main() {
     final gate = Completer<void>();
     fake.pauseMutations = gate;
 
-    await tester.tap(find.byKey(const Key('finalize-day')));
+    await tester.tap(find.byKey(const Key('finalize-day-12')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byKey(const Key('confirm-mutation')));

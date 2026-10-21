@@ -240,7 +240,7 @@ class _DayCard extends ConsumerWidget {
               children: [
                 if (canWrite && editable)
                   GatedButton(
-                    buttonKey: const Key('add-purchase'),
+                    buttonKey: ValueKey('add-purchase-${day.day}'),
                     allowed: true,
                     online: online,
                     label: AppStrings.add,
@@ -251,7 +251,7 @@ class _DayCard extends ConsumerWidget {
                   ),
                 if (canFinalize && day.status == 'draft')
                   GuardedMutation(
-                    buttonKey: const Key('finalize-day'),
+                    buttonKey: ValueKey('finalize-day-${day.day}'),
                     inputs: 'finalize:${day.day}:${day.version}',
                     expectedVersion: day.version,
                     label: AppStrings.finalizeDay,

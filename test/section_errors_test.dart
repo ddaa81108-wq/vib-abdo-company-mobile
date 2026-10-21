@@ -101,7 +101,7 @@ void main() {
     gate.failing = false;
     await tester.tap(find.text(AppStrings.retry));
     await settle(tester);
-    expect(find.byKey(const Key('add-purchase')), findsOneWidget);
+    expect(find.byKey(const Key('add-purchase-12')), findsOneWidget);
     expect(gate.calls, greaterThanOrEqualTo(2));
   });
 
