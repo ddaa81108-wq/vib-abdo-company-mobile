@@ -13,11 +13,11 @@
 
 | التصنيف | المعرّفات |
 |---|---|
-| Pending PM decision | DEF-002. السلوك لم يتغير على `main` عند `dff1456`، والعيب لم يُغلق |
-| Blocking ما زال مفتوحًا على `main` | DEF-013 وDEF-014 ما زالا في `dff1456`. لا يبقى DEF-003 أو DEF-004 أو DEF-005 أو DEF-006 مفتوحًا على `main` |
-| Non-blocking على `main` | DEF-010، DEF-012. DEF-015 وDEF-016 أُغلقا على مسودات وليسا على `main` |
-| verified وليس على `main` | DEF-013 على #31 `636ef4b`. DEF-014 على #30 `fe69157`. DEF-015 على #28 `002db97`. DEF-016 على #29 `5b27815` |
-| أُغلق بعد إعادة اختبار | DEF-001: Fixed in #15 — verified، وأُعيد على `main`. DEF-003 وDEF-004 وDEF-005: Verified على #24 وأُعيدت على `main`. DEF-006 وDEF-008 وDEF-009 وDEF-011: Verified على #17 وأُعيد DEF-006 على `main`. DEF-007: Verified على #26 عند `aead4c5` وأُعيد ضمن المجموعة على `main` |
+| Pending PM decision | DEF-002. على `main` عند `451ec58` السلوك لم يتغير، والعيب لم يُغلق |
+| Blocking مفتوح على `main` | لا يبقى عيب مانع من DEF-013 أو DEF-014. هما verified on main 451ec58 |
+| Non-blocking مفتوح | DEF-010، DEF-012. DEF-012 ما زال Fail على `main` لأن #27 لم يُدمج |
+| verified on main 451ec58 | DEF-001، DEF-003، DEF-004، DEF-005، DEF-006، DEF-013، DEF-014، DEF-015، DEF-016 |
+| أُغلق بعد إعادة اختبار | DEF-007 وDEF-008 وDEF-009 وDEF-011 بقيت مغلقة ضمن المجموعة على `451ec58` |
 
 ---
 
@@ -93,6 +93,8 @@
 
 **إعادة الاختبار على `main` (2026-10-21، `dff1456`):** اختبار `DEF-002 limited admin has collections.decide and the server accepts it` ناجح ضمن 74. الإداري المحدود ما زال `canDo(collections.decide)` والاعتماد يخزّن `approved` والإصدار 2. الموظف ما زال بلا الصلاحية والاعتماد 403. السلوك لم يتغير. الحالة تبقى **Pending PM decision**. لم يُغلق.
 
+**على `main` (`451ec58`):** الاختبار نفسه ناجح ضمن 87. الحالة تبقى **Pending PM decision**.
+
 ---
 
 ### DEF-003 — السداد الكامل لا يصفّر الرصيد على Fake API
@@ -121,7 +123,9 @@
 
 **على فرع الدمج #26 (`589d645`):** القائمة 10 كروت. بعد سداد `c_55` الرصيد 0 والإصدار 5، و`c_56` يبقى 150، والملخص **10315**. إعادة نفس `requestId` تعيد النتيجة الأولى ويبقى الملخص 10315. `GET /api/home` يقرأ الملخص المخزَّن فيصير العملاء **10315** مثل القائمة، والأمانات المصرية تبقى 23750 في الجهتين. الحكم: **Verified**. `bash tool/check.sh` على #26 خرج 0: التطبيق 93/0 والحزمة 70/0.
 
-**إعادة الاختبار على `main` (`dff1456`):** الاختبار نفسه ناجح: الرصيد 0 والإصدار 5 والملخص **10315**. مسبار `GET /api/home` بعد السداد نفسه: بطاقة العملاء **10315** والأمانات المصرية **23750**. الحكم يبقى **Verified**. نشرة الديون على الرئيسية تبقى 320 (DEF-016) وهذا لا يعيد فتح DEF-003.
+**إعادة الاختبار على `main` (`dff1456`):** الاختبار نفسه ناجح: الرصيد 0 والإصدار 5 والملخص **10315**. مسبار `GET /api/home` بعد السداد نفسه: بطاقة العملاء **10315** والأمانات المصرية **23750**. الحكم يبقى **Verified**. نشرة الديون على `dff1456` كانت تبقى 320.
+
+**على `main` (`451ec58`):** verified on main 451ec58. `DEF-003 full payment stores balance 0` ناجح. نشرة الرئيسية صارت تتبع الرصيد المخزَّن (DEF-016).
 
 ---
 
@@ -378,6 +382,8 @@
 
 **إعادة الاختبار على `main` (`dff1456`):** الجملة العامة ومفاتيح `LYD` / `EGP` اختفت. `P4-003 settings empty states and Arabic ledger labels` و`DEF-012 admin settings replace the old unavailable sentence` ناجحان: الإجماليات «0 د.ل» و«0 ج.م»، والبلاطات تعرض `employeesEmpty` و`auditEmpty` و`operationsEmpty`. المتوقع في P4-003 ما زال بيانات أو إخفاء البلاطة، فلم يتحقق. العيب يبقى مفتوحًا وغير مانع. لا يُغلق قبل المرحلة 5 أو قرار مكتوب بإزالة الشاشات.
 
+**على `main` (`451ec58`):** ما زال **Fail**. #27 لم يُدمج. `P4-003 settings empty states and Arabic ledger labels` ينجح لأنه يتوقع النص البديل: البلاطات تعرض `employeesEmpty` و`auditEmpty` و`operationsEmpty`، والإجماليات «0 د.ل» و«0 ج.م» بلا مفاتيح ظاهرة. المعيار (بيانات أو إخفاء البلاطة) لم يتحقق. بانتظار قرار علي.
+
 **إعادة الاختبار على PR #27 (2026-10-21، `5d9700f`، فوق `main`، ليس على `main` بعد):** الحكم **Fail**. لم يُعلَّم verified. `bash tool/check.sh` خرج 0 (التطبيق 250/0، الحزمة 74/0).
 
 | الفحص | النتيجة |
@@ -393,7 +399,7 @@
 
 ### DEF-013 — لا نموذج لحفظ يوم المصراوية، و`PUT` لا يخزّن القيم
 
-**الحالة:** verified on #31 636ef4b, not yet on main
+**الحالة:** verified on main 451ec58
 
 | الحقل | القيمة |
 |---|---|
@@ -416,11 +422,13 @@
 
 المدير يحفظ من النموذج. `DEF-013 PUT stores the submitted day and GET returns it`: القيمة السابقة 1 والمشتريات 9 والإصدار يصير 3، و`GET` يعيد ذلك. `saving the day sends raw inputs and refreshes server values`: الواجهة تعرض «1 ج.م» و«9 ج.م» بعد التأكيد، والجسم فيه `requestId` و`expectedVersion` 2. إصدار قديم يعيد 409 `VERSION_CONFLICT` ولا يغيّر اليوم (`DEF-013 a stale expectedVersion is VERSION_CONFLICT`). إعادة نفس `requestId` تعيد اليوم الأول ولا تطبّق القيمة الثانية. الموظف و`limited.admin.demo` و`guest.demo` بلا قراءة ولا كتابة: `GET` و`PUT` يعيدان 403، والنموذج يختفي بلا `masraweya.write` (`the save form is visible only with write permission`). `workTotal` يبقى 3050 و`remaining` يبقى 8950 لأن لا صيغة معتمدة. هذا **سؤال مفتوح** وليس عيبًا.
 
+**على `main` (`451ec58`):** verified on main 451ec58. الدمج `#31` عند رأس `main`. `DEF-013 PUT stores the submitted day and GET returns it` و`saving the day sends raw inputs and refreshes server values` و`a version conflict refetches and the next save uses the new version` ناجحة ضمن 260/87. سؤال الصيغة يبقى مفتوحًا.
+
 ---
 
 ### DEF-014 — Fake API يقبل كتابة بند على يوم مشتريات معتمد
 
-**الحالة:** verified on #30 fe69157, not yet on main
+**الحالة:** verified on main 451ec58
 
 | الحقل | القيمة |
 |---|---|
@@ -444,11 +452,13 @@
 
 `DEF-014 finalized purchase day rejects entry create update and delete`: بعد الاعتماد الإصدار 4، الإضافة والتعديل والحذف كل منها 409 `DAY_FINALIZED`، وبصمة الدفتر لا تتغير. إعادة نفس `requestId` الذي نجح على المسودة لا تتجاوز الرفض (`DEF-014 a stored requestId does not bypass the finalized-day check`). الواجهة تخفي `add-purchase-12` و`edit-pe_1` و`delete-pe_1` وتبقي `open-correction-12` (`a finalized purchases day hides add edit and delete`). حفظ أو حذف بعد الاعتماد يعرض رسالة الخادم لا رسالة تعارض الإصدار. الموظف و`limited.admin.demo` و`guest.demo` يأخذون 403 قبل ذلك لأنهم بلا `purchases.write`. يوم `correction` يبقى قابلًا للكتابة.
 
+**على `main` (`451ec58`):** verified on main 451ec58. الدمج `#30` هو `52d12c2`. `a finalized purchases day hides add edit and delete` ناجح ضمن المجموعة.
+
 ---
 
 ### DEF-015 — قبض الخزينة وصرفها لا يظهران في دفتر النقد
 
-**الحالة:** verified on #28 002db97, not yet on main
+**الحالة:** verified on main 451ec58
 
 | الحقل | القيمة |
 |---|---|
@@ -471,11 +481,13 @@
 
 `DEF-015 cash in and cash out are returned by the ledger`: قبض 1250 يعيد `ce_8` والإصدار 8. إعادة نفس `requestId` لا تضيف سطرًا. إصدار 7 بعد ذلك يعيد 409 `VERSION_CONFLICT`. الصرف 200 يعيد `ce_9` والإصدار 9. الدفتر `[ce_9, ce_8, ce_1]`، والنقد النشط 9050، والصافي 52050، والإصدار 9. الواجهة `DEF-015 cash in and cash out refresh the ledger and the summaries` ترسم `cash-entry-ce_8` بمبلغ 1,250 د.ل وبطاقة النقد 9,250 د.ل ثم `ce_9`. الموظف و`limited.admin.demo` و`guest.demo`: قراءة الخزينة و`POST` يعيدان 403، والأزرار مخفية عمن بلا `treasury.write`.
 
+**على `main` (`451ec58`):** verified on main 451ec58. الدمج `#28` هو `45adda5`. `DEF-015 cash in and cash out refresh the ledger and the summaries` ناجح ضمن المجموعة.
+
 ---
 
 ### DEF-016 — نشرة الديون في الرئيسية تبقى على رصيد الملف بعد السداد
 
-**الحالة:** verified on #29 5b27815, not yet on main
+**الحالة:** verified on main 451ec58
 
 | الحقل | القيمة |
 |---|---|
@@ -498,12 +510,18 @@
 
 `DEF-016 home debt rows copy the stored card balance`: بعد السداد الكامل رصيد الكارت 0 وصف النشرة 0، والملخص 10315، والمصري 23750. السداد الجزئي 100 يجعل الكارت والنشرة **220**. الواجهة `DEF-016 full payment no longer shows the 320 home debt row` لا تعرض «320 د.ل» بعد السداد الكلي وتعرض الصفر. `limited.admin.demo` و`employee.demo` يقرآن الصف 220 بعد سداد المدير على العميل نفسه. `guest.demo` بلا `oldDebts`. الصف يبقى ظاهرًا عند الصفر. اختفاؤه عند الصفر **سؤال مفتوح لمدير المشروع** وليس عيبًا.
 
+**على `main` (`451ec58`):** verified on main 451ec58. الدمج `#29` هو `86362f9`. `DEF-016 home debt rows copy the stored card balance` و`DEF-016 full payment no longer shows the 320 home debt row` ناجحان. السؤال المفتوح يبقى.
+
 ---
 
-## سؤالان مفتوحان من إعادة #28–#31
+## أسئلة مفتوحة لمدير المشروع على `main` `451ec58`
 
-- **المصراوية:** `workTotalUnits` و`remainingUnits` لا يُعاد حسابهما من القيم المحفوظة. لا صيغة معتمدة. ليس عيبًا.
-- **نشرة الديون:** بعد السداد الكامل يبقى صف `c_55` برصيد 0. هل يختفي الصف عند الصفر سؤال لمدير المشروع، وليس عيبًا.
+هذه ليست عيوبًا جديدة، ولا تُغلق من هذه الجولة:
+
+- **صيغة المصراوية:** `workTotalUnits` و`remainingUnits` لا يُعاد حسابهما من القيم المحفوظة. بعد الحفظ يبقى `workTotal` 3050 و`remaining` 8950. لا صيغة معتمدة. ليس عيبًا.
+- **صف الدين عند الصفر:** بعد السداد الكامل يبقى صف `c_55` ظاهرًا برصيد 0. هل يختفي الصف عند الصفر سؤال لمدير المشروع، وليس عيبًا.
+- **بلاطات #27 الفارغة:** P4-003/DEF-012 ما زال Fail على `main` لأن #27 لم يُدمج. البلاطات الثلاث تعرض `employeesEmpty` و`auditEmpty` و`operationsEmpty`. بانتظار قرار علي. غير مانع.
+- **DEF-002:** الحالة تبقى Pending PM decision. اختبار الاعتماد عند الإداري المحدود ناجح، والعيب لم يُغلق.
 - **P3-01** يبقى Blocked. يحتاج staging حقيقيًا.
 
 ## سؤال مفتوح على PR #17 — بطاقة «الاستلامات المعتمدة اليوم»

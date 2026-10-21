@@ -4,6 +4,19 @@
 
 المعايير الأربعة على `main` عند `dff1456` مسجّلة في `phase-4.md`: P4-001 وP4-002 وP4-004 ناجحة. P4-003 فاشل وغير مانع ويبقى DEF-012.
 
+## الجولة النهائية على `main` `451ec58`
+
+verified on main 451ec58. `bash tool/check.sh` خرج 0: التطبيق **260/0** والحزمة **87/0**. لقطات PR #14 لم تُستخدم كمرجع بكسل.
+
+| المعرف | الحكم | الملاحظة |
+|---|---|---|
+| P4-001 | Pass. verified on main 451ec58 | `P4-001 debt and payment amounts use the status colours`: `debtText` و`creditText` |
+| P4-002 | Pass. verified on main 451ec58 | صف الرئيسية وترويسة الدفتر يرسمان `warningDebt` |
+| P4-004 | Pass. verified on main 451ec58 | تسمية واحدة «منذ 4 أيام» تطابق `debtAgeDays` 4 |
+| P4-003 / DEF-012 | Fail | #27 (`5d9700f`) ليس على `main`. الاختبار ينجح لأنه يتوقع النص البديل. البلاطات تعرض `employeesEmpty` و`auditEmpty` و`operationsEmpty`. الإجماليات «0 د.ل» و«0 ج.م» بلا `LYD` أو `EGP`. المعيار (بيانات أو إخفاء البلاطة) لم يتحقق. بانتظار قرار علي. غير مانع |
+
+لا عيب جديد من هذه الجولة.
+
 ## P4-003 / DEF-012 على PR #27
 
 - **الالتزام:** `5d9700f218efecf1447500c926137e30b3e40930`
@@ -42,4 +55,4 @@
 | P4-06 | Pass | `empty reports and a missing treasury rate stay neutral` |
 | المراحل 1–3 | Pass | `phase_1_3_fake_test.dart` أربعة اختبارات |
 
-لا عيب جديد من هذه الإعادة.
+لا عيب جديد من إعادة #27. الحكم النهائي لـP4-003 على `main` `451ec58` يبقى Fail، كما في قسم الجولة النهائية أعلاه.
