@@ -225,6 +225,7 @@ Future<void> _pumpSurface(
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
     MaterialApp(
+      key: UniqueKey(),
       debugShowCheckedModeBanner: false,
       locale: const Locale('ar', 'LY'),
       supportedLocales: const [Locale('ar', 'LY')],
