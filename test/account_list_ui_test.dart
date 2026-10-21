@@ -84,6 +84,11 @@ void main() {
     final customerCard = loaded!.customer;
     final companyCard = loaded.company;
     final tickerDebt = loaded.ticker;
+    // #17: the card label names debtAgeDays, and the home bulletin copies it.
+    expect(customerCard.ageStatusLabel, 'منذ ${customerCard.debtAgeDays} أيام');
+    expect(companyCard.ageStatusLabel, 'منذ ${companyCard.debtAgeDays} أيام');
+    expect(tickerDebt.ageStatusLabel, customerCard.ageStatusLabel);
+    expect(tickerDebt.debtAgeDays, customerCard.debtAgeDays);
 
     await go(tester, '/customers');
     expectRtl(tester);
@@ -231,11 +236,10 @@ void main() {
     final pin = find.byKey(const Key('pin-c_55'));
     await tester.ensureVisible(pin);
     expect(tester.widget<IconButton>(pin).onPressed, isNull);
-    expect(find.byKey(const Key('zero-review')), findsOneWidget);
-    expect(
-      tester.widget<TextButton>(find.byKey(const Key('zero-review'))).onPressed,
-      isNull,
-    );
+    final zero = find.byKey(const Key('zero-review'));
+    expect(zero, findsWidgets);
+    await tester.ensureVisible(zero.first);
+    expect(tester.widget<TextButton>(zero.first).onPressed, isNull);
   });
 
   testWidgets('lists lay out at phone widths and large text', (tester) async {
@@ -276,7 +280,11 @@ void main() {
           );
           await _reveal(tester, find.byKey(const Key('pin-c_55')), list);
           if (path == '/customers') {
-            await _reveal(tester, find.byKey(const Key('zero-review')), list);
+            await _reveal(
+              tester,
+              find.byKey(const Key('zero-review')).first,
+              list,
+            );
             await _reveal(tester, find.byKey(const Key('assign-mode')), list);
           }
           if (path == '/egyptian-deposits') {
@@ -372,6 +380,7 @@ void _expectSingleAge(
   final finder = find.byKey(Key('account-card-${card.id}'));
   final age = tester.widget<Text>(find.byKey(Key('account-age-${card.id}')));
   expect(age.data, shown);
+  expect(shown, card.ageStatusLabel);
   expect(
     find.descendant(
       of: finder,
@@ -379,8 +388,12 @@ void _expectSingleAge(
     ),
     findsOneWidget,
   );
+  expect(
+    find.descendant(of: finder, matching: find.text(shown!)),
+    findsOneWidget,
+  );
   final days = card.debtAgeDays;
-  if (days == null || shown == null) return;
+  if (days == null) return;
   final count = ageCountPhrase(days);
   if (count == shown) return;
   expect(find.descendant(of: finder, matching: find.text(count)), findsNothing);
@@ -433,7 +446,7 @@ Future<void> _expectActions(
   );
   expect(
     find.byKey(const Key('zero-review')),
-    zero ? findsOneWidget : findsNothing,
+    zero ? findsWidgets : findsNothing,
   );
   expect(
     find.byKey(const Key('save-rate')),

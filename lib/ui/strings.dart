@@ -84,6 +84,7 @@ abstract final class AppStrings {
   static const noNotifications = 'لا توجد إشعارات';
   static const refresh = 'تحديث';
   static const integerOnly = 'أدخل عددًا صحيحًا كما هو، بلا كسور.';
+  static const dateInvalid = 'أدخل التاريخ بصيغة سنة-شهر-يوم.';
   static const unitsHint =
       'عدد صحيح بالوحدة الصغرى التي يخزّنها الخادم. بلا فواصل وبلا كسور. التطبيق لا يحوّل هذا الرقم ولا يحسبه.';
   static const rateInvalid = 'أدخل السعر نصًا كما هو.';
@@ -97,6 +98,7 @@ abstract final class AppStrings {
   static const finalizeConfirm = 'تأكيد ترحيل اليوم؟';
   static const cashIn = 'دخول';
   static const cashOut = 'خروج';
+  static const cashMovements = 'حركات النقد';
   static const formulaCaption = 'ديون لنا + النشط + المصري − ديون علينا';
   static const pinnedColumn = 'التاريخ';
   static const changePassword = 'تغيير كلمة المرور';
@@ -225,6 +227,8 @@ abstract final class AppStrings {
   static const purchases = 'المشتريات';
   static const purchasesValue = purchases;
   static const reports = 'التقارير الذكية';
+  static const reportsReadOnly = 'للقراءة فقط. الأرقام كما أرسلها الخادم.';
+  static const scrollColumns = 'اسحب أفقيًا لعرض بقية الأعمدة';
   static const treasury = 'الخزينة';
   static const adjustment = 'تسوية تاريخية';
   static const period = 'الفترة';
@@ -277,6 +281,10 @@ abstract final class AppStrings {
   static const link = 'ربط';
   static const batch = 'الدفعة';
   static const toneNeutral = 'محايد';
+  static const correctTransaction = 'تصحيح الحركة';
+  static const confirmCorrect =
+      'تأكيد إرسال تصحيح هذه الحركة؟ المبلغ والرصيد بعد الحفظ يظهران من الخادم فقط.';
+  static const currentServerAmount = 'المبلغ الحالي من الخادم';
 
   // Account-list presentation only. Grouped at the end so ledger and
   // collections edits to the catalogue above can merge without overlap.

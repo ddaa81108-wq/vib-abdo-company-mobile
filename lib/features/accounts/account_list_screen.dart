@@ -91,7 +91,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
           children: [
             ScreenTitle(sectionLabel(section.sectionKey)),
             const SizedBox(height: AppSpacing.md),
-            if (_showTicker) _ticker(home, money, width),
+            if (_showTicker) _ticker(home, money, width, cards),
             _SummaryStrip(
               summary: data.summary,
               currency: section.currency,
@@ -250,6 +250,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     AsyncValue<HomeDto?> home,
     MoneyFormatter money,
     double width,
+    List<AccountCardDto> cards,
   ) {
     final debts = home.asData?.value?.oldDebts;
     if (debts == null) return const SizedBox.shrink();
@@ -264,7 +265,11 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             children: [
               for (var i = 0; i < rows.length; i++) ...[
                 if (i > 0) const SizedBox(height: AppSpacing.sm),
-                _TickerLine(debt: rows[i], money: money),
+                _TickerLine(
+                  debt: rows[i],
+                  card: _cardFor(cards, rows[i].id),
+                  money: money,
+                ),
               ],
             ],
           );
@@ -303,6 +308,13 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
         const SizedBox(height: AppSpacing.md),
       ],
     );
+  }
+
+  AccountCardDto? _cardFor(List<AccountCardDto> cards, String id) {
+    for (final card in cards) {
+      if (card.id == id) return card;
+    }
+    return null;
   }
 
   String _message(Object error) {
@@ -1056,9 +1068,14 @@ class _Metric extends StatelessWidget {
 }
 
 class _TickerLine extends StatelessWidget {
-  const _TickerLine({required this.debt, required this.money});
+  const _TickerLine({
+    required this.debt,
+    required this.card,
+    required this.money,
+  });
 
   final OldDebtDto debt;
+  final AccountCardDto? card;
   final MoneyFormatter money;
 
   @override
@@ -1070,9 +1087,11 @@ class _TickerLine extends StatelessWidget {
       ageStatus: debt.ageStatus,
       debtAgeDays: debt.debtAgeDays,
     );
-    final amount = debt.currency == null
+    final currency = card?.currency ?? debt.currency;
+    final units = card?.balanceUnits ?? debt.balanceUnits;
+    final amount = currency == null
         ? AppStrings.dash
-        : money.formatOrDash(debt.balanceUnits, debt.currency!);
+        : money.formatOrDash(units, currency);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHigh,
