@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/section_providers.dart';
+import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/presentation.dart';
 import '../../ui/strings.dart';
@@ -221,17 +222,24 @@ class _CashFormState extends ConsumerState<_CashForm> {
             ),
             meta,
           );
+      _refreshCashViews();
       if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
       );
-      ref.invalidate(treasuryProvider);
-      ref.invalidate(cashLedgerProvider);
       Navigator.of(context).pop();
       return null;
     } catch (error) {
-      return ref.read(errorHandlerProvider).toFailure(error).message;
+      final failure = ref.read(errorHandlerProvider).toFailure(error);
+      if (failure.code == 'VERSION_CONFLICT') _refreshCashViews();
+      return failure.message;
     }
+  }
+
+  void _refreshCashViews() {
+    ref.invalidate(treasuryProvider);
+    ref.invalidate(cashLedgerProvider);
+    ref.invalidate(homeDashboardProvider);
   }
 }
 

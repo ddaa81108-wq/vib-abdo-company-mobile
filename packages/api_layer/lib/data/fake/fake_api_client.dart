@@ -19,7 +19,8 @@ import 'fake_fixtures.dart';
 /// Fake-only fixture switch by USERNAME (see FakeFixtures.meFor): `admin…` = admin like the real
 /// server today (empty permission list), `limited.admin…`, `flag.admin…`, `guest…`,
 /// `mustchange…`, else employee.
-/// Password "wrong" -> 401. It only returns canned values; it never computes money.
+/// Password "wrong" -> 401. Fixture pages stay canned. A successful mutation
+/// stores its result, and the next read returns that stored result.
 ///
 /// Section reads and writes are rejected with 403 unless the signed-in profile
 /// allows them. The check uses [PermissionService], which is the only place that
@@ -133,6 +134,13 @@ class FakeApiClient implements ApiClient {
 
   /// Posted lines added by a direct partial payment. Keyed by section.
   final Map<String, List<Map<String, dynamic>>> _extraLedger = {};
+
+  /// Cash lines stored by POST /api/treasury/cash-entries, oldest first.
+  final List<Map<String, dynamic>> _cashEntries = [];
+
+  /// Treasury version and the running cash figures stored by those lines.
+  /// Null until the first successful entry. Reads otherwise use the fixture.
+  Map<String, dynamic>? _treasuryState;
   static const _err = ErrorMapper();
   static const _denied = 'لا تملك صلاحية لهذا الإجراء';
   static const _adminOnly = 'هذا الإجراء للإدارة فقط';
@@ -298,6 +306,13 @@ class FakeApiClient implements ApiClient {
   Map<String, dynamic> _withStoredSectionFigure(Map<String, dynamic> summary) {
     final section = summary['section'];
     final key = summary['key'];
+    if (section == 'treasury' && key == 'treasury.activeCash') {
+      final stored = _treasuryView()['totals'];
+      if (stored is Map && stored['activeCashUnits'] != null) {
+        summary['valueUnits'] = stored['activeCashUnits'];
+      }
+      return summary;
+    }
     if (section is! String ||
         key is! String ||
         !key.endsWith('.netBalance') ||
@@ -492,15 +507,18 @@ class FakeApiClient implements ApiClient {
       case 'treasury':
         if (method == 'GET') {
           _requireRead(SectionKey.treasury);
-          if (seg.length == 1) return _ok(FakeFixtures.treasury());
+          if (seg.length == 1) return _ok(_treasuryView());
           final before = query?['before']?.toString();
           if (before != null && before.isNotEmpty && failOlderRemaining > 0) {
             failOlderRemaining--;
             _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
           }
-          return _ok(FakeFixtures.cashLedger(before: before));
+          return _ok(_cashLedgerView(before));
         }
         _requireWrite(SectionKey.treasury);
+        if (method == 'POST' && seg.length > 1 && seg[1] == 'cash-entries') {
+          return _applyCashEntry(b);
+        }
         return _ok({'id': 'ce_new', 'version': 8});
       case 'reports':
         if (method != 'GET') _requireWrite(SectionKey.reports);
@@ -1065,6 +1083,88 @@ class FakeApiClient implements ApiClient {
       'version': version,
     };
     return _ok({'id': 'ok', 'version': version});
+  }
+
+  /// Fixture treasury, with version and running cash from a stored entry.
+  Map<String, dynamic> _treasuryView() {
+    final body = _copy(FakeFixtures.treasury());
+    final state = _treasuryState;
+    if (state == null) return body;
+    body['version'] = state['version'];
+    final totals = Map<String, dynamic>.from(body['totals'] as Map);
+    totals['activeCashUnits'] = state['activeCashUnits'];
+    totals['netUnits'] = state['netUnits'];
+    body['totals'] = totals;
+    return body;
+  }
+
+  /// First page prepends stored cash lines, newest first. An older page stays
+  /// the fixture page: new lines are not copied onto it.
+  Map<String, dynamic> _cashLedgerView(String? before) {
+    final page = _copy(FakeFixtures.cashLedger(before: before));
+    if (before != null && before.isNotEmpty) return page;
+    final items = <Map<String, dynamic>>[
+      for (final entry in _cashEntries.reversed)
+        Map<String, dynamic>.from(entry),
+      for (final raw in page['items'] as List)
+        Map<String, dynamic>.from(raw as Map),
+    ];
+    page['items'] = items;
+    return page;
+  }
+
+  /// Stores one cash line and the running treasury figures.
+  ///
+  /// `direction` is the line type (`in` or `out`). `amountUnits` is stored as
+  /// posted. The running cash is the previous stored active cash with that
+  /// amount applied, and the same signed amount is stored on `netUnits`
+  /// because the fixture net already includes active cash one-for-one.
+  /// `activeCashTone` is left as the fixture sent it. A repeated `requestId`
+  /// never reaches this method.
+  ApiResponse _applyCashEntry(Map b) {
+    final treasury = _treasuryView();
+    _requireVersion(b['expectedVersion'], treasury['version']);
+    final direction = b['direction'];
+    if (direction != 'in' && direction != 'out') {
+      _fail(400, 'VALIDATION_ERROR', 'الاتجاه غير معروف');
+    }
+    final amount = b['amountUnits'];
+    if (amount is! int || amount <= 0) {
+      _fail(400, 'VALIDATION_ERROR', 'amountUnits مطلوب');
+    }
+    final totals = treasury['totals'] as Map;
+    final previousCash = totals['activeCashUnits'];
+    final previousNet = totals['netUnits'];
+    if (previousCash is! int || previousNet is! int) {
+      _fail(500, 'SERVER_ERROR', 'الخزينة بلا رصيد مخزّن');
+    }
+    final signed = direction == 'in' ? amount : -amount;
+    final runningCash = previousCash + signed;
+    final runningNet = previousNet + signed;
+    final version = (treasury['version'] as int) + 1;
+    final user = _me['user'];
+    final actor = user is Map && user['displayName'] != null
+        ? '${user['displayName']}'
+        : 'مدير تجريبي';
+    final stamp = _cashEntries.length;
+    final minute = (stamp ~/ 60).toString().padLeft(2, '0');
+    final second = (stamp % 60).toString().padLeft(2, '0');
+    final entry = <String, dynamic>{
+      'id': 'ce_$version',
+      'direction': direction,
+      'amountUnits': amount,
+      'description': b['description'] is String ? b['description'] : null,
+      'balanceAfterUnits': runningCash,
+      'createdAt': '2026-10-21T03:$minute:$second+02:00',
+      'createdByName': actor,
+    };
+    _cashEntries.add(entry);
+    _treasuryState = {
+      'version': version,
+      'activeCashUnits': runningCash,
+      'netUnits': runningNet,
+    };
+    return _ok({'id': entry['id'], 'version': version});
   }
 
   Map<String, dynamic> _recordById(List items, String id, String missing) {
