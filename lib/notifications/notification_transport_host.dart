@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/notifications/notification_opener.dart';
 import '../state/session_providers.dart';
 import 'device_token_registrar.dart';
-import 'notification_registration.dart';
 import 'push_providers.dart';
 
 /// Binds the wipe gate, the push stream, and a cold-start tap.
@@ -25,14 +24,12 @@ class NotificationTransportHost extends ConsumerStatefulWidget {
 }
 
 class _NotificationTransportHostState
-    extends ConsumerState<NotificationTransportHost>
-    with WidgetsBindingObserver {
+    extends ConsumerState<NotificationTransportHost> {
   StreamSubscription<Map<String, dynamic>>? _pushes;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _bind();
@@ -41,23 +38,8 @@ class _NotificationTransportHostState
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _pushes?.cancel();
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) return;
-    unawaited(_syncPermission());
-  }
-
-  Future<void> _syncPermission() {
-    return syncNotificationRegistration(
-      session: ref.read(sessionStateProvider),
-      registrar: ref.read(deviceTokenRegistrarProvider),
-      permission: ref.read(notificationPermissionProvider),
-    );
   }
 
   void _bind() {

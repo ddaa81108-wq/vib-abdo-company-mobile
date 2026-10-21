@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/widgets.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'api/api_providers.dart';
 import 'app.dart';
 import 'error_handling/error_handler.dart';
+import 'notifications/android_notification_setup.dart';
 import 'notifications/app_push_service.dart';
 import 'notifications/device_token_registrar.dart';
 import 'notifications/device_token_store.dart';
@@ -28,6 +30,12 @@ void main() {
     errors.report(error, stack);
     return true;
   };
+
+  // Channel only, after the activity exists. The runtime permission request
+  // lives in another change.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(AndroidNotificationSetup.start(onError: errors.report));
+  });
 
   final stores = AppSecureStores();
   final pushGate = PushSessionGate();

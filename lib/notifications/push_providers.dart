@@ -2,7 +2,6 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_providers.dart';
-import '../features/notifications/notification_permission.dart' as ui;
 import '../state/notification_providers.dart';
 import '../state/session_providers.dart';
 import 'background_poll.dart';
@@ -16,7 +15,6 @@ import 'notification_ingress.dart';
 import 'notification_permission_service.dart';
 import 'push_drop_log.dart';
 import 'push_transport.dart';
-import 'ui_notification_permission.dart';
 
 final notificationDedupProvider = Provider<NotificationIdDedup>(
   (ref) => NotificationIdDedup(),
@@ -29,12 +27,9 @@ final pushTransportProvider = Provider<PushTransport>(
   (ref) => createPushTransport(kPushTransportName),
 );
 
-/// Reads the screen permission service. Granted registers a device token.
-/// Denied or revoked does not.
+/// Stub. Granted is false until the UI dev overrides this provider.
 final notificationPermissionProvider = Provider<NotificationPermissionService>(
-  (ref) => UiBackedNotificationPermission(
-    ref.watch(ui.notificationPermissionServiceProvider),
-  ),
+  (ref) => const StubNotificationPermissionService(),
 );
 
 /// Memory by default so a test that forgets an override does not touch the

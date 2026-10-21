@@ -102,3 +102,5 @@ Other defines are listed in `packages/api_layer/README.md`. Negative permission 
 ## Android
 
 The debug application id is `com.example.vib_abdo_company_mobile`. Replace it before any store listing. Debug builds are signed with the debug key only.
+
+Notification channels, the Android 13 notification permission, and optional Firebase config are described in [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md). The application id above is unchanged.

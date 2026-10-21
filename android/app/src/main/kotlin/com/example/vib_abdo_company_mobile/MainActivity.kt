@@ -1,7 +1,10 @@
 package com.example.vib_abdo_company_mobile
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
@@ -15,6 +18,21 @@ class MainActivity : FlutterActivity() {
             WindowManager.LayoutParams.FLAG_SECURE,
             WindowManager.LayoutParams.FLAG_SECURE,
         )
+        ensureCollectionsChannel()
+    }
+
+    private fun ensureCollectionsChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = getSystemService(NotificationManager::class.java) ?: return
+        val id = getString(R.string.notification_channel_id)
+        val channel = NotificationChannel(
+            id,
+            getString(R.string.notification_channel_name),
+            NotificationManager.IMPORTANCE_HIGH,
+        )
+        channel.description = getString(R.string.notification_channel_description)
+        channel.setShowBadge(true)
+        manager.createNotificationChannel(channel)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -31,6 +49,14 @@ class MainActivity : FlutterActivity() {
                         WindowManager.LayoutParams.FLAG_SECURE,
                     )
                     result.success(null)
+                } else {
+                    result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/android_notifications")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "sdkInt") {
+                    result.success(Build.VERSION.SDK_INT)
                 } else {
                     result.notImplemented()
                 }
