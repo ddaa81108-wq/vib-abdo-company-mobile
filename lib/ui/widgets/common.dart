@@ -3,6 +3,7 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../error_handling/app_failure.dart';
+import '../../error_handling/error_handler.dart';
 import '../presentation.dart';
 import '../strings.dart';
 import '../theme.dart';
@@ -214,7 +215,7 @@ class ForbiddenPane extends StatelessWidget {
 
 /// Copy the UI may show. An HTTP 403 never keeps the raw server sentence.
 String failureText(AppFailure failure) =>
-    failure.code == 'FORBIDDEN' ? AppStrings.forbidden : failure.message;
+    failure.isForbidden ? AppStrings.forbidden : failure.message;
 
 /// Section failure. 403 is [ForbiddenPane]; every other code stays [ErrorPane].
 Widget presentFailure(
@@ -222,7 +223,7 @@ Widget presentFailure(
   VoidCallback? onRetry,
   Key? retryKey,
 }) {
-  if (failure.code == 'FORBIDDEN') return const ForbiddenPane();
+  if (failure.isForbidden) return const ForbiddenPane();
   return ErrorPane(
     message: failure.message,
     onRetry: onRetry,
@@ -234,7 +235,7 @@ Widget presentFailure(
 void showFailureSnackBar(BuildContext context, AppFailure failure) {
   final messenger = ScaffoldMessenger.maybeOf(context);
   if (messenger == null) return;
-  final forbidden = failure.code == 'FORBIDDEN';
+  final forbidden = failure.isForbidden;
   messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(
@@ -558,6 +559,7 @@ class _KeptDataState<T> extends State<KeptData<T>> {
     }
 
     if (value.hasError && _hasLast) {
+      if (_forbidden(value.error!)) return const ForbiddenPane();
       return _withError(widget.builder(_last as T), value.error!);
     }
 
@@ -565,8 +567,19 @@ class _KeptDataState<T> extends State<KeptData<T>> {
       skipLoadingOnReload: true,
       data: widget.builder,
       loading: () => widget.loading ?? const SkeletonBox(height: 88),
-      error: (error, _) => _pane(error),
+      error: (error, _) {
+        if (_forbidden(error)) return const ForbiddenPane();
+        return _pane(error);
+      },
     );
+  }
+
+  /// 403 is [ForbiddenPane] whether the screen passed [KeptData.failureOf]
+  /// or only a thrown [ApiException].
+  bool _forbidden(Object error) {
+    final mapped = widget.failureOf?.call(error);
+    if (mapped != null) return mapped.isForbidden;
+    return const ErrorHandler().toFailure(error).isForbidden;
   }
 
   Widget _pane(Object error) {

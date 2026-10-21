@@ -9,6 +9,7 @@ import '../features/accounts/account_list_screen.dart';
 import '../features/accounts/edit_account_card_screen.dart';
 import '../features/accounts/ledger_screen.dart';
 import '../features/collections/collections_screen.dart';
+import '../features/forbidden/forbidden_screen.dart';
 import '../features/home/home_dashboard.dart';
 import '../features/home/home_shell.dart';
 import '../features/login/change_password_screen.dart';
@@ -110,6 +111,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/account',
             builder: (context, state) => const AccountScreen(),
+          ),
+          GoRoute(
+            path: forbiddenLocation,
+            builder: (context, state) => const ForbiddenScreen(),
           ),
           GoRoute(
             path: '/collections',

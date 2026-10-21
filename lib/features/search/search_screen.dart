@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_providers.dart';
+import '../../error_handling/app_failure.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/section_labels.dart';
@@ -24,8 +25,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _query = TextEditingController();
   final _results = <SectionKey, List<AccountSuggestionDto>>{};
   var _busy = false;
-  var _forbidden = false;
-  String? _error;
+  AppFailure? _failure;
 
   static const _sections = [
     AccountSection.customers,
@@ -55,16 +55,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           onSubmitted: (_) => _run(),
         ),
         if (_busy) const SkeletonBox(key: Key('search-loading'), height: 48),
-        if (_forbidden)
-          const ForbiddenPane()
-        else if (_error != null)
-          ErrorPane(
-            message: _error!,
+        if (_failure != null)
+          presentFailure(
+            _failure!,
             onRetry: _run,
             retryKey: const Key('search-retry'),
           ),
         if (!_busy &&
-            _error == null &&
+            _failure == null &&
             _query.text.isNotEmpty &&
             _results.values.every((items) => items.isEmpty))
           const EmptyPane(message: AppStrings.noResults),
@@ -90,8 +88,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final query = _query.text.trim();
     setState(() {
       _busy = true;
-      _error = null;
-      _forbidden = false;
+      _failure = null;
       _results.clear();
     });
     try {
@@ -105,9 +102,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       }
     } catch (error) {
       if (!mounted) return;
-      final failure = ref.read(errorHandlerProvider).toFailure(error);
-      _forbidden = failure.code == 'FORBIDDEN';
-      _error = failureText(failure);
+      _failure = ref.read(errorHandlerProvider).toFailure(error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

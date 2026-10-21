@@ -31,6 +31,7 @@ void main() {
   );
   runApp(
     ProviderScope(
+      retry: retryUnlessForbidden,
       overrides: [apiLayerProvider.overrideWithValue(layer)],
       child: const CompanyApp(),
     ),

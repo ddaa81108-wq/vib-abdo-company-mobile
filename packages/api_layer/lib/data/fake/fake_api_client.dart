@@ -26,7 +26,14 @@ import 'fake_fixtures.dart';
 /// allows them. The check uses [PermissionService], which is the only place that
 /// matches the server role string. A successful business mutation is stored by
 /// `requestId` for that user; a later call with the same id returns that result
-/// and does not apply the operation again.
+/// and does not apply the operation again. Permission is checked before that
+/// replay, so a stored success cannot answer a call the profile may not make.
+///
+/// 🔶 Status choices below are not confirmed by the server:
+/// an employee who calls an admin, approve, reject, or other management route
+/// gets 403 `FORBIDDEN` (never an empty list); a route that names another
+/// employee's id gets 404 `NOT_FOUND`; an employee reads their own summary
+/// from the route that does not take an employee id. A missing session is 401.
 ///
 /// Creating, updating, or deleting a purchase entry on a day whose status is
 /// `finalized` is rejected with 409 [dayFinalizedCode]. The README and the
@@ -258,6 +265,254 @@ class FakeApiClient implements ApiClient {
     if (!_access.fullAccess) _fail(403, 'FORBIDDEN', _adminOnly);
   }
 
+  static const _notFound = 'العنصر غير موجود';
+
+  /// 🔶 Query names the fake treats as an employee id. Own data is not read
+  /// through these names.
+  static const _employeeQueryKeys = [
+    'employeeId',
+    'userId',
+    'employeeUserId',
+  ];
+
+  String? _queryEmployeeId(Map<String, dynamic>? query) {
+    if (query == null) return null;
+    for (final key in _employeeQueryKeys) {
+      final value = query[key];
+      if (value == null) continue;
+      final text = '$value';
+      if (text.isEmpty) continue;
+      return text;
+    }
+    return null;
+  }
+
+  /// Another employee's id is 404. The caller's own id on a route that should
+  /// not take an employee id is 403. 🔶
+  void _rejectEmployeeSelector(String? id) {
+    if (id == null) return;
+    if (id != _userId) _fail(404, 'NOT_FOUND', _notFound);
+    _fail(403, 'FORBIDDEN', _adminOnly);
+  }
+
+  void _rejectEmployeeQuery(Map<String, dynamic>? query) {
+    _rejectEmployeeSelector(_queryEmployeeId(query));
+  }
+
+  bool get _seesEveryCollection =>
+      _access.fullAccess || _access.canDo(ManagementAction.collectionsDecide);
+
+  bool get _managesPayroll =>
+      _access.fullAccess || _access.canDo(ManagementAction.payrollManage);
+
+  bool _managesDirectory(String head) {
+    if (_access.fullAccess) return true;
+    if (head == 'account-requests') {
+      return _access.canDo(ManagementAction.accountRequestsDecide);
+    }
+    return _access.canDo(ManagementAction.settingsManage);
+  }
+
+  /// Runs before idempotent replay and before the handler. A stored success
+  /// must not answer a forbidden call.
+  void _authorize(
+    String method,
+    List<String> seg,
+    String head,
+    Map<String, dynamic>? query,
+  ) {
+    switch (head) {
+      case 'home':
+      case 'event-changes':
+      case 'notification-preferences':
+        _rejectEmployeeQuery(query);
+        return;
+      case 'notifications':
+        _authorizeNotifications(seg, query);
+        return;
+      case 'customers':
+      case 'companies':
+      case 'libyan-deposits':
+      case 'egyptian-deposits':
+        _authorizeAccounts(method, head, seg, query);
+        return;
+      case 'collections':
+        _authorizeCollections(method, seg, query);
+        return;
+      case 'masraweya':
+        if (method == 'GET') {
+          _requireRead(SectionKey.masraweya);
+        } else {
+          _requireWrite(SectionKey.masraweya);
+        }
+        return;
+      case 'purchases':
+        _authorizePurchases(method, seg);
+        return;
+      case 'treasury':
+        if (method == 'GET') {
+          _requireRead(SectionKey.treasury);
+        } else {
+          _requireWrite(SectionKey.treasury);
+        }
+        return;
+      case 'reports':
+        if (method != 'GET') _requireWrite(SectionKey.reports);
+        _requireRead(SectionKey.reports);
+        return;
+      case 'statements':
+      case 'financial-ledger':
+        _requireFullAccess();
+        return;
+      case 'account-requests':
+      case 'users':
+      case 'staff':
+      case 'employees':
+      case 'admins':
+      case 'settings':
+      case 'audit':
+      case 'operations':
+        _authorizeAdminApi(head, seg, query);
+        return;
+    }
+  }
+
+  void _authorizeAccounts(
+    String method,
+    String head,
+    List<String> seg,
+    Map<String, dynamic>? query,
+  ) {
+    final section = _sectionFor(head);
+    _rejectEmployeeQuery(query);
+    if (method == 'GET') {
+      _requireRead(section);
+      return;
+    }
+    if (seg.length > 2 && seg[2] == 'zero-review') {
+      _requireAction(ManagementAction.customerZeroReview);
+      return;
+    }
+    _requireWrite(section);
+  }
+
+  void _authorizePurchases(String method, List<String> seg) {
+    if (method == 'GET') {
+      _requireRead(SectionKey.purchases);
+      return;
+    }
+    final finalize = seg.isNotEmpty && seg.last == 'finalize';
+    final correction =
+        method == 'PATCH' && seg.length >= 5 && seg.last == 'correction';
+    if (finalize || correction) {
+      if (!_access.canFinalizePurchases) _fail(403, 'FORBIDDEN', _denied);
+      return;
+    }
+    _requireWrite(SectionKey.purchases);
+  }
+
+  void _authorizeCollections(
+    String method,
+    List<String> seg,
+    Map<String, dynamic>? query,
+  ) {
+    if (_isSalaryPath(seg)) {
+      _authorizeSalary(seg[3]);
+      return;
+    }
+    if (seg.length > 3 && seg[1] == 'payroll' && seg.last == 'confirm') {
+      _requireAction(ManagementAction.payrollManage);
+      return;
+    }
+    if (method == 'GET' && seg.length > 1 && seg[1] == 'payroll') {
+      _rejectEmployeeQuery(query);
+      if (!_managesPayroll && !_access.canWrite(SectionKey.collections)) {
+        _fail(403, 'FORBIDDEN', _denied);
+      }
+      return;
+    }
+    if (method != 'GET') {
+      _requireCollectionMutation(seg);
+      return;
+    }
+    if (seg.length > 1 && seg[1] == 'assignees') {
+      _requireAction(ManagementAction.collectionsAssign);
+      return;
+    }
+    if (seg.length == 2 && seg[1] == 'assignments') {
+      _requireAction(ManagementAction.collectionsAssign);
+      return;
+    }
+    if (seg.length > 1 && seg[1] == 'link-candidates') {
+      _requireAction(ManagementAction.collectionsDecide);
+      return;
+    }
+    _rejectEmployeeQuery(query);
+    _requireRead(SectionKey.collections);
+  }
+
+  bool _isSalaryPath(List<String> seg) =>
+      seg.length >= 5 &&
+      seg[1] == 'payroll' &&
+      seg[2] == 'employees' &&
+      seg[4] == 'salary';
+
+  /// Salary-by-id is a payroll admin route. 🔶 An employee does not pass
+  /// their own id here; another employee's id is not found.
+  void _authorizeSalary(String employeeId) {
+    if (_managesPayroll) return;
+    if (employeeId != _userId) _fail(404, 'NOT_FOUND', _notFound);
+    _fail(403, 'FORBIDDEN', _adminOnly);
+  }
+
+  void _authorizeNotifications(List<String> seg, Map<String, dynamic>? query) {
+    _rejectEmployeeQuery(query);
+    if (seg.length < 2) return;
+    final id = seg[1];
+    if (id == 'read-all' || id == 'unread-count') return;
+    final owner = _notificationOwner(id);
+    if (owner != null && owner != _userId && !_access.fullAccess) {
+      _fail(404, 'NOT_FOUND', _notFound);
+    }
+  }
+
+  String? _notificationOwner(String id) {
+    for (final raw in FakeFixtures.notifications(0)['items'] as List) {
+      final item = raw as Map;
+      if ('${item['id']}' != id) continue;
+      final owner = item['recipientUserId'];
+      if (owner == null) return null;
+      return '$owner';
+    }
+    return null;
+  }
+
+  /// 🔶 Admin catalog paths are proposed. An id that belongs to someone else
+  /// is 404 before the 403 for the catalog itself.
+  void _authorizeAdminApi(
+    String head,
+    List<String> seg,
+    Map<String, dynamic>? query,
+  ) {
+    final pathId = _directoryUserId(head, seg);
+    if (!_managesDirectory(head)) {
+      if (pathId != null && pathId != _userId) {
+        _fail(404, 'NOT_FOUND', _notFound);
+      }
+      final queryId = _queryEmployeeId(query);
+      if (queryId != null && queryId != _userId) {
+        _fail(404, 'NOT_FOUND', _notFound);
+      }
+      _fail(403, 'FORBIDDEN', _adminOnly);
+    }
+  }
+
+  String? _directoryUserId(String head, List<String> seg) {
+    const directories = {'users', 'staff', 'employees', 'admins'};
+    if (!directories.contains(head) || seg.length < 2) return null;
+    return seg[1];
+  }
+
   /// 🔶 GET /api/admin/employee-totals. Full admin only until DEF-002, via
   /// [_requireFullAccess]. An employee, a limited admin, and any other
   /// profile without full access gets 403 and never an empty list. `from`
@@ -458,27 +713,44 @@ class FakeApiClient implements ApiClient {
       if (id != null) _passwordChangedUserIds.add('$id');
       return _ok({});
     }
-    if (path == '/api/me') return _ok(_me);
+    if (path == '/api/me') {
+      // Own profile. 🔶 An employee id on this route is not how own data is read.
+      _rejectEmployeeQuery(query);
+      return _ok(_me);
+    }
 
     if (method != 'GET' &&
         head != 'notifications' &&
         head != 'notification-preferences') {
-      return _mutate(b, path, () => _route(method, b, seg, head, query));
+      return _mutate(
+        b,
+        method,
+        path,
+        seg,
+        head,
+        query,
+        () => _route(method, b, seg, head, query),
+      );
     }
     return _route(method, b, seg, head, query);
   }
 
   /// A repeated [requestId] for this user returns the original success and
   /// does not apply the operation again. A failure is not remembered, so a
-  /// retry of the same id can still succeed. A purchase-entry write on a
-  /// finalized day is rejected here as well, so a stored success cannot skip
-  /// that check.
+  /// retry of the same id can still succeed. Permission is checked before
+  /// that replay. A purchase-entry write on a finalized day is rejected here
+  /// as well, so a stored success cannot skip that check.
   Future<ApiResponse> _mutate(
     Map b,
+    String method,
     String path,
+    List<String> seg,
+    String head,
+    Map<String, dynamic>? query,
     Future<ApiResponse> Function() send,
   ) async {
     _requireMutationMeta(b);
+    _authorize(method, seg, head, query);
     final requestId = '${b['requestId']}';
     final key = '${_userId ?? ''}|$requestId';
     if (_completedMutations.containsKey(key)) {
@@ -522,6 +794,7 @@ class FakeApiClient implements ApiClient {
     String head,
     Map<String, dynamic>? query,
   ) async {
+    _authorize(method, seg, head, query);
     switch (head) {
       case 'home': // 🔶 proposed endpoint, fake only
         if (failHomeRemaining > 0) {
@@ -614,7 +887,7 @@ class FakeApiClient implements ApiClient {
         });
       case 'notifications':
         if (method == 'GET') {
-          final data = FakeFixtures.notifications(_unread);
+          final data = _notificationsForCaller();
           if (omitUnreadCount) data.remove('unreadCount');
           return _ok(data);
         }
@@ -628,6 +901,17 @@ class FakeApiClient implements ApiClient {
         return _ok({'soundEnabled': true, 'speechEnabled': false});
       case 'event-changes':
         return _ok({'events': [], 'latest': 0, 'fullResync': false});
+      case 'account-requests':
+        return _accountRequests(seg, b);
+      case 'users':
+      case 'staff':
+      case 'employees':
+      case 'admins':
+      case 'settings':
+      case 'audit':
+      case 'operations':
+        // 🔶 Proposed admin catalogs. Reached only after [_authorize].
+        return _adminCatalog(head, seg);
       case 'admin':
         return _employeeTotals(method, seg, query);
     }
@@ -737,22 +1021,43 @@ class FakeApiClient implements ApiClient {
     if (method == 'GET' && seg.length == 1) {
       _requireRead(SectionKey.collections);
       collectionOverviewReads++;
-      return _ok(_collectionsView());
+      return _ok(_collectionsForCaller());
+    }
+    if (method == 'GET' && _isSalaryPath(seg)) {
+      return _ok(_salaryRecord(seg[3]));
     }
     if (method == 'GET' && seg.length > 1 && seg[1] == 'payroll') {
-      if (!_access.canDo(ManagementAction.payrollManage) &&
-          !_access.canWrite(SectionKey.collections)) {
+      if (!_managesPayroll && !_access.canWrite(SectionKey.collections)) {
         _fail(403, 'FORBIDDEN', _denied);
       }
-      return _ok(FakeFixtures.payroll());
+      return _ok(_payrollForCaller());
     }
     if (method == 'GET' && seg.length > 1 && seg[1] == 'assignees') {
-      _requireRead(SectionKey.collections);
+      _requireAction(ManagementAction.collectionsAssign);
       return _ok({
         'items': [
-          {'id': 'u_12', 'displayName': 'موظف استلام تجريبي'},
+          {
+            'id': FakeFixtures.demoEmployeeId,
+            'displayName': 'موظف استلام تجريبي',
+          },
+          {
+            'id': FakeFixtures.otherEmployeeId,
+            'displayName': 'موظف آخر تجريبي',
+          },
         ],
       });
+    }
+    if (method == 'GET' && seg.length > 1 && seg[1] == 'link-candidates') {
+      _requireAction(ManagementAction.collectionsDecide);
+      return _ok({
+        'items': [
+          {'id': 'c_55', 'name': 'عميل تجريبي'},
+        ],
+      });
+    }
+    if (method == 'GET' && seg.length == 2 && seg[1] == 'assignments') {
+      _requireAction(ManagementAction.collectionsAssign);
+      return _ok({'items': _collectionsView()['assignments']});
     }
     if (method == 'GET') {
       _requireRead(SectionKey.collections);
@@ -804,10 +1109,7 @@ class FakeApiClient implements ApiClient {
       return;
     }
     if (seg.length > 3 && seg[1] == 'payroll' && last == 'confirm') {
-      if (!_access.canWrite(SectionKey.collections) &&
-          !_access.canDo(ManagementAction.payrollManage)) {
-        _fail(403, 'FORBIDDEN', _adminOnly);
-      }
+      _requireAction(ManagementAction.payrollManage);
       return;
     }
     if (seg.length == 2 && seg[1] == 'assignments') {
@@ -1197,11 +1499,8 @@ class FakeApiClient implements ApiClient {
   /// Idempotent replay enters here with the path only. [_mutate] is used for
   /// non-GET calls, so an entry-shaped path is a create, update, or delete.
   void _rejectFinalizedPurchaseEntry(String path) {
-    final seg = path
-        .split('/')
-        .where((part) => part.isNotEmpty)
-        .skip(1)
-        .toList();
+    final seg =
+        path.split('/').where((part) => part.isNotEmpty).skip(1).toList();
     if (seg.length < 2 || seg.first != 'purchases') return;
     final entryPath =
         seg.length == 2 || (seg.length >= 4 && seg[2] == 'entries');
@@ -1340,6 +1639,111 @@ class FakeApiClient implements ApiClient {
       'netUnits': runningNet,
     };
     return _ok({'id': entry['id'], 'version': version});
+  }
+
+  Map<String, dynamic> _collectionsForCaller() {
+    final body = _collectionsView();
+    if (_seesEveryCollection) return body;
+    final id = _userId;
+    body['assignments'] = _owned(body['assignments'], 'assigneeUserId', id);
+    body['submissions'] = _owned(body['submissions'], 'submittedByUserId', id);
+    body['unlinkedReceipts'] =
+        _owned(body['unlinkedReceipts'], 'submittedByUserId', id);
+    body['employeeTotals'] = _owned(body['employeeTotals'], 'userId', id);
+    // 🔶 Own overview figures are stored literals, not a sum of the rows above.
+    if (id == FakeFixtures.demoEmployeeId) {
+      body['metrics'] =
+          Map<String, dynamic>.from(FakeFixtures.ownCollectionMetrics);
+      body['assignedCount'] = FakeFixtures.ownAssignedCount;
+    } else {
+      body['metrics'] = {
+        'collectedUnits': 0,
+        'dayTotalUnits': 0,
+        'pendingCount': 0,
+        'unlinkedPendingCount': 0,
+        'cashOutstandingUnits': 0,
+      };
+      body['assignedCount'] = 0;
+    }
+    return body;
+  }
+
+  List<Map<String, dynamic>> _owned(Object? raw, String field, String? id) {
+    if (raw is! List || id == null) return const [];
+    return [
+      for (final item in raw)
+        if (item is Map && '${item[field]}' == id)
+          Map<String, dynamic>.from(item),
+    ];
+  }
+
+  Map<String, dynamic> _payrollForCaller() {
+    final body = _copy(FakeFixtures.payroll());
+    if (_managesPayroll) return body;
+    body['employees'] = _owned(body['employees'], 'userId', _userId);
+    return body;
+  }
+
+  Map<String, dynamic> _salaryRecord(String employeeId) {
+    for (final raw in FakeFixtures.payroll()['employees'] as List) {
+      final row = Map<String, dynamic>.from(raw as Map);
+      if ('${row['userId']}' == employeeId) return {'employee': row};
+    }
+    _fail(404, 'NOT_FOUND', _notFound);
+  }
+
+  Map<String, dynamic> _notificationsForCaller() {
+    final data = FakeFixtures.notifications(_unread);
+    final items = <Map<String, dynamic>>[];
+    for (final raw in data['items'] as List) {
+      final item = Map<String, dynamic>.from(raw as Map);
+      final owner = item['recipientUserId'];
+      if (owner == null || _access.fullAccess || '$owner' == _userId) {
+        items.add(item);
+      }
+    }
+    data['items'] = items;
+    return data;
+  }
+
+  ApiResponse _accountRequests(List<String> seg, Map b) {
+    if (seg.length >= 3 && seg[2] == 'decision') {
+      return _ok({
+        'id': seg[1],
+        'status': '${b['decision'] ?? 'approved'}',
+      });
+    }
+    return _ok({
+      'items': [
+        {'id': 'ar_1', 'status': 'pending'},
+      ],
+    });
+  }
+
+  /// 🔶 Proposed admin catalog. Callers who fail [_authorize] never reach this.
+  ApiResponse _adminCatalog(String head, List<String> seg) {
+    final id = _directoryUserId(head, seg);
+    if (id != null) return _ok(_userRecord(id));
+    return _ok({
+      'items': [
+        {'id': 'row_1', 'kind': head},
+      ],
+    });
+  }
+
+  Map<String, dynamic> _userRecord(String id) {
+    const known = {
+      'u_1': 'مدير تجريبي',
+      'u_2': 'إداري محدود تجريبي',
+      'u_3': 'إداري بعلم صريح',
+      'u_4': 'مستخدم تغيير كلمة المرور',
+      'u_9': 'دور غير معروف',
+      FakeFixtures.demoEmployeeId: 'موظف استلام تجريبي',
+      FakeFixtures.otherEmployeeId: 'موظف آخر تجريبي',
+    };
+    final name = known[id];
+    if (name == null) _fail(404, 'NOT_FOUND', _notFound);
+    return {'id': id, 'displayName': name};
   }
 
   Map<String, dynamic> _recordById(List items, String id, String missing) {

@@ -8,7 +8,7 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/error_handling/app_failure.dart';
-import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
+import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/settings/settings_screen.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
@@ -52,7 +52,8 @@ void main() {
     await go(tester, '/settings/employees');
     expect(find.byKey(const Key('screen-settings-employees')), findsNothing);
     expect(find.text(AppStrings.employeesEmpty), findsNothing);
-    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

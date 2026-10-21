@@ -1,6 +1,7 @@
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/core/network/api_endpoints.dart';
 import 'package:flutter_api_layer/core/network/precise_json.dart';
+import 'package:flutter_api_layer/data/fake/fake_fixtures.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -80,7 +81,8 @@ void main() {
       (await api.client.get(
         ApiEndpoints.employeeTotals,
         query: const {'employeeId': 'u_99'},
-      )).data,
+      ))
+          .data,
     );
     expect(report.items.single.employeeId, 'u_12');
   });
@@ -97,15 +99,30 @@ void main() {
         from: '2026-01-01',
         to: '2026-01-02',
       );
-      expect(report.items, hasLength(1));
-      expect(report.items.single.employeeName, 'موظف استلام تجريبي');
-      expect(report.items.single.employeeId, isNull);
-      expect(report.items.single.collectedUnits, 0);
-      expect(report.items.single.pendingUnits, isNull);
-      expect(report.items.single.approvedCount, 0);
-      expect(report.items.single.pendingCount, 1);
-      expect(report.items.single.cashOutstandingUnits, isNull);
-      expect(report.items.single.currency, Currency.lyd);
+      final byId = await _collectionsTotalsByUser(api);
+      expect(
+        byId.keys,
+        containsAll(
+            [FakeFixtures.demoEmployeeId, FakeFixtures.otherEmployeeId]),
+      );
+      final own = _rowForUser(report, byId, FakeFixtures.demoEmployeeId);
+      final other = _rowForUser(report, byId, FakeFixtures.otherEmployeeId);
+      expect(own.employeeName, 'موظف استلام تجريبي');
+      expect(own.employeeId, isNull);
+      expect(own.collectedUnits, 0);
+      expect(own.pendingUnits, isNull);
+      expect(own.approvedCount, 0);
+      expect(own.pendingCount, 1);
+      expect(own.cashOutstandingUnits, isNull);
+      expect(own.currency, Currency.lyd);
+      expect(other.employeeName, 'موظف آخر تجريبي');
+      expect(other.employeeId, isNull);
+      expect(other.collectedUnits, 900);
+      expect(other.approvedCount, 4);
+      expect(other.pendingCount, 2);
+      expect(other.pendingUnits, isNull);
+      expect(other.cashOutstandingUnits, isNull);
+      expect(other.currency, Currency.lyd);
       expect(report.from, isNull);
       expect(report.to, isNull);
       expect(report.version, 1);
@@ -127,25 +144,37 @@ void main() {
         from: '2026-10-01',
         to: '2026-10-18',
       );
-      final row = report.items.single;
+      final byId = await _collectionsTotalsByUser(api);
+      final own = _rowForUser(report, byId, FakeFixtures.demoEmployeeId);
+      final other = _rowForUser(report, byId, FakeFixtures.otherEmployeeId);
       const money = MoneyFormatter();
 
       // 🔶 Not provided by this source. Null, not a fabricated 0, so the UI
       // shows '—' rather than a zero amount or an invented id/date.
-      expect(row.employeeId, isNull);
-      expect(row.employeeId, isNot(0));
-      expect(row.pendingUnits, isNull);
-      expect(row.pendingUnits, isNot(0));
+      // `userId` on the fixture is the scoping id, not `employeeId`.
+      for (final row in [own, other]) {
+        expect(row.employeeId, isNull);
+        expect(row.employeeId, isNot(0));
+        expect(row.pendingUnits, isNull);
+        expect(row.pendingUnits, isNot(0));
+        expect(row.cashOutstandingUnits, isNull);
+        expect(money.formatOrDash(row.pendingUnits, row.currency), '—');
+      }
       expect(report.from, isNull);
       expect(report.from, isNot(0));
       expect(report.to, isNull);
       expect(report.to, isNot(0));
-      expect(money.formatOrDash(row.pendingUnits, row.currency), '—');
-      expect(money.formatOrDash(0, row.currency), isNot('—'));
+      expect(money.formatOrDash(0, own.currency), isNot('—'));
 
-      // A zero the collections row actually sends stays zero.
-      expect(row.collectedUnits, 0);
-      expect(money.formatOrDash(row.collectedUnits, row.currency), isNot('—'));
+      // A zero the collections row actually sends stays zero. The other
+      // employee's stored collected amount stays that amount.
+      expect(own.collectedUnits, 0);
+      expect(other.collectedUnits, 900);
+      expect(money.formatOrDash(own.collectedUnits, own.currency), isNot('—'));
+      expect(
+        money.formatOrDash(other.collectedUnits, other.currency),
+        isNot('—'),
+      );
     },
   );
 
@@ -251,4 +280,29 @@ void main() {
       );
     }
   });
+}
+
+/// Collections rows keyed by the fixture `userId`. That id is not copied onto
+/// [EmployeeTotalsItemDto.employeeId].
+Future<Map<String, Map<String, dynamic>>> _collectionsTotalsByUser(
+  ApiLayer api,
+) async {
+  final data = Map<String, dynamic>.from(
+    (await api.client.get(ApiEndpoints.collections)).data as Map,
+  );
+  final rows = <String, Map<String, dynamic>>{};
+  for (final raw in data['employeeTotals'] as List) {
+    final row = Map<String, dynamic>.from(raw as Map);
+    rows['${row['userId']}'] = row;
+  }
+  return rows;
+}
+
+EmployeeTotalsItemDto _rowForUser(
+  EmployeeTotalsDto report,
+  Map<String, Map<String, dynamic>> byId,
+  String userId,
+) {
+  final name = '${byId[userId]!['employeeName']}';
+  return report.items.singleWhere((row) => row.employeeName == name);
 }

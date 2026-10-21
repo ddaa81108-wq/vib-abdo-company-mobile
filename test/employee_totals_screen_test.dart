@@ -7,7 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
-import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
+import 'package:vib_abdo_company_mobile/authentication/auth_gate.dart';
+import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/settings/employee_totals_screen.dart';
 import 'package:vib_abdo_company_mobile/state/employee_totals_provider.dart';
@@ -117,7 +118,15 @@ void main() {
     GoRouter.of(tester.element(find.byKey(HomeShell.shellKey)))
         .go('/settings/employee-totals');
     await settle(tester);
-    expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
+    expect(
+      GoRouter.of(tester.element(find.byKey(HomeShell.shellKey)))
+          .state
+          .uri
+          .path,
+      forbiddenLocation,
+    );
+    expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+    expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
     expect(find.byKey(EmployeeTotalsScreen.screenKey), findsNothing);
   });
 

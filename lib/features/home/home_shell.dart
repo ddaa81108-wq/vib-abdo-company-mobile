@@ -5,6 +5,7 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../authentication/auth_gate.dart';
 import '../../models/home_summary.dart';
 import '../../notifications/unread_badge.dart';
 import '../../state/notification_providers.dart';
@@ -272,6 +273,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   String _title(String location) {
     if (location == '/' || location.isEmpty) return AppStrings.homeTitle;
     if (location.startsWith('/notifications')) return AppStrings.notifications;
+    if (location.startsWith(forbiddenLocation)) return AppStrings.forbidden;
     if (location.startsWith('/settings/employee-totals')) {
       return AppStrings.employeeTotals;
     }

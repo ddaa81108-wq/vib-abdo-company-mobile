@@ -58,19 +58,26 @@ void main() {
     expect(authRedirect(session, '/change-password'), isNull);
   });
 
-  test('a forbidden section redirects home', () {
+  test('a forbidden section redirects to the forbidden screen', () {
     final permissions = PermissionService()
       ..applyFromServer(const [
         'collections.read',
         'collections.write',
       ], role: 'employee');
-    expect(permissionRedirect('/treasury', permissions), '/');
+    expect(permissionRedirect('/treasury', permissions), forbiddenLocation);
     expect(permissionRedirect('/collections', permissions), isNull);
     expect(permissionRedirect('/notifications', permissions), isNull);
-    expect(permissionRedirect('/settings', permissions), '/');
-    expect(permissionRedirect('/settings/employees', permissions), '/');
-    expect(permissionRedirect('/settings/audit', permissions), '/');
-    expect(permissionRedirect('/settings/operations', permissions), '/');
+    expect(permissionRedirect('/settings', permissions), forbiddenLocation);
+    expect(
+      permissionRedirect('/settings/employees', permissions),
+      forbiddenLocation,
+    );
+    expect(permissionRedirect('/settings/audit', permissions), forbiddenLocation);
+    expect(
+      permissionRedirect('/settings/operations', permissions),
+      forbiddenLocation,
+    );
+    expect(permissionRedirect(forbiddenLocation, permissions), isNull);
   });
 
   test('settings.manage can open the empty admin routes', () {

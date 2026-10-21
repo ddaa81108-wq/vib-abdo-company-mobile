@@ -2,13 +2,17 @@ import 'package:flutter_api_layer/api_layer.dart';
 
 import '../ui/strings.dart';
 
+/// Signed-in users who open a section or admin path they cannot read land here.
+const forbiddenLocation = '/forbidden';
+
 /// Where the router should send the user for the current server session.
 ///
 /// Returns null to stay on [location]. [SessionOtpRequired] is treated as
 /// signed out: the current server does not issue that state.
 ///
 /// When [permissions] is set, a signed-in user who opens a section they cannot
-/// read is sent home. Search, notifications, and the account screen stay open.
+/// read is sent to [forbiddenLocation]. Search, notifications, the account
+/// screen, and [forbiddenLocation] itself stay open.
 String? authRedirect(
   SessionState session,
   String location, {
@@ -34,10 +38,12 @@ String? authRedirect(
   }
 }
 
-/// Home when [location] is a section the user cannot read. Null to stay.
+/// [forbiddenLocation] when [location] is a section or admin path the user
+/// cannot read. Null to stay. [forbiddenLocation] itself is never redirected.
 String? permissionRedirect(String location, PermissionService permissions) {
   final path = location.split('?').first;
   if (path == '/' ||
+      path == forbiddenLocation ||
       path == '/search' ||
       path == '/notifications' ||
       path == '/account' ||
@@ -46,13 +52,13 @@ String? permissionRedirect(String location, PermissionService permissions) {
   }
   if (path == '/settings' || path.startsWith('/settings/')) {
     final manage = permissions.canDo(ManagementAction.settingsManage);
-    if (path != '/settings') return manage ? null : '/';
+    if (path != '/settings') return manage ? null : forbiddenLocation;
     if (permissions.canViewFinancialLedger || manage) return null;
-    return '/';
+    return forbiddenLocation;
   }
   final section = sectionForLocation(path);
   if (section == null) return null;
-  if (!permissions.canRead(section)) return '/';
+  if (!permissions.canRead(section)) return forbiddenLocation;
   return null;
 }
 
