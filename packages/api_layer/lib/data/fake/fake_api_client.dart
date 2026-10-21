@@ -249,8 +249,10 @@ class FakeApiClient implements ApiClient {
 
   /// Home publishes the section catalog, then replaces each account-section
   /// net figure with the summary the list endpoint returns for that section.
-  /// It then drops every summary, counter, and old-debt row whose section this
-  /// profile cannot read. An unknown section name is dropped as well.
+  /// Each old-debt row keeps its catalog place and copies `balanceUnits` from
+  /// the card stored after later writes. It then drops every summary, counter,
+  /// and old-debt row whose section this profile cannot read. An unknown
+  /// section name is dropped as well.
   Map<String, dynamic> _homeForSignedInUser() {
     final source = FakeFixtures.home();
     final summaries = <Map<String, dynamic>>[
@@ -265,7 +267,7 @@ class FakeApiClient implements ApiClient {
     final debts = <Map<String, dynamic>>[
       for (final raw in source['oldDebts'] as List)
         if (_mayReadSection((raw as Map)['section']))
-          Map<String, dynamic>.from(raw),
+          _withStoredDebtBalance(Map<String, dynamic>.from(raw)),
     ];
     return {
       'businessDate': source['businessDate'],
@@ -309,6 +311,18 @@ class FakeApiClient implements ApiClient {
       summary['valueUnits'] = stored['netBalance'];
     }
     return summary;
+  }
+
+  /// Bulletin membership stays the catalog. The amount is the card's stored
+  /// balance, including 0 after a full payment. The proposed home payload does
+  /// not say a settled card leaves the list, so this does not drop the row.
+  Map<String, dynamic> _withStoredDebtBalance(Map<String, dynamic> debt) {
+    final section = debt['section'];
+    final id = debt['id'];
+    if (section is! String || id is! String) return debt;
+    if (_cardOrNull(section, id) == null) return debt;
+    debt['balanceUnits'] = _cardView(section, id)['balanceUnits'];
+    return debt;
   }
 
   Map<String, dynamic>? _cardOrNull(String head, String id) {

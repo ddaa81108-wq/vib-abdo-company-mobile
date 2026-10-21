@@ -242,6 +242,118 @@ void main() {
     expect(still.version, 5);
   });
 
+  test('DEF-016 home debt rows copy the stored card balance', () async {
+    final api = await login('admin@example.invalid');
+    final before = await api.home.fetch();
+    expect(
+      before.oldDebts!.singleWhere((row) => row.id == 'c_55').balanceUnits,
+      320,
+    );
+    expect(
+      before.summaries
+          .firstWhere((item) => item.section == 'customers')
+          .valueUnits,
+      10635,
+    );
+
+    await api.accounts.addTransaction(
+      AccountSection.customers,
+      'c_55',
+      AccountTransactionRequest.fullPayment(date: DateTime(2026, 10, 19)),
+      MutationMeta(expectedVersion: 4, requestId: 'def-016-full'),
+    );
+    final card = await api.accounts.get(AccountSection.customers, 'c_55');
+    final after = await api.home.fetch();
+    final row = after.oldDebts!.singleWhere((item) => item.id == 'c_55');
+    expect(card.balanceUnits, 0);
+    expect(row.balanceUnits, card.balanceUnits);
+    expect(row.balanceUnits, isNot(320));
+    expect(row.section, 'customers');
+    expect(row.debtAgeDays, 4);
+    expect(
+      after.summaries
+          .firstWhere((item) => item.section == 'customers')
+          .valueUnits,
+      10315,
+    );
+    expect(
+      after.summaries
+          .firstWhere((item) => item.section == 'egyptian-deposits')
+          .valueUnits,
+      23750,
+    );
+
+    await api.session.logout();
+    await api.session.login(username: 'guest@example.invalid', password: 'x');
+    final guest = await api.home.fetch();
+    expect(guest.oldDebts, isNull);
+    expect(guest.summaries, isEmpty);
+  });
+
+  test(
+    'DEF-016 partial payment and cancel publish the stored home balance',
+    () async {
+      final partial = await login('admin@example.invalid');
+      await partial.accounts.addTransaction(
+        AccountSection.customers,
+        'c_55',
+        AccountTransactionRequest.partialPayment(
+          inputValue: 100,
+          date: DateTime(2026, 10, 19),
+        ),
+        MutationMeta(expectedVersion: 4, requestId: 'def-016-partial'),
+      );
+      final partialCard = await partial.accounts.get(
+        AccountSection.customers,
+        'c_55',
+      );
+      final partialHome = await partial.home.fetch();
+      expect(partialCard.balanceUnits, 220);
+      expect(
+        partialHome.oldDebts!
+            .singleWhere((item) => item.id == 'c_55')
+            .balanceUnits,
+        partialCard.balanceUnits,
+      );
+      expect(
+        partialHome.summaries
+            .firstWhere((item) => item.section == 'customers')
+            .valueUnits,
+        10535,
+      );
+
+      final cancelled = await login('admin@example.invalid');
+      final ledger = await cancelled.accounts.ledger(
+        AccountSection.customers,
+        'c_55',
+      );
+      final payment = ledger.page.items.firstWhere(
+        (entry) => entry.id == 'tx_2',
+      );
+      await cancelled.accounts.cancelTransaction(
+        AccountSection.customers,
+        'c_55',
+        'tx_2',
+        MutationMeta(
+          expectedVersion: payment.version,
+          requestId: 'def-016-cancel',
+        ),
+      );
+      final afterCard = await cancelled.accounts.get(
+        AccountSection.customers,
+        'c_55',
+      );
+      final afterHome = await cancelled.home.fetch();
+      expect(afterCard.balanceUnits, 500);
+      expect(
+        afterHome.oldDebts!
+            .singleWhere((item) => item.id == 'c_55')
+            .balanceUnits,
+        afterCard.balanceUnits,
+      );
+    },
+  );
+
   test('cash received stores the new version and rejects a stale one',
       () async {
     final api = await login('admin@example.invalid');
