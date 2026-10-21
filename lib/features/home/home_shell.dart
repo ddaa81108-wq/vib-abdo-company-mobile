@@ -117,70 +117,104 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               ),
             )
           : null,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            _TopBar(
-              title: _title(widget.location),
-              phone: phone,
-              panel: panel,
-              collapsed: _collapsed,
-              online: online,
-              onToggleCollapsed: () => setState(() => _collapsed = !_collapsed),
-              onSearch: () => context.go('/search'),
-              onNotifications: () => context.go('/notifications'),
-              onLogout: () => ref.read(sessionStateProvider.notifier).logout(),
-              unread: unread.asData?.value,
-            ),
-            ConnectionBanner(online: online),
-            Expanded(
-              child: Row(
-                children: [
-                  if (panel && !_collapsed)
-                    SizedBox(
-                      width: math
-                          .max(
-                            width >= AppBreakpoints.wide ? 300.0 : 260.0,
-                            200.0,
-                          )
-                          .clamp(200.0, width * 0.5),
-                      child: _NavList(
-                        key: HomeShell.panelKey,
-                        items: items,
-                        selected: selected,
-                        summary: summary,
-                        showIdentity: true,
-                        dark: dark,
-                        onSelect: (item) => context.go(item.path),
-                      ),
-                    )
-                  else if (rail)
-                    SizedBox(
-                      width: (200 * MediaQuery.textScalerOf(context).scale(1))
-                          .clamp(188.0, width * 0.46),
-                      child: _Rail(
-                        key: HomeShell.railKey,
-                        items: items,
-                        selected: selected,
-                        summary: summary,
-                        dark: dark,
-                        onSelect: (item) => context.go(item.path),
-                      ),
+      appBar: AppBar(
+        leading: phone
+            ? Builder(
+                builder: (barContext) => IconButton(
+                  key: HomeShell.menuKey,
+                  tooltip: AppStrings.menu,
+                  onPressed: () => Scaffold.of(barContext).openDrawer(),
+                  icon: const Icon(Icons.menu),
+                ),
+              )
+            : panel
+            ? IconButton(
+                tooltip: _collapsed
+                    ? AppStrings.showSidebar
+                    : AppStrings.hideSidebar,
+                onPressed: () => setState(() => _collapsed = !_collapsed),
+                icon: Icon(_collapsed ? Icons.menu_open : Icons.menu),
+              )
+            : const SizedBox.shrink(),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: AlignmentDirectional.centerStart,
+          child: Text(_title(widget.location)),
+        ),
+        actions: [
+          IconButton(
+            tooltip: AppStrings.search,
+            onPressed: () => context.go('/search'),
+            icon: const Icon(Icons.search),
+          ),
+          Icon(
+            Icons.circle,
+            size: 10,
+            color: online
+                ? context.appColors.success
+                : Theme.of(context).colorScheme.error,
+          ),
+          UnreadBadge(
+            count: unread.asData?.value,
+            onPressed: () => context.go('/notifications'),
+          ),
+          IconButton(
+            key: HomeShell.logoutKey,
+            tooltip: AppStrings.logout,
+            onPressed: () => ref.read(sessionStateProvider.notifier).logout(),
+            icon: const Icon(Icons.logout),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          ConnectionBanner(online: online),
+          Expanded(
+            child: Row(
+              children: [
+                if (panel && !_collapsed)
+                  SizedBox(
+                    width: math
+                        .max(
+                          width >= AppBreakpoints.wide ? 300.0 : 260.0,
+                          200.0,
+                        )
+                        .clamp(200.0, width * 0.5),
+                    child: _NavList(
+                      key: HomeShell.panelKey,
+                      items: items,
+                      selected: selected,
+                      summary: summary,
+                      showIdentity: true,
+                      dark: dark,
+                      onSelect: (item) => context.go(item.path),
                     ),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        if (showIdentityHere) _PhoneIdentity(summary: summary),
-                        Expanded(child: widget.child),
-                      ],
+                  )
+                else if (rail)
+                  SizedBox(
+                    width: (200 * MediaQuery.textScalerOf(context).scale(1))
+                        .clamp(188.0, width * 0.46),
+                    child: _Rail(
+                      key: HomeShell.railKey,
+                      items: items,
+                      selected: selected,
+                      summary: summary,
+                      dark: dark,
+                      onSelect: (item) => context.go(item.path),
                     ),
                   ),
-                ],
-              ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      if (showIdentityHere) _PhoneIdentity(summary: summary),
+                      Expanded(child: widget.child),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
       bottomNavigationBar: phone
           ? _BottomBar(
@@ -303,124 +337,6 @@ class _PhoneIdentity extends StatelessWidget {
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: cap),
       child: SingleChildScrollView(child: block),
-    );
-  }
-}
-
-class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.title,
-    required this.phone,
-    required this.panel,
-    required this.collapsed,
-    required this.online,
-    required this.onToggleCollapsed,
-    required this.onSearch,
-    required this.onNotifications,
-    required this.onLogout,
-    required this.unread,
-  });
-
-  final String title;
-  final bool phone;
-  final bool panel;
-  final bool collapsed;
-  final bool online;
-  final VoidCallback onToggleCollapsed;
-  final VoidCallback onSearch;
-  final VoidCallback onNotifications;
-  final VoidCallback onLogout;
-  final int? unread;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final sidebar = context.sidebarPalette;
-    final titleStyle = cairo(16, 800, color: sidebar.bright);
-    final iconTheme = IconThemeData(color: sidebar.bright);
-
-    Widget? leading;
-    if (phone) {
-      leading = Builder(
-        builder: (barContext) => IconButton(
-          key: HomeShell.menuKey,
-          tooltip: AppStrings.menu,
-          onPressed: () => Scaffold.of(barContext).openDrawer(),
-          icon: const Icon(Icons.menu),
-        ),
-      );
-    } else if (panel) {
-      leading = IconButton(
-        tooltip: collapsed ? AppStrings.showSidebar : AppStrings.hideSidebar,
-        onPressed: onToggleCollapsed,
-        icon: mirrorInRtl(context, collapsed ? Icons.menu_open : Icons.menu),
-      );
-    }
-
-    return Material(
-      color: colors.sidebarBg,
-      child: IconTheme(
-        data: iconTheme,
-        child: Padding(
-          padding: const EdgeInsetsDirectional.only(
-            start: AppSpacing.xs,
-            end: AppSpacing.xs,
-            bottom: AppSpacing.sm,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ?leading,
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.only(
-                    start: AppSpacing.sm,
-                    top: AppSpacing.md,
-                    end: AppSpacing.sm,
-                  ),
-                  child: SizedBox(
-                    height: 32,
-                    width: double.infinity,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: AlignmentDirectional.centerStart,
-                      child: Text(title, maxLines: 1, style: titleStyle),
-                    ),
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: AppStrings.search,
-                onPressed: onSearch,
-                icon: const Icon(Icons.search),
-              ),
-              Tooltip(
-                message: online ? AppStrings.online : AppStrings.offline,
-                child: Semantics(
-                  label: online ? AppStrings.online : AppStrings.offline,
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.only(top: 18),
-                    child: Icon(
-                      Icons.circle,
-                      size: 10,
-                      color: online
-                          ? colors.success
-                          : Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-              ),
-              UnreadBadge(count: unread, onPressed: onNotifications),
-              IconButton(
-                key: HomeShell.logoutKey,
-                tooltip: AppStrings.logout,
-                onPressed: onLogout,
-                icon: mirrorInRtl(context, Icons.logout),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
