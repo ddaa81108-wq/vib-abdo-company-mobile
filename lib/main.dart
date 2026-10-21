@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 
 import 'api/api_providers.dart';
 import 'app.dart';
@@ -48,20 +49,40 @@ void main() {
     cleanups: [pushGate.forget],
   );
   runApp(
-    ProviderScope(
-      // A dead session is not fetched again. A 403 is not retried.
-      // Every other failure keeps Riverpod's own retry.
-      retry: (retryCount, error) {
-        if (error is SessionExpiredException) return null;
-        return retryUnlessForbidden(retryCount, error);
-      },
-      overrides: [
-        apiLayerProvider.overrideWithValue(layer),
-        pushSessionGateProvider.overrideWithValue(pushGate),
-        deviceTokenStoreProvider.overrideWithValue(SecureDeviceTokenStore()),
-        notificationPermissionRegistrarOverride(),
-      ],
-      child: const CompanyApp(),
+    buildAppRoot(
+      layer: layer,
+      pushGate: pushGate,
+      tokenStore: SecureDeviceTokenStore(),
     ),
+  );
+}
+
+/// Root scope the process and the registration tests share.
+///
+/// [notificationPermissionRegistrarOverride] is on this scope, so the
+/// registrar created here sees the screen permission service. Tests may add
+/// ports (transport, connectivity). They do not replace the registrar.
+ProviderScope buildAppRoot({
+  required ApiLayer layer,
+  required PushSessionGate pushGate,
+  required DeviceTokenStore tokenStore,
+  List<Override> overrides = const [],
+  Widget child = const CompanyApp(),
+}) {
+  return ProviderScope(
+    // A dead session is not fetched again. A 403 is not retried.
+    // Every other failure keeps Riverpod's own retry.
+    retry: (retryCount, error) {
+      if (error is SessionExpiredException) return null;
+      return retryUnlessForbidden(retryCount, error);
+    },
+    overrides: [
+      apiLayerProvider.overrideWithValue(layer),
+      pushSessionGateProvider.overrideWithValue(pushGate),
+      deviceTokenStoreProvider.overrideWithValue(tokenStore),
+      notificationPermissionRegistrarOverride(),
+      ...overrides,
+    ],
+    child: child,
   );
 }

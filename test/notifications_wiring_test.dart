@@ -1,14 +1,20 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
+import 'package:flutter_api_layer/core/network/api_client.dart';
+import 'package:flutter_api_layer/core/network/api_endpoints.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_api_layer/data/fake/fake_fixtures.dart';
 import 'package:flutter_api_layer/data/repositories/notifications_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/features/collections/collections_screen.dart';
+import 'package:vib_abdo_company_mobile/main.dart' as app_root;
+import 'package:vib_abdo_company_mobile/notifications/background_scheduler.dart';
+import 'package:vib_abdo_company_mobile/notifications/shown_notification_store.dart';
+import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
@@ -284,17 +290,15 @@ void main() {
     );
     final log = await _pumpDevicePost(tester, permission, token);
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
-    expect(log.registerBodies, isEmpty);
+    expect(log.devicePosts, isEmpty);
 
     await go(tester, '/notifications');
     await tester.tap(find.byKey(const Key('notification-permission-agree')));
     await settle(tester);
 
-    expect(log.registerBodies, hasLength(1));
-    expect(log.registerBodies.single, contains(token));
-    expect(log.registerBodies.single, contains('"platform":"android"'));
-    expect(log.registerBodies.single, isNot(contains('unregister')));
-    expect(log.unregisterBodies, isEmpty);
+    expect(log.devicePosts, [
+      {'token': token, 'platform': 'android'},
+    ]);
     expect(tester.takeException(), isNull);
   });
 
@@ -309,13 +313,13 @@ void main() {
     await go(tester, '/notifications');
     await tester.tap(find.byKey(const Key('notification-permission-agree')));
     await settle(tester);
-    expect(log.registerBodies, hasLength(1));
+    expect(log.devicePosts, hasLength(1));
 
     await resume(tester);
 
-    expect(log.registerBodies, hasLength(1));
-    expect(log.registerBodies.single, contains(token));
-    expect(log.unregisterBodies, isEmpty);
+    expect(log.devicePosts, [
+      {'token': token, 'platform': 'android'},
+    ]);
     expect(tester.takeException(), isNull);
   });
 }
@@ -341,30 +345,98 @@ AppNotification _ownedCollection({
   );
 }
 
-class _DevicePostLog implements DeviceRegistrationClient {
-  _DevicePostLog(this._http, this._fake);
+/// Sees the POST the real [HttpDeviceRegistrationClient] sends. The registrar
+/// and that client stay on the root scope.
+class _DevicePostLog {
+  final List<Map<String, Object?>> devicePosts = [];
+}
 
-  final HttpDeviceRegistrationClient _http;
+class _ObservingGateway implements ApiClient {
+  _ObservingGateway(this._fake, this._log);
+
   final FakeApiClient _fake;
-  final List<String?> registerBodies = [];
-  final List<String?> unregisterBodies = [];
+  final _DevicePostLog _log;
 
-  @override
-  Future<void> register({required String token}) async {
-    try {
-      await _http.register(token: token);
-    } catch (_) {
-      // The fake has no devices route. The POST still reached it.
+  void _note(String method, String path, Object? body) {
+    if (method != 'POST' || path != ApiEndpoints.proposedMobilePushDevices) {
+      return;
     }
-    registerBodies.add(_fake.lastWireBody);
+    final posted = body is Map
+        ? Map<String, Object?>.from(body)
+        : <String, Object?>{'body': body};
+    _log.devicePosts.add(posted);
+  }
+
+  Future<ApiResponse> _forward(
+    String method,
+    String path,
+    Object? body,
+    ApiRequestOptions options, {
+    Map<String, dynamic>? query,
+  }) async {
+    _note(method, path, body);
+    final result = await _fake.serveHttp(
+      method: method,
+      path: path,
+      data: body,
+      query: query,
+      headers: options.headers,
+      authenticated: options.authenticated,
+    );
+    if (result.status >= 400) {
+      throw StateError('fake ${result.status} $path');
+    }
+    final decoded = jsonDecode(result.body);
+    final data = decoded is Map && decoded.containsKey('data')
+        ? decoded['data']
+        : decoded;
+    return ApiResponse(statusCode: result.status, data: data);
   }
 
   @override
-  Future<void> unregister({required String token}) async {
-    try {
-      await _http.unregister(token: token);
-    } catch (_) {}
-    unregisterBodies.add(_fake.lastWireBody);
+  Future<ApiResponse> get(
+    String path, {
+    Map<String, dynamic>? query,
+    ApiRequestOptions options = const ApiRequestOptions(),
+  }) {
+    return _forward('GET', path, null, options, query: query);
+  }
+
+  @override
+  Future<ApiResponse> post(
+    String path, {
+    Object? body,
+    Map<String, dynamic>? query,
+    ApiRequestOptions options = const ApiRequestOptions(),
+  }) {
+    return _forward('POST', path, body, options, query: query);
+  }
+
+  @override
+  Future<ApiResponse> put(
+    String path, {
+    Object? body,
+    ApiRequestOptions options = const ApiRequestOptions(),
+  }) {
+    return _forward('PUT', path, body, options);
+  }
+
+  @override
+  Future<ApiResponse> patch(
+    String path, {
+    Object? body,
+    ApiRequestOptions options = const ApiRequestOptions(),
+  }) {
+    return _forward('PATCH', path, body, options);
+  }
+
+  @override
+  Future<ApiResponse> delete(
+    String path, {
+    Object? body,
+    ApiRequestOptions options = const ApiRequestOptions(),
+  }) {
+    return _forward('DELETE', path, body, options);
   }
 }
 
@@ -373,22 +445,47 @@ Future<_DevicePostLog> _pumpDevicePost(
   FakeNotificationPermissionService permission,
   String token,
 ) async {
+  tester.view.physicalSize = const Size(800, 1400);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
   final transport = FakePushTransport(token: token);
   addTearDown(transport.dispose);
-  _DevicePostLog? log;
-  await pumpFakeApp(
-    tester,
-    notificationsPermission: permission,
-    overrides: [
-      pushTransportProvider.overrideWithValue(transport),
-      deviceRegistrationClientProvider.overrideWith((ref) {
-        final fake = ref.watch(apiLayerProvider).client as FakeApiClient;
-        log = _DevicePostLog(HttpDeviceRegistrationClient(fake), fake);
-        return log!;
-      }),
-    ],
+  final pushGate = PushSessionGate();
+  final layer = ApiLayer.create(
+    config: const ApiConfig(baseUrl: 'https://fake.invalid', useFakeApi: true),
+    fakeLatency: Duration.zero,
+    cleanups: [pushGate.forget],
   );
-  return log!;
+  addTearDown(layer.dispose);
+  final log = _DevicePostLog();
+  (layer.client as FakeApiClient).bindGateway(
+    _ObservingGateway(layer.client as FakeApiClient, log),
+  );
+
+  await tester.pumpWidget(
+    app_root.buildAppRoot(
+      layer: layer,
+      pushGate: pushGate,
+      tokenStore: MemoryDeviceTokenStore(),
+      overrides: [
+        pushTransportProvider.overrideWithValue(transport),
+        notificationPermissionServiceProvider.overrideWithValue(permission),
+        connectivityPortProvider.overrideWithValue(
+          const FixedConnectivity(true),
+        ),
+        backgroundNotificationSchedulerProvider.overrideWithValue(
+          const NoopBackgroundNotificationScheduler(),
+        ),
+        shownNotificationStoreProvider.overrideWithValue(
+          MemoryShownNotificationStore(),
+        ),
+      ],
+    ),
+  );
+  await settle(tester);
+  return log;
 }
 
 class RecordingDeviceTokenRegistrar extends DeviceTokenRegistrar {
