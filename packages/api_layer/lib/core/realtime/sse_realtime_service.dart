@@ -5,7 +5,6 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 
 import '../network/api_endpoints.dart';
-import '../network/error_mapper.dart';
 import '../network/precise_json.dart';
 import 'realtime_service.dart';
 
@@ -69,13 +68,8 @@ class SseRealtimeService implements RealtimeService {
       try {
         await _connectOnce();
         _failures = 0;
-      } catch (error) {
-        // 401/419 ends the loop. Backoff would reconnect forever after logout.
-        if (isUnrecoverableSessionError(error)) {
-          _running = false;
-        } else {
-          _failures++;
-        }
+      } catch (_) {
+        _failures++;
       }
       _setConnected(false);
       if (!_running) break;

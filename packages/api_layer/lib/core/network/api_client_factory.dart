@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../../data/fake/fake_api_client.dart';
@@ -7,12 +10,13 @@ import '../auth/cookie_csrf_auth_strategy.dart';
 import '../auth/cookie_store.dart';
 import '../config/api_config.dart';
 import '../session/token_storage.dart';
-import 'api_client.dart';
 import 'api_exception.dart';
+import 'api_client.dart';
 import 'auth_interceptor.dart';
 import 'dio_api_client.dart';
 import 'get_retry_interceptor.dart';
 import 'logging_interceptor.dart';
+import 'precise_json.dart';
 
 /// Wires the network stack. Interceptor order per API contract:
 ///   [AuthInterceptor, GetRetryInterceptor, SafeLoggingInterceptor]
@@ -30,47 +34,45 @@ class ApiStack {
     CookieStore? cookieStore,
     TokenStorage? tokenStorage,
     Duration? fakeLatency,
-    HttpClientAdapter? httpClientAdapter,
   }) {
     if (config.useFakeApi) {
-      return ApiStack._(
-        FakeApiClient(
-          rateWireFormat: config.rateWireFormat,
-          latency: fakeLatency ?? const Duration(milliseconds: 250),
-        ),
-        // Fake mode has no cookie jar of its own. Stores passed by the app
-        // are still wiped so a leftover bearer token cannot survive logout.
-        _WipingStrategy(_FakeStrategy(), cookieStore, tokenStorage),
-        null,
+      final fake = FakeApiClient(
+        rateWireFormat: config.rateWireFormat,
+        latency: fakeLatency ?? const Duration(milliseconds: 250),
       );
+      // In-memory stand-ins when the app did not inject stores. Real mode
+      // below still defaults to secure storage. No bearer token is written.
+      final cookies = cookieStore ?? InMemoryCookieStore();
+      final tokens = tokenStorage ?? InMemoryTokenStorage();
+      final strategy = _FakeCookieStrategy(cookies: cookies, tokens: tokens, client: fake);
+      final dio = Dio(DioApiClient.baseOptions(config));
+      dio.httpClientAdapter = _FakeAdapter(fake);
+      final auth = AuthInterceptor(strategy: strategy, onForcedLogout: onForcedLogout)
+        ..retryDio = dio;
+      dio.interceptors.add(auth);
+      final gateway = DioApiClient(dio, rateWireFormat: config.rateWireFormat);
+      // DioApiClient installs a background transformer. Fake mode stays
+      // synchronous so a 401 is mapped on this isolate and no socket opens.
+      dio.transformer = _SyncJsonTransformer();
+      fake.bindGateway(gateway);
+      // dio stays null on the stack: realtime must not start in fake mode.
+      return ApiStack._(fake, strategy, null);
     }
 
     final options = DioApiClient.baseOptions(config);
     final bareDio = Dio(options); // no interceptors: CSRF fetch only
     DioApiClient.usePreciseJson(bareDio);
     final dio = Dio(options);
-    if (httpClientAdapter != null) {
-      bareDio.httpClientAdapter = httpClientAdapter;
-      dio.httpClientAdapter = httpClientAdapter;
-    }
     // TLS pinning hook (optional): configure dio.httpClientAdapter with an
     // IOHttpClientAdapter + SecurityContext / badCertificateCallback using SPKI
     // pins supplied by the server owner, per API contract.
 
-    // One pair of stores for the active strategy and for logout. Cookie mode
-    // still clears the token store. Bearer mode still clears the cookie jar.
-    final cookies = cookieStore ?? SecureCookieStore();
-    final tokens = tokenStorage ?? SecureTokenStorage();
-    final AuthStrategy strategy = _WipingStrategy(
-      switch (config.authStrategy) {
-        AuthStrategyKind.cookieCsrf =>
-          CookieCsrfAuthStrategy(cookieStore: cookies, bareDio: bareDio),
-        AuthStrategyKind.bearerToken =>
-          BearerTokenAuthStrategy(tokenStorage: tokens),
-      },
-      cookies,
-      tokens,
-    );
+    final AuthStrategy strategy = switch (config.authStrategy) {
+      AuthStrategyKind.cookieCsrf => CookieCsrfAuthStrategy(
+          cookieStore: cookieStore ?? SecureCookieStore(), bareDio: bareDio),
+      AuthStrategyKind.bearerToken => BearerTokenAuthStrategy(
+          tokenStorage: tokenStorage ?? SecureTokenStorage()),
+    };
 
     final auth =
         AuthInterceptor(strategy: strategy, onForcedLogout: onForcedLogout)
@@ -86,70 +88,144 @@ class ApiStack {
   }
 }
 
-/// Clears the active strategy (in-memory CSRF, or that strategy's own store)
-/// and then both the cookie jar and the token store when this stack owns them.
-class _WipingStrategy implements AuthStrategy {
-  _WipingStrategy(this._inner, this._cookies, this._tokens);
+/// Cookie session for the fake server. Same [AuthStrategy] path as the real
+/// client: attach the cookie, keep CSRF in memory, [clear] drops the jar,
+/// the token store, and that CSRF token. No refresh call.
+class _FakeCookieStrategy implements AuthStrategy {
+  _FakeCookieStrategy({
+    required CookieStore cookies,
+    required TokenStorage tokens,
+    required FakeApiClient client,
+  })  : _cookies = cookies,
+        _tokens = tokens,
+        _client = client;
 
-  final AuthStrategy _inner;
-  final CookieStore? _cookies;
-  final TokenStorage? _tokens;
-
-  @override
-  String get name => _inner.name;
-
-  @override
-  Future<void> attach(RequestOptions options, {required bool authenticated}) =>
-      _inner.attach(options, authenticated: authenticated);
-
-  @override
-  Future<void> capture(Response<dynamic> response) => _inner.capture(response);
+  final CookieStore _cookies;
+  final TokenStorage _tokens;
+  final FakeApiClient _client;
+  String? _csrfToken;
 
   @override
-  Future<void> onLoginSucceeded(Map<String, dynamic> loginData) =>
-      _inner.onLoginSucceeded(loginData);
+  String get name => 'fake-cookie';
 
   @override
-  Future<void> onSessionResumed() => _inner.onSessionResumed();
+  Future<void> attach(RequestOptions options, {required bool authenticated}) async {
+    options.headers.remove('Authorization');
+    final cookie = await _cookies.cookieHeader();
+    if (cookie != null && cookie.isNotEmpty) {
+      options.headers['Cookie'] = cookie;
+    } else {
+      options.headers.remove('Cookie');
+    }
+    final method = options.method.toUpperCase();
+    final unsafe = method != 'GET' && method != 'HEAD';
+    final token = _csrfToken;
+    if (unsafe && token != null && token.isNotEmpty) {
+      options.headers['X-CSRF-Token'] = token;
+    } else {
+      options.headers.remove('X-CSRF-Token');
+    }
+  }
 
   @override
-  Future<bool> hasPersistedSession() => _inner.hasPersistedSession();
+  Future<void> capture(Response<dynamic> response) async {
+    final setCookie = response.headers.map['set-cookie'];
+    if (setCookie != null && setCookie.isNotEmpty) {
+      await _cookies.saveFromSetCookie(setCookie);
+    }
+  }
+
+  @override
+  Future<void> onLoginSucceeded(Map<String, dynamic> loginData) async {
+    final token = loginData['csrfToken'];
+    _csrfToken = token is String && token.isNotEmpty ? token : null;
+  }
+
+  @override
+  Future<void> onSessionResumed() async {}
+
+  @override
+  Future<bool> hasPersistedSession() async => !(await _cookies.isEmpty());
 
   @override
   Future<AuthErrorAction> handleAuthError(
-          ApiException error, RequestOptions request,
-          {required bool authenticated}) =>
-      _inner.handleAuthError(error, request, authenticated: authenticated);
+    ApiException error,
+    RequestOptions request, {
+    required bool authenticated,
+  }) async {
+    if (error is SessionExpiredException && authenticated) {
+      return AuthErrorAction.forceLogout;
+    }
+    return AuthErrorAction.passThrough;
+  }
 
   @override
   Future<void> clear() async {
-    await _inner.clear();
-    await _cookies?.clear();
-    await _tokens?.clear();
+    _csrfToken = null;
+    _client.dropHeldCookie();
+    await _cookies.clear();
+    await _tokens.clear();
   }
 }
 
-/// No-op strategy for FakeApiClient (the fake keeps its own logged-in flag).
-class _FakeStrategy implements AuthStrategy {
-  bool _session = false;
+/// Speaks HTTP to [FakeApiClient] on this isolate. No socket.
+class _FakeAdapter implements HttpClientAdapter {
+  _FakeAdapter(this._fake);
+  final FakeApiClient _fake;
+
   @override
-  String get name => 'fake';
+  void close({bool force = false}) {}
+
   @override
-  Future<void> attach(RequestOptions options,
-      {required bool authenticated}) async {}
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final headers = <String, String>{};
+    options.headers.forEach((key, value) {
+      if (value == null) return;
+      headers[key] = value is List ? value.join(', ') : '$value';
+    });
+    final query = options.queryParameters.isEmpty
+        ? null
+        : Map<String, dynamic>.from(options.queryParameters);
+    final result = await _fake.serveHttp(
+      method: options.method,
+      path: options.uri.path.isEmpty ? options.path : options.uri.path,
+      data: options.data,
+      query: query,
+      headers: headers,
+      authenticated: options.extra['skipAuth'] != true,
+    );
+    return ResponseBody.fromString(
+      result.body,
+      result.status,
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+        'x-correlation-id': ['fake'],
+        if (result.setCookie.isNotEmpty) 'set-cookie': result.setCookie,
+      },
+    );
+  }
+}
+
+class _SyncJsonTransformer extends Transformer {
   @override
-  Future<void> capture(Response<dynamic> response) async {}
+  Future<String> transformRequest(RequestOptions options) async {
+    final data = options.data;
+    if (data == null) return '';
+    if (data is String) return data;
+    return jsonEncode(data);
+  }
+
   @override
-  Future<void> onLoginSucceeded(Map<String, dynamic> loginData) async =>
-      _session = true;
-  @override
-  Future<void> onSessionResumed() async {}
-  @override
-  Future<bool> hasPersistedSession() async => _session;
-  @override
-  Future<AuthErrorAction> handleAuthError(error, RequestOptions request,
-          {required bool authenticated}) async =>
-      AuthErrorAction.passThrough;
-  @override
-  Future<void> clear() async => _session = false;
+  Future<Object?> transformResponse(
+    RequestOptions options,
+    ResponseBody responseBody,
+  ) async {
+    final text = await utf8.decoder.bind(responseBody.stream).join();
+    if (text.isEmpty) return null;
+    return PreciseJson.decode(text);
+  }
 }

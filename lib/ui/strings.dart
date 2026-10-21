@@ -14,10 +14,6 @@ abstract final class AppStrings {
   static const signIn = 'تسجيل الدخول';
   static const emptyCredentials = 'أدخل البريد الإلكتروني وكلمة المرور.';
   static const sessionExpired = 'انتهت الجلسة، يرجى تسجيل الدخول';
-
-  /// Shown on a write that died with the session. The request is not replayed.
-  static const writeNotSaved =
-      'لم يُحفظ. انتهت الجلسة. أعد المحاولة بعد تسجيل الدخول.';
   static const homeTitle = 'الرئيسية';
   static const logout = 'تسجيل الخروج';
   static const signedInAs = 'الحساب';

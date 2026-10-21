@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 
 import '../auth/auth_strategy.dart';
+import 'api_endpoints.dart';
 import 'api_exception.dart';
 import 'error_mapper.dart';
 
@@ -10,8 +11,7 @@ import 'error_mapper.dart';
 /// - onRequest: strategy.attach (cookies + X-CSRF-Token, or Bearer).
 /// - onResponse/onError: strategy.capture (Set-Cookie).
 /// - onError: maps the error; CSRF invalid -> strategy refetches token -> replay ONCE;
-///   authenticated 401 / non-CSRF 419 -> forced logout. That path never replays,
-///   including writes. There is no refresh token.
+///   AUTH_REQUIRED -> forced logout (no refresh flow on the cookie session).
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required AuthStrategy strategy,
@@ -29,6 +29,11 @@ class AuthInterceptor extends Interceptor {
   late Dio retryDio;
 
   bool _authenticated(RequestOptions o) => o.extra['skipAuth'] != true;
+
+  bool _isLogout(RequestOptions request) {
+    final path = request.uri.path;
+    return path == ApiEndpoints.logout || request.path == ApiEndpoints.logout;
+  }
 
   @override
   Future<void> onRequest(
@@ -60,12 +65,16 @@ class AuthInterceptor extends Interceptor {
       case AuthErrorAction.passThrough:
         return handler.next(err);
       case AuthErrorAction.forceLogout:
-        await _onForcedLogout('session_expired');
+        // Logout's own 401 must not announce session_expired. SessionManager
+        // .logout() still wipes with reason 'logout'.
+        if (!_isLogout(req)) await _onForcedLogout('session_expired');
         return handler.next(err);
       case AuthErrorAction.retryOnce:
-        // Session expiry is logout, never a replay, even if a strategy asks.
+        // A dead session is never replayed, even if a strategy asks.
         if (mapped is SessionExpiredException) {
-          if (_authenticated(req)) await _onForcedLogout('session_expired');
+          if (_authenticated(req) && !_isLogout(req)) {
+            await _onForcedLogout('session_expired');
+          }
           return handler.next(err);
         }
         if (req.extra['authRetried'] == true) return handler.next(err);

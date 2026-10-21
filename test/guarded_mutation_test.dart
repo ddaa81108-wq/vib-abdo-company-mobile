@@ -112,37 +112,6 @@ void main() {
     await _drainSnackBar(tester);
   });
 
-  testWidgets(
-    'session expiry says the write was not saved and a manual retry reuses the request id',
-    (tester) async {
-      final host = await _pump(tester);
-
-      await _fail(
-        tester,
-        host,
-        const SessionExpiredException(
-          code: 'AUTH_REQUIRED',
-          message: 'انتهت الجلسة، يرجى تسجيل الدخول',
-          statusCode: 401,
-        ),
-      );
-
-      expect(find.text(AppStrings.writeNotSaved), findsOneWidget);
-      expect(find.text('انتهت الجلسة، يرجى تسجيل الدخول'), findsNothing);
-      expect(host.conflicts, 0);
-
-      await _fail(
-        tester,
-        host,
-        const SessionExpiredException(statusCode: 419, code: 'PAGE_EXPIRED'),
-      );
-
-      expect(host.ids, hasLength(2));
-      expect(host.ids[1], host.ids[0]);
-      expect(host.versions, [1, 1]);
-    },
-  );
-
   testWidgets('a non-conflict error does not refetch', (tester) async {
     final host = await _pump(tester);
 

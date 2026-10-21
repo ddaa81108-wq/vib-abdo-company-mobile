@@ -3,6 +3,8 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../error_handling/error_handler.dart';
+import '../../state/pending_mutation.dart';
+import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
 import '../strings.dart';
 import 'common.dart';
@@ -33,6 +35,13 @@ class SubmissionLock {
   void succeed() {
     _meta = null;
     _inputs = null;
+  }
+
+  /// Keeps [requestId] for a later manual retry of the same inputs.
+  void adopt(String requestId, String inputs, int? version) {
+    expectedVersion = version;
+    _inputs = inputs;
+    _meta = MutationMeta(expectedVersion: version, requestId: requestId);
   }
 }
 
@@ -94,6 +103,7 @@ class GuardedMutation extends ConsumerStatefulWidget {
 class _GuardedMutationState extends ConsumerState<GuardedMutation> {
   final _lock = SubmissionLock();
   String? _error;
+  String? _draftUserId;
 
   @override
   void didUpdateWidget(GuardedMutation oldWidget) {
@@ -151,7 +161,23 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
     });
     _lock.expectedVersion = widget.expectedVersion;
     final sentInputs = widget.inputs;
+    _draftUserId = _signedInUserId();
+    _adoptDraft(_draftUserId);
     final meta = _lock.metaFor(sentInputs);
+    // Kept before the await. A 401 runs forceLogout, and go('/login') can
+    // dispose this route before the error is caught. The snapshot stays until
+    // a successful send clears it. Nothing sends it again on its own.
+    final userId = _draftUserId;
+    if (userId != null) {
+      ref.read(pendingMutationProvider.notifier).remember(
+        PendingMutation(
+          userId: userId,
+          inputs: sentInputs,
+          expectedVersion: meta.expectedVersion,
+          requestId: meta.requestId,
+        ),
+      );
+    }
     var accepted = false;
     try {
       final error = widget.confirmText == null
@@ -169,6 +195,12 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
     } finally {
       if (accepted) {
         _lock.succeed();
+        if (mounted) {
+          ref.read(pendingMutationProvider.notifier).complete(
+            userId: _draftUserId,
+            requestId: meta.requestId,
+          );
+        }
       } else {
         _dropUnlessIdentical(sentInputs, meta.expectedVersion);
       }
@@ -184,11 +216,32 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
     }
   }
 
+  /// The isolated widget tests have no [apiLayerProvider]. A missing session
+  /// just means there is no draft to keep.
+  String? _signedInUserId() {
+    try {
+      final session = ref.read(sessionStateProvider);
+      return session is SessionAuthenticated ? session.profile.id : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _adoptDraft(String? userId) {
+    if (userId == null) return;
+    final saved = ref.read(pendingMutationProvider);
+    if (saved != null &&
+        saved.matches(userId, widget.inputs, widget.expectedVersion)) {
+      _lock.adopt(saved.requestId, widget.inputs, widget.expectedVersion);
+    }
+  }
+
   /// Maps a thrown write error. Version conflicts refetch and show the shared
-  /// conflict copy. Session expiry says the write was not saved and keeps the
-  /// request id for a manual retry. Every other error keeps the server message.
+  /// conflict copy; every other error keeps the mapped server message.
+  ///
+  /// A session expiry is not retried. The request id is kept for a manual
+  /// retry of these same inputs after the same user signs in again.
   String _presentFailure(Object error) {
-    if (error is SessionExpiredException) return AppStrings.writeNotSaved;
     final failure = ref.read(errorHandlerProvider).toFailure(error);
     if (failure.code != 'VERSION_CONFLICT') return failure.message;
     _announceConflict();
