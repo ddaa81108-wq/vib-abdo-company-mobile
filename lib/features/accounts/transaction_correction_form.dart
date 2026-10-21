@@ -40,11 +40,19 @@ class TransactionCorrectionLauncher extends ConsumerWidget {
         .watch(accountCardProvider((section, accountId)))
         .asData
         ?.value;
-    // Same gate as the other ledger writes: section write, and not a system card.
-    final visible =
-        card != null &&
-        !card.systemManaged &&
-        permissions.canWrite(section.sectionKey);
+    // `correct` is the token this screen asks for. It is not a confirmed
+    // permission code. When the line carries allowedActions, that list decides.
+    // When the list is absent, fall back to section write on a non-system card.
+    final recorded = entry.allowedActions;
+    final visible = recorded != null
+        ? permissions.canOnRecord(
+            action: 'correct',
+            allowedActions: recorded,
+            section: section.sectionKey,
+          )
+        : card != null &&
+              !card.systemManaged &&
+              permissions.canWrite(section.sectionKey);
     if (!visible) return const SizedBox.shrink();
 
     final online = ref.watch(onlineProvider);
@@ -127,12 +135,24 @@ class _TransactionCorrectionFormState
         ? PaymentMode.full
         : PaymentMode.partial;
     _note.text = widget.entry.note ?? '';
+    _factor.text = _factorText(widget.entry);
     for (final controller in [_amount, _factor, _note, _date]) {
       controller.addListener(_changed);
     }
   }
 
   void _changed() => setState(() {});
+
+  /// Ungrouped rate text for multiply/divide. Empty when the line has no rate.
+  static String _factorText(LedgerEntryDto entry) {
+    final mode = entry.calculationMode;
+    final scaled = entry.factorMicros;
+    if (scaled == null) return '';
+    if (mode != CalculationMode.multiply && mode != CalculationMode.divide) {
+      return '';
+    }
+    return const MoneyFormatter().plainScaled(scaled, 6);
+  }
 
   @override
   void dispose() {
@@ -282,7 +302,7 @@ class _TransactionCorrectionFormState
 
   Future<String?> _submit(MutationMeta meta) async {
     final parsedDate = DateTime.tryParse(_date.text);
-    if (parsedDate == null) return AppStrings.integerOnly;
+    if (parsedDate == null) return AppStrings.dateInvalid;
     final note = _note.text.trim().isEmpty ? null : _note.text.trim();
     final AccountTransactionRequest request;
     if (_full) {

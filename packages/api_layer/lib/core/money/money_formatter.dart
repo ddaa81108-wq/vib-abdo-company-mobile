@@ -52,6 +52,18 @@ class MoneyFormatter {
   String formatScaled(int scaledValue, int scale) =>
       formatNumber(scaledValue, scale: scale, trimTrailingZeros: true);
 
+  /// Same digit cut as [formatScaled], without thousands separators.
+  ///
+  /// A text field has to round-trip through [DecimalString.tryParse], which
+  /// rejects grouping commas. This is still a cut of the digit string: no
+  /// division and no rounding.
+  String plainScaled(int scaledValue, int scale) => formatNumber(
+        scaledValue,
+        scale: scale,
+        trimTrailingZeros: true,
+        groupDigits: false,
+      );
+
   /// Rate/factor text ("9.5" -> "9.5", "12500.25" -> "12,500.25"). String-only, no parsing to a number.
   String formatDecimal(DecimalString d) {
     final v = d.value;
@@ -70,8 +82,12 @@ class MoneyFormatter {
       d == null ? '—' : formatDecimal(d);
 
   /// Digit-string formatting. No arithmetic is performed on the value.
-  String formatNumber(int value,
-      {int scale = 0, bool trimTrailingZeros = false}) {
+  String formatNumber(
+    int value, {
+    int scale = 0,
+    bool trimTrailingZeros = false,
+    bool groupDigits = true,
+  }) {
     final raw = value.toString();
     final negative = raw.startsWith('-');
     var digits = negative ? raw.substring(1) : raw;
@@ -87,11 +103,11 @@ class MoneyFormatter {
       }
     }
 
-    final grouped = _group(digits);
+    final shown = groupDigits ? _group(digits) : digits;
     final sign = negative ? '-' : '';
     return fraction.isEmpty
-        ? '$sign$grouped'
-        : '$sign$grouped$decimalSeparator$fraction';
+        ? '$sign$shown'
+        : '$sign$shown$decimalSeparator$fraction';
   }
 
   String _group(String digits) {
