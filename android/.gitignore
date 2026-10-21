@@ -12,3 +12,7 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Firebase config. See docs/NOTIFICATIONS.md.
+google-services.json
+**/google-services.json
