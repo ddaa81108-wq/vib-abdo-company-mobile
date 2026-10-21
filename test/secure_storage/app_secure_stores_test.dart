@@ -53,7 +53,7 @@ void main() {
       );
       expect(layer.session.state, isA<SessionAuthenticated>());
       expect(await stores.tokens.readAccessToken(), isNull);
-      expect(await stores.cookies.isEmpty(), isTrue);
+      expect(await stores.cookies.cookieHeader(), contains('session='));
 
       expect(await layer.notifications.fetchUnreadCount(), 1);
     },

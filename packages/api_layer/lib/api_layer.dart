@@ -133,6 +133,9 @@ class ApiLayer {
       profileRepository: profile,
       permissionService: permissions,
       cleanups: [
+        // Bearer storage is unused (AUTH_BEARER stays off). Logout still
+        // clears it so a leftover token cannot outlive the cookie session.
+        if (tokenStorage != null) tokenStorage.clear,
         () async {
           await realtime.stop();
           cursor.reset();

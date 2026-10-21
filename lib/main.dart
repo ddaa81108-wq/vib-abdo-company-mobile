@@ -31,6 +31,12 @@ void main() {
   );
   runApp(
     ProviderScope(
+      // A dead session must not be fetched again. Other failures keep
+      // Riverpod's own retry.
+      retry: (retryCount, error) {
+        if (error is SessionExpiredException) return null;
+        return ProviderContainer.defaultRetry(retryCount, error);
+      },
       overrides: [apiLayerProvider.overrideWithValue(layer)],
       child: const CompanyApp(),
     ),

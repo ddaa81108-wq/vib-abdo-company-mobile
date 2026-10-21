@@ -79,6 +79,15 @@ final accountExtraCardsProvider = NotifierProvider.autoDispose
       AccountExtraCards.new,
     );
 
+/// User-scoped reads stop when the session is gone, so a 401 does not start
+/// another request and the previous user's value is not fetched again.
+void watchSignedIn(Ref ref) {
+  final session = ref.watch(sessionStateProvider);
+  if (session is! SessionAuthenticated) {
+    throw const SessionExpiredException();
+  }
+}
+
 /// `GET /api/{section}/suggestions?q` for the create-card name field.
 /// An empty query does not call the server.
 final accountNameSuggestionsProvider = FutureProvider.autoDispose
@@ -86,7 +95,7 @@ final accountNameSuggestionsProvider = FutureProvider.autoDispose
       ref,
       key,
     ) async {
-      ref.watch(sessionStateProvider);
+      watchSignedIn(ref);
       final query = key.$2.trim();
       if (query.isEmpty) return const [];
       return ref.read(apiLayerProvider).accounts.suggestions(key.$1, query);
@@ -96,7 +105,7 @@ final accountsProvider = FutureProvider.family<AccountsPage, AccountSection>((
   ref,
   section,
 ) async {
-  ref.watch(sessionStateProvider);
+  watchSignedIn(ref);
   final query = ref.watch(accountQueryProvider(section)).trim();
   final filter = ref.watch(accountFilterProvider(section));
   return ref
@@ -110,7 +119,7 @@ final ledgerProvider =
       ref,
       key,
     ) async {
-      ref.watch(sessionStateProvider);
+      watchSignedIn(ref);
       return ref.read(apiLayerProvider).accounts.ledger(key.$1, key.$2);
     });
 
@@ -119,12 +128,12 @@ final accountCardProvider =
       ref,
       key,
     ) async {
-      ref.watch(sessionStateProvider);
+      watchSignedIn(ref);
       return ref.read(apiLayerProvider).accounts.get(key.$1, key.$2);
     });
 
 final exchangeRateProvider = FutureProvider<ExchangeRateDto>((ref) async {
-  ref.watch(sessionStateProvider);
+  watchSignedIn(ref);
   return ref.read(apiLayerProvider).accounts.getExchangeRate();
 });
 
@@ -133,47 +142,47 @@ final purchaseBookProvider = StateProvider<PurchaseBook>(
 );
 
 final purchasesProvider = FutureProvider<PurchasesBookPage>((ref) async {
-  ref.watch(sessionStateProvider);
+  watchSignedIn(ref);
   final book = ref.watch(purchaseBookProvider);
   return ref.read(apiLayerProvider).purchases.list(book);
 });
 
 final collectionsProvider = FutureProvider<CollectionsOverviewDto>((ref) async {
-  ref.watch(sessionStateProvider);
+  watchSignedIn(ref);
   return ref.read(apiLayerProvider).collections.overview();
 });
 
 final payrollProvider = FutureProvider<PayrollDto>((ref) async {
-  ref.watch(sessionStateProvider);
+  watchSignedIn(ref);
   return ref.read(apiLayerProvider).collections.payroll();
 });
 
 final assigneesProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
-  ref.watch(sessionStateProvider);
+  watchSignedIn(ref);
   return ref.read(apiLayerProvider).collections.assignees();
 });
 
 final treasuryProvider = FutureProvider<TreasurySummaryDto>((ref) async {
-  ref.watch(sessionStateProvider);
+  watchSignedIn(ref);
   return ref.read(apiLayerProvider).treasury.summary();
 });
 
 final cashLedgerProvider = FutureProvider<Paged<CashEntryDto>>((ref) async {
-  ref.watch(sessionStateProvider);
+  watchSignedIn(ref);
   return ref.read(apiLayerProvider).treasury.cashLedger();
 });
 
 final reportsProvider = FutureProvider<ReportsDto>((ref) async {
-  ref.watch(sessionStateProvider);
+  watchSignedIn(ref);
   return ref.read(apiLayerProvider).reports.daily();
 });
 
 final financialLedgerProvider = FutureProvider<FinancialLedgerPage>((
   ref,
 ) async {
-  ref.watch(sessionStateProvider);
+  watchSignedIn(ref);
   final layer = ref.read(apiLayerProvider);
   if (!layer.permissions.canViewFinancialLedger) {
     throw const ForbiddenException(code: 'FORBIDDEN', message: 'غير مصرح');
@@ -182,19 +191,19 @@ final financialLedgerProvider = FutureProvider<FinancialLedgerPage>((
 });
 
 final notificationsProvider = FutureProvider<NotificationsPage>((ref) async {
-  ref.watch(sessionStateProvider);
+  watchSignedIn(ref);
   return ref.read(apiLayerProvider).notifications.list();
 });
 
 final notificationPrefsProvider = FutureProvider<Map<String, dynamic>>((
   ref,
 ) async {
-  ref.watch(sessionStateProvider);
+  watchSignedIn(ref);
   return ref.read(apiLayerProvider).notifications.preferences();
 });
 
 final masraweyaProvider = FutureProvider<MasraweyaDayDto>((ref) async {
-  ref.watch(sessionStateProvider);
+  watchSignedIn(ref);
   return ref.read(apiLayerProvider).masraweya.getDay();
 });
 
