@@ -42,6 +42,12 @@ class FakeApiClient implements ApiClient {
   /// A replay of a request id that already succeeded is not added again.
   final List<String> mutationRequestIds = [];
 
+  /// Paths of those mutations, in the same order (tests).
+  final List<String> mutationPaths = [];
+
+  /// Wire bodies of those mutations, in the same order (tests).
+  final List<String> mutationBodies = [];
+
   /// The next N business mutations fail before they change fake state (tests).
   int failMutationsRemaining = 0;
 
@@ -59,6 +65,12 @@ class FakeApiClient implements ApiClient {
 
   /// The next N notification writes fail (tests).
   int failNotificationWritesRemaining = 0;
+
+  /// The next N versioned collection mutations fail with VERSION_CONFLICT (tests).
+  int versionConflictRemaining = 0;
+
+  /// GET /api/collections calls, including a refetch after a conflict (tests).
+  int collectionOverviewReads = 0;
 
   /// Omit `unreadCount` from the notifications page (tests).
   bool omitUnreadCount = false;
@@ -338,7 +350,7 @@ class FakeApiClient implements ApiClient {
     if (method != 'GET' &&
         head != 'notifications' &&
         head != 'notification-preferences') {
-      return _mutate(b, () => _route(method, b, seg, head, query));
+      return _mutate(b, path, () => _route(method, b, seg, head, query));
     }
     return _route(method, b, seg, head, query);
   }
@@ -348,6 +360,7 @@ class FakeApiClient implements ApiClient {
   /// retry of the same id can still succeed.
   Future<ApiResponse> _mutate(
     Map b,
+    String path,
     Future<ApiResponse> Function() send,
   ) async {
     _requireMutationMeta(b);
@@ -365,6 +378,8 @@ class FakeApiClient implements ApiClient {
     _pendingMutations[key] = gate;
     gate.future.ignore();
     mutationRequestIds.add(requestId);
+    mutationPaths.add(path);
+    if (lastWireBody != null) mutationBodies.add(lastWireBody!);
     try {
       final paused = pauseMutations;
       if (paused != null) await paused.future;
@@ -568,6 +583,7 @@ class FakeApiClient implements ApiClient {
   ) async {
     if (method == 'GET' && seg.length == 1) {
       _requireRead(SectionKey.collections);
+      collectionOverviewReads++;
       return _ok(_collectionsView());
     }
     if (method == 'GET' && seg.length > 1 && seg[1] == 'payroll') {
@@ -595,6 +611,10 @@ class FakeApiClient implements ApiClient {
         (seg.last == 'decision' || seg.last == 'cash-received');
     if (needsVersion && b['expectedVersion'] == null) {
       _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
+    }
+    if (needsVersion && versionConflictRemaining > 0) {
+      versionConflictRemaining--;
+      _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
     }
     if (seg.length == 4 && seg[1] == 'submissions' && seg[3] == 'decision') {
       return _applyDecision(seg[2], b);

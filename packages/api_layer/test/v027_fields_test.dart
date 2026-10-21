@@ -42,6 +42,20 @@ void main() {
       expect(f.paymentMode, isNull);
       expect(f.note, 'raw');
     });
+    test('allowedActions is a list or absent', () {
+      final listed = LedgerEntryDto.fromJson(_j('{"id":"t","type":"debt","status":"posted","allowedActions":["correct","pin"]}'));
+      expect(listed.allowedActions, ['correct', 'pin']);
+      final absent = LedgerEntryDto.fromJson(_j('{"id":"t","type":"debt","status":"posted"}'));
+      expect(absent.allowedActions, isNull);
+      final notAList = LedgerEntryDto.fromJson(_j('{"id":"t","type":"debt","status":"posted","allowedActions":"correct"}'));
+      expect(notAList.allowedActions, isNull);
+    });
+    test('full payment omits a date the user did not choose', () {
+      final omitted = AccountTransactionRequest.fullPayment();
+      expect(omitted.toJson().containsKey('date'), isFalse);
+      final chosen = AccountTransactionRequest.fullPayment(date: DateTime.utc(2026, 1, 15));
+      expect(chosen.toJson()['date'], '2026-01-15T00:00:00.000Z');
+    });
     test('malformed amountUnits fails the whole entry', () {
       expect(() => LedgerEntryDto.fromJson(_j('{"id":"t","type":"debt","status":"posted","amountUnits":1.5}')), _invalid);
     });

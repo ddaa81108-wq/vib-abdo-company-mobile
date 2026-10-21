@@ -738,6 +738,15 @@ class FakeFixtures {
         'version': 1,
         'cashStatus': 'not_applicable',
       },
+      {
+        'id': 'ur_2',
+        'customerName': 'استلام مرفوض تجريبي',
+        'amountUnits': 40,
+        'status': 'rejected',
+        'version': 4,
+        'cashStatus': 'pending',
+        'cashPending': true,
+      },
     ],
     'employeeTotals': [
       {
