@@ -106,6 +106,29 @@ void main() {
   );
 
   test(
+    'GET /api/home customers matches the list summary after c_55 is paid in full',
+    () async {
+      final api = await login('admin@example.invalid');
+      final before = await api.accounts.list(AccountSection.customers);
+      final demo = before.page.items.firstWhere((card) => card.id == 'c_55');
+      await api.accounts.addTransaction(
+        AccountSection.customers,
+        'c_55',
+        AccountTransactionRequest.fullPayment(date: DateTime(2026, 10, 19)),
+        MutationMeta(expectedVersion: demo.version, requestId: 'home-full'),
+      );
+
+      final list = await api.accounts.list(AccountSection.customers);
+      final home = await api.home.fetch();
+      final customers = home.summaries.firstWhere(
+        (summary) => summary.section == 'customers',
+      );
+      expect(list.summary.netBalanceUnits, 10315);
+      expect(customers.valueUnits, list.summary.netBalanceUnits);
+    },
+  );
+
+  test(
     'DEF-004 cancel copies the stored balance of the latest posted line',
     () async {
       final api = await login('admin@example.invalid');
