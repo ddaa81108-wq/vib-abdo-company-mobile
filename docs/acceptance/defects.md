@@ -15,7 +15,8 @@
 |---|---|
 | Pending PM decision | DEF-002. على `main` عند `8a52160` السلوك لم يتغير. الإداري المحدود ما زال `collections.decide`، ومسار الإجماليات المخصص يرفضه بـ 403 |
 | Blocking مفتوح على `main` | لا يبقى عيب مانع من DEF-013 أو DEF-014. هما verified on main 451ec58 |
-| Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `8a52160` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل. DEF-017 على فرع الصينية `82e0e8c` وليس على `main`: 401 أثناء ابتلاع الدفع يرمي خارج `presentPush` |
+| Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `8a52160` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل |
+| أُغلق على فرع وليس على `main` | DEF-017. Verified closed on `cursor/phase6-system-tray-bg-poll` `cc1bc83`, not on main. كان مفتوحًا على `82e0e8c` |
 | verified on main 8a52160 | DEF-010. «عرض الكل» يتبع قسم النشرة |
 | verified on main 451ec58 | DEF-001، DEF-003، DEF-004، DEF-005، DEF-006، DEF-013، DEF-014، DEF-015، DEF-016 |
 | أُغلق بعد إعادة اختبار | DEF-007 وDEF-008 وDEF-009 وDEF-011 بقيت مغلقة ضمن المجموعة على `451ec58` |
@@ -528,7 +529,7 @@
 
 ### DEF-017 — 401 أثناء ابتلاع الدفع يخرج من `presentPush` بلا `sessionEnded`
 
-**الحالة:** Open. verified on branch `cursor/phase6-system-tray-bg-poll` `82e0e8cd687daf79bc8ca88ee049af2259cbdaa0`, not on main. غير مانع.
+**الحالة:** Verified closed on `cursor/phase6-system-tray-bg-poll` `cc1bc83b81e4b996cd0a974121e5b057b182726a`, not on main. كان Open على `82e0e8c`. غير مانع حين كان مفتوحًا. التالي الحر DEF-018.
 
 | الحقل | القيمة |
 |---|---|
@@ -545,7 +546,9 @@
 
 **المتوقع:** لا صينية، ولا اسم الحساب السابق، و`TrayDelivery.sessionEnded`، و`expireSession` / `session_expired` مرة واحدة.
 
-**الفعلي:** لا صينية، والسبب `session_expired` مرة واحدة، ونداء ثانٍ يرجع `loggedOut` بلا مسح ثانٍ. لكن `SessionExpiredException` (`AUTH_REQUIRED`، 401) تخرج من `DioApiClient._send` عبر عدد غير المقروء داخل `acceptPush`، قبل `try` في `presentPush`. المضيف يستدعي `presentPush` بلا انتظار، فالخطأ غير ممسوك. اختبار المؤلف `a failed GET or a 404 shows no name, and a 401 shows nothing` يحقن `SessionExpiredException` من `reload` نفسه، وذلك داخل `try` ويرجع `sessionEnded`، ولا يستدعي `expireSession`. المسبار المحلي غير المدفوع `a 401 on the refresh GET posts nothing and expires the session once` أثبت الرمي على المزوّد الموصول. لا اسم ولا مبلغ يُرسم. لذلك العيب غير مانع: نصف الأمان (لا عرض، وخروج واحد) قائم، ونصف «لا يرمي» على المسار الموصول فاشل.
+**الفعلي على `82e0e8c`:** لا صينية، والسبب `session_expired` مرة واحدة، ونداء ثانٍ يرجع `loggedOut` بلا مسح ثانٍ. لكن `SessionExpiredException` (`AUTH_REQUIRED`، 401) تخرج من `DioApiClient._send` عبر عدد غير المقروء داخل `acceptPush`، قبل `try` في `presentPush`. المضيف يستدعي `presentPush` بلا انتظار، فالخطأ غير ممسوك. اختبار المؤلف `a failed GET or a 404 shows no name, and a 401 shows nothing` يحقن `SessionExpiredException` من `reload` نفسه، وذلك داخل `try` ويرجع `sessionEnded`، ولا يستدعي `expireSession`. المسبار المحلي غير المدفوع `a 401 on the refresh GET posts nothing and expires the session once` أثبت الرمي على المزوّد الموصول. لا اسم ولا مبلغ يُرسم. لذلك العيب غير مانع: نصف الأمان (لا عرض، وخروج واحد) قائم، ونصف «لا يرمي» على المسار الموصول فاشل.
+
+**إعادة الاختبار على `cc1bc83`:** `presentPush` يلف `acceptPush` داخل `try`. 401 و419 غير CSRF يرجعان `TrayDelivery.sessionEnded` من المزوّد الحقيقي `systemTrayPresenterProvider`، بلا صينية، وبلا خطأ منطقة، و`session_expired` مرة واحدة، والنداء الثاني `loggedOut`. خروج الجلسة يحدث في `AuthInterceptor` قبل رجوع الدالة، و`onError` الفارغ في المضيف لا يُستدعى على هذا المسار فلا يبتلع خروجًا. 419 الذي يحمل `CSRF` يحدّث الرمز مرة ولا يخرج. 401 على الدخول يبقى `INVALID_CREDENTIALS`. فشل جلب الصف صينية بلا اسم، و404 لا شيء. الحكم: **Verified closed** على هذا الرأس، وليس على `main`.
 
 ---
 
@@ -593,3 +596,4 @@
 - إعادة اختبار #41 عند `ae7311f` (ويحل محل `ad4f3d8`) لم تفتح DEF-017. الشاشة صارت على المتحكّم، والنداء المزدوج طلب واحد، وفشل مسار العدد (404 و500 و403 وشبكة ومهلة) يبقي القائمة ويأخذ الشارة من القائمة بلا خروج. 401 على المسار خروج واحد `session_expired`. `fromDto` يبقي `recipientUserId`، وحمولة الدفع تسقط المفاتيح الحساسة. سؤال `requestId` على السلك وP6-39 مفتوحان وليسا عيبين. التالي الحر يبقى DEF-017.
 - الحكم المجمّع للمرحلة 6 على #40 `8149b55` و#41 `ae7311f` و#42 `52ab75f` و#43 `6fc4204` و#44 `8a6f287` لم يفتح DEF-017. مرشح `push` في workflow #42 مانع دمج. درزة النقر ودرزة الإذن وملصق الصينية الصامت طلبات متابعة، لا عيوب داخل رأس واحد. التالي الحر يبقى DEF-017.
 - إعادة اختبار فرع الصينية `cursor/phase6-system-tray-bg-poll` عند `82e0e8c` فتحت DEF-017 أعلاه. التالي الحر صار DEF-018. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
+- إعادة اختبار الإصلاح على `cc1bc83` أغلقت DEF-017 على الفرع وليس على `main`. التالي الحر يبقى DEF-018.

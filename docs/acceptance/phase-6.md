@@ -35,7 +35,7 @@
 
 طريقة التحقق واحدة من ثلاث: اختبار وحدة أو ودجت على Fake، أو مصفوفة محاكٍ في CI، أو جهاز حقيقي أو staging. ما لا يُغلق إلا بالجهاز أو staging معلَّم في الحالة وفي الجدول أسفل الخطة.
 
-الحكم الآن لكل معيار في جدول «من المعيار إلى الحكم»، ثم في إعادة اختبار فرع الصينية `82e0e8c`. المرحلة لم تُوقَّع. «غير مبني بعد» ليس عيبًا. DEF-017 لم يُستخدم في الخطة الأولى؛ فُتح لاحقًا على ذلك الفرع، والتالي الحر DEF-018.
+الحكم الآن لكل معيار في جدول «من المعيار إلى الحكم»، ثم في إعادة اختبار فرع الصينية. المرحلة لم تُوقَّع. «غير مبني بعد» ليس عيبًا. DEF-017 فُتح على `82e0e8c` وأُغلق على `cc1bc83` على الفرع وليس على `main`. التالي الحر DEF-018.
 
 ---
 
@@ -955,7 +955,65 @@ Flutter 3.47.7 / Dart 3.13.5. `bash tool/check.sh` خرج **0**. الادعاء 
 
 الأسباب: البوابة تطابق 354 و150. الفحوص (a) و(c) و(d) و(e) و(f) Pass على Fake أو الوحدة، مع ملاحظة أن `BACKGROUND_NOTIFICATION_POLL=true` الصريح يشغّل الاستطلاع في release، وأن (d) على الجهاز و(c) و(e) على الظل المرسوم ما زالت خارج الوحدة. الفحص (b) Fail على المسار الموصول: DEF-017، غير مانع لأن لا شيء يُنشر والخروج مرة واحدة. إن عُدّ الاستثناء غير الممسوك مانعًا يصبح الحكم لا. المعياران (2) و(3) والمعيار (12) فجوات للتوقيع على جهاز أو staging. FCM غير مستخدم، والمسار استطلاع فقط، ومطفأ في الإنتاج حتى السؤال 9. لا يُدمج هذا الفرع إلى `main` من هذه الجولة، ولا طلب له بعد.
 
-DEF-017 مفتوح وغير مانع. التالي الحر DEF-018. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
+DEF-017 مفتوح وغير مانع على هذا الرأس. التالي الحر DEF-018. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail. الإغلاق على `cc1bc83` في القسم التالي.
+
+---
+
+## إعادة اختبار إصلاح DEF-017 على `cc1bc83`
+
+التاريخ 2026-10-21. نفس الفرع `cursor/phase6-system-tray-bg-poll` عند `cc1bc83b81e4b996cd0a974121e5b057b182726a`. لا طلب. لم يُدفع إلى الفرع ولم يُدمج. التوثيق على #12 فقط. المرحلة لم تُوقَّع.
+
+| المجموعة | المدّعى | الفعلي |
+|---|---|---|
+| التطبيق | 357/0 | **357/0** |
+| الحزمة | 150/0 | **150/0** |
+| `--tags permissions-negative` التطبيق | 27/0 | **27/0** |
+| `--tags permissions-negative` الحزمة | 23/0 | **23/0** |
+
+`bash tool/check.sh` خرج **0**.
+
+### الفحص (b) على المزوّد الموصول
+
+المسبار المحلي غير المدفوع `test/qa_def017_retest_probe_test.dart` على شجرة `/tmp` فقط: **7/0**. يستدعي `systemTrayPresenterProvider`، ونفس شكل `onError` الفارغ في المضيف، و`runZonedGuarded`.
+
+| السيناريو | النتيجة |
+|---|---|
+| 401 عبر `expireSession` ثم `presentPush` | `sessionEnded`. لا صينية. `session_expired` مرة واحدة. النداء الثاني `loggedOut` والعدّاد يبقى 1. `onError` لم يُستدعَ. لا خطأ منطقة |
+| 419 غير CSRF (`failNextAuthenticatedStatus = 419`، الرمز `PAGE_EXPIRED`) | نفس 401 |
+| 419 CSRF (`CSRF_TOKEN_MISMATCH`) على عميل الكوكي الحقيقي لا على Fake | `GET /api/auth/csrf` مرة واحدة، وعدد غير المقروء أُعيد أكثر من مرة، والجلسة تبقى `SessionAuthenticated`، و`onError` فارغ، ولا `session_expired`. أي صينية بلا الاسم ولا المبلغ القادمين من الحمولة |
+| خطأ قبل رجوع `acceptPush` (مخزن المعروض يرمي) | `dropped`. لا صينية. الجلسة تبقى. هذا فرع `if (!accepted)` |
+| فشل GET للصفحة بعد القبول (500) | `nameless`. الجسم بلا «لا يُعرض» وبلا `900`. الجلسة تبقى |
+| 404 لصفحة الإشعارات | `notFound`. لا صينية. الجلسة تبقى |
+| 401 على الدخول بكلمة `wrong` | `InvalidCredentialsException` والرمز `INVALID_CREDENTIALS`. الحالة تبقى `SessionUnknown` |
+| المضيف نفسه: `FakePushTransport.inject` بعد `expireSession` | الشاشة تصبح الدخول، والسبب `session_expired`، ولا صينية، ولا `FlutterError`. ثم كلمة `wrong` تعرض «بيانات الدخول غير صحيحة» |
+
+الخروج يتم في `AuthInterceptor` قبل أن ترجع `presentPush`. الـ `onError` الفارغ لا يرى خطأ الجلسة على هذا المسار، فلا يبتلع خروجًا كان يجب أن يحدث. هو غطاء لرمي غير متوقع فقط.
+
+اختبارات المؤلف على المزوّد الحقيقي لا على `reload` محقون: `a real push ingest that gets 401 posts nothing and does not escape` و`a real push ingest that gets a non-CSRF 419 posts nothing and does not escape` في `test/permissions/system_tray_permission_negative_test.dart`. يستدعيان `systemTrayPresenterProvider` داخل `runZonedGuarded` ويتوقعان `sessionEnded` و`reasons == ['session_expired']` وصينية فارغة. `test/system_tray_navigation_test.dart`: `a list tap and a tray tap mark read once, and needsLogin does not` يثبت `readAt` ونقص العدد مرة، وأن `needsLogin` لا يكتب.
+
+### تراجع (a) و(c) و(d) و(e) و(f)
+
+ما زالت Pass. أُعيد تشغيل `test/system_tray_bg_poll_test.dart` و`test/system_tray_navigation_test.dart` (**8/0**) وملف الصينية السالب (**10/0**)، ومنها اختبارا المؤلف الجديدان واختبارا القراءة و`needsLogin`.
+
+### الشجرة المجمّعة
+
+`origin/main` صار `7018c6c` «Present phase 6 notifications in the app shell (#43)»، سكواش فوق `9a734df`. فرع #43 الأحدث `f90449a` يطابق شجرة `main` بلا فرق ملفات. دمجه فوق `main` كان فارغًا. ثم `cc1bc83`. الالتزام المحلي `51d6e48`. لم يُدفع.
+
+تعارضات هذا الدمج، بعد أخذ ملفات النقل من الفرع واتحاد استيراد `pump_app.dart`:
+
+- add/add كما في الجولة السابقة: `docs/push-transport.md` و`background_poll.dart` و`background_scheduler.dart` و`local_notification_poster.dart` و`push_payload.dart` و`push_providers.dart` و`test/push_transport_test.dart`.
+- `notification_transport_host.dart` add/add. نسخة الفرع هي التي تُبقى: `presentPush` ترجع تسليمًا، و`onError` الفارغ غطاء فقط.
+- `fake_api_client.dart` اندمج تلقائيًا بعد دمج #43، والنتيجة هي ملف الفرع وفيها `failNextAuthenticatedStatus`. `git merge-tree` بين `main` والفرع مباشرة يُظهر تعارض محتوى: الحقل الجديد وكتلة توجيه الإشعارات المتطابقة على الطرفين. لا حذف لسلوك `main`.
+- `notification_open_seam.dart` اندمج والمزوّد `OpenerNotificationSeam`. الدمج المباشر مع `main` كان سيتعارض add/add لأن السكواش أضاف الدرزة بمعرّف مختلف.
+- `pubspec.yaml` اندمج مع `workmanager` ^0.10.10 والاعتمادات الثلاثة. `pubspec.lock` فيه `workmanager`.
+- `realtime_lifecycle.dart` في الشجرة المجمّعة بلا إبطالي `unreadNotificationsCountProvider`. فرع الصينية ما زال يحملهما؛ الدمج أبقى حذف `main`.
+- `lib/app.dart` بلا تعارض. الترتيب `NotificationTransportHost` ثم `ForegroundNotificationBanner` ثم `RealtimeLifecycle`.
+
+`tool/check.sh` على الشجرة المحلية خرج **0**: التطبيق **357/0**، والحزمة **150/0**، والسالب **27/0** و**23/0**. لا اختبار منتج فشل فقط بعد الجمع.
+
+### الحكم
+
+**نعم مع ملاحظات.** verified on `cc1bc83`, not on main. DEF-017 **Verified closed** على هذا الرأس وليس على `main`. الفحص (b) Pass على المسار الموصول. (a) و(c) و(d) و(e) و(f) ما زالت Pass، مع الملاحظة السابقة أن `BACKGROUND_NOTIFICATION_POLL=true` الصريح يشغّل الاستطلاع في release. المعياران (2) و(3) والمعيار (12) فجوات جهاز أو staging. FCM غير مستخدم. المرحلة لم تُوقَّع. التالي الحر DEF-018.
 
 ---
 
@@ -970,8 +1028,8 @@ DEF-017 مفتوح وغير مانع. التالي الحر DEF-018. DEF-002 ي�
 | الدور | مهندس قبول |
 | التاريخ | 2026-10-21 |
 | القرار | لم يُوقَّع |
-| العيوب المانعة المفتوحة | لا عيب مانع جديد. DEF-017 مفتوح وغير مانع على فرع الصينية `82e0e8c`، وليس على `main` |
-| ملاحظات | الحكم المجمّع للطلبات الخمسة قسم سابق. إعادة اختبار `cursor/phase6-system-tray-bg-poll` عند `82e0e8c`: نعم مع ملاحظات. المرحلة لم تُوقَّع. (2) و(3) و(12) فجوات جهاز أو staging، وDEF-017 على 401 الموصول. مرشح #42 لم يعد على `main`. القرار عند التوقيع أحد: مقبول / مقبول بشروط / مرفوض. التوقيع الإداري في الجدول التالي فارغ |
+| العيوب المانعة المفتوحة | لا عيب مانع جديد. DEF-017 أُغلق على فرع الصينية `cc1bc83` وليس على `main` |
+| ملاحظات | إعادة اختبار `cursor/phase6-system-tray-bg-poll` عند `cc1bc83`: نعم مع ملاحظات. DEF-017 مغلق على الفرع. (2) و(3) و(12) فجوات جهاز أو staging. المرحلة لم تُوقَّع. القرار عند التوقيع أحد: مقبول / مقبول بشروط / مرفوض. التوقيع الإداري في الجدول التالي فارغ |
 
 توقيع الإدارة:
 
