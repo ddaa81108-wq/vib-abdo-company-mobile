@@ -69,6 +69,7 @@ class HomeDashboard extends ConsumerWidget {
       onRefresh: () async {
         ref.invalidate(homeDashboardProvider);
         ref.invalidate(unreadCountProvider);
+        ref.invalidate(unreadNotificationsCountProvider);
         await ref.read(homeDashboardProvider.future);
       },
       child: ListView(

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/app.dart';
+import 'package:vib_abdo_company_mobile/features/notifications/notification_permission.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 
 /// Pumps the app with an injected fake [ApiLayer]. The provider does not build one.
@@ -15,6 +16,7 @@ Future<ApiLayer> pumpFakeApp(
   double textScale = 1,
   List<Override> overrides = const [],
   ConnectivityPort? connectivity,
+  NotificationPermissionService? notificationsPermission,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -42,6 +44,9 @@ Future<ApiLayer> pumpFakeApp(
         apiLayerProvider.overrideWithValue(layer),
         connectivityPortProvider.overrideWithValue(
           connectivity ?? const FixedConnectivity(true),
+        ),
+        notificationPermissionServiceProvider.overrideWithValue(
+          notificationsPermission ?? const GrantedNotificationPermission(),
         ),
         ...overrides,
       ],
