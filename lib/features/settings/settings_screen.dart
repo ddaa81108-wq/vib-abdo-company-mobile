@@ -12,41 +12,7 @@ import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/export_pdf_button.dart';
 import '../../ui/widgets/soft_tile.dart';
-
-class _AdminLink {
-  const _AdminLink({
-    required this.tileKey,
-    required this.title,
-    required this.path,
-    required this.icon,
-  });
-
-  final Key tileKey;
-  final String title;
-  final String path;
-  final IconData icon;
-}
-
-const _adminLinks = <_AdminLink>[
-  _AdminLink(
-    tileKey: Key('settings-link-employees'),
-    title: AppStrings.employeesTile,
-    path: '/settings/employees',
-    icon: Icons.groups_outlined,
-  ),
-  _AdminLink(
-    tileKey: Key('settings-link-audit'),
-    title: AppStrings.auditTile,
-    path: '/settings/audit',
-    icon: Icons.fact_check_outlined,
-  ),
-  _AdminLink(
-    tileKey: Key('settings-link-operations'),
-    title: AppStrings.operationsTile,
-    path: '/settings/operations',
-    icon: Icons.monitor_heart_outlined,
-  ),
-];
+import 'admin_destinations.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -67,16 +33,16 @@ class SettingsScreen extends ConsumerWidget {
         const ScreenTitle(AppStrings.settings),
         const SizedBox(height: AppSpacing.md),
         if (manage)
-          for (final link in _adminLinks)
+          for (final destination in adminDestinations)
             Card(
               margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
               clipBehavior: Clip.antiAlias,
               child: SoftTile(
-                key: link.tileKey,
-                leading: Icon(link.icon),
-                title: link.title,
+                key: destination.tileKey,
+                leading: Icon(destination.icon),
+                title: destination.title,
                 trailing: forwardChevron(context),
-                onTap: () => context.go(link.path),
+                onTap: () => context.go(destination.path),
               ),
             ),
         if (ledger) const _LedgerTile(),

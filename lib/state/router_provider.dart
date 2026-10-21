@@ -20,9 +20,9 @@ import '../features/purchases/purchases_screen.dart';
 import '../features/reports/reports_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/settings/account_screen.dart';
+import '../features/settings/admin_destinations.dart';
 import '../features/settings/admin_placeholder_screen.dart';
 import '../features/settings/settings_screen.dart';
-import '../ui/strings.dart';
 import '../features/splash/splash_screen.dart';
 import '../features/treasury/treasury_screen.dart';
 
@@ -75,33 +75,16 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/settings',
             builder: (context, state) => const SettingsScreen(),
           ),
-          GoRoute(
-            path: '/settings/employees',
-            builder: (context, state) => const AdminPlaceholderScreen(
-              title: AppStrings.employeesTile,
-              message: AppStrings.employeesEmpty,
-              icon: Icons.groups_outlined,
-              screenKey: Key('screen-settings-employees'),
+          for (final destination in adminDestinations)
+            GoRoute(
+              path: destination.path,
+              builder: (context, state) => AdminPlaceholderScreen(
+                title: destination.title,
+                message: destination.emptyMessage,
+                icon: destination.icon,
+                screenKey: destination.screenKey,
+              ),
             ),
-          ),
-          GoRoute(
-            path: '/settings/audit',
-            builder: (context, state) => const AdminPlaceholderScreen(
-              title: AppStrings.auditTile,
-              message: AppStrings.auditEmpty,
-              icon: Icons.fact_check_outlined,
-              screenKey: Key('screen-settings-audit'),
-            ),
-          ),
-          GoRoute(
-            path: '/settings/operations',
-            builder: (context, state) => const AdminPlaceholderScreen(
-              title: AppStrings.operationsTile,
-              message: AppStrings.operationsEmpty,
-              icon: Icons.monitor_heart_outlined,
-              screenKey: Key('screen-settings-operations'),
-            ),
-          ),
           GoRoute(
             path: '/account',
             builder: (context, state) => const AccountScreen(),
