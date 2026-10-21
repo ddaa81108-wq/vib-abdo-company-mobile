@@ -52,7 +52,8 @@ void main() {
       expect(badge.data, '1');
       expect(find.text('2026-10-19'), findsOneWidget);
       expect(find.textContaining('320 د.ل'), findsWidgets);
-      expect(find.textContaining('250 د.ل'), findsOneWidget);
+      expect(find.text('0 د.ل'), findsOneWidget);
+      expect(find.textContaining('10,635 د.ل'), findsOneWidget);
       expect(find.textContaining('ج.م'), findsNothing);
 
       await tester.tap(find.byKey(HomeShell.logoutKey));
@@ -99,7 +100,8 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.textContaining('15,000 ج.م'), findsOneWidget);
+      expect(find.textContaining('23,750 ج.م'), findsOneWidget);
+      expect(find.textContaining('8,000 د.ل'), findsOneWidget);
       expect(
         find.byKey(HomeShell.sectionKey(SectionKey.reports)),
         findsOneWidget,

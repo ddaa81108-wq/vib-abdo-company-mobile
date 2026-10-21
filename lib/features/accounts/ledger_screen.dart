@@ -200,6 +200,7 @@ class LedgerScreen extends ConsumerWidget {
         );
       }
       ref.invalidate(ledgerProvider((section, id)));
+      ref.invalidate(accountCardProvider((section, id)));
       ref.invalidate(accountsProvider(section));
       return null;
     } catch (error) {
@@ -224,11 +225,15 @@ class LedgerScreen extends ConsumerWidget {
         );
       }
       ref.invalidate(ledgerProvider((section, id)));
+      ref.invalidate(accountCardProvider((section, id)));
+      ref.invalidate(accountsProvider(section));
       return null;
     } catch (error) {
       final failure = ref.read(errorHandlerProvider).toFailure(error);
       if (failure.code == 'VERSION_CONFLICT') {
         ref.invalidate(ledgerProvider((section, id)));
+        ref.invalidate(accountCardProvider((section, id)));
+        ref.invalidate(accountsProvider(section));
       }
       return failure.message;
     }
