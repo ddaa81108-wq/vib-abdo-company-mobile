@@ -68,6 +68,12 @@ class FakeApiClient implements ApiClient {
   /// The next N proposed home reads fail so the app can use per-section data.
   int failHomeRemaining = 0;
 
+  /// The next N admin employee-totals reads fail after the permission check.
+  int failEmployeeTotalsRemaining = 0;
+
+  /// When set, admin employee-totals reads wait here after the permission check.
+  Completer<void>? pauseEmployeeTotals;
+
   /// The next N older-page reads (`before`) fail (tests).
   int failOlderRemaining = 0;
 
@@ -250,6 +256,31 @@ class FakeApiClient implements ApiClient {
 
   void _requireFullAccess() {
     if (!_access.fullAccess) _fail(403, 'FORBIDDEN', _adminOnly);
+  }
+
+  /// 🔶 GET /api/admin/employee-totals. Full admin only until DEF-002, via
+  /// [_requireFullAccess]. An employee, a limited admin, and any other
+  /// profile without full access gets 403 and never an empty list. `from`
+  /// and `to` are echoed by the fixture. `employeeId` is ignored.
+  Future<ApiResponse> _employeeTotals(
+    String method,
+    List<String> seg,
+    Map<String, dynamic>? query,
+  ) async {
+    if (method != 'GET' || seg.length != 2 || seg[1] != 'employee-totals') {
+      _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
+    }
+    _requireFullAccess();
+    final paused = pauseEmployeeTotals;
+    if (paused != null) await paused.future;
+    if (failEmployeeTotalsRemaining > 0) {
+      failEmployeeTotalsRemaining--;
+      _fail(500, 'SERVER_ERROR', 'تعذر تحميل إجماليات الموظفين.');
+    }
+    return _ok(FakeFixtures.employeeTotals(
+      from: _queryText(query, 'from'),
+      to: _queryText(query, 'to'),
+    ));
   }
 
   void _activate(Map<String, dynamic> me) {
@@ -597,6 +628,8 @@ class FakeApiClient implements ApiClient {
         return _ok({'soundEnabled': true, 'speechEnabled': false});
       case 'event-changes':
         return _ok({'events': [], 'latest': 0, 'fullResync': false});
+      case 'admin':
+        return _employeeTotals(method, seg, query);
     }
     _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
   }
