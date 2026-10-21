@@ -133,6 +133,8 @@ abstract final class AppStrings {
   static const amount = 'المبلغ';
   static const date = 'التاريخ';
   static const name = 'الاسم';
+  static const nameRequired = 'أدخل الاسم.';
+  static const similarNames = 'أسماء مشابهة';
   static const phone = 'الهاتف';
   static const factor = 'المعامل';
   static const sinceDays = 'منذ';
@@ -284,7 +286,6 @@ abstract final class AppStrings {
   static const editCardScope =
       'يُحفظ الاسم والهاتف فقط. الرصيد والحركات تبقى كما يرسلها الخادم.';
   static const editCardUnavailable = 'تعديل هذا الكارت غير متاح لهذا الحساب.';
-  static const nameRequired = 'أدخل الاسم.';
   static const cardVersionMissing =
       'تعذر الحفظ قبل وصول إصدار الكارت من الخادم. أُعيد الجلب.';
   static const delete = 'حذف';
