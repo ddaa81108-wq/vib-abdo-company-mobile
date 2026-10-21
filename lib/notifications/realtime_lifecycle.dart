@@ -65,6 +65,8 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
       _bridge ??= NotificationSignalBridge(
         refresh: () async {
           try {
+            // List ingest happens before the unread-count fetch. A 404 on
+            // that count route does not throw and does not roll the list back.
             await ref
                 .read(notificationsProvider.notifier)
                 .refresh(announce: true);

@@ -63,7 +63,14 @@ Map<String, dynamic>? _pair(Map<dynamic, dynamic> ref) {
 
 /// Shade text. Fixed labels only. The raw operation string is not copied,
 /// and neither is [AppNotification.title], body, employee name, or the ref id.
-String genericNotificationText(AppNotification notification) {
+///
+/// [systemName] is the whitelisted push value. His [AppNotification.fromPushPayload]
+/// drops `systemName`, so a push shade line passes it in here instead of
+/// reading it back off the parsed row.
+String genericNotificationText(
+  AppNotification notification, {
+  String? systemName,
+}) {
   final label = switch (notification.operationType) {
     NotificationOperationType.collectionSubmit => 'استلام جديد',
     NotificationOperationType.approve ||
@@ -73,7 +80,7 @@ String genericNotificationText(AppNotification notification) {
     NotificationOperationType.cashReceived => 'استلام نقد',
     NotificationOperationType.unknown => 'إشعار',
   };
-  final system = notification.systemName.trim();
+  final system = (systemName ?? notification.systemName).trim();
   if (system.isEmpty) return label;
   return '$system · $label';
 }

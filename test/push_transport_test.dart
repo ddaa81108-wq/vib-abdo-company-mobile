@@ -1,5 +1,9 @@
 import 'package:flutter_api_layer/api_layer.dart';
+import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/api/api_providers.dart';
+import 'package:vib_abdo_company_mobile/state/notification_providers.dart';
 import 'package:vib_abdo_company_mobile/notifications/background_poll.dart';
 import 'package:vib_abdo_company_mobile/notifications/background_scheduler.dart';
 import 'package:vib_abdo_company_mobile/notifications/device_registration_client.dart';
@@ -13,7 +17,6 @@ import 'package:vib_abdo_company_mobile/notifications/notification_signal_bridge
 import 'package:vib_abdo_company_mobile/notifications/push_drop_log.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_payload.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_transport.dart';
-import 'package:vib_abdo_company_mobile/state/notification_merge.dart';
 
 void main() {
   AppNotification row({
@@ -137,15 +140,28 @@ void main() {
     expect(clean['relatedRef'], {'type': 'collection', 'id': 'sb_1'});
 
     final item = AppNotification.fromPushPayload(clean);
-    final text = genericNotificationText(item);
+    expect(item.systemName, isEmpty);
+    expect(item.title, isNull);
+    expect(item.body, isNull);
+    expect(item.employeeName, isNull);
+    final text = genericNotificationText(
+      item,
+      systemName: clean['systemName'] as String,
+    );
     expect(text, 'VIB · اعتماد');
     expect(text.contains('سر'), isFalse);
     expect(text.contains('900'), isFalse);
     expect(text.contains('091'), isFalse);
     expect(text.contains('secret'), isFalse);
     expect(text.contains('sb_1'), isFalse);
-    expect(item.title, isNull);
-    expect(item.body, isNull);
+
+    final direct = AppNotification.fromPushPayload(
+      pushMap(id: 'n-1', recipient: 'u_12'),
+    );
+    expect(direct.title, isNull);
+    expect(direct.body, isNull);
+    expect(direct.employeeName, isNull);
+    expect(direct.systemName, isEmpty);
   });
 
   test('logged-out push and poll rows are dropped', () async {
@@ -159,6 +175,62 @@ void main() {
     expect(door.acceptPoll([row(id: 'n-2')]), isEmpty);
     expect(drops.loggedOut, 2);
     expect(door.ingestCalls, 0);
+  });
+
+  test('a 404 on unread-count still updates the list from a signal', () async {
+    final layer = ApiLayer.create(
+      config: const ApiConfig(
+        baseUrl: 'https://fake.invalid',
+        useFakeApi: true,
+      ),
+      fakeLatency: Duration.zero,
+    );
+    await layer.session.login(username: 'employee.demo', password: 'x');
+    final container = ProviderContainer(
+      overrides: [apiLayerProvider.overrideWithValue(layer)],
+    );
+    addTearDown(container.dispose);
+    addTearDown(layer.dispose);
+
+    final before = await container.read(notificationsProvider.future);
+    expect(before.items.map((item) => item.id), ['77']);
+
+    final fake = layer.client as FakeApiClient;
+    fake.failUnreadCountRemaining = 1;
+    fake.stageNotification({
+      'id': 'fresh',
+      'action': 'approve',
+      'createdAt': '2026-10-20T12:00:00Z',
+      'title': 'عميل سري',
+      'phone': '0910000001',
+    }, unreadCount: 4);
+
+    Future<void>? refresh;
+    final clock = _ManualClock();
+    final bridge = NotificationSignalBridge(
+      refresh: () {
+        final run = container
+            .read(notificationsProvider.notifier)
+            .refresh(announce: true);
+        refresh = run;
+        return run;
+      },
+      wait: const Duration(milliseconds: 400),
+      startDelay: clock.schedule,
+    );
+    bridge.onSignal(RealtimeSignal.resync);
+    clock.elapse(const Duration(seconds: 1));
+    expect(refresh, isNull);
+
+    bridge.onSignal(
+      const RealtimeSignal(sequence: 4, topic: 'collection.changed'),
+    );
+    clock.elapse(const Duration(milliseconds: 400));
+    await refresh;
+    final updated = container.read(notificationsProvider).value!;
+    expect(updated.items.map((item) => item.id), containsAll(['fresh', '77']));
+    expect(updated.unreadCount, 4);
+    expect(bridge.refreshCalls, 1);
   });
 
   test('the connect resync does not refresh, and a later signal does', () {

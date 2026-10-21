@@ -41,11 +41,13 @@ The device token lives in `SecureDeviceTokenStore` (`push.device_token.v1`,
 `token`, `devicetoken`, and `pushtoken` as sensitive. Drop logs print counts
 only.
 
-The push whitelist is `notificationId`, `recipientUserId`, `operationType`,
-`relatedRef` (`type` and `id` only), `relatedRefType`, `relatedRefId`,
-`createdAt`, and `systemName`. `systemName` is kept because the shade line is
-that name plus a fixed label. `employeeName`, title, body, amounts, phones,
-and tokens are discarded before `fromPushPayload`.
+The transport whitelist is `notificationId`, `recipientUserId`,
+`operationType`, `relatedRef` (`type` and `id` only), `relatedRefType`,
+`relatedRefId`, `createdAt`, and `systemName`. It runs before
+`fromPushPayload`, which has its own allow list and drops `systemName`.
+The shade line reads `systemName` from the transport whitelist, then a fixed
+label. `employeeName`, title, body, amounts, phones, and tokens are discarded
+by both layers.
 
 ## Flags
 
@@ -60,7 +62,7 @@ Both are `--dart-define` values. Tests read the defaults.
 
 | State | Today (no server push) | After the server adds push |
 |---|---|---|
-| Open, signed in | SSE `GET /api/events`, or `GET /api/event-changes` every 4 seconds while SSE is down. Stop on pause, hidden, detached, `401`, and `419`. After the connect resync, a signal coalesces into `refresh(announce: true)`. | Same, plus `FakePushTransport` or a real FCM adapter calling `ingest` with `NotificationSource.push`. His ingest refetches the unread count. |
+| Open, signed in | SSE `GET /api/events`, or `GET /api/event-changes` every 4 seconds while SSE is down. Stop on pause, hidden, detached, `401`, and `419`. After the connect resync, a signal coalesces into `refresh(announce: true)`. That refresh ingests the list before it fetches the unread count. | Same, plus `FakePushTransport` or a real FCM adapter calling `ingest` with `NotificationSource.push`. His ingest refetches the unread count and keeps the previous count if that route fails. |
 | Background, process alive | Realtime stops. The background flag is off, so nothing polls. | With the flag on, the in-process scheduler polls at 15 minutes or more, only while a user id is in memory. `401` / `419` cancels it. |
 | Process killed | Nothing is delivered. There is no push token and no OS worker. | Still nothing until a real FCM adapter and WorkManager are linked. The stub and the in-process scheduler do not survive process death. |
 
@@ -124,8 +126,9 @@ not declared.
   (`SessionUnknown`) does not leave `/splash`. After restore or login,
   `resumePending` runs the same `open`.
 - `recipientUserId` must match on `banner` and `systemTray`. A missing id is
-  `forbidden` for those origins. A list row may omit it, because his
-  `fromDto` clears the field and list/poll rows are session-scoped.
+  `forbidden` for those origins. `fromDto` copies `recipientUserId` when the
+  list row has it. A list row may still omit it; that origin stays openable
+  because the list is session-scoped. A present mismatch is `forbidden`.
 - The role must `canRead` the target section
   (`docs/permission-enforcement-matrix.md`). Otherwise `/forbidden`.
 - `collection` and `receipt` open `/collections`. A card section key opens
@@ -144,9 +147,11 @@ Questions 1–12 are in
 that gates `BACKGROUND_NOTIFICATION_POLL`.
 
 13. Does the standalone `GET /api/notifications/unread-count` route exist,
-    and is the body `{unreadCount: int}`? His `refresh` calls
-    `serverUnreadCount()` before it ingests the list. This transport calls
-    `refresh(announce: true)` for a realtime signal. If that route 404s, the
-    refresh throws and the list is left as it was. The initial load does not
-    use the route. This is the same gap as question 7 in
+    and is the body `{unreadCount: int}`? `refresh` now fetches
+    `GET /api/notifications` and ingests that list first, then fetches the
+    unread count. A 404 or any other non-auth failure of the count route uses
+    `unreadCount` from the list response. If the list omits that field too,
+    the previous count stays. The list is not left stale, and a count failure
+    does not roll it back. The initial load still does not call the count
+    route. This is the same open question as question 7 in
     `docs/notifications-phase6-contract.md`.
