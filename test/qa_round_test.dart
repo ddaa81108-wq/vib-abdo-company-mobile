@@ -168,18 +168,18 @@ void main() {
     expect(find.text(AppStrings.retry), findsWidgets);
   });
 
-  testWidgets('a notification tap stays on the list until the opener lands', (
+  testWidgets('a notification tap opens the linked collections screen', (
     tester,
   ) async {
-    await pumpFakeApp(tester, size: const Size(800, 1400));
+    final layer = await pumpFakeApp(tester, size: const Size(800, 1400));
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
     await go(tester, '/notifications');
     await tester.tap(find.byKey(const Key('notice-77')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await settle(tester);
     expect(find.text('تعذر تحديث الإشعار.'), findsNothing);
-    expect(find.byKey(NotificationsScreen.screenKey), findsOneWidget);
-    expect(find.byKey(CollectionsScreen.screenKey), findsNothing);
+    expect(find.byKey(CollectionsScreen.screenKey), findsOneWidget);
+    expect(find.byKey(NotificationsScreen.screenKey), findsNothing);
+    expect((layer.client as FakeApiClient).notificationMutationApplies, 1);
   });
 
   testWidgets('a missing unread count draws no badge', (tester) async {

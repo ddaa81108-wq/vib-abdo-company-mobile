@@ -3,7 +3,10 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../error_handling/error_handler.dart';
+import '../../notifications/notification_registration.dart';
+import '../../notifications/push_providers.dart';
 import '../../state/notification_providers.dart';
+import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
@@ -48,8 +51,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       return;
     }
     if (!mounted) return;
-    if (status == NotificationPermissionChoice.granted) return;
+    if (status == NotificationPermissionChoice.granted) {
+      await _syncRegistration();
+      return;
+    }
     if (status == NotificationPermissionChoice.permanentlyDenied) {
+      await _syncRegistration();
+      if (!mounted) return;
       await _showDenied();
       return;
     }
@@ -74,7 +82,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         ],
       ),
     );
-    if (agreed != true || !mounted) return;
+    if (!mounted) return;
+    if (agreed != true) {
+      await _syncRegistration();
+      return;
+    }
     final NotificationPermissionChoice next;
     try {
       next = await service.request();
@@ -82,7 +94,18 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       return;
     }
     if (!mounted) return;
+    await _syncRegistration();
+    if (!mounted) return;
     if (next != NotificationPermissionChoice.granted) await _showDenied();
+  }
+
+  /// Grant registers the device. Denial and a later revocation unregister it.
+  Future<void> _syncRegistration() {
+    return syncNotificationRegistration(
+      session: ref.read(sessionStateProvider),
+      registrar: ref.read(deviceTokenRegistrarProvider),
+      permission: ref.read(notificationPermissionProvider),
+    );
   }
 
   Future<void> _showDenied() {
