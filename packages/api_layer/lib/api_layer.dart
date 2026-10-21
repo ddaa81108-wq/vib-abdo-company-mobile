@@ -1,6 +1,8 @@
 /// Composition root for the API layer. UI (Riverpod providers) depends on what is exposed here.
 library;
 
+import 'package:dio/dio.dart';
+
 import 'core/auth/cookie_store.dart';
 import 'core/config/api_config.dart';
 import 'core/money/money_formatter.dart';
@@ -102,6 +104,7 @@ class ApiLayer {
     CookieStore? cookieStore,
     TokenStorage? tokenStorage,
     Duration? fakeLatency,
+    HttpClientAdapter? httpClientAdapter,
   }) {
     final cfg = config ?? ApiConfig.fromEnvironment();
     final permissions = PermissionService();
@@ -116,6 +119,7 @@ class ApiLayer {
       cookieStore: cookieStore,
       tokenStorage: tokenStorage,
       fakeLatency: fakeLatency,
+      httpClientAdapter: httpClientAdapter,
     );
     final api = stack.client;
 

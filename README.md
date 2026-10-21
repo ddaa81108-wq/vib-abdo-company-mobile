@@ -11,7 +11,7 @@ A form creates one `requestId` when it opens. A retry of the same inputs reuses 
 ## Rules
 
 1. **No financial calculations.** Totals, balances, remaining amounts, debt age, and converted amounts are shown exactly as the server sends them. Fields named `*Units` are raw integers. The only transformation is `MoneyFormatter`, which turns one integer into text and appends that value's own currency symbol. The app does not add, subtract, convert, or mix LYD and EGP.
-2. **No secrets in the repo.** There are no passwords, API keys, tokens, real base URLs, real usernames, or real customer records. The API origin and similar settings come from `--dart-define`. The default origin is the placeholder `https://staging.example.invalid`. Fixtures are obviously fake (`example.invalid`, "تجريبي").
+2. **No secrets in the repo.** There are no passwords, API keys, tokens, real base URLs, real usernames, or real customer records. The API origin comes from `--dart-define=API_BASE` and only when fake mode is off. There is no default host. Fake mode does not open a socket. Fixtures are obviously fake (`example.invalid`, "تجريبي").
 3. **The server decides permissions.** `PermissionService` is the only place that matches the server `role` string (`admin` or `employee`, exact). An unknown or missing role grants nothing. If the server sends `fullAccess`, that flag wins. Otherwise an explicit permission list applies even for an admin, and an admin with only `sectionAccess` does not become unrestricted. An admin with both lists empty and no `fullAccess` flag is unrestricted. Section keys in `sectionAccess` are the server keys (`customerDebts`, `companyDebts`, `libyanDeposits`, and the rest). Values are `none`, `read`, or `manage`. Opening a section needs the read code and a level other than `none`; writing needs the write code and `manage`. Collections has no `sectionAccess` entry and is gated by its permission codes only. Management actions (approve, reject, cash receive, and the rest) use those action codes through `can` / `canDo`. Hiding a control is not enforcement.
 4. **Unread count comes from the server.** The badge shows `unreadCount` from the notifications response. The app does not increment or decrement it. A realtime event or a push message, when one exists, is only a signal to fetch that count again.
 
@@ -89,10 +89,10 @@ Demo cards (ten per section; balances are canned server figures):
 - Libyan deposits use `c_ly_02` … `c_ly_10`
 - Egyptian deposits use `c_eg_02` … `c_eg_10`
 
-Point a build at a real host without committing the host:
+Point a build at a staging host without committing the host. `API_BASE` is required in that mode; a missing or invalid origin stops startup before any request. See [docs/staging.md](docs/staging.md).
 
 ```bash
-flutter run --dart-define=USE_FAKE_API=false --dart-define=API_BASE=https://your-host.example
+flutter run --dart-define=USE_FAKE_API=false --dart-define=API_BASE=https://your-staging-host.example
 ```
 
 Other defines are listed in `packages/api_layer/README.md`.

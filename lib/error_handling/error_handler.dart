@@ -17,9 +17,7 @@ class ErrorHandler {
 
   AppFailure toFailure(Object error) {
     if (error is ApiException) {
-      final message = error.message.trim().isEmpty
-          ? AppStrings.genericError
-          : error.message;
+      final message = _message(error);
       return AppFailure(
         message: message,
         code: error.code,
@@ -33,6 +31,23 @@ class ErrorHandler {
       message: AppStrings.genericError,
       code: 'REQUEST_FAILED',
     );
+  }
+
+  /// Top-level server text, plus each validation field the server named.
+  /// Field text is already a display string. Raw `details` are not copied.
+  static String _message(ApiException error) {
+    final message = error.message.trim().isEmpty
+        ? AppStrings.genericError
+        : error.message.trim();
+    if (error is! ValidationException || error.fieldErrors.isEmpty) {
+      return message;
+    }
+    final fields = error.fieldErrors
+        .map((field) => field.message.trim())
+        .where((text) => text.isNotEmpty && text != message)
+        .toList(growable: false);
+    if (fields.isEmpty) return message;
+    return '$message\n${fields.join('\n')}';
   }
 
   /// Drops sensitive keys before a value could reach a log.

@@ -32,6 +32,16 @@ enum RateWireFormat {
   string,
 }
 
+/// Thrown before any socket is opened when real mode has no usable origin.
+class ApiConfigException implements Exception {
+  const ApiConfigException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class ApiConfig {
   const ApiConfig({
     required this.baseUrl,
@@ -47,6 +57,7 @@ class ApiConfig {
   });
 
   /// Origin only, e.g. https://host — paths in ApiEndpoints already start with /api.
+  /// Empty in fake mode. Real mode is rejected unless this is an http(s) origin.
   final String baseUrl;
   final Duration connectTimeout;
   final Duration receiveTimeout;
@@ -69,24 +80,99 @@ class ApiConfig {
   /// provider and the UI call `EmployeeTotalsRepository.fetch` either way.
   final EmployeeTotalsSource employeeTotalsSource;
 
-  /// 🔶 Real base URL is intentionally NOT defaulted to production. The app must be
-  /// pointed at a staging/test copy explicitly via --dart-define=API_BASE=...
-  factory ApiConfig.fromEnvironment() => const ApiConfig(
-        baseUrl: String.fromEnvironment('API_BASE',
-            defaultValue: 'https://staging.example.invalid'),
-        useFakeApi: bool.fromEnvironment('USE_FAKE_API', defaultValue: true),
-        enableDebugLogging: bool.fromEnvironment('API_DEBUG_LOG'),
-        authStrategy: bool.fromEnvironment('AUTH_BEARER')
-            ? AuthStrategyKind.bearerToken
-            : AuthStrategyKind.cookieCsrf,
-        moneyUnitScale:
-            int.fromEnvironment('MONEY_UNIT_SCALE', defaultValue: 0),
-        rateWireFormat: String.fromEnvironment('RATE_WIRE_FORMAT') == 'string'
-            ? RateWireFormat.string
-            : RateWireFormat.number,
-        employeeTotalsSource:
-            String.fromEnvironment('EMPLOYEE_TOTALS_SOURCE') == 'collections'
-                ? EmployeeTotalsSource.collections
-                : EmployeeTotalsSource.standalone,
+  /// Compile-time defines. Fake mode is the default and does not read a host.
+  /// Real mode (`USE_FAKE_API=false`) throws [ApiConfigException] when `API_BASE`
+  /// is missing or not an origin. The value is never given a placeholder host.
+  factory ApiConfig.fromEnvironment() {
+    const useFakeApi = bool.fromEnvironment('USE_FAKE_API', defaultValue: true);
+    const apiBase = String.fromEnvironment('API_BASE');
+    const debug = bool.fromEnvironment('API_DEBUG_LOG');
+    const bearer = bool.fromEnvironment('AUTH_BEARER');
+    const scale = int.fromEnvironment('MONEY_UNIT_SCALE', defaultValue: 0);
+    const rate = String.fromEnvironment('RATE_WIRE_FORMAT');
+    const totals = String.fromEnvironment('EMPLOYEE_TOTALS_SOURCE');
+    return ApiConfig.fromDefines(
+      useFakeApi: useFakeApi,
+      apiBase: apiBase,
+      enableDebugLogging: debug,
+      authStrategy:
+          bearer ? AuthStrategyKind.bearerToken : AuthStrategyKind.cookieCsrf,
+      moneyUnitScale: scale,
+      rateWireFormat:
+          rate == 'string' ? RateWireFormat.string : RateWireFormat.number,
+      employeeTotalsSource: totals == 'collections'
+          ? EmployeeTotalsSource.collections
+          : EmployeeTotalsSource.standalone,
+    );
+  }
+
+  /// Same rules as [fromEnvironment], with explicit values so tests can cover
+  /// real mode without rebuilding under a different `--dart-define`.
+  factory ApiConfig.fromDefines({
+    required bool useFakeApi,
+    required String apiBase,
+    bool enableDebugLogging = false,
+    AuthStrategyKind authStrategy = AuthStrategyKind.cookieCsrf,
+    int moneyUnitScale = 0,
+    RateWireFormat rateWireFormat = RateWireFormat.number,
+    EmployeeTotalsSource employeeTotalsSource = EmployeeTotalsSource.standalone,
+    Duration connectTimeout = const Duration(seconds: 15),
+    Duration receiveTimeout = const Duration(seconds: 30),
+    Duration pollingInterval = const Duration(seconds: 4),
+  }) {
+    return ApiConfig(
+      // Fake mode never opens a socket, so a host is neither required nor kept.
+      baseUrl: useFakeApi ? '' : requireRealBaseUrl(apiBase),
+      connectTimeout: connectTimeout,
+      receiveTimeout: receiveTimeout,
+      useFakeApi: useFakeApi,
+      enableDebugLogging: enableDebugLogging,
+      authStrategy: authStrategy,
+      pollingInterval: pollingInterval,
+      moneyUnitScale: moneyUnitScale,
+      rateWireFormat: rateWireFormat,
+      employeeTotalsSource: employeeTotalsSource,
+    );
+  }
+
+  /// Absolute http(s) origin with no userinfo, query, fragment, or path.
+  /// The raw value is never copied into the error text (it may contain a secret).
+  static String requireRealBaseUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      throw const ApiConfigException(
+        'API_BASE is required when USE_FAKE_API=false. '
+        'Pass --dart-define=API_BASE=https://<staging-host> '
+        '(origin only, no path, query, or credentials).',
       );
+    }
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty || !uri.isAbsolute) {
+      throw const ApiConfigException(
+        'API_BASE must be an absolute http or https origin, '
+        'for example https://staging.example.com.',
+      );
+    }
+    if (uri.scheme != 'http' && uri.scheme != 'https') {
+      throw const ApiConfigException('API_BASE must use http or https.');
+    }
+    if (uri.userInfo.isNotEmpty) {
+      throw const ApiConfigException(
+        'API_BASE must not include a username or password.',
+      );
+    }
+    if (uri.query.isNotEmpty || uri.fragment.isNotEmpty) {
+      throw const ApiConfigException(
+        'API_BASE must be an origin only, with no query or fragment.',
+      );
+    }
+    if (uri.path.isNotEmpty && uri.path != '/') {
+      throw const ApiConfigException(
+        'API_BASE must be an origin only. Request paths already start with /api.',
+      );
+    }
+    final host = uri.host.contains(':') ? '[${uri.host}]' : uri.host;
+    final port = uri.hasPort ? ':${uri.port}' : '';
+    return '${uri.scheme}://$host$port';
+  }
 }

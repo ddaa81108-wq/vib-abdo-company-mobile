@@ -38,8 +38,11 @@ class NetworkException extends ApiException {
 }
 
 class TimeoutApiException extends ApiException {
-  const TimeoutApiException({super.message = 'انتهت مهلة الاتصال'})
-      : super(code: 'TIMEOUT');
+  const TimeoutApiException({
+    super.message = 'انتهت مهلة الاتصال',
+    super.statusCode,
+    super.correlationId,
+  }) : super(code: 'TIMEOUT');
 }
 
 /// Client-side code used by the existing web client too: INVALID_SERVER_RESPONSE.

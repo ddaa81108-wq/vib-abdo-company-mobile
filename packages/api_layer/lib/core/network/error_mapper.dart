@@ -56,8 +56,10 @@ class ErrorMapper {
       case DioExceptionType.unknown:
         break;
       default:
-        // Newer dio values (e.g. transformTimeout in recent dio 5.x) fall through to
-        // response-based mapping; kept as `default` to stay compatible with dio ^5.4.
+        // Newer dio values (e.g. transformTimeout) are not in the pinned enum.
+        if (error.type.name.toLowerCase().contains('timeout')) {
+          return const TimeoutApiException();
+        }
         break;
     }
 
@@ -93,14 +95,14 @@ class ErrorMapper {
       }
     }
     final code = (err['code'] as String?) ?? _defaultCode(status);
-    final serverMessage =
-        err['message'] is String ? (err['message'] as String).trim() : null;
+    final serverMessage = _serverMessage(err, body);
     final message = (serverMessage == null || serverMessage.isEmpty)
         ? _defaultMessage(status)
         : serverMessage;
-    final details = err['details'];
+    final details = err['details'] ?? (body is Map ? body['details'] : null);
 
     // CSRF wins over 419. A bare 419 is session expiry, not a token refresh.
+    // HTML and empty bodies stay on the client default (see [_serverMessage]).
     if (isCsrfCode(code) || isCsrfMessage(serverMessage)) {
       return CsrfInvalidException(
           code: isCsrfCode(code) ? code : 'CSRF_INVALID',
@@ -147,12 +149,28 @@ class ErrorMapper {
 
     switch (status) {
       case 400:
+        final fields = _fieldErrors(details);
+        if (fields.isNotEmpty) {
+          return ValidationException(
+            code: code,
+            message: message,
+            statusCode: status,
+            correlationId: correlationId,
+            details: details,
+            fieldErrors: fields,
+          );
+        }
         return BadRequestException(
             code: code,
             message: message,
             statusCode: status,
             correlationId: correlationId,
             details: details);
+      case 408:
+        return TimeoutApiException(
+            message: serverMessage ?? 'انتهت مهلة الاتصال',
+            statusCode: status,
+            correlationId: correlationId);
       case 401:
         // Unauthenticated 401 already returned above. Anything left is expiry.
         return SessionExpiredException(
@@ -258,10 +276,25 @@ class ErrorMapper {
     return const [];
   }
 
+  /// Message the server actually sent. HTML and empty bodies stay null so the
+  /// client default is used instead of a proxy page.
+  String? _serverMessage(Map<String, dynamic> err, Object? body) {
+    final fromError = err['message'];
+    if (fromError is String && fromError.trim().isNotEmpty) {
+      return fromError.trim();
+    }
+    if (body is Map) {
+      final top = body['message'];
+      if (top is String && top.trim().isNotEmpty) return top.trim();
+    }
+    return null;
+  }
+
   String _defaultCode(int status) => switch (status) {
         401 => 'AUTH_REQUIRED',
         403 => 'FORBIDDEN',
         404 => 'NOT_FOUND',
+        408 => 'TIMEOUT',
         409 => 'VERSION_CONFLICT',
         419 => 'PAGE_EXPIRED',
         422 => 'VALIDATION_ERROR',
@@ -274,10 +307,21 @@ class ErrorMapper {
         401 || 419 => 'يجب تسجيل الدخول أولًا.',
         403 => 'لا تملك صلاحية لهذا الإجراء',
         404 => 'العنصر غير موجود',
+        408 => 'انتهت مهلة الاتصال',
         409 => 'تغيرت البيانات على الخادم، يرجى التحديث',
-        422 => 'البيانات المدخلة غير صحيحة',
+        400 || 422 => 'البيانات المدخلة غير صحيحة',
         429 => 'طلبات كثيرة، حاول لاحقاً',
         _ when status >= 500 => 'خطأ في الخادم، حاول لاحقاً',
         _ => 'تعذر تنفيذ الطلب.',
       };
+}
+
+/// 401/419 (and [SessionExpiredException]) must not be retried by SSE or polling.
+bool isUnrecoverableSessionError(Object error) {
+  if (error is SessionExpiredException) return true;
+  if (error is DioException) {
+    final status = error.response?.statusCode;
+    return status == 401 || status == 419;
+  }
+  return false;
 }
