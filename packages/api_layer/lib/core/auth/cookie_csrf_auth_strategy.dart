@@ -13,10 +13,8 @@ import 'cookie_store.dart';
 ///   GET /api/auth/csrf, and must be sent as `X-CSRF-Token` on every non-GET request.
 /// - The CSRF token is kept IN MEMORY only; after an app restart it is refetched
 ///   from GET /api/auth/csrf (same as the web client's `resume`).
-/// - No refresh token and no local session timer. AUTH_REQUIRED is the only
-///   expiry code observed. Authenticated 401 and non-CSRF 419 force logout.
-///   A code or message containing CSRF refetches the token once and replays
-///   once. Session expiry never replays a write.
+/// - No refresh flow: AUTH_REQUIRED -> forced logout.
+/// - CSRF invalid -> refetch the token ONCE (single-flight) and replay the request once.
 class CookieCsrfAuthStrategy implements AuthStrategy {
   CookieCsrfAuthStrategy(
       {required CookieStore cookieStore, required Dio bareDio})
@@ -29,7 +27,7 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
   final Dio _bareDio;
 
   String? _csrfToken;
-  Completer<_CsrfFetch>? _csrfInFlight;
+  Completer<bool>? _csrfInFlight;
 
   @override
   String get name => 'cookie+csrf';
@@ -55,7 +53,7 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
     }
 
     if (_isUnsafe(options.method)) {
-      if (_csrfToken == null && authenticated) await _refetchCsrf();
+      if (_csrfToken == null && authenticated) await refetchCsrfSingleFlight();
       final token = _csrfToken;
       if (token != null && token.isNotEmpty) {
         options.headers['X-CSRF-Token'] = token;
@@ -84,12 +82,12 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
   Future<void> onLoginSucceeded(Map<String, dynamic> loginData) async {
     final token = loginData['csrfToken'];
     _csrfToken = token is String && token.isNotEmpty ? token : null;
-    if (_csrfToken == null) await _refetchCsrf();
+    if (_csrfToken == null) await refetchCsrfSingleFlight();
   }
 
   @override
   Future<void> onSessionResumed() async {
-    await _refetchCsrf();
+    await refetchCsrfSingleFlight();
   }
 
   @override
@@ -101,23 +99,12 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
       {required bool authenticated}) async {
     if (error is CsrfInvalidException) {
       if (request.extra['authRetried'] == true) {
-        // One refresh was already spent. 401/419 after that ends the session.
-        if (authenticated && _ended(error.statusCode)) {
-          return AuthErrorAction.forceLogout;
-        }
         return AuthErrorAction.passThrough;
       }
       _csrfToken = null;
-      switch (await _refetchCsrf()) {
-        case _CsrfFetch.ready:
-          return AuthErrorAction.retryOnce;
-        case _CsrfFetch.sessionEnded:
-          return authenticated
-              ? AuthErrorAction.forceLogout
-              : AuthErrorAction.passThrough;
-        case _CsrfFetch.missing:
-          return AuthErrorAction.passThrough;
-      }
+      return await refetchCsrfSingleFlight()
+          ? AuthErrorAction.retryOnce
+          : AuthErrorAction.passThrough;
     }
     if (error is SessionExpiredException && authenticated) {
       return AuthErrorAction.forceLogout;
@@ -125,16 +112,12 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
     return AuthErrorAction.passThrough;
   }
 
-  static bool _ended(int? status) => status == 401 || status == 419;
-
   /// GET /api/auth/csrf -> { ok: true, data: { csrfToken } }. Shared by concurrent callers.
-  /// A 401 or 419 from this call is session expiry, not another retry.
-  Future<_CsrfFetch> _refetchCsrf() async {
+  Future<bool> refetchCsrfSingleFlight() async {
     final existing = _csrfInFlight;
     if (existing != null) return existing.future;
-    final completer = Completer<_CsrfFetch>();
+    final completer = Completer<bool>();
     _csrfInFlight = completer;
-    var outcome = _CsrfFetch.missing;
     try {
       final cookie = await _cookies.cookieHeader();
       final res = await _bareDio.get<Object?>(
@@ -142,26 +125,16 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
         options: Options(headers: {if (cookie != null) 'Cookie': cookie}),
       );
       await capture(res);
-      final status = res.statusCode ?? 0;
-      if (_ended(status)) {
-        outcome = _CsrfFetch.sessionEnded;
-      } else {
-        final body = res.data;
-        final data = body is Map && body['ok'] == true && body['data'] is Map
-            ? body['data'] as Map
-            : const {};
-        final token = data['csrfToken'];
-        _csrfToken = token is String && token.isNotEmpty ? token : null;
-        outcome = _csrfToken != null ? _CsrfFetch.ready : _CsrfFetch.missing;
-      }
-    } on DioException catch (error) {
-      outcome = _ended(error.response?.statusCode)
-          ? _CsrfFetch.sessionEnded
-          : _CsrfFetch.missing;
+      final body = res.data;
+      final data = body is Map && body['ok'] == true && body['data'] is Map
+          ? body['data'] as Map
+          : const {};
+      final token = data['csrfToken'];
+      _csrfToken = token is String && token.isNotEmpty ? token : null;
+      completer.complete(_csrfToken != null);
     } catch (_) {
-      outcome = _CsrfFetch.missing;
+      completer.complete(false);
     } finally {
-      if (!completer.isCompleted) completer.complete(outcome);
       _csrfInFlight = null;
     }
     return completer.future;
@@ -173,5 +146,3 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
     await _cookies.clear();
   }
 }
-
-enum _CsrfFetch { ready, missing, sessionEnded }

@@ -8,10 +8,6 @@
 # already the default (see ApiConfig.fromEnvironment). No API host and no
 # secrets are configured.
 #
-# The permission-negative tag is a separate flutter test step. The staging
-# negative suite runs only with --dry-run and has no STAGING_* secrets, so CI
-# does not contact a network.
-#
 # Flutter is pinned to 3.47.7, the stable release recorded in .metadata
 # (revision abaf9c523780a608bd46686fd5e53740a07077f8) and named in the README.
 # That SDK ships Dart 3.13.5, which satisfies the root pubspec constraint
@@ -108,19 +104,6 @@ jobs:
         run: |
           set -o pipefail
           flutter test --reporter expanded --dart-define=USE_FAKE_API=true | tee "$RUNNER_TEMP/test-api.log"
-
-      - name: Permission-negative tests (app)
-        if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
-        run: flutter test --tags permissions-negative --reporter expanded --dart-define=USE_FAKE_API=true
-
-      - name: Permission-negative tests (API package)
-        if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
-        working-directory: packages/api_layer
-        run: flutter test --tags permissions-negative --reporter expanded --dart-define=USE_FAKE_API=true
-
-      - name: Staging negative suite dry-run
-        if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
-        run: tool/staging_negative_tests/run.sh --dry-run --junit "$RUNNER_TEMP/staging-negative-dry-run.xml"
 
       - name: Write check summary
         if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}

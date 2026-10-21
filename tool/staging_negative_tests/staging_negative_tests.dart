@@ -1,7 +1,8 @@
 // Staging negative checks for the permission matrix.
 //
-// Normal CI runs: tool/staging_negative_tests/run.sh --dry-run
-// That path does not open a socket. The manual workflow in PR #32 calls
+// Self-test: tool/staging_negative_tests/run.sh --dry-run
+// That path does not open a socket. PR #32's job calls it when this file
+// exists. The manual workflow in PR #32 calls
 // `run.sh --junit staging-permissions-junit.xml` and uploads the artifact
 // `staging-permissions-junit`. Live mode uses the same origin rules as
 // `classify_origin` in that preflight: https only, a non-TLD label of
@@ -524,13 +525,9 @@ Future<CaseResult> _foreignIds(HttpClient http, StagingConfig config) async {
         'GET /api/collections included the other employee',
       );
     }
-    if (own.ok && _totalsPresent(own.body)) {
-      return CaseResult(
-        name,
-        'FAIL',
-        'employee GET /api/collections included employeeTotals',
-      );
-    }
+    // Whether the server must omit employeeTotals for an employee is an
+    // open question for Ali. A present array is not a failure. A name or
+    // user id from employee 2 still fails through _leaks above.
     if (ids.isEmpty) {
       return CaseResult(
         name,
@@ -909,20 +906,6 @@ List<_IdRef> _ids(String body) {
     for (final id in found)
       if (seen.add(id.path)) id,
   ];
-}
-
-bool _totalsPresent(String body) {
-  try {
-    final decoded = jsonDecode(body);
-    final data = decoded is Map && decoded['data'] is Map
-        ? decoded['data'] as Map
-        : decoded;
-    if (data is! Map) return false;
-    final totals = data['employeeTotals'];
-    return totals is List && totals.isNotEmpty;
-  } on FormatException {
-    return false;
-  }
 }
 
 bool _leaks(String body, _Session other) {

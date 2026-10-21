@@ -12,13 +12,13 @@ A **login 401 is bad credentials**, including when the code is `AUTH_REQUIRED`. 
 
 ## CSRF
 
-Unsafe methods (`POST`, `PUT`, `PATCH`, `DELETE`) send `X-CSRF-Token` when the in-memory token is present. `GET` and `HEAD` do not. A code **or a server message** containing `CSRF` refreshes `GET /api/auth/csrf` once (single-flight) and replays that request once, with the same body and the same `requestId`. If the refresh itself returns 401 or 419, or the replay returns 401 or 419, the session ends and the write is not sent again.
+Unsafe methods (`POST`, `PUT`, `PATCH`, `DELETE`) send `X-CSRF-Token` when the in-memory token is present. `GET` and `HEAD` do not. A code **or a server message** containing `CSRF` refreshes `GET /api/auth/csrf` once (single-flight) and replays that request once, with the same body and the same `requestId`. If the refresh fails, or that one replay was already spent, `CookieCsrfAuthStrategy` passes the error through. A 401 or 419 from the CSRF refresh stays on that pass-through path. An authenticated 401, and a 419 that is not a CSRF error, are session expiry in the table below. That path is what wipes the session.
 
 ## Expiry
 
 Only `AUTH_REQUIRED` has been observed. `SESSION_EXPIRED`, `SESSION_REVOKED`, and `PAGE_EXPIRED` are defensive.
 
-The implementation is open [PR #38](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/38) (`cursor/session-expiry-logout-2f57`). This branch merges that code and does not keep a second expiry mapper.
+The implementation is open [PR #38](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/38) (`cursor/session-expiry-logout-2f57`). This branch documents that behaviour and does not add a second expiry mapper.
 
 | Response | Result |
 |---|---|
@@ -28,9 +28,11 @@ The implementation is open [PR #38](https://github.com/ddaa81108-wq/vib-abdo-com
 | Any other 419, including a non-JSON body | Session expiry (`PAGE_EXPIRED` when the server sends no code) |
 | `AUTH_REQUIRED`, `SESSION_EXPIRED`, `SESSION_REVOKED`, or `PAGE_EXPIRED` on another status | Session expiry |
 
-Expiry calls `SessionManager.forceLogout`. Many 401s share one wipe. An explicit logout that overlaps those 401s keeps reason `logout`, so the login screen does not show the expiry notice. The router shows "انتهت الجلسة، يرجى تسجيل الدخول" only for reason `session_expired` and sends the user to `/login`.
+Expiry calls `SessionManager.forceLogout`. Many 401s share one wipe. An explicit logout that overlaps those 401s keeps reason `logout`, so the login screen does not show the expiry notice. `signedOutNotice` shows "انتهت الجلسة، يرجى تسجيل الدخول" only when the reason is `session_expired`, and the router sends the user to `/login`.
 
-`GET` / `HEAD` transport retries skip 401 and 419. They never retry `POST`, `PUT`, `PATCH`, or `DELETE`.
+The logout request itself never announces `session_expired`. `AuthInterceptor` does not call `forceLogout('session_expired')` when the path is `POST /api/auth/logout`. A 401 on that logout call does not trigger the session-expired message.
+
+`GET` and `HEAD` may be retried on connection failure, timeout, 502, 503, or 504. They are never retried on 4xx, including 401 and 419. `POST`, `PUT`, `PATCH`, and `DELETE` are never retried by that interceptor.
 
 ## Logout and local wipe
 
@@ -40,13 +42,13 @@ Expiry calls `SessionManager.forceLogout`. Many 401s share one wipe. An explicit
 - the token store (`TokenStorage.clear`), including a bearer token left from a stub experiment
 - the in-memory CSRF token
 
-`SessionManager` runs that wipe single-flight. Logout's own 401 does not announce `session_expired`. The same wipe runs on expiry. A later authenticated request has no cookie and no CSRF token. The fake answers 401 once `expireSession` has marked the cookie dead, and again after logout. The real server must do the same for a replayed cookie (question 8 in the totals proposal). If logout never reached the server, the server session can live until its own lifetime; the app will not send the cookie again.
+`SessionManager` runs that wipe single-flight. The logout request itself never announces `session_expired`: a 401 from `POST /api/auth/logout` does not call `forceLogout('session_expired')`, and the reason stays `logout`, so the session-expired message is not shown. The same wipe runs on expiry, and that path does use reason `session_expired`. A later authenticated request has no cookie and no CSRF token. The fake answers 401 once `expireSession` has marked the cookie dead, and again after logout. The real server must do the same for a replayed cookie (question 8 in the totals proposal). If logout never reached the server, the server session can live until its own lifetime; the app will not send the cookie again.
 
 ## In-flight write at expiry
 
-A write that is in flight when the session dies is **not** retried, and it is **not** replayed after the next login.
+A write that is in flight when the session dies is not retried. A submit after expiry keeps the same `requestId`.
 
-`pendingMutationProvider` keeps the `requestId`, the inputs, and the expected version for that user. The protected route is disposed by the login redirect, so the form's controllers are gone. The next `GuardedMutation` for the same user, the same inputs, and the same expected version reuses that `requestId`. A different user drops the snapshot. A successful send clears it. Nothing sends the write by itself after login.
+`pendingMutationProvider` keeps the `requestId` in memory for the same user, the same inputs, and the same expected version. Writes are never auto-replayed. The protected route is disposed by the login redirect, so the form's controllers are gone. The next `GuardedMutation` for that same user, those same inputs, and that same expected version reuses the stored `requestId`. A different user drops the snapshot. A successful send clears it. Nothing sends the write by itself after login.
 
 The CSRF replay above is the only automatic replay of a write, and only when the server said the token was rejected. The body, including `requestId`, is unchanged. Question 9 in the totals proposal asks the server to treat `requestId` as idempotent if a write was applied and then the session died.
 

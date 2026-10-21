@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 
 /// Retries only GET/HEAD (per API contract). Never retries POST/PUT/PATCH/DELETE.
-/// Never retries HTTP 401 or 419.
 /// - max 2 retries; delay ~ base * 3^n ± 20% (400ms, 1200ms).
 /// - retry on connectionError / timeouts / 502 / 503 / 504.
 /// - never on 4xx, 500, badCertificate, cancel.
@@ -33,9 +32,6 @@ class GetRetryInterceptor extends Interceptor {
     final req = err.requestOptions;
     final method = req.method.toUpperCase();
     final attempt = (req.extra['retryAttempt'] as int?) ?? 0;
-    final status = err.response?.statusCode;
-    // Session expiry is never retried, including when a later edit adds statuses.
-    if (status == 401 || status == 419) return handler.next(err);
     if ((method != 'GET' && method != 'HEAD') ||
         req.extra['noRetry'] == true ||
         attempt >= maxRetries ||

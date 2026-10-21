@@ -41,12 +41,6 @@ class ApiEndpoints {
 
   // Collections (استلامات الديون)
   static const collections = '/api/collections';
-
-  /// 🔶 PROPOSED and unconfirmed. Full-management employee totals.
-  /// The client that calls this lives in open PR #34
-  /// (`EMPLOYEE_TOTALS_SOURCE`), not in this branch.
-  /// See docs/employee-totals-proposal.md.
-  static const adminEmployeeTotals = '/api/admin/employee-totals';
   static const collectionAssignees = '/api/collections/assignees';
   static const collectionAssignments = '/api/collections/assignments';
   static String collectionSubmissions(String assignmentId) =>
