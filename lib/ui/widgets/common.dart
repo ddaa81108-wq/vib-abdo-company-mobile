@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../error_handling/app_failure.dart';
 import '../presentation.dart';
 import '../strings.dart';
 import '../theme.dart';
@@ -169,14 +170,81 @@ class ForbiddenPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      key: paneKey,
-      child: Padding(
-        padding: EdgeInsetsDirectional.all(AppSpacing.xxl),
-        child: Text(AppStrings.forbidden, textAlign: TextAlign.center),
+    final theme = Theme.of(context);
+    final message = Padding(
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xl,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.lock_outline,
+            size: 40,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            AppStrings.forbidden,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(height: 1.6),
+          ),
+        ],
       ),
     );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // A list parent gives an unbounded height. A full-screen parent
+        // centers the notice and scrolls when the text scale is large.
+        if (!constraints.hasBoundedHeight) {
+          return KeyedSubtree(key: paneKey, child: message);
+        }
+        return SingleChildScrollView(
+          key: paneKey,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(child: message),
+          ),
+        );
+      },
+    );
   }
+}
+
+/// Copy the UI may show. An HTTP 403 never keeps the raw server sentence.
+String failureText(AppFailure failure) =>
+    failure.code == 'FORBIDDEN' ? AppStrings.forbidden : failure.message;
+
+/// Section failure. 403 is [ForbiddenPane]; every other code stays [ErrorPane].
+Widget presentFailure(
+  AppFailure failure, {
+  VoidCallback? onRetry,
+  Key? retryKey,
+}) {
+  if (failure.code == 'FORBIDDEN') return const ForbiddenPane();
+  return ErrorPane(
+    message: failure.message,
+    onRetry: onRetry,
+    retryKey: retryKey,
+  );
+}
+
+/// One snackbar for a failure. A second 403 replaces the first instead of stacking.
+void showFailureSnackBar(BuildContext context, AppFailure failure) {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  if (messenger == null) return;
+  final forbidden = failure.code == 'FORBIDDEN';
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(
+          failureText(failure),
+          key: forbidden ? const Key('forbidden-snackbar') : null,
+        ),
+      ),
+    );
 }
 
 class ServerReplyText extends StatelessWidget {
@@ -450,6 +518,7 @@ class KeptData<T> extends StatefulWidget {
     this.loading,
     this.resetKey,
     this.retryKey,
+    this.failureOf,
     this.expand = false,
   });
 
@@ -460,6 +529,9 @@ class KeptData<T> extends StatefulWidget {
   final Widget? loading;
   final Object? resetKey;
   final Key? retryKey;
+
+  /// When set, a `FORBIDDEN` code renders [ForbiddenPane] instead of [ErrorPane].
+  final AppFailure Function(Object error)? failureOf;
 
   /// True when [builder] returns a scrolling view that should fill the body.
   final bool expand;
@@ -493,20 +565,28 @@ class _KeptDataState<T> extends State<KeptData<T>> {
       skipLoadingOnReload: true,
       data: widget.builder,
       loading: () => widget.loading ?? const SkeletonBox(height: 88),
-      error: (error, _) => ErrorPane(
-        message: widget.messageOf(error),
-        onRetry: widget.onRetry,
-        retryKey: widget.retryKey,
-      ),
+      error: (error, _) => _pane(error),
     );
   }
 
-  Widget _withError(Widget body, Object error) {
-    final pane = ErrorPane(
+  Widget _pane(Object error) {
+    final failure = widget.failureOf?.call(error);
+    if (failure != null) {
+      return presentFailure(
+        failure,
+        onRetry: widget.onRetry,
+        retryKey: widget.retryKey,
+      );
+    }
+    return ErrorPane(
       message: widget.messageOf(error),
       onRetry: widget.onRetry,
       retryKey: widget.retryKey,
     );
+  }
+
+  Widget _withError(Widget body, Object error) {
+    final pane = _pane(error);
     if (widget.expand) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

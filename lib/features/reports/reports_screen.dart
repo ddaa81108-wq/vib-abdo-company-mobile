@@ -56,7 +56,8 @@ class ReportsScreen extends ConsumerWidget {
           resetKey: 'reports',
           onRetry: () => ref.invalidate(reportsProvider),
           messageOf: (error) =>
-              ref.read(errorHandlerProvider).toFailure(error).message,
+              failureText(ref.read(errorHandlerProvider).toFailure(error)),
+          failureOf: (error) => ref.read(errorHandlerProvider).toFailure(error),
           loading: const SkeletonBox(key: Key('reports-loading'), height: 160),
           builder: (data) {
             if (data.rows.isEmpty) {

@@ -8,6 +8,7 @@ import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
+import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
 
 /// Reject, and cash confirmation, for one unlinked receipt (استلام غير مربوط).
@@ -118,7 +119,7 @@ class UnlinkedReceiptActions extends ConsumerWidget {
         ref.invalidate(collectionsProvider);
         return AppStrings.versionConflict;
       }
-      return failure.message;
+      return failureText(failure);
     }
   }
 }

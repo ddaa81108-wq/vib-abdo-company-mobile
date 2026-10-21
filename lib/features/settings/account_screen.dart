@@ -88,11 +88,8 @@ class AccountScreen extends ConsumerWidget {
                     key: Key('account-prefs-loading'),
                     height: 48,
                   ),
-                  error: (error, _) => ErrorPane(
-                    message: ref
-                        .read(errorHandlerProvider)
-                        .toFailure(error)
-                        .message,
+                  error: (error, _) => presentFailure(
+                    ref.read(errorHandlerProvider).toFailure(error),
                     onRetry: online
                         ? () => ref.invalidate(notificationPrefsProvider)
                         : null,

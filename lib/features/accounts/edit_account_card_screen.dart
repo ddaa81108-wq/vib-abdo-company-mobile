@@ -113,7 +113,8 @@ class EditAccountCardScreen extends ConsumerWidget {
     if (!permissions.canRead(section.sectionKey)) return const ForbiddenPane();
     final card = ref.watch(accountCardProvider((section, id)));
     String messageOf(Object error) =>
-        ref.read(errorHandlerProvider).toFailure(error).message;
+        failureText(ref.read(errorHandlerProvider).toFailure(error));
+    failureOf(Object error) => ref.read(errorHandlerProvider).toFailure(error);
 
     return Scaffold(
       key: Key('screen-edit-card-${section.path}'),
@@ -123,6 +124,7 @@ class EditAccountCardScreen extends ConsumerWidget {
         expand: true,
         onRetry: () => ref.invalidate(accountCardProvider((section, id))),
         messageOf: messageOf,
+        failureOf: failureOf,
         loading: const SkeletonBox(key: Key('edit-card-loading'), height: 240),
         builder: (loaded) {
           final allowed = canEditAccountCard(
@@ -335,7 +337,7 @@ class _EditAccountCardFormState extends ConsumerState<_EditAccountCardForm> {
         _refresh();
         return AppStrings.versionConflict;
       }
-      return failure.message;
+      return failureText(failure);
     }
   }
 
