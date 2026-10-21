@@ -13,6 +13,7 @@ import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
+import 'edit_account_card_screen.dart';
 import 'transaction_correction_form.dart';
 
 /// Ledger for one card. Customers, companies, Libyan deposits, and Egyptian
@@ -45,7 +46,7 @@ class LedgerScreen extends ConsumerWidget {
           ref.invalidate(ledgerProvider((section, id)));
         },
         messageOf: messageOf,
-        loading: const SkeletonBox(key: Key('ledger-loading'), height: 240),
+        loading: const _LedgerLoading(),
         builder: (loadedCard) {
           // Writes stay hidden until the card has loaded and is not system-managed.
           final canWrite =
@@ -57,15 +58,53 @@ class LedgerScreen extends ConsumerWidget {
             expand: true,
             onRetry: () => ref.invalidate(ledgerProvider((section, id))),
             messageOf: messageOf,
-            loading: const SkeletonBox(key: Key('ledger-loading'), height: 240),
+            loading: const _LedgerLoading(),
             builder: (page) {
               final showBalance = page.page.items.any(
                 (entry) => entry.balanceAfterUnits != null,
               );
+              final tight = layoutIsTight(context);
+              final writes = <Widget>[
+                GatedButton(
+                  buttonKey: const Key('add-debt'),
+                  allowed: true,
+                  online: online,
+                  label: section == AccountSection.libyanDeposits
+                      ? AppStrings.depositIn
+                      : section == AccountSection.egyptianDeposits
+                      ? AppStrings.egpIn
+                      : AppStrings.debtMovement,
+                  onPressed: () => _movement(context, ref, type: 'debt'),
+                ),
+                GatedButton(
+                  buttonKey: const Key('add-payment'),
+                  allowed: true,
+                  online: online,
+                  label: section == AccountSection.libyanDeposits
+                      ? AppStrings.depositOut
+                      : section == AccountSection.egyptianDeposits
+                      ? AppStrings.egpOut
+                      : AppStrings.paymentMovement,
+                  onPressed: () => _movement(context, ref, type: 'payment'),
+                ),
+                GuardedMutation(
+                  buttonKey: const Key('full-payment'),
+                  allowed:
+                      section != AccountSection.libyanDeposits &&
+                      section != AccountSection.egyptianDeposits,
+                  filled: false,
+                  inputs: 'full:${card.asData?.value.version}',
+                  expectedVersion: card.asData?.value.version,
+                  label: AppStrings.fullPayment,
+                  onSubmit: (meta) => _full(context, ref, meta),
+                ),
+              ];
               return ListView(
-                padding: pagePadding(MediaQuery.sizeOf(context).width),
+                padding: pagePadding(MediaQuery.sizeOf(context).width)
+                    .copyWith(top: AppSpacing.sm),
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       IconButton(
                         tooltip: AppStrings.back,
@@ -77,62 +116,31 @@ class LedgerScreen extends ConsumerWidget {
                           section: section,
                           card: loadedCard,
                           money: money,
+                          title: _ledgerTitle(section),
                         ),
                       ),
                     ],
                   ),
-                  if (canWrite)
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      children: [
-                        GatedButton(
-                          buttonKey: const Key('add-debt'),
-                          allowed: true,
-                          online: online,
-                          label: section == AccountSection.libyanDeposits
-                              ? AppStrings.depositIn
-                              : section == AccountSection.egyptianDeposits
-                              ? AppStrings.egpIn
-                              : AppStrings.debtMovement,
-                          onPressed: () =>
-                              _movement(context, ref, type: 'debt'),
-                        ),
-                        GatedButton(
-                          buttonKey: const Key('add-payment'),
-                          allowed: true,
-                          online: online,
-                          label: section == AccountSection.libyanDeposits
-                              ? AppStrings.depositOut
-                              : section == AccountSection.egyptianDeposits
-                              ? AppStrings.egpOut
-                              : AppStrings.paymentMovement,
-                          onPressed: () =>
-                              _movement(context, ref, type: 'payment'),
-                        ),
-                        GuardedMutation(
-                          buttonKey: const Key('full-payment'),
-                          allowed:
-                              section != AccountSection.libyanDeposits &&
-                              section != AccountSection.egyptianDeposits,
-                          filled: false,
-                          inputs: 'full:${card.asData?.value.version}',
-                          expectedVersion: card.asData?.value.version,
-                          label: AppStrings.fullPayment,
-                          onSubmit: (meta) => _full(context, ref, meta),
-                        ),
-                      ],
-                    ),
+                  EditAccountCardButton(section: section, card: loadedCard),
+                  if (canWrite) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    _ActionRow(children: writes),
+                  ],
                   const SizedBox(height: AppSpacing.sm),
-                  const Text(AppStrings.noPreview),
+                  Text(
+                    AppStrings.noPreview,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                   if (!showBalance)
                     Text(
                       AppStrings.statementHidden,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
-                  const SizedBox(height: AppSpacing.md),
+                  const SizedBox(height: AppSpacing.xs),
                   if (page.page.items.isEmpty)
                     const EmptyPane(message: AppStrings.emptyLedger)
-                  else
+                  else ...[
+                    if (!tight) _LedgerColumnHeader(showBalance: showBalance),
                     for (final entry in page.page.items)
                       _EntryTile(
                         section: section,
@@ -143,6 +151,7 @@ class LedgerScreen extends ConsumerWidget {
                         canWrite: canWrite,
                         onCancel: (meta) => _cancel(context, ref, entry, meta),
                       ),
+                  ],
                   if (page.page.nextCursor != null)
                     _LoadOlderLedger(
                       section: section,
@@ -290,9 +299,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          widget.type == 'payment'
-              ? AppStrings.paymentMovement
-              : AppStrings.debtMovement,
+          movementLabel(section: widget.section, type: widget.type),
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const Text(AppStrings.noPreview),
@@ -402,42 +409,91 @@ class _Header extends StatelessWidget {
     required this.section,
     required this.card,
     required this.money,
+    required this.title,
   });
 
   final AccountSection section;
   final AccountCardDto? card;
   final MoneyFormatter money;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
     final value = card;
     if (value == null) return const SkeletonBox(height: 48);
+    final width = MediaQuery.sizeOf(context).width;
+    final colors = context.statusColors;
+    final scheme = Theme.of(context).colorScheme;
     final visual = ageVisual(
-      colors: context.statusColors,
+      colors: colors,
       ageStatus: value.ageStatus,
       section: section,
       serverLabel: value.ageStatusLabel,
     );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(value.name, style: Theme.of(context).textTheme.titleLarge),
-        if (value.phone != null) LtrText(value.phone!),
-        MoneyText(
-          money.formatOrDash(value.balanceUnits, value.currency),
-          style: context.textExtras.amountLarge.copyWith(
-            color: visual.colored
-                ? null
-                : Theme.of(context).colorScheme.onSurface,
+    final flat = useFlatAgeCard(width, Theme.of(context).brightness);
+    final colored = visual.colored;
+    final foreground = colored ? colors.onStatus : scheme.onSurface;
+    final accent = colored
+        ? (visual.accent ?? colors.onStatus)
+        : scheme.onSurfaceVariant;
+    return Material(
+      key: const Key('ledger-header'),
+      color: colored
+          ? (flat ? visual.flat : colors.neutralCard)
+          : scheme.surface,
+      borderRadius: BorderRadius.circular(AppRadii.card),
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        decoration: BoxDecoration(
+          gradient: colored && !flat ? visual.gradient : null,
+          color: colored && flat ? visual.flat : null,
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          border: Border.all(
+            color: value.ageStatus == 'zero'
+                ? colors.zeroCardBorder
+                : colored
+                ? colors.onStatus.withValues(alpha: 0.2)
+                : scheme.outline,
           ),
         ),
-        if (visual.label != null) Text(visual.label!),
-        if (value.systemManaged)
-          Text(
-            AppStrings.systemCard,
-            key: ValueKey('system-${value.systemLinkKey ?? 'managed'}'),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
           ),
-      ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.xxs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(title, style: cairo(16, 800, color: foreground)),
+                  if (visual.label != null)
+                    Text(visual.label!, style: cairo(12, 700, color: accent)),
+                ],
+              ),
+              Text(value.name, style: cairo(18, 800, color: foreground)),
+              if (value.phone != null)
+                LtrText(value.phone!, style: cairo(12, 500, color: accent)),
+              MoneyText(
+                money.formatOrDash(value.balanceUnits, value.currency),
+                key: const Key('ledger-header-balance'),
+                style: context.textExtras.amountLarge.copyWith(
+                  color: foreground,
+                ),
+              ),
+              if (value.systemManaged)
+                Text(
+                  AppStrings.systemCard,
+                  key: ValueKey('system-${value.systemLinkKey ?? 'managed'}'),
+                  style: cairo(12, 700, color: accent),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -507,7 +563,9 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final entry in _extra)
           _EntryTile(
@@ -519,20 +577,35 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
             canWrite: widget.canWrite,
             onCancel: (meta) => widget.onCancel(entry, meta),
           ),
-        if (_error != null) Text(_error!, key: const Key('load-older-error')),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
+            child: Text(
+              _error!,
+              key: const Key('load-older-error'),
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: scheme.error),
+            ),
+          ),
         if (_cursor != null)
-          TextButton(
-            key: const Key('load-older'),
-            onPressed: _busy ? null : _load,
-            child: _busy
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(
-                    _error == null ? AppStrings.loadOlder : AppStrings.retry,
-                  ),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton(
+              key: const Key('load-older'),
+              onPressed: _busy ? null : _load,
+              child: _busy
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: scheme.primary,
+                      ),
+                    )
+                  : Text(
+                      _error == null ? AppStrings.loadOlder : AppStrings.retry,
+                    ),
+            ),
           ),
       ],
     );
@@ -561,76 +634,361 @@ class _EntryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reversed = entry.status == 'reversed';
-    final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
-      color: reversed ? Theme.of(context).colorScheme.onSurfaceVariant : null,
-      decoration: reversed ? TextDecoration.lineThrough : null,
-    );
-    return Card(
-      color: reversed
-          ? Theme.of(context).colorScheme.surfaceContainerHighest
-          : null,
-      margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-        child: Column(
+    final scheme = Theme.of(context).colorScheme;
+    final muted = reversed ? scheme.onSurfaceVariant : scheme.onSurface;
+    final strike = reversed ? TextDecoration.lineThrough : null;
+    final body = Theme.of(context).textTheme.bodyMedium
+        ?.copyWith(color: muted, decoration: strike);
+    final tight = layoutIsTight(context);
+    final sequence = entry.sequence == null
+        ? AppStrings.dash
+        : '${entry.sequence}';
+    final identity = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              entry.sequence == null ? AppStrings.dash : '${entry.sequence}',
-              style: style,
-            ),
-            Text(formatIsoDate(entry.date), style: style),
-            Text(
-              movementLabel(
-                section: section,
-                type: entry.type,
-                paymentMode: entry.paymentMode,
-              ),
-              style: style,
-            ),
-            MoneyText(
-              money.formatOrDash(entry.amountUnits, section.currency),
-              style: context.textExtras.amount.copyWith(
-                decoration: reversed ? TextDecoration.lineThrough : null,
+            _SequenceMark(
+              key: Key('ledger-sequence-${entry.id}'),
+              text: sequence,
+              style: context.textExtras.tableNumber.copyWith(
+                color: muted,
+                decoration: strike,
               ),
             ),
-            Text(
-              '${calculationLabel(entry.calculationMode)} · ${AppStrings.inputValue} ${entry.inputValue ?? AppStrings.dash}'
-              '${entry.factorMicros == null ? '' : ' · ${money.formatScaled(entry.factorMicros!, 6)}'}',
-              style: style,
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                movementLabel(
+                  section: section,
+                  type: entry.type,
+                  paymentMode: entry.paymentMode,
+                ),
+                style: Theme.of(context).textTheme.titleSmall
+                    ?.copyWith(color: muted, decoration: strike),
+              ),
             ),
-            LtrText(entry.id, style: style),
-            if (entry.note != null) Text(entry.note!, style: style),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: LtrText(
+            formatIsoDate(entry.date),
+            key: Key('ledger-date-${entry.id}'),
+            style: context.textExtras.tableNumber.copyWith(
+              color: muted,
+              decoration: strike,
+            ),
+          ),
+        ),
+      ],
+    );
+    final figures = _AmountBlock(
+      entry: entry,
+      section: section,
+      money: money,
+      showBalance: showBalance,
+      reversed: reversed,
+    );
+    return Card(
+      color: reversed ? scheme.surfaceContainerHighest : null,
+      margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.all(AppSpacing.xs),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (tight) ...[
+              identity,
+              const SizedBox(height: AppSpacing.sm),
+              figures,
+            ] else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 3, child: identity),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(flex: 2, child: figures),
+                ],
+              ),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(calculationLabel(entry.calculationMode), style: body),
+                Text(AppStrings.inputValue, style: body),
+                LtrText('${entry.inputValue ?? AppStrings.dash}', style: body),
+                if (entry.factorMicros != null) ...[
+                  Text(AppStrings.factor, style: body),
+                  LtrText(
+                    money.formatScaled(entry.factorMicros!, 6),
+                    style: body,
+                  ),
+                ],
+              ],
+            ),
+            if (entry.note != null) Text(entry.note!, style: body),
             if (entry.createdByName != null)
-              Text('${AppStrings.actor}: ${entry.createdByName}', style: style),
+              Text('${AppStrings.actor}: ${entry.createdByName}', style: body),
+            LtrText(entry.id, style: body),
             if (reversed)
               Text(
                 AppStrings.reversed,
+                style: Theme.of(context).textTheme.labelLarge
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            if (entry.corrected)
+              Text(
+                AppStrings.corrected,
                 style: Theme.of(context).textTheme.labelLarge,
               ),
-            if (entry.corrected) const Text(AppStrings.corrected),
-            if (showBalance && entry.balanceAfterUnits != null)
-              Text(
-                '${AppStrings.balanceAfter} ${money.format(entry.balanceAfterUnits!, section.currency)}',
-              ),
-            if (canWrite && !reversed)
-              GuardedMutation(
-                buttonKey: Key('cancel-${entry.id}'),
-                inputs: 'cancel:${entry.id}:${entry.version}',
-                expectedVersion: entry.version,
-                filled: false,
-                label: AppStrings.cancelMovement,
-                confirmText: AppStrings.confirmCancel,
-                onSubmit: onCancel,
-              ),
-            TransactionCorrectionLauncher(
+            _EntryActions(
               section: section,
               accountId: accountId,
               entry: entry,
+              canCancel: canWrite && !reversed,
+              onCancel: onCancel,
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Debt lines use [AppStatusColors.debtText]. Payment lines use
+/// [AppStatusColors.creditText]. Other types stay on the surface colour.
+Color _movementAmountColor(BuildContext context, String type, Color fallback) {
+  final colors = context.statusColors;
+  return switch (type) {
+    'debt' => colors.debtText,
+    'payment' => colors.creditText,
+    _ => fallback,
+  };
+}
+
+String _ledgerTitle(AccountSection section) => switch (section) {
+  AccountSection.customers => AppStrings.customerLedger,
+  AccountSection.companies => AppStrings.companyLedger,
+  AccountSection.libyanDeposits => AppStrings.libyanLedger,
+  AccountSection.egyptianDeposits => AppStrings.egyptianLedger,
+};
+
+class _LedgerLoading extends StatelessWidget {
+  const _LedgerLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SkeletonBox(key: Key('ledger-loading'), height: 112),
+        SizedBox(height: AppSpacing.sm),
+        SkeletonBox(height: 84),
+        SizedBox(height: AppSpacing.sm),
+        SkeletonBox(height: 84),
+      ],
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            for (final child in children)
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                child: child,
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _LedgerColumnHeader extends StatelessWidget {
+  const _LedgerColumnHeader({required this.showBalance});
+
+  final bool showBalance;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelSmall;
+    final amount = showBalance
+        ? '${AppStrings.amount} · ${AppStrings.balanceAfter}'
+        : AppStrings.amount;
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(
+        start: AppSpacing.md,
+        end: AppSpacing.md,
+        bottom: AppSpacing.sm,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 3,
+            child: Text(
+              '${AppStrings.sequence} · ${AppStrings.date}',
+              style: style,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            flex: 2,
+            child: Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: Text(amount, style: style, textAlign: TextAlign.end),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SequenceMark extends StatelessWidget {
+  const _SequenceMark({required this.text, required this.style, super.key});
+
+  final String text;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xxs,
+        ),
+        child: Text(text, style: style),
+      ),
+    );
+  }
+}
+
+class _AmountBlock extends StatelessWidget {
+  const _AmountBlock({
+    required this.entry,
+    required this.section,
+    required this.money,
+    required this.showBalance,
+    required this.reversed,
+  });
+
+  final LedgerEntryDto entry;
+  final AccountSection section;
+  final MoneyFormatter money;
+  final bool showBalance;
+  final bool reversed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final strike = reversed ? TextDecoration.lineThrough : null;
+    final amountColor = _movementAmountColor(
+      context,
+      entry.type,
+      reversed ? scheme.onSurfaceVariant : scheme.onSurface,
+    );
+    return Align(
+      alignment: AlignmentDirectional.centerEnd,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          MoneyText(
+            money.formatOrDash(entry.amountUnits, section.currency),
+            key: Key('ledger-amount-${entry.id}'),
+            style: context.textExtras.amount.copyWith(
+              color: amountColor,
+              decoration: strike,
+            ),
+          ),
+          if (showBalance && entry.balanceAfterUnits != null) ...[
+            const SizedBox(height: AppSpacing.xxs),
+            MoneyText(
+              money.format(entry.balanceAfterUnits!, section.currency),
+              key: Key('ledger-balance-${entry.id}'),
+              style: context.textExtras.tableNumber.copyWith(
+                color: scheme.onSurface,
+                decoration: strike,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EntryActions extends StatelessWidget {
+  const _EntryActions({
+    required this.section,
+    required this.accountId,
+    required this.entry,
+    required this.canCancel,
+    required this.onCancel,
+  });
+
+  final AccountSection section;
+  final String accountId;
+  final LedgerEntryDto entry;
+  final bool canCancel;
+  final Future<String?> Function(MutationMeta meta) onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final cancel = canCancel
+        ? GuardedMutation(
+            buttonKey: Key('cancel-${entry.id}'),
+            inputs: 'cancel:${entry.id}:${entry.version}',
+            expectedVersion: entry.version,
+            filled: false,
+            label: AppStrings.cancelMovement,
+            confirmText: AppStrings.confirmCancel,
+            onSubmit: onCancel,
+          )
+        : null;
+    final correct = TransactionCorrectionLauncher(
+      section: section,
+      accountId: accountId,
+      entry: entry,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            for (final child in [?cancel, correct])
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                child: child,
+              ),
+          ],
+        );
+      },
     );
   }
 }

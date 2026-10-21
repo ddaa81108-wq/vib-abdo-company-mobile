@@ -69,6 +69,10 @@ class FakeApiClient implements ApiClient {
   /// The next N versioned collection mutations fail with VERSION_CONFLICT (tests).
   int versionConflictRemaining = 0;
 
+  /// When set, purchases days without a stored finalize or correction use this
+  /// status on the next GET (tests).
+  String? purchaseFixtureStatus;
+
   /// GET /api/collections calls, including a refetch after a conflict (tests).
   int collectionOverviewReads = 0;
 
@@ -77,6 +81,25 @@ class FakeApiClient implements ApiClient {
 
   /// When set, account-suggestion reads wait here (tests).
   Completer<void>? pauseSuggestions;
+
+  /// Account-list reads, in call order (tests). `filter` / `q` / `cursor` are
+  /// null when the request omitted them.
+  final List<AccountListQuery> accountListQueries = [];
+
+  /// When set, the first account-list page reports this `nextCursor` (tests).
+  String? accountNextCursor;
+
+  /// Items returned for an account-list read that sends `cursor` (tests).
+  List<Map<String, dynamic>> accountNextItems = const [];
+
+  /// When set, account-list reads wait here (tests).
+  Completer<void>? pauseAccountLists;
+
+  /// Suggestion reads, in call order (tests).
+  final List<AccountSuggestionQuery> suggestionQueries = [];
+
+  /// When non-null, suggestion reads return these items instead of `[]` (tests).
+  List<Map<String, dynamic>>? suggestionItems;
   bool _loggedIn = false;
   final PermissionService _access = PermissionService();
   final Set<String> _passwordChangedUserIds = {};
@@ -99,8 +122,11 @@ class FakeApiClient implements ApiClient {
   /// Unlinked receipt fields changed by a decision or cash receipt. Keyed by id.
   final Map<String, Map<String, dynamic>> _unlinkedState = {};
 
-  /// Purchase day fields changed by finalize. Keyed by book|day.
+  /// Purchase day fields changed by finalize or correction. Keyed by book|day.
   final Map<String, Map<String, dynamic>> _purchaseDays = {};
+
+  /// Opening amounts echoed on the next purchases GET. Keyed by book.
+  final Map<String, Map<String, dynamic>> _openingByBook = {};
 
   /// Collections day close. The next batch id is a stored successor.
   Map<String, dynamic>? _batchState;
@@ -116,32 +142,37 @@ class FakeApiClient implements ApiClient {
     String path, {
     Map<String, dynamic>? query,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _handle('GET', path, null, options, query: query);
+  }) =>
+      _handle('GET', path, null, options, query: query);
   @override
   Future<ApiResponse> post(
     String path, {
     Object? body,
     Map<String, dynamic>? query,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _handle('POST', path, body, options);
+  }) =>
+      _handle('POST', path, body, options);
   @override
   Future<ApiResponse> put(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _handle('PUT', path, body, options);
+  }) =>
+      _handle('PUT', path, body, options);
   @override
   Future<ApiResponse> patch(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _handle('PATCH', path, body, options);
+  }) =>
+      _handle('PATCH', path, body, options);
   @override
   Future<ApiResponse> delete(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _handle('DELETE', path, body, options);
+  }) =>
+      _handle('DELETE', path, body, options);
 
   ApiResponse _ok(Object? data, {int status = 200}) {
     ApiReachability.instance.recordSuccess();
@@ -204,9 +235,8 @@ class FakeApiClient implements ApiClient {
       sectionAccess: section is Map
           ? section.map((key, value) => MapEntry('$key', '$value'))
           : const {},
-      fullAccess: user['fullAccess'] is bool
-          ? user['fullAccess'] as bool
-          : null,
+      fullAccess:
+          user['fullAccess'] is bool ? user['fullAccess'] as bool : null,
     );
   }
 
@@ -435,11 +465,16 @@ class FakeApiClient implements ApiClient {
         if (seg.isNotEmpty && seg.last == 'finalize') {
           if (!_access.canFinalizePurchases) _fail(403, 'FORBIDDEN', _denied);
           return _applyFinalize(seg.length > 1 ? seg[1] : '', b);
-        } else {
-          _requireWrite(SectionKey.purchases);
         }
-        final entryWrite =
-            (method == 'POST' && seg.length == 2) ||
+        if (method == 'PATCH' && seg.length >= 5 && seg.last == 'correction') {
+          if (!_access.canFinalizePurchases) _fail(403, 'FORBIDDEN', _denied);
+          return _applyCorrection(seg[1], seg[3], b);
+        }
+        _requireWrite(SectionKey.purchases);
+        if (method == 'PATCH' && seg.length >= 3 && seg[2] == 'opening') {
+          return _applyOpening(seg[1], b);
+        }
+        final entryWrite = (method == 'POST' && seg.length == 2) ||
             ((method == 'POST' || method == 'PATCH') &&
                 seg.length > 3 &&
                 seg[2] == 'entries');
@@ -522,15 +557,38 @@ class FakeApiClient implements ApiClient {
     }
     if (method == 'GET') {
       _requireRead(section);
-      if (seg.length == 1) return _ok(_sectionPage(head));
+      if (seg.length == 1) {
+        final paused = pauseAccountLists;
+        if (paused != null) await paused.future;
+        final filter = _queryText(query, 'filter');
+        final q = _queryText(query, 'q');
+        final cursor = _queryText(query, 'cursor');
+        accountListQueries.add(
+          AccountListQuery(section: head, filter: filter, q: q, cursor: cursor),
+        );
+        final page = _sectionPage(head);
+        if (cursor != null) {
+          return _ok({...page, 'items': accountNextItems, 'nextCursor': null});
+        }
+        if (accountNextCursor != null) {
+          return _ok({...page, 'nextCursor': accountNextCursor});
+        }
+        return _ok(page);
+      }
       if (seg.length > 1 && seg[1] == 'suggestions') {
         final paused = pauseSuggestions;
         if (paused != null) await paused.future;
+        suggestionQueries.add(
+          AccountSuggestionQuery(
+            section: head,
+            q: _queryText(query, 'q') ?? '',
+          ),
+        );
         if (failSuggestionsRemaining > 0) {
           failSuggestionsRemaining--;
           _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر البحث.');
         }
-        return _ok({'items': []});
+        return _ok({'items': suggestionItems ?? const []});
       }
       if (seg.length == 3 && seg[2] == 'ledger') {
         _requireCard(head, seg[1]);
@@ -606,8 +664,7 @@ class FakeApiClient implements ApiClient {
       return _ok({'items': []});
     }
     _requireCollectionMutation(seg);
-    final needsVersion =
-        seg.isNotEmpty &&
+    final needsVersion = seg.isNotEmpty &&
         (seg.last == 'decision' || seg.last == 'cash-received');
     if (needsVersion && b['expectedVersion'] == null) {
       _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
@@ -896,8 +953,8 @@ class FakeApiClient implements ApiClient {
 
   ApiResponse _applyCash(String id, Map b, {required bool unlinked}) {
     final view = _collectionsView();
-    final items = (unlinked ? view['unlinkedReceipts'] : view['submissions'])
-        as List;
+    final items =
+        (unlinked ? view['unlinkedReceipts'] : view['submissions']) as List;
     final current = _recordById(
       items,
       id,
@@ -946,11 +1003,55 @@ class FakeApiClient implements ApiClient {
     for (final raw in body['days'] as List) {
       final day = Map<String, dynamic>.from(raw as Map);
       final state = _purchaseDays['$book|${day['day']}'];
-      if (state != null) day.addAll(state);
+      if (state != null) {
+        day.addAll(state);
+      } else if (purchaseFixtureStatus != null) {
+        day['status'] = purchaseFixtureStatus;
+      }
       days.add(day);
     }
     body['days'] = days;
+    final opening = _openingByBook[book];
+    if (opening != null) body['opening'] = Map<String, dynamic>.from(opening);
     return body;
+  }
+
+  ApiResponse _applyOpening(String book, Map b) {
+    final days = _purchasesView(book)['days'] as List;
+    final stored = _openingByBook[book];
+    final current = stored != null
+        ? stored['version']
+        : (days.isEmpty ? null : (days.first as Map)['version']);
+    _requireVersion(b['expectedDayVersion'], current);
+    _openingByBook[book] = {
+      'previousDebtUnits': b['previousDebtUnits'],
+      'previousVodafoneUnits': b['previousVodafoneUnits'],
+      'version': current,
+    };
+    return _ok({'id': 'opening', 'version': current});
+  }
+
+  ApiResponse _applyCorrection(String book, String dayId, Map b) {
+    Map<String, dynamic>? day;
+    for (final raw in _purchasesView(book)['days'] as List) {
+      final item = raw as Map<String, dynamic>;
+      if ('${item['day']}' == dayId) {
+        day = item;
+        break;
+      }
+    }
+    if (day == null) _fail(404, 'NOT_FOUND', 'اليوم غير موجود');
+    _requireVersion(b['expectedDayVersion'], day['version']);
+    final open = b['open'] == true;
+    _purchaseDays['$book|$dayId'] = {
+      ...?_purchaseDays['$book|$dayId'],
+      'status': open ? 'correction' : 'finalized',
+    };
+    return _ok({
+      'id': dayId,
+      'version': day['version'],
+      'status': open ? 'correction' : 'finalized',
+    });
   }
 
   ApiResponse _applyFinalize(String book, Map b) {
@@ -973,4 +1074,35 @@ class FakeApiClient implements ApiClient {
     }
     _fail(404, 'NOT_FOUND', missing);
   }
+}
+
+String? _queryText(Map<String, dynamic>? query, String key) {
+  final value = query?[key];
+  if (value == null) return null;
+  final text = '$value';
+  if (text.isEmpty) return null;
+  return text;
+}
+
+/// One recorded `GET /api/{section}` (tests).
+class AccountListQuery {
+  const AccountListQuery({
+    required this.section,
+    this.filter,
+    this.q,
+    this.cursor,
+  });
+
+  final String section;
+  final String? filter;
+  final String? q;
+  final String? cursor;
+}
+
+/// One recorded `GET /api/{section}/suggestions` (tests).
+class AccountSuggestionQuery {
+  const AccountSuggestionQuery({required this.section, required this.q});
+
+  final String section;
+  final String q;
 }

@@ -35,10 +35,9 @@ class UnlinkedReceiptActions extends ConsumerWidget {
         receipt.cashStatus == CashStatus.pending;
     if (!showReject && !showCash) return const SizedBox.shrink();
 
-    return Wrap(
+    return Column(
       key: Key('unlinked-actions-${receipt.id}'),
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (showReject)
           GuardedMutation(
@@ -49,6 +48,7 @@ class UnlinkedReceiptActions extends ConsumerWidget {
             filled: false,
             onSubmit: (meta) => _reject(context, ref, meta),
           ),
+        if (showReject && showCash) const SizedBox(height: AppSpacing.sm),
         if (showCash)
           GuardedMutation(
             buttonKey: Key('unlinked-cash-${receipt.id}'),

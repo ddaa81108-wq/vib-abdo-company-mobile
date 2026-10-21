@@ -120,7 +120,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 icon: Icon(_collapsed ? Icons.menu_open : Icons.menu),
               )
             : const SizedBox.shrink(),
-        title: Text(_title(widget.location)),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: AlignmentDirectional.centerStart,
+          child: Text(_title(widget.location)),
+        ),
         actions: [
           IconButton(
             tooltip: AppStrings.search,

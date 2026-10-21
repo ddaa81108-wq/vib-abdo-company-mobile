@@ -108,6 +108,21 @@ String? _fallbackLabel(String? ageStatus, AccountSection? section) {
   };
 }
 
+/// Shared stack threshold for the ledger and the edit-card screen.
+///
+/// Below this width, or at [stackLayoutTextScale] and above, amounts and
+/// actions stack. At 360 dp and the default text scale they stay on one row.
+const double stackLayoutWidth = 360;
+
+/// Text scale at which the ledger and the edit-card screen stack.
+const double stackLayoutTextScale = 1.3;
+
+bool layoutIsTight(BuildContext context) {
+  final width = MediaQuery.sizeOf(context).width;
+  final scale = MediaQuery.textScalerOf(context).scale(1);
+  return width < stackLayoutWidth || scale >= stackLayoutTextScale;
+}
+
 /// Age colours are the same hex at every width. The tablet flat palette is not
 /// substituted for the phone/desktop gradient.
 bool useFlatAgeCard(double width, Brightness brightness) => false;
@@ -196,6 +211,10 @@ bool dayIsEditable(String? status) =>
     status == 'open' ||
     status == 'correction' ||
     status == 'correctionOpen';
+
+/// Server day status means a correction session is open.
+bool dayCorrectionIsOpen(String? status) =>
+    status == 'correction' || status == 'correctionOpen';
 
 String notificationFallback(String action) => switch (action) {
   'collection.submit' => 'استلام جديد بانتظار المراجعة',
