@@ -7,9 +7,11 @@ import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/app.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notification_permission.dart';
+import 'package:vib_abdo_company_mobile/notifications/background_scheduler.dart';
 import 'package:vib_abdo_company_mobile/notifications/device_token_registrar.dart';
 import 'package:vib_abdo_company_mobile/notifications/device_token_store.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_providers.dart';
+import 'package:vib_abdo_company_mobile/notifications/shown_notification_store.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 
 /// Pumps the app with an injected fake [ApiLayer]. The provider does not build one.
@@ -54,6 +56,12 @@ Future<ApiLayer> pumpFakeApp(
         ),
         notificationPermissionServiceProvider.overrideWithValue(
           notificationsPermission ?? const GrantedNotificationPermission(),
+        ),
+        backgroundNotificationSchedulerProvider.overrideWithValue(
+          const NoopBackgroundNotificationScheduler(),
+        ),
+        shownNotificationStoreProvider.overrideWithValue(
+          MemoryShownNotificationStore(),
         ),
         ...overrides,
       ],

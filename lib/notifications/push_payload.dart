@@ -4,9 +4,13 @@ import 'package:flutter_api_layer/api_layer.dart';
 
 /// Keys a push map is allowed to keep before [AppNotification.fromPushPayload].
 ///
-/// `systemName` is included because the shade text is that name plus a fixed
-/// operation label. `employeeName`, amounts, phones, titles, and tokens are
-/// not in this set. `relatedRef` keeps only `type` and `id`.
+/// `systemName` is included because the shade title is that name plus a fixed
+/// operation label. `employeeName` stays off this list on purpose. Push data
+/// is untrusted, and the name is personal data: copying it from the payload
+/// could put it on a locked screen before the server has confirmed the row.
+/// The tray reads the name only from the `AppNotification` returned by
+/// `GET /api/notifications`. Amounts, phones, titles, and tokens are not in
+/// this set either. `relatedRef` keeps only `type` and `id`.
 const pushPayloadKeys = <String>{
   'notificationId',
   'recipientUserId',
@@ -61,17 +65,9 @@ Map<String, dynamic>? _pair(Map<dynamic, dynamic> ref) {
   return {'type': ?type, 'id': ?id};
 }
 
-/// Shade text. Fixed labels only. The raw operation string is not copied,
-/// and neither is [AppNotification.title], body, employee name, or the ref id.
-///
-/// [systemName] is the whitelisted push value. His [AppNotification.fromPushPayload]
-/// drops `systemName`, so a push shade line passes it in here instead of
-/// reading it back off the parsed row.
-String genericNotificationText(
-  AppNotification notification, {
-  String? systemName,
-}) {
-  final label = switch (notification.operationType) {
+/// Fixed operation label. The raw operation string is never copied.
+String operationLabel(NotificationOperationType type) {
+  return switch (type) {
     NotificationOperationType.collectionSubmit => 'استلام جديد',
     NotificationOperationType.approve ||
     NotificationOperationType.approved => 'اعتماد',
@@ -80,6 +76,20 @@ String genericNotificationText(
     NotificationOperationType.cashReceived => 'استلام نقد',
     NotificationOperationType.unknown => 'إشعار',
   };
+}
+
+/// Shade text. Fixed labels only. The raw operation string is not copied,
+/// and neither is [AppNotification.title], body, employee name, or the ref id.
+///
+/// [systemName] is the whitelisted push value. His [AppNotification.fromPushPayload]
+/// drops `systemName`, so a push shade line passes it in here instead of
+/// reading it back off the parsed row. The system tray uses [operationLabel]
+/// plus the server-fetched employee name, and only in the private body.
+String genericNotificationText(
+  AppNotification notification, {
+  String? systemName,
+}) {
+  final label = operationLabel(notification.operationType);
   final system = (systemName ?? notification.systemName).trim();
   if (system.isEmpty) return label;
   return '$system · $label';

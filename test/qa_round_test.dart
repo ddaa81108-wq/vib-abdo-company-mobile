@@ -8,7 +8,6 @@ import 'package:vib_abdo_company_mobile/features/collections/collections_screen.
 import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/signup_info_screen.dart';
-import 'package:vib_abdo_company_mobile/features/notifications/notifications_screen.dart';
 import 'package:vib_abdo_company_mobile/notifications/unread_badge.dart';
 import 'package:vib_abdo_company_mobile/state/notification_providers.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
@@ -168,19 +167,24 @@ void main() {
     expect(find.text(AppStrings.retry), findsWidgets);
   });
 
-  testWidgets('a notification tap stays on the list until the opener lands', (
-    tester,
-  ) async {
-    await pumpFakeApp(tester, size: const Size(800, 1400));
-    await signIn(tester, username: 'employee.demo', password: 'demo-only');
-    await go(tester, '/notifications');
-    await tester.tap(find.byKey(const Key('notice-77')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('تعذر تحديث الإشعار.'), findsNothing);
-    expect(find.byKey(NotificationsScreen.screenKey), findsOneWidget);
-    expect(find.byKey(CollectionsScreen.screenKey), findsNothing);
-  });
+  testWidgets(
+    'a notification list tap opens the collection through the opener',
+    (tester) async {
+      await pumpFakeApp(tester, size: const Size(800, 1400));
+      await signIn(tester, username: 'employee.demo', password: 'demo-only');
+      await go(tester, '/notifications');
+      await tester.tap(find.byKey(const Key('notice-77')));
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 1));
+        if (find.byKey(CollectionsScreen.screenKey).evaluate().isNotEmpty) {
+          break;
+        }
+      }
+      expect(find.text('تعذر تحديث الإشعار.'), findsNothing);
+      expect(find.byKey(CollectionsScreen.screenKey), findsOneWidget);
+      await settle(tester);
+    },
+  );
 
   testWidgets('a missing unread count draws no badge', (tester) async {
     await pumpFakeApp(

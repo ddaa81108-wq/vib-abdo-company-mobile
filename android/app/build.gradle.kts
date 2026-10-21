@@ -51,6 +51,9 @@ kotlin {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // NotificationCompat.setPublicVersion. The local-notifications plugin
+    // cannot set a lock-screen public version, so MainActivity posts it.
+    implementation("androidx.core:core-ktx:1.15.0")
 }
 
 flutter {
