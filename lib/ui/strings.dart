@@ -84,6 +84,7 @@ abstract final class AppStrings {
   static const noNotifications = 'لا توجد إشعارات';
   static const refresh = 'تحديث';
   static const integerOnly = 'أدخل عددًا صحيحًا كما هو، بلا كسور.';
+  static const dateInvalid = 'أدخل التاريخ بصيغة سنة-شهر-يوم.';
   static const unitsHint =
       'عدد صحيح بالوحدة الصغرى التي يخزّنها الخادم. بلا فواصل وبلا كسور. التطبيق لا يحوّل هذا الرقم ولا يحسبه.';
   static const rateInvalid = 'أدخل السعر نصًا كما هو.';

@@ -191,7 +191,8 @@ class LedgerScreen extends ConsumerWidget {
           .addTransaction(
             section,
             id,
-            AccountTransactionRequest.fullPayment(date: DateTime.now()),
+            // No date control on this button. Omit date; the server stamps it.
+            AccountTransactionRequest.fullPayment(),
             meta,
           );
       if (context.mounted) {
@@ -353,7 +354,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
     final units = parseUnits(_amount.text);
     if (units == null) return AppStrings.integerOnly;
     final parsedDate = DateTime.tryParse(_date.text);
-    if (parsedDate == null) return AppStrings.integerOnly;
+    if (parsedDate == null) return AppStrings.dateInvalid;
     DecimalString? factorValue;
     if (_mode != CalculationMode.direct) {
       factorValue = DecimalString.tryParse(_factor.text);

@@ -250,6 +250,242 @@ void main() {
     expect(find.textContaining('400'), findsNothing);
   });
 
+  testWidgets('multiply and divide prefill the rate without grouping', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(
+      tester,
+      size: const Size(800, 1800),
+      overrides: [
+        ledgerProvider.overrideWith((ref, key) async {
+          final raw = FakeFixtures.ledger();
+          final item = (raw['items'] as List).first as Map;
+          item['calculationMode'] = 'multiply';
+          item['factorMicros'] = 12500250000;
+          return LedgerPage.fromData(raw, key.$1);
+        }),
+      ],
+    );
+    final fake = layer.client as FakeApiClient;
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    await openCorrection(tester, 'customers');
+
+    final factor = tester.widget<TextField>(
+      find.byKey(const Key('correction-factor')),
+    );
+    expect(factor.controller?.text, '12500.25');
+    expect(factor.controller?.text.contains(','), isFalse);
+    expect(DecimalString.tryParse(factor.controller?.text)?.value, '12500.25');
+
+    await enterAmount(tester, '100');
+    await openConfirm(tester);
+    await confirmSend(tester, fake);
+
+    final sent = jsonDecode(fake.mutationBodies.single) as Map;
+    expect(sent['calculationMode'], 'multiply');
+    expect(sent['factor'], 12500.25);
+    expect(sent['inputValue'], 100);
+  });
+
+  testWidgets('a multiply line with no rate stays empty and explains it', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(
+      tester,
+      size: const Size(800, 1800),
+      overrides: [
+        ledgerProvider.overrideWith((ref, key) async {
+          final raw = FakeFixtures.ledger();
+          final item = (raw['items'] as List).first as Map;
+          item['calculationMode'] = 'divide';
+          item.remove('factorMicros');
+          return LedgerPage.fromData(raw, key.$1);
+        }),
+      ],
+    );
+    final fake = layer.client as FakeApiClient;
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    await openCorrection(tester, 'customers');
+
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('correction-factor')))
+          .controller
+          ?.text,
+      isEmpty,
+    );
+    await openConfirm(tester);
+    await confirmSend(tester, fake);
+
+    expect(find.text(AppStrings.rateInvalid), findsOneWidget);
+    expect(find.text(AppStrings.integerOnly), findsNothing);
+    expect(fake.mutationBodies, isEmpty);
+    expect(find.byKey(const Key('correction-form')), findsOneWidget);
+  });
+
+  testWidgets('an invalid correction date names the date', (tester) async {
+    final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
+    final fake = layer.client as FakeApiClient;
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    await openCorrection(tester, 'customers');
+    await tester.enterText(
+      find.byKey(const Key('correction-date')),
+      'ليس تاريخًا',
+    );
+    await openConfirm(tester);
+    await confirmSend(tester, fake);
+
+    expect(find.text(AppStrings.dateInvalid), findsOneWidget);
+    expect(find.text(AppStrings.integerOnly), findsNothing);
+    expect(fake.mutationBodies, isEmpty);
+  });
+
+  testWidgets('an invalid movement date names the date', (tester) async {
+    final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
+    final fake = layer.client as FakeApiClient;
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    await tester.tap(find.byKey(const Key('add-debt')));
+    await settle(tester);
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.labelText == AppStrings.amount,
+      ),
+      '10',
+    );
+    await tester.enterText(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.labelText == AppStrings.date,
+      ),
+      'ليس تاريخًا',
+    );
+    await tester.tap(find.byKey(const Key('save-movement')));
+    await settle(tester);
+
+    expect(find.text(AppStrings.dateInvalid), findsOneWidget);
+    expect(find.text(AppStrings.integerOnly), findsNothing);
+    expect(fake.mutationBodies, isEmpty);
+  });
+
+  testWidgets('a correct token shows the button without section write', (
+    tester,
+  ) async {
+    await pumpFakeApp(
+      tester,
+      size: const Size(800, 1800),
+      overrides: [
+        ledgerProvider.overrideWith((ref, key) async {
+          final raw = FakeFixtures.ledger();
+          final items = raw['items'] as List;
+          (items[0] as Map)['allowedActions'] = ['correct'];
+          return LedgerPage.fromData(raw, key.$1);
+        }),
+      ],
+    );
+    await signIn(tester, username: 'employee.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    expect(find.byKey(const Key('correct-tx_1')), findsOneWidget);
+    expect(find.byKey(const Key('correct-tx_2')), findsNothing);
+  });
+
+  testWidgets('a line list without correct hides the button from a writer', (
+    tester,
+  ) async {
+    await pumpFakeApp(
+      tester,
+      size: const Size(800, 1800),
+      overrides: [
+        ledgerProvider.overrideWith((ref, key) async {
+          final raw = FakeFixtures.ledger();
+          final items = raw['items'] as List;
+          (items[0] as Map)['allowedActions'] = ['pin'];
+          (items[1] as Map)['allowedActions'] = <String>[];
+          return LedgerPage.fromData(raw, key.$1);
+        }),
+      ],
+    );
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    expect(find.byKey(const Key('correct-tx_1')), findsNothing);
+    expect(find.byKey(const Key('correct-tx_2')), findsNothing);
+  });
+
+  testWidgets('a server correct token shows on a system card', (tester) async {
+    await pumpFakeApp(
+      tester,
+      size: const Size(800, 1800),
+      overrides: [
+        accountCardProvider.overrideWith((ref, key) async {
+          return AccountCardDto.fromJson({
+            'id': key.$2,
+            'name': 'كارت نظامي',
+            'balanceUnits': 10,
+            'version': 3,
+            'systemManaged': true,
+          }, key.$1);
+        }),
+        ledgerProvider.overrideWith((ref, key) async {
+          final raw = FakeFixtures.ledger();
+          ((raw['items'] as List).first as Map)['allowedActions'] = ['correct'];
+          return LedgerPage.fromData(raw, key.$1);
+        }),
+      ],
+    );
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    expect(find.byKey(const Key('correct-tx_1')), findsOneWidget);
+    expect(find.byKey(const Key('add-debt')), findsNothing);
+  });
+
+  testWidgets('full payment sends a chosen date and omits an unchosen one', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(
+      tester,
+      size: const Size(800, 1800),
+      overrides: [
+        ledgerProvider.overrideWith((ref, key) async {
+          final raw = FakeFixtures.ledger();
+          ((raw['items'] as List)[1] as Map)['paymentMode'] = 'full';
+          return LedgerPage.fromData(raw, key.$1);
+        }),
+      ],
+    );
+    final fake = layer.client as FakeApiClient;
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+
+    await tester.tap(find.byKey(const Key('full-payment')));
+    await settle(tester);
+    final ledgerBody = jsonDecode(fake.mutationBodies.single) as Map;
+    expect(ledgerBody.containsKey('date'), isFalse);
+    expect(ledgerBody['paymentMode'], 'full');
+    expect(ledgerBody['type'], 'payment');
+
+    await scrollTo(tester, const Key('correct-tx_2'), 'customers');
+    await tester.tap(find.byKey(const Key('correct-tx_2')));
+    await settle(tester);
+    expect(find.byKey(const Key('correction-amount')), findsNothing);
+    await tester.enterText(
+      find.byKey(const Key('correction-date')),
+      '2026-01-15',
+    );
+    await openConfirm(tester);
+    await confirmSend(tester, fake);
+
+    final correction = jsonDecode(fake.mutationBodies[1]) as Map;
+    expect(correction['paymentMode'], 'full');
+    expect('${correction['date']}'.startsWith('2026-01-15'), isTrue);
+    expect(correction['inputValue'], 1);
+  });
+
   testWidgets(
     'the correction form is RTL in both themes on small and large phones',
     (tester) async {
