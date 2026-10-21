@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'features/splash/splash_screen.dart';
+import 'notifications/notification_transport_host.dart';
 import 'notifications/realtime_lifecycle.dart';
 import 'state/router_provider.dart';
 import 'state/session_providers.dart';
@@ -74,5 +75,7 @@ class CompanyApp extends ConsumerWidget {
 }
 
 Widget _live(BuildContext context, Widget? page) {
-  return RealtimeLifecycle(child: page ?? const SizedBox.shrink());
+  return NotificationTransportHost(
+    child: RealtimeLifecycle(child: page ?? const SizedBox.shrink()),
+  );
 }

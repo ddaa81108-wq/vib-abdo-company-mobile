@@ -190,11 +190,6 @@ final financialLedgerProvider = FutureProvider<FinancialLedgerPage>((
   return layer.reports.financialLedger();
 });
 
-final notificationsProvider = FutureProvider<NotificationsPage>((ref) async {
-  watchSignedIn(ref);
-  return ref.read(apiLayerProvider).notifications.list();
-});
-
 final notificationPrefsProvider = FutureProvider<Map<String, dynamic>>((
   ref,
 ) async {

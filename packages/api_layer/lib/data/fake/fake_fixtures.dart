@@ -78,6 +78,17 @@ class FakeFixtures {
         sectionAccess: const {'customerDebts': 'manage'},
       );
     }
+    if (username.startsWith('other.employee')) {
+      // Fake-only login for the existing id [otherEmployeeId]. Not a new account.
+      return _me(
+        id: otherEmployeeId,
+        username: 'other.employee@example.invalid',
+        name: 'موظف آخر تجريبي',
+        role: 'employee',
+        permissions: employeePermissions,
+        sectionAccess: employeeSectionAccess,
+      );
+    }
     if (username.startsWith('mustchange')) {
       return _me(
         id: 'u_4',
@@ -1051,32 +1062,68 @@ class FakeFixtures {
         },
       };
 
-  static Map<String, dynamic> notifications(int unread) => {
-        'items': [
-          {
-            'id': '77',
-            'action': 'collection.submit',
-            'title': 'استلام جديد بانتظار المراجعة',
-            'body': 'افتح قسم الاستلامات',
-            'section': 'collections',
-            'entityId': 'sb_1',
-            'readAt': null,
-            'createdAt': '2026-10-18T12:00:00+02:00',
-          },
-          {
-            'id': '88',
-            'action': 'collection.submit',
-            'title': 'إشعار موظف آخر',
-            'body': 'لا يظهر لموظف غيره',
-            'section': 'collections',
-            'entityId': 'sb_9',
-            'readAt': null,
-            'createdAt': '2026-10-18T16:00:00+02:00',
-            // 🔶 recipientUserId is not a confirmed notifications field.
-            'recipientUserId': otherEmployeeId,
-          },
-        ],
-        'unreadCount': unread,
-        'nextBefore': null,
-      };
+  /// Literal unread counts. The fake decrements these; it does not count rows.
+  static const notificationUnreadCounts = <String, int>{
+    demoEmployeeId: 1,
+    otherEmployeeId: 2,
+    'u_1': 1,
+  };
+
+  /// One row per signed-in fixture user. 🔶 `recipientUserId`, `systemName`,
+  /// and `employeeName` are not confirmed notification fields. `id` 77 stays
+  /// the demo employee's row so the current screen can open it.
+  static List<Map<String, dynamic>> notificationCatalog() => [
+        {
+          'id': '77',
+          'action': 'collection.submit',
+          'title': 'استلام جديد بانتظار المراجعة',
+          'body': 'افتح قسم الاستلامات',
+          'section': 'collections',
+          'entityId': 'sb_1',
+          'readAt': null,
+          'createdAt': '2026-10-18T12:00:00+02:00',
+          'systemName': 'الاستلامات',
+          'employeeName': 'موظف استلام تجريبي',
+          'recipientUserId': demoEmployeeId,
+        },
+        {
+          'id': '88',
+          'action': 'collection.submit',
+          'title': 'إشعار موظف آخر',
+          'body': 'لا يظهر لموظف غيره',
+          'section': 'collections',
+          'entityId': 'sb_9',
+          'readAt': null,
+          'createdAt': '2026-10-18T16:00:00+02:00',
+          'systemName': 'الاستلامات',
+          'employeeName': 'موظف آخر تجريبي',
+          'recipientUserId': otherEmployeeId,
+        },
+        {
+          'id': 'n_20',
+          'action': 'approve',
+          'title': 'إشعار ثان لموظف آخر',
+          'body': 'صف خاص',
+          'section': 'collections',
+          'entityId': 'sb_8',
+          'readAt': null,
+          'createdAt': '2026-10-18T10:00:00+02:00',
+          'systemName': 'الاستلامات',
+          'employeeName': 'موظف آخر تجريبي',
+          'recipientUserId': otherEmployeeId,
+        },
+        {
+          'id': 'n_1',
+          'action': 'cash_received',
+          'title': 'إشعار المدير',
+          'body': 'صف المدير',
+          'section': 'collections',
+          'entityId': 'sb_1',
+          'readAt': null,
+          'createdAt': '2026-10-18T09:00:00+02:00',
+          'systemName': 'الاستلامات',
+          'employeeName': 'مدير تجريبي',
+          'recipientUserId': 'u_1',
+        },
+      ];
 }

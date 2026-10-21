@@ -13,6 +13,9 @@ class Redactor {
     'newpassword',
     'accesstoken',
     'refreshtoken',
+    'token',
+    'devicetoken',
+    'pushtoken',
     'username',
     'displayname',
     'name',
@@ -36,8 +39,9 @@ class Redactor {
 
   Object? redact(Object? value) {
     if (value is Map) {
-      return value
-          .map((k, v) => MapEntry(k, isSensitiveKey('$k') ? '***' : redact(v)));
+      return value.map(
+        (k, v) => MapEntry(k, isSensitiveKey('$k') ? '***' : redact(v)),
+      );
     }
     if (value is List) return value.map(redact).toList();
     return value;
