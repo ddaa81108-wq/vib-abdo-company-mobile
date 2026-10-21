@@ -36,8 +36,11 @@ void invalidateUserScope(WidgetRef ref) {
   ref.invalidate(reportsProvider);
   ref.invalidate(financialLedgerProvider);
   ref.invalidate(notificationsProvider);
+  ref.invalidate(notificationsStateProvider);
   ref.invalidate(notificationPrefsProvider);
   ref.invalidate(unreadCountProvider);
+  ref.invalidate(unreadNotificationsCountProvider);
+  ref.invalidate(foregroundNotificationsProvider);
   ref.invalidate(masraweyaProvider);
 }
 
