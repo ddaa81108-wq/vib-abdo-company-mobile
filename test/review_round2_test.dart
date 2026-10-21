@@ -208,7 +208,7 @@ void main() {
       await pumpFakeApp(tester, size: const Size(800, 1800));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/collections');
-      final label = find.byKey(const Key('awaiting-cash'));
+      final label = find.byKey(const Key('awaiting-cash-sb_2'));
       expect(label, findsOneWidget);
       final text = tester.widget<Text>(label);
       expect(text.data, 'ينتظر النقد');

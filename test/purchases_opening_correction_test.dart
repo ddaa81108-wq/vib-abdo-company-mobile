@@ -109,13 +109,13 @@ void main() {
       await tester.tap(find.byKey(const Key('confirm-mutation')));
       await finishSend(tester);
 
-      final body = jsonDecode(fake.lastWireBody!) as Map<String, dynamic>;
+      final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
       expect(body['requestId'], isA<String>());
       expect('${body['requestId']}'.isNotEmpty, isTrue);
       expect(body['expectedDayVersion'], 3);
       expect(body['previousDebtUnits'], 1500);
       expect(body['previousVodafoneUnits'], 40);
-      expect(fake.lastMutationPath, '/api/purchases/al_bayan/opening');
+      expect(fake.mutationPaths.last, '/api/purchases/al_bayan/opening');
       expect(find.text(AppStrings.openingConfirm), findsNothing);
       expect(
         find.descendant(
@@ -149,10 +149,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byKey(const Key('confirm-mutation')));
     await finishSend(tester);
-    final body = jsonDecode(fake.lastWireBody!) as Map<String, dynamic>;
+    final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
     expect(body['requestId'], isNotEmpty);
     expect(body['expectedDayVersion'], 3);
-    expect(fake.lastMutationPath, '/api/purchases/simsim/opening');
+    expect(fake.mutationPaths.last, '/api/purchases/simsim/opening');
   });
 
   testWidgets('a server opening object supplies the version that is sent', (
@@ -201,7 +201,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byKey(const Key('confirm-mutation')));
     await finishSend(tester);
-    final body = jsonDecode(fake.lastWireBody!) as Map<String, dynamic>;
+    final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
     expect(body['expectedDayVersion'], 11);
     expect(body['previousDebtUnits'], 7);
     expect(body['previousVodafoneUnits'], 8);
@@ -246,7 +246,7 @@ void main() {
       await tester.tap(find.byKey(const Key('confirm-mutation')));
       await settle(tester);
 
-      expect(find.text(AppStrings.versionConflict), findsOneWidget);
+      expect(find.text(AppStrings.versionConflict), findsWidgets);
       expect(loads, greaterThan(before));
       final first = fake.mutationRequestIds.single;
 
@@ -299,12 +299,12 @@ void main() {
       await tester.tap(find.byKey(const Key('confirm-mutation')));
       await finishSend(tester);
 
-      final opened = jsonDecode(fake.lastWireBody!) as Map<String, dynamic>;
+      final opened = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
       expect(opened['requestId'], isNotEmpty);
       expect(opened['expectedDayVersion'], 3);
       expect(opened['open'], isTrue);
       expect(
-        fake.lastMutationPath,
+        fake.mutationPaths.last,
         '/api/purchases/al_bayan/days/12/correction',
       );
       expect(find.text(AppStrings.correctionOpen), findsWidgets);
@@ -318,7 +318,7 @@ void main() {
       expect(find.text(AppStrings.closeCorrectionConfirm), findsOneWidget);
       await tester.tap(find.byKey(const Key('confirm-mutation')));
       await finishSend(tester);
-      final closed = jsonDecode(fake.lastWireBody!) as Map<String, dynamic>;
+      final closed = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
       expect(closed['requestId'], isNotEmpty);
       expect(closed['expectedDayVersion'], 3);
       expect(closed['open'], isFalse);
@@ -328,54 +328,55 @@ void main() {
     },
   );
 
-  testWidgets('day correction conflict and a server error reload the ledger', (
-    tester,
-  ) async {
-    var loads = 0;
-    final layer = await pumpFakeApp(
-      tester,
-      size: const Size(800, 1600),
-      overrides: [
-        purchasesProvider.overrideWith((ref) async {
-          loads++;
-          return PurchasesBookPage.fromData({
-            'days': [
-              {
-                'day': '4',
-                'version': -1,
-                'status': 'finalized',
-                'entries': [],
-                'totals': {'previousDebtUnits': 1},
-              },
-            ],
-          });
-        }),
-      ],
-    );
-    final fake = layer.client as FakeApiClient;
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/purchases');
-    final before = loads;
-    await tester.tap(find.byKey(const Key('open-correction-4')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text(AppStrings.openCorrectionConfirm), findsOneWidget);
-    await tester.tap(find.byKey(const Key('confirm-mutation')));
-    await settle(tester);
-    expect(find.text(AppStrings.versionConflict), findsOneWidget);
-    expect(loads, greaterThan(before));
-    expect(find.byKey(const Key('open-correction-4')), findsOneWidget);
+  testWidgets(
+    'day correction conflict reloads the ledger and a server error does not',
+    (tester) async {
+      var loads = 0;
+      final layer = await pumpFakeApp(
+        tester,
+        size: const Size(800, 1600),
+        overrides: [
+          purchasesProvider.overrideWith((ref) async {
+            loads++;
+            return PurchasesBookPage.fromData({
+              'days': [
+                {
+                  'day': '12',
+                  'version': -1,
+                  'status': 'finalized',
+                  'entries': [],
+                  'totals': {'previousDebtUnits': 1},
+                },
+              ],
+            });
+          }),
+        ],
+      );
+      final fake = layer.client as FakeApiClient;
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/purchases');
+      final before = loads;
+      await tester.tap(find.byKey(const Key('open-correction-12')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text(AppStrings.openCorrectionConfirm), findsOneWidget);
+      await tester.tap(find.byKey(const Key('confirm-mutation')));
+      await settle(tester);
+      expect(find.text(AppStrings.versionConflict), findsWidgets);
+      expect(loads, greaterThan(before));
+      expect(find.byKey(const Key('open-correction-12')), findsOneWidget);
 
-    fake.failMutationsRemaining = 1;
-    final afterConflict = loads;
-    await tester.tap(find.byKey(const Key('open-correction-4')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.byKey(const Key('confirm-mutation')));
-    await settle(tester);
-    expect(find.text('تعذر تنفيذ الطلب.'), findsWidgets);
-    expect(loads, greaterThan(afterConflict));
-  });
+      fake.failMutationsRemaining = 1;
+      final afterConflict = loads;
+      await tester.tap(find.byKey(const Key('open-correction-12')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const Key('confirm-mutation')));
+      await settle(tester);
+      expect(find.text('تعذر تنفيذ الطلب.'), findsWidgets);
+      expect(loads, afterConflict);
+    },
+  );
 
   testWidgets('opening and correction stay hidden without their permissions', (
     tester,
@@ -797,6 +798,8 @@ Future<void> exercisePhone(
   expect(find.byKey(const Key('save-opening')), findsOneWidget);
   expect(tester.takeException(), isNull);
 
+  await tester.ensureVisible(find.byKey(const Key('save-opening')));
+  await tester.pump();
   await tester.tap(find.byKey(const Key('save-opening')));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 300));

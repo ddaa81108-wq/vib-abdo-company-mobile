@@ -206,6 +206,7 @@ class _DayCard extends ConsumerWidget {
                     expectedVersion: day.version,
                     label: AppStrings.openDayCorrection,
                     confirmText: AppStrings.openCorrectionConfirm,
+                    onVersionConflict: () => ref.invalidate(purchasesProvider),
                     onSubmit: (meta) =>
                         _correct(context, ref, meta, open: true),
                   ),
@@ -216,6 +217,7 @@ class _DayCard extends ConsumerWidget {
                     expectedVersion: day.version,
                     label: AppStrings.closeDayCorrection,
                     confirmText: AppStrings.closeCorrectionConfirm,
+                    onVersionConflict: () => ref.invalidate(purchasesProvider),
                     onSubmit: (meta) =>
                         _correct(context, ref, meta, open: false),
                   ),
@@ -273,29 +275,18 @@ class _DayCard extends ConsumerWidget {
     MutationMeta meta, {
     required bool open,
   }) async {
-    try {
-      final ack = await ref
-          .read(apiLayerProvider)
-          .purchases
-          .setDayCorrection(book, day.day, open: open, meta: meta);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-        );
-      }
-      ref.invalidate(purchasesProvider);
-      return null;
-    } catch (error) {
-      return _purchaseFailure(ref, error);
+    final ack = await ref
+        .read(apiLayerProvider)
+        .purchases
+        .setDayCorrection(book, day.day, open: open, meta: meta);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+      );
     }
+    ref.invalidate(purchasesProvider);
+    return null;
   }
-}
-
-String _purchaseFailure(WidgetRef ref, Object error) {
-  final failure = ref.read(errorHandlerProvider).toFailure(error);
-  ref.invalidate(purchasesProvider);
-  if (failure.code == 'VERSION_CONFLICT') return AppStrings.versionConflict;
-  return failure.message;
 }
 
 class _PurchaseForm extends ConsumerStatefulWidget {
@@ -628,6 +619,7 @@ class _OpeningFormState extends ConsumerState<_OpeningForm> {
           label: AppStrings.saveOpening,
           confirmText: valid ? AppStrings.openingConfirm : null,
           normalizedValue: valid ? '$debt · $vodafone' : null,
+          onVersionConflict: () => ref.invalidate(purchasesProvider),
           onSubmit: (meta) => _submit(meta, debt, vodafone),
         ),
       ],
@@ -636,33 +628,29 @@ class _OpeningFormState extends ConsumerState<_OpeningForm> {
 
   Future<String?> _submit(MutationMeta meta, int? debt, int? vodafone) async {
     if (debt == null || vodafone == null) return AppStrings.integerOnly;
-    try {
-      final ack = await ref
-          .read(apiLayerProvider)
-          .purchases
-          .setOpening(
-            widget.book,
-            previousDebtUnits: debt,
-            previousVodafoneUnits: vodafone,
-            meta: meta,
-          );
-      if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
-      ref.invalidate(purchasesProvider);
-      // The confirm dialog is the top route. Close this form after it pops.
-      final navigator = Navigator.of(context);
-      final formRoute = ModalRoute.of(context);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (formRoute != null && formRoute.isActive) {
-          navigator.removeRoute(formRoute);
-        }
-      });
-      return null;
-    } catch (error) {
-      return _purchaseFailure(ref, error);
-    }
+    final ack = await ref
+        .read(apiLayerProvider)
+        .purchases
+        .setOpening(
+          widget.book,
+          previousDebtUnits: debt,
+          previousVodafoneUnits: vodafone,
+          meta: meta,
+        );
+    if (!mounted) return null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
+    );
+    ref.invalidate(purchasesProvider);
+    // The confirm dialog is the top route. Close this form after it pops.
+    final navigator = Navigator.of(context);
+    final formRoute = ModalRoute.of(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (formRoute != null && formRoute.isActive) {
+        navigator.removeRoute(formRoute);
+      }
+    });
+    return null;
   }
 }
 

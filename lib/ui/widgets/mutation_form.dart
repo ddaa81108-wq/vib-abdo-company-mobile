@@ -38,8 +38,9 @@ class SubmissionLock {
 
 /// Submit control for a write.
 ///
-/// The request id is chosen when this control is first used and is reused until
-/// the send succeeds or [inputs] / [expectedVersion] change. The button is
+/// The request id is chosen when this control is first used. It is reused only
+/// for a retry of that same [inputs] and [expectedVersion]. A successful send,
+/// or a change to either value after a failure, starts a new id. The button is
 /// disabled, with a progress indicator, for the whole send.
 class GuardedMutation extends ConsumerStatefulWidget {
   const GuardedMutation({
@@ -56,14 +57,20 @@ class GuardedMutation extends ConsumerStatefulWidget {
     this.normalizedValue,
     this.icon,
     this.tooltip,
+    this.onVersionConflict,
   });
 
   /// Fields that define this attempt. A change starts a new request id.
   final String inputs;
   final int? expectedVersion;
 
-  /// Null when the server accepted the send. Any other string is shown and the
-  /// request id is kept for a retry of the same inputs.
+  /// Null when the server accepted the send. Any other string is shown.
+  ///
+  /// The request id is kept only when a later send is still this same [inputs]
+  /// and [expectedVersion]. A thrown [ConflictException] with code
+  /// `VERSION_CONFLICT` is shown as [AppStrings.versionConflict] and runs
+  /// [onVersionConflict] so the caller can refetch. Once that refetch changes
+  /// [expectedVersion] or [inputs], the next send is a new request.
   final Future<String?> Function(MutationMeta meta) onSubmit;
   final String label;
   final Key? buttonKey;
@@ -77,6 +84,9 @@ class GuardedMutation extends ConsumerStatefulWidget {
   final IconData? icon;
   final String? tooltip;
 
+  /// Refetch the record this write was based on. Used only for VERSION_CONFLICT.
+  final VoidCallback? onVersionConflict;
+
   @override
   ConsumerState<GuardedMutation> createState() => _GuardedMutationState();
 }
@@ -84,6 +94,17 @@ class GuardedMutation extends ConsumerStatefulWidget {
 class _GuardedMutationState extends ConsumerState<GuardedMutation> {
   final _lock = SubmissionLock();
   String? _error;
+
+  @override
+  void didUpdateWidget(GuardedMutation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A new version or payload is a new logical request, even when the last
+    // send returned a message and the cached id would otherwise be reused.
+    if (oldWidget.inputs != widget.inputs ||
+        oldWidget.expectedVersion != widget.expectedVersion) {
+      _lock.succeed();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +150,8 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
       _error = null;
     });
     _lock.expectedVersion = widget.expectedVersion;
-    final meta = _lock.metaFor(widget.inputs);
+    final sentInputs = widget.inputs;
+    final meta = _lock.metaFor(sentInputs);
     var accepted = false;
     try {
       final error = widget.confirmText == null
@@ -141,13 +163,43 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
       }
     } catch (error) {
       if (!mounted) return;
-      setState(
-        () => _error = ref.read(errorHandlerProvider).toFailure(error).message,
-      );
+      final message = _presentFailure(error);
+      if (!mounted) return;
+      setState(() => _error = message);
     } finally {
-      if (accepted) _lock.succeed();
+      if (accepted) {
+        _lock.succeed();
+      } else {
+        _dropUnlessIdentical(sentInputs, meta.expectedVersion);
+      }
       if (mounted) setState(() => _lock.busy = false);
     }
+  }
+
+  /// Keeps the cached id only when this control still describes the send that
+  /// failed. A conflict refetch can update the widget before the next tap.
+  void _dropUnlessIdentical(String sentInputs, int? sentVersion) {
+    if (widget.inputs != sentInputs || widget.expectedVersion != sentVersion) {
+      _lock.succeed();
+    }
+  }
+
+  /// Maps a thrown write error. Version conflicts refetch and show the shared
+  /// conflict copy; every other error keeps the mapped server message.
+  String _presentFailure(Object error) {
+    final failure = ref.read(errorHandlerProvider).toFailure(error);
+    if (failure.code != 'VERSION_CONFLICT') return failure.message;
+    _announceConflict();
+    widget.onVersionConflict?.call();
+    return AppStrings.versionConflict;
+  }
+
+  void _announceConflict() {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (!mounted || messenger == null) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text(AppStrings.versionConflict)));
   }
 
   /// Null when the confirmed send is accepted.
@@ -206,12 +258,7 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
                                   if (!dialogContext.mounted) return;
                                   Navigator.pop(
                                     dialogContext,
-                                    _DialogResult.fail(
-                                      dialogRef
-                                          .read(errorHandlerProvider)
-                                          .toFailure(error)
-                                          .message,
-                                    ),
+                                    _DialogResult.fail(_presentFailure(error)),
                                   );
                                 }
                               },
