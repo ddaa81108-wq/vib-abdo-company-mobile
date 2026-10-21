@@ -17,6 +17,11 @@ dependencies:
   go_router: ^17.0.0
   shared_preferences: ^2.5.3
   flutter_secure_storage: ^9.2.2
+  # Newest release that still builds here. 13.0.0+ depends on
+  # permission_handler_android 14.x, which sets compileSdk 37. This app
+  # stays on compileSdk 36, so the pin is 12.0.3 (android plugin 13.0.1,
+  # compileSdk 35, minSdk 19).
+  permission_handler: 12.0.3
 
 dev_dependencies:
   flutter_test:

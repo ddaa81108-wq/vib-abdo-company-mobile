@@ -347,4 +347,17 @@ abstract final class AppStrings {
   static const pendingUnits = 'المبلغ المنتظر';
   static const rejectedCount = 'عدد المرفوض';
   static const serverTotals = 'الإجمالي من الخادم';
+
+  // Phase 6 notifications presentation. After the totals block so those edits merge.
+  static const notificationSystemFallback = 'منظومة VIB';
+  static const notificationNotFound = 'هذا الإشعار غير موجود.';
+  static const notificationNoTarget = 'لا يوجد قسم مرتبط بهذا الإشعار.';
+  static const notificationPermissionTitle = 'إذن الإشعارات';
+  static const notificationPermissionBody =
+      'نحتاج إذن الإشعارات لعرض التنبيهات الجديدة وأنت تستخدم التطبيق.';
+  static const notificationPermissionAgree = 'موافق';
+  static const notificationPermissionLater = 'ليس الآن';
+  static const notificationPermissionDenied =
+      'لم يُمنح إذن الإشعارات. يمكنك تفعيله من إعدادات التطبيق.';
+  static const notificationPermissionSettings = 'فتح الإعدادات';
 }

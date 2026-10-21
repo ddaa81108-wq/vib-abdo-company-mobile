@@ -4,10 +4,10 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'strings.dart';
 import 'theme.dart';
 
-/// Badge text from the server count. 0 draws nothing. 99 and above draw "99".
+/// Badge text from the server count. 0 draws nothing. Above 99 draws "99+".
 String? badgeLabel(int? count) {
   if (count == null || count <= 0) return null;
-  if (count >= 99) return '99';
+  if (count > 99) return '99+';
   return '$count';
 }
 
