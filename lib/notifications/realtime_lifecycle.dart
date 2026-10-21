@@ -13,9 +13,8 @@ import 'notification_signal_bridge.dart';
 
 /// Starts realtime delivery while a session is open and the app is in front.
 ///
-/// Every signal invalidates both unread-count providers. The signal payload is
-/// ignored: the next count comes from a refetch. This does not announce a
-/// foreground banner; that stays on the data layer's refresh path.
+/// Every signal invalidates the unread-count provider. The signal payload is
+/// ignored: the next count comes from a refetch.
 class RealtimeLifecycle extends ConsumerStatefulWidget {
   const RealtimeLifecycle({required this.child, super.key});
 
@@ -81,7 +80,6 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
         // A notification-related refresh refetches the list. It does not
         // ingest the event payload.
         ref.invalidate(unreadCountProvider);
-        ref.invalidate(unreadNotificationsCountProvider);
         ref.invalidate(homeDashboardProvider);
         ref.invalidate(collectionsProvider);
         ref.invalidate(ledgerProvider);
@@ -89,7 +87,6 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
       });
       _pushes = layer.push.messages.listen((_) {
         ref.invalidate(unreadCountProvider);
-        ref.invalidate(unreadNotificationsCountProvider);
       });
       layer.realtime.start().catchError((Object error, StackTrace stackTrace) {
         ref.read(errorHandlerProvider).report(error, stackTrace);
