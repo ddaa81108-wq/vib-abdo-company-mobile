@@ -54,3 +54,15 @@ staging-permissions-junit.xml
 .env.*
 *.jks
 *.keystore
+
+# Push credentials and API keys. Never commit these.
+google-services.json
+**/google-services.json
+GoogleService-Info.plist
+**/GoogleService-Info.plist
+google-services.json.bak
+**/firebase_options.dart
+**/*service-account*.json
+**/*serviceAccount*.json
+**/*-api-key*.json
+**/*apikey*.json

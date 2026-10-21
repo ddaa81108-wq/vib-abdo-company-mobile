@@ -8,6 +8,9 @@ import 'api/api_providers.dart';
 import 'app.dart';
 import 'error_handling/error_handler.dart';
 import 'notifications/app_push_service.dart';
+import 'notifications/device_token_registrar.dart';
+import 'notifications/device_token_store.dart';
+import 'notifications/push_providers.dart';
 import 'secure_storage/app_secure_stores.dart';
 
 void main() {
@@ -27,11 +30,13 @@ void main() {
   };
 
   final stores = AppSecureStores();
+  final pushGate = PushSessionGate();
   final layer = ApiLayer.create(
     config: ApiConfig.fromEnvironment(),
     cookieStore: stores.cookies,
     tokenStorage: stores.tokens,
     push: AppPushService(),
+    cleanups: [pushGate.forget],
   );
   runApp(
     ProviderScope(
@@ -41,7 +46,11 @@ void main() {
         if (error is SessionExpiredException) return null;
         return retryUnlessForbidden(retryCount, error);
       },
-      overrides: [apiLayerProvider.overrideWithValue(layer)],
+      overrides: [
+        apiLayerProvider.overrideWithValue(layer),
+        pushSessionGateProvider.overrideWithValue(pushGate),
+        deviceTokenStoreProvider.overrideWithValue(SecureDeviceTokenStore()),
+      ],
       child: const CompanyApp(),
     ),
   );
