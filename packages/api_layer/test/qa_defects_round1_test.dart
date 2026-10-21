@@ -290,7 +290,9 @@ void main() {
     );
     expect(unlinkedAck.version, 2);
     overview = await api.collections.overview();
-    final receipt = overview.unlinkedReceipts.single;
+    final receipt = overview.unlinkedReceipts.firstWhere(
+      (item) => item.id == 'ur_1',
+    );
     expect(receipt.cashStatus, CashStatus.received);
     expect(receipt.version, 2);
     expect(receipt.status, 'pending');
@@ -309,8 +311,11 @@ void main() {
       ),
     );
     overview = await api.collections.overview();
-    expect(overview.unlinkedReceipts.single.version, 2);
-    expect(overview.unlinkedReceipts.single.cashStatus, CashStatus.received);
+    final stillReceived = overview.unlinkedReceipts.firstWhere(
+      (item) => item.id == 'ur_1',
+    );
+    expect(stillReceived.version, 2);
+    expect(stillReceived.cashStatus, CashStatus.received);
   });
 
   test('unlinked decision stores status and version and rejects a stale one',
@@ -332,8 +337,11 @@ void main() {
       ),
     );
     var overview = await api.collections.overview();
-    expect(overview.unlinkedReceipts.single.status, 'pending');
-    expect(overview.unlinkedReceipts.single.version, 1);
+    var receipt = overview.unlinkedReceipts.firstWhere(
+      (item) => item.id == 'ur_1',
+    );
+    expect(receipt.status, 'pending');
+    expect(receipt.version, 1);
 
     final ack = await api.collections.decideUnlinked(
       'ur_1',
@@ -342,8 +350,9 @@ void main() {
     );
     expect(ack.version, 2);
     overview = await api.collections.overview();
-    expect(overview.unlinkedReceipts.single.status, 'approved');
-    expect(overview.unlinkedReceipts.single.version, 2);
+    receipt = overview.unlinkedReceipts.firstWhere((item) => item.id == 'ur_1');
+    expect(receipt.status, 'approved');
+    expect(receipt.version, 2);
 
     await expectLater(
       api.collections.decideUnlinked(
@@ -360,8 +369,15 @@ void main() {
       ),
     );
     overview = await api.collections.overview();
-    expect(overview.unlinkedReceipts.single.status, 'approved');
-    expect(overview.unlinkedReceipts.single.version, 2);
+    receipt = overview.unlinkedReceipts.firstWhere((item) => item.id == 'ur_1');
+    expect(receipt.status, 'approved');
+    expect(receipt.version, 2);
+    final other = overview.unlinkedReceipts.firstWhere(
+      (item) => item.id == 'ur_2',
+    );
+    expect(other.status, 'rejected');
+    expect(other.cashStatus, CashStatus.pending);
+    expect(other.version, 4);
   });
 
   test('purchase day finalize stores the day version and rejects a stale one',

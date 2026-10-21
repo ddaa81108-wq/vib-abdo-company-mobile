@@ -63,6 +63,12 @@ class FakeApiClient implements ApiClient {
   /// The next N notification writes fail (tests).
   int failNotificationWritesRemaining = 0;
 
+  /// The next N versioned collection mutations fail with VERSION_CONFLICT (tests).
+  int versionConflictRemaining = 0;
+
+  /// GET /api/collections calls, including a refetch after a conflict (tests).
+  int collectionOverviewReads = 0;
+
   /// Omit `unreadCount` from the notifications page (tests).
   bool omitUnreadCount = false;
 
@@ -541,6 +547,7 @@ class FakeApiClient implements ApiClient {
   ) async {
     if (method == 'GET' && seg.length == 1) {
       _requireRead(SectionKey.collections);
+      collectionOverviewReads++;
       return _ok(_collectionsView());
     }
     if (method == 'GET' && seg.length > 1 && seg[1] == 'payroll') {
@@ -567,6 +574,11 @@ class FakeApiClient implements ApiClient {
         (seg.last == 'decision' || seg.last == 'cash-received');
     if (needsVersion && b['expectedVersion'] == null) {
       _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
+    }
+    // Test injection only. A real write still compares the stored version.
+    if (needsVersion && versionConflictRemaining > 0) {
+      versionConflictRemaining--;
+      _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
     }
     if (seg.length == 4 && seg[1] == 'submissions' && seg[3] == 'decision') {
       return _applyDecision(seg[2], b);
