@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
+import 'package:flutter_api_layer/data/repositories/notifications_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
@@ -75,6 +76,28 @@ void main() {
       (harness.layer.client as FakeApiClient).notificationMutationApplies,
       2,
     );
+  });
+
+  test('a second mark while the first is in flight sends one request', () async {
+    final harness = await signedIn('employee.demo');
+    final container = harness.container;
+    final fake = harness.layer.client as FakeApiClient;
+    await container.read(notificationsProvider.future);
+    final notifier = container.read(notificationsProvider.notifier);
+    final writes =
+        harness.layer.notifications as RemoteNotificationsRepository;
+
+    final one = notifier.markRead('77');
+    final two = notifier.markRead('77');
+    await Future.wait([one, two]);
+    expect(fake.notificationMutationApplies, 1);
+    expect(writes.attemptedWriteRequestIds, hasLength(1));
+
+    final allOne = notifier.markAllRead();
+    final allTwo = notifier.markAllRead();
+    await Future.wait([allOne, allTwo]);
+    expect(fake.notificationMutationApplies, 2);
+    expect(writes.attemptedWriteRequestIds, hasLength(2));
   });
 
   test('push and poll dedupe, and a push does not increment the count', () async {
