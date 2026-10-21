@@ -8,10 +8,18 @@ import '../theme.dart';
 import '../tokens.dart';
 
 class MoneyText extends StatelessWidget {
-  const MoneyText(this.text, {super.key, this.style});
+  const MoneyText(
+    this.text, {
+    super.key,
+    this.style,
+    this.align = TextAlign.start,
+  });
 
   final String text;
   final TextStyle? style;
+
+  /// Alignment inside the LTR amount. The default keeps existing callers.
+  final TextAlign align;
 
   @override
   Widget build(BuildContext context) {
@@ -20,8 +28,14 @@ class MoneyText extends StatelessWidget {
       textDirection: TextDirection.ltr,
       child: Text(
         text,
+        textAlign: align,
         softWrap: true,
-        style: (style ?? extras.amount).copyWith(fontFamily: 'JetBrainsMono'),
+        style: (style ?? extras.amount).copyWith(
+          fontFamily: 'JetBrainsMono',
+          // Digits stay in JetBrains Mono. That face has no Arabic, so the
+          // currency letters (د.ل) come from Cairo instead of a missing-glyph box.
+          fontFamilyFallback: const ['Cairo'],
+        ),
       ),
     );
   }
@@ -81,22 +95,43 @@ class ErrorPane extends StatelessWidget {
 }
 
 class EmptyPane extends StatelessWidget {
-  const EmptyPane({required this.message, super.key, this.action});
+  const EmptyPane({
+    required this.message,
+    super.key,
+    this.title,
+    this.icon = Icons.inbox_outlined,
+    this.action,
+  });
 
   final String message;
+
+  /// Optional heading. Existing callers that pass only [message] stay the same.
+  final String? title;
+  final IconData icon;
   final Widget? action;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsetsDirectional.all(AppSpacing.xxl),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.inbox_outlined,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            icon,
+            size: title == null ? 24 : 40,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: AppSpacing.md),
+          if (title != null) ...[
+            Text(
+              title!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           Text(message, textAlign: TextAlign.center),
           if (action != null) ...[
             const SizedBox(height: AppSpacing.lg),
@@ -278,17 +313,31 @@ class ReportStatusChip extends StatelessWidget {
 }
 
 Future<T?> showAppForm<T>(BuildContext context, Widget child) {
-  final wide = MediaQuery.sizeOf(context).width > AppBreakpoints.phone;
+  final size = MediaQuery.sizeOf(context);
+  final wide = size.width > AppBreakpoints.phone;
+  final maxHeight = size.height * 0.92;
+  // shrinkWrap keeps a short form at its own height. primary: false so the
+  // form does not steal the screen's PrimaryScrollController. A tall form,
+  // including large text, scrolls inside the cap instead of overflowing.
+  Widget sheet(EdgeInsetsGeometry padding) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: ListView(
+        primary: false,
+        shrinkWrap: true,
+        padding: padding,
+        children: [child],
+      ),
+    );
+  }
+
   if (wide) {
     return showDialog<T>(
       context: context,
       builder: (context) => Dialog(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
-          child: SingleChildScrollView(
-            padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-            child: child,
-          ),
+          child: sheet(const EdgeInsetsDirectional.all(AppSpacing.lg)),
         ),
       ),
     );
@@ -303,7 +352,7 @@ Future<T?> showAppForm<T>(BuildContext context, Widget child) {
         top: AppSpacing.lg,
         bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
       ),
-      child: SingleChildScrollView(child: child),
+      child: sheet(EdgeInsets.zero),
     ),
   );
 }
@@ -346,10 +395,18 @@ int? parseUnits(String raw) {
 }
 
 class UnitsField extends StatelessWidget {
-  const UnitsField({required this.controller, required this.label, super.key});
+  const UnitsField({
+    required this.controller,
+    required this.label,
+    super.key,
+    this.dense,
+  });
 
   final TextEditingController controller;
   final String label;
+
+  /// Overrides the theme density. Null keeps the theme value.
+  final bool? dense;
 
   @override
   Widget build(BuildContext context) {
@@ -361,7 +418,8 @@ class UnitsField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         helperText: AppStrings.unitsHint,
-        helperMaxLines: 3,
+        helperMaxLines: 12,
+        isDense: dense,
       ),
     );
   }

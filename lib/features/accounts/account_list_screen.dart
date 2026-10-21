@@ -15,6 +15,8 @@ import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
+import 'account_list_logic.dart';
+import 'account_name_suggestions.dart';
 
 /// Customers, companies, Libyan deposits, and Egyptian deposits share this
 /// screen. [section] selects the repository path, currency, and labels.
@@ -30,7 +32,6 @@ class AccountListScreen extends ConsumerStatefulWidget {
 
 class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   final _search = TextEditingController();
-  final _extra = <AccountCardDto>[];
   var _assigning = false;
   var _showAllDebts = false;
   final _selected = <String>{};
@@ -51,11 +52,16 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       return const ForbiddenPane();
     }
     final page = ref.watch(accountsProvider(section));
+    final extra = ref.watch(accountExtraCardsProvider(section));
     final online = ref.watch(onlineProvider);
     final money = ref.watch(apiLayerProvider).money;
-    final canWrite = permissions.canWrite(section.sectionKey) && online;
+    final canWrite = permissions.canWrite(section.sectionKey);
     final home = ref.watch(homeDashboardProvider);
     final width = MediaQuery.sizeOf(context).width;
+    final columns = accountListColumns(
+      width,
+      textScale: MediaQuery.textScalerOf(context).scale(1),
+    );
 
     return KeptData<AccountsPage>(
       value: page,
@@ -64,18 +70,31 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       onRetry: () => ref.invalidate(accountsProvider(section)),
       messageOf: _message,
       loading: const Padding(
+        key: Key('accounts-loading'),
         padding: EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: SkeletonBox(key: Key('accounts-loading')),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SkeletonBox(height: 28, width: 180),
+            SizedBox(height: AppSpacing.md),
+            SkeletonBox(height: 96),
+            SizedBox(height: AppSpacing.md),
+            SkeletonBox(height: 148),
+            SizedBox(height: AppSpacing.md),
+            SkeletonBox(height: 148),
+          ],
+        ),
       ),
       builder: (data) {
-        final cards = [...data.page.items, ..._extra];
+        final cards = [...data.page.items, ...extra];
         return ListView(
           key: Key('screen-${section.path}'),
           padding: pagePadding(width),
           children: [
             ScreenTitle(sectionLabel(section.sectionKey)),
             const SizedBox(height: AppSpacing.md),
-            if (_showTicker) _ticker(home, money, width),
+            if (_showTicker)
+              _ticker(home, money, width, cards, data.page.nextCursor),
             _SummaryStrip(
               summary: data.summary,
               currency: section.currency,
@@ -89,11 +108,32 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
               key: const Key('account-search'),
               controller: _search,
               textInputAction: TextInputAction.search,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: AppStrings.filterSearch,
+                isDense: false,
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _search,
+                  builder: (context, value, _) {
+                    if (value.text.isEmpty) return const SizedBox.shrink();
+                    return IconButton(
+                      key: const Key('clear-account-search'),
+                      tooltip: AppStrings.clearSearch,
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        _search.clear();
+                        ref
+                            .read(accountExtraCardsProvider(section).notifier)
+                            .clear();
+                        ref.read(accountQueryProvider(section).notifier).state =
+                            '';
+                      },
+                    );
+                  },
+                ),
               ),
               onSubmitted: (value) {
-                setState(_extra.clear);
+                ref.read(accountExtraCardsProvider(section).notifier).clear();
                 ref.read(accountQueryProvider(section).notifier).state = value;
               },
             ),
@@ -122,12 +162,16 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             if (_assigning)
               _AssignSubmit(
                 section: section,
-                customerIds: _selected.toList(growable: false),
+                customerIds: assignmentTargetIds(_selected, cards),
                 online: online,
               ),
             if (_reply != null) ...[
               const SizedBox(height: AppSpacing.sm),
-              Text(_reply!, key: const Key('server-reply')),
+              Text(
+                _reply!,
+                key: const Key('server-reply'),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
             ],
             const SizedBox(height: AppSpacing.md),
             if (cards.isEmpty)
@@ -135,11 +179,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             else
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final columns = AppBreakpoints.cardColumns(width);
-                  final cardWidth =
-                      ((constraints.maxWidth - AppSpacing.md * (columns - 1)) /
-                              columns)
-                          .clamp(120.0, constraints.maxWidth);
+                  final cardWidth = _cardWidth(constraints.maxWidth, columns);
                   return Wrap(
                     spacing: AppSpacing.md,
                     runSpacing: AppSpacing.md,
@@ -151,23 +191,24 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                             section: section,
                             card: card,
                             money: money,
-                            online: online,
                             canWrite: canWrite && !card.systemManaged,
                             assigning: _assigning,
                             selected: _selected.contains(card.id),
                             onOpen: () =>
                                 context.go('/${section.path}/${card.id}'),
                             onToggle: () => setState(() {
+                              if (!canSelectAccountForAssignment(card)) return;
                               _selected.contains(card.id)
                                   ? _selected.remove(card.id)
                                   : _selected.add(card.id);
                             }),
                             onPin: (meta) => _pin(card, meta),
                             onZero:
-                                permissions.canDo(
-                                      ManagementAction.customerZeroReview,
-                                    ) &&
-                                    section == AccountSection.customers
+                                showCustomerZeroReview(
+                                  permissions: permissions,
+                                  section: section,
+                                  card: card,
+                                )
                                 ? (meta) => _zero(card, meta)
                                 : null,
                           ),
@@ -177,14 +218,24 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                 },
               ),
             if (data.page.nextCursor != null)
-              TextButton(
-                onPressed: online ? () => _more(data.page.nextCursor!) : null,
-                child: const Text(AppStrings.loadMore),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton(
+                  onPressed: online ? () => _more(data.page.nextCursor!) : null,
+                  child: const Text(AppStrings.loadMore),
+                ),
               ),
           ],
         );
       },
     );
+  }
+
+  double _cardWidth(double maxWidth, int columns) {
+    if (columns <= 1 || maxWidth <= 0) return maxWidth;
+    final raw = (maxWidth - AppSpacing.md * (columns - 1)) / columns;
+    if (raw < 160) return maxWidth;
+    return raw.clamp(160.0, maxWidth);
   }
 
   bool get _showTicker =>
@@ -206,6 +257,8 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     AsyncValue<HomeDto?> home,
     MoneyFormatter money,
     double width,
+    List<AccountCardDto> cards,
+    String? nextCursor,
   ) {
     final debts = home.asData?.value?.oldDebts;
     if (debts == null) return const SizedBox.shrink();
@@ -215,27 +268,38 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     ];
     final body = rows.isEmpty
         ? const Text(AppStrings.emptyTicker)
-        : Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final debt in rows)
-                Chip(
-                  label: Text(
-                    '${debt.name} · ${debt.currency == null ? AppStrings.dash : money.formatOrDash(debt.balanceUnits, debt.currency!)} · ${sinceDays(debt.debtAgeDays)}',
-                  ),
+              for (var i = 0; i < rows.length; i++) ...[
+                if (i > 0) const SizedBox(height: AppSpacing.sm),
+                _TickerLine(
+                  debt: rows[i],
+                  card: _cardFor(cards, rows[i].id),
+                  money: money,
                 ),
+              ],
             ],
           );
     if (width <= AppBreakpoints.phone && !_showAllDebts) {
       return ExpansionTile(
+        tilePadding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.sm,
+        ),
+        childrenPadding: const EdgeInsetsDirectional.only(
+          bottom: AppSpacing.sm,
+        ),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
         title: const Text(AppStrings.oldDebtsTitle),
         children: [
           body,
-          TextButton(
-            key: const Key('show-all-debts'),
-            onPressed: () => setState(() => _showAllDebts = true),
-            child: const Text(AppStrings.showAll),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton(
+              key: const Key('show-all-debts'),
+              onPressed: () => _showAll(nextCursor),
+              child: const Text(AppStrings.showAll),
+            ),
           ),
         ],
       );
@@ -243,12 +307,22 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(AppStrings.oldDebtsTitle),
+        Text(
+          AppStrings.oldDebtsTitle,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
         const SizedBox(height: AppSpacing.sm),
         body,
         const SizedBox(height: AppSpacing.md),
       ],
     );
+  }
+
+  AccountCardDto? _cardFor(List<AccountCardDto> cards, String id) {
+    for (final card in cards) {
+      if (card.id == id) return card;
+    }
+    return null;
   }
 
   String _message(Object error) {
@@ -270,7 +344,38 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
           filter: filter,
         );
     if (!mounted) return;
-    setState(() => _extra.addAll(next.page.items));
+    if (ref.read(accountQueryProvider(section)).trim() != query) return;
+    if (ref.read(accountFilterProvider(section)) != filter) return;
+    ref
+        .read(accountExtraCardsProvider(section).notifier)
+        .append(next.page.items, nextCursor: next.page.nextCursor);
+  }
+
+  /// Phone «عرض الكل»: keep the bulletin's existing flag, and load every
+  /// remaining account page for the filter and search that are active now.
+  void _showAll(String? firstPageCursor) {
+    setState(() => _showAllDebts = true);
+    if (!ref.read(onlineProvider)) return;
+    final query = ref.read(accountQueryProvider(section)).trim();
+    final filter = ref.read(accountFilterProvider(section));
+    ref
+        .read(accountExtraCardsProvider(section).notifier)
+        .loadRemaining(
+          firstPageCursor: firstPageCursor,
+          fetch: (cursor) => ref
+              .read(apiLayerProvider)
+              .accounts
+              .list(
+                section,
+                cursor: cursor,
+                q: query.isEmpty ? null : query,
+                filter: filter,
+              ),
+          stillCurrent: () =>
+              mounted &&
+              ref.read(accountQueryProvider(section)).trim() == query &&
+              ref.read(accountFilterProvider(section)) == filter,
+        );
   }
 
   Future<void> _create(BuildContext context) async {
@@ -347,23 +452,26 @@ class _SummaryStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
       child: Padding(
         padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Wrap(
+          spacing: AppSpacing.xl,
+          runSpacing: AppSpacing.md,
           children: [
-            Text(
-              AppStrings.netDebt,
-              style: Theme.of(context).textTheme.titleSmall,
+            _Metric(
+              label: AppStrings.netDebt,
+              value: money.formatOrDash(summary.netBalanceUnits, currency),
+              valueStyle: theme.textTheme.titleSmall,
+              amountStyle: context.textExtras.amountLarge,
             ),
-            MoneyText(money.formatOrDash(summary.netBalanceUnits, currency)),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              AppStrings.totalDebt,
-              style: Theme.of(context).textTheme.bodySmall,
+            _Metric(
+              label: AppStrings.totalDebt,
+              value: money.formatOrDash(summary.totalDebtUnits, currency),
+              valueStyle: theme.textTheme.bodySmall,
+              amountStyle: context.textExtras.amount,
             ),
-            MoneyText(money.formatOrDash(summary.totalDebtUnits, currency)),
           ],
         ),
       ),
@@ -380,24 +488,7 @@ class _Tabs extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final current = ref.watch(accountFilterProvider(section));
-    final tabs = <(String?, String, int?)>[
-      (
-        null,
-        section == AccountSection.libyanDeposits
-            ? AppStrings.smartTab
-            : AppStrings.activeTab,
-        summary.activeCards,
-      ),
-      ('today', AppStrings.todayTab, null),
-      ('debts', AppStrings.debtsTab, null),
-      ('settled', AppStrings.settledTab, null),
-      ('pinned', AppStrings.pinnedTab, null),
-      if (section == AccountSection.customers)
-        ('pendingReview', AppStrings.zeroTab, summary.pendingReviewCount),
-    ];
-    if (section == AccountSection.egyptianDeposits) {
-      return const SizedBox.shrink();
-    }
+    final tabs = accountListFilters(section);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -406,17 +497,24 @@ class _Tabs extends ConsumerWidget {
             Padding(
               padding: const EdgeInsetsDirectional.only(end: AppSpacing.sm),
               child: ChoiceChip(
-                label: Text(tab.$3 == null ? tab.$2 : '${tab.$2} ${tab.$3}'),
-                selected: current == tab.$1,
+                key: ValueKey('account-filter-${tab.id ?? 'all'}'),
+                label: Text(_filterLabel(summary, tab)),
+                selected: current == tab.id,
                 onSelected: (_) {
                   ref.read(accountFilterProvider(section).notifier).state =
-                      tab.$1;
+                      tab.id;
                 },
               ),
             ),
         ],
       ),
     );
+  }
+
+  String _filterLabel(AccountsSummaryDto summary, AccountListFilter tab) {
+    final count = accountFilterCount(summary, tab.count);
+    if (count == null) return tab.label;
+    return '${tab.label} $count';
   }
 }
 
@@ -425,7 +523,6 @@ class _AccountCard extends StatelessWidget {
     required this.section,
     required this.card,
     required this.money,
-    required this.online,
     required this.canWrite,
     required this.assigning,
     required this.selected,
@@ -438,7 +535,6 @@ class _AccountCard extends StatelessWidget {
   final AccountSection section;
   final AccountCardDto card;
   final MoneyFormatter money;
-  final bool online;
   final bool canWrite;
   final bool assigning;
   final bool selected;
@@ -459,16 +555,26 @@ class _AccountCard extends StatelessWidget {
     );
     final flat = useFlatAgeCard(width, Theme.of(context).brightness);
     final colored = visual.colored;
-    final fg = colored
-        ? colors.onStatus
-        : Theme.of(context).colorScheme.onSurface;
+    final scheme = Theme.of(context).colorScheme;
+    final fg = colored ? colors.onStatus : scheme.onSurface;
     final accent = colored
         ? (visual.accent ?? colors.onStatus)
-        : Theme.of(context).colorScheme.onSurfaceVariant;
+        : scheme.onSurfaceVariant;
+    final age = singleAgeText(
+      serverLabel: card.ageStatusLabel,
+      ageStatus: card.ageStatus,
+      section: section,
+      debtAgeDays: card.debtAgeDays,
+    );
+    final showPin = canWrite;
+    final showZero = onZero != null && !card.systemManaged;
+    final showAssign = assigning && canSelectAccountForAssignment(card);
+    final showActions = showAssign || showPin || showZero;
     return Material(
+      key: Key('account-card-${card.id}'),
       color: colored
           ? (flat ? visual.flat : colors.neutralCard)
-          : Theme.of(context).colorScheme.surface,
+          : scheme.surface,
       borderRadius: BorderRadius.circular(AppRadii.card),
       clipBehavior: Clip.antiAlias,
       child: Ink(
@@ -481,7 +587,7 @@ class _AccountCard extends StatelessWidget {
                 ? colors.zeroCardBorder
                 : colored
                 ? colors.onStatus.withValues(alpha: 0.2)
-                : Theme.of(context).colorScheme.outline,
+                : scheme.outline,
           ),
         ),
         child: InkWell(
@@ -493,15 +599,28 @@ class _AccountCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (visual.label != null)
-                    Text(visual.label!, style: cairo(11, 800, color: accent)),
+                  if (age != null)
+                    Text(
+                      age,
+                      key: Key('account-age-${card.id}'),
+                      style: cairo(11, 800, color: accent),
+                    ),
                   Text(card.name, style: cairo(16, 800, color: fg)),
                   if (card.phone != null)
-                    LtrText(card.phone!, style: cairo(12, 500, color: accent)),
-                  MoneyText(
+                    _StartAlignedText(
+                      card.phone!,
+                      style: cairo(12, 500, color: accent),
+                    ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _StartAlignedText(
                     money.formatOrDash(card.balanceUnits, card.currency),
-                    style: context.textExtras.amountLarge.copyWith(color: fg),
+                    style: context.textExtras.amountLarge.copyWith(
+                      color: fg,
+                      fontFamily: 'JetBrainsMono',
+                    ),
+                    mono: true,
                   ),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
                     '${AppStrings.lastActivity}: ${formatIsoDate(card.lastActivityAt)}',
                     style: cairo(11, 500, color: accent),
@@ -511,55 +630,67 @@ class _AccountCard extends StatelessWidget {
                       '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
                       style: cairo(11, 600, color: accent),
                     ),
-                  if (card.debtAgeDays != null)
-                    Text(
-                      sinceDays(card.debtAgeDays),
-                      style: cairo(11, 500, color: accent),
-                    ),
                   if (card.systemManaged)
                     Row(
                       children: [
                         Icon(Icons.lock_outline, size: 16, color: fg),
                         const SizedBox(width: AppSpacing.xs),
-                        Text(
-                          AppStrings.systemCard,
-                          style: cairo(11, 800, color: fg),
+                        Expanded(
+                          child: Text(
+                            AppStrings.systemCard,
+                            style: cairo(11, 800, color: fg),
+                          ),
                         ),
                       ],
                     ),
-                  Wrap(
-                    spacing: AppSpacing.xs,
-                    children: [
-                      if (assigning)
-                        Checkbox(value: selected, onChanged: (_) => onToggle()),
-                      if (canWrite)
-                        GuardedMutation(
-                          buttonKey: Key('pin-${card.id}'),
-                          inputs:
-                              'pin:${card.id}:${card.pinned}:${card.version}',
-                          expectedVersion: card.version,
-                          label: card.pinned
-                              ? AppStrings.unpin
-                              : AppStrings.pin,
-                          tooltip: card.pinned
-                              ? AppStrings.unpin
-                              : AppStrings.pin,
-                          icon: card.pinned
-                              ? Icons.push_pin
-                              : Icons.push_pin_outlined,
-                          onSubmit: (meta) => onPin(meta),
-                        ),
-                      if (onZero != null && !card.systemManaged)
-                        GuardedMutation(
-                          buttonKey: const Key('zero-review'),
-                          inputs: 'zero:${card.id}:${card.version}',
-                          expectedVersion: card.version,
-                          label: AppStrings.zeroReview,
-                          filled: false,
-                          onSubmit: (meta) => onZero!(meta),
-                        ),
-                    ],
-                  ),
+                  if (showActions) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Divider(
+                      height: 1,
+                      color: colored
+                          ? colors.onStatus.withValues(alpha: 0.24)
+                          : scheme.outlineVariant,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Wrap(
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        if (showAssign)
+                          Checkbox(
+                            value: selected,
+                            onChanged: (_) => onToggle(),
+                          ),
+                        if (showPin)
+                          GuardedMutation(
+                            buttonKey: Key('pin-${card.id}'),
+                            inputs:
+                                'pin:${card.id}:${card.pinned}:${card.version}',
+                            expectedVersion: card.version,
+                            label: card.pinned
+                                ? AppStrings.unpin
+                                : AppStrings.pin,
+                            tooltip: card.pinned
+                                ? AppStrings.unpin
+                                : AppStrings.pin,
+                            icon: card.pinned
+                                ? Icons.push_pin
+                                : Icons.push_pin_outlined,
+                            onSubmit: (meta) => onPin(meta),
+                          ),
+                        if (showZero)
+                          GuardedMutation(
+                            buttonKey: ValueKey('zero-review-${card.id}'),
+                            inputs: 'zero:${card.id}:${card.version}',
+                            expectedVersion: card.version,
+                            label: AppStrings.zeroReview,
+                            filled: false,
+                            onSubmit: (meta) => onZero!(meta),
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -612,40 +743,56 @@ class _RateCardState extends ConsumerState<_RateCard> {
             message: ref.read(errorHandlerProvider).toFailure(error).message,
             onRetry: () => ref.invalidate(exchangeRateProvider),
           ),
-          data: (data) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                AppStrings.rateTitle,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              LtrText(
-                money.formatDecimalOrDash(data.egpPerLyd),
-                style: context.textExtras.amountLarge,
-              ),
-              Text(formatIsoDate(data.updatedAt)),
-              if (permissions.canWrite(SectionKey.egyptianDeposits)) ...[
-                const SizedBox(height: AppSpacing.md),
-                TextField(
-                  key: const Key('rate-field'),
-                  controller: _rate,
-                  textDirection: TextDirection.ltr,
-                  decoration: const InputDecoration(labelText: AppStrings.rate),
+          data: (data) {
+            final canEdit = permissions.canWrite(SectionKey.egyptianDeposits);
+            final theme = Theme.of(context);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(AppStrings.rateTitle, style: theme.textTheme.titleSmall),
+                const SizedBox(height: AppSpacing.xs),
+                _StartAlignedText(
+                  money.formatDecimalOrDash(data.egpPerLyd),
+                  style: context.textExtras.amountLarge.copyWith(
+                    fontFamily: 'JetBrainsMono',
+                  ),
+                  mono: true,
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                GuardedMutation(
-                  buttonKey: const Key('save-rate'),
-                  inputs: _rate.text,
-                  expectedVersion: data.version,
-                  label: AppStrings.save,
-                  confirmText: AppStrings.confirm,
-                  normalizedValue: DecimalString.tryParse(_rate.text)?.value,
-                  onSubmit: _save,
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  '${AppStrings.date}: ${formatIsoDate(data.updatedAt)}',
+                  style: theme.textTheme.bodySmall,
                 ),
+                if (canEdit) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  TextField(
+                    key: const Key('rate-field'),
+                    controller: _rate,
+                    textDirection: TextDirection.ltr,
+                    textAlign: TextAlign.start,
+                    decoration: const InputDecoration(
+                      labelText: AppStrings.rate,
+                      isDense: false,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  GuardedMutation(
+                    buttonKey: const Key('save-rate'),
+                    inputs: _rate.text,
+                    expectedVersion: data.version,
+                    label: AppStrings.save,
+                    confirmText: AppStrings.confirm,
+                    normalizedValue: DecimalString.tryParse(_rate.text)?.value,
+                    onSubmit: _save,
+                  ),
+                ],
+                if (_message != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(_message!, style: theme.textTheme.bodyMedium),
+                ],
               ],
-              if (_message != null) Text(_message!),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -718,17 +865,29 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
         TextField(
           key: const Key('create-name'),
           controller: _name,
-          decoration: const InputDecoration(labelText: AppStrings.name),
+          decoration: const InputDecoration(
+            labelText: AppStrings.name,
+            isDense: false,
+          ),
         ),
+        AccountNameSuggestions(section: widget.section, query: _name.text),
         const SizedBox(height: AppSpacing.md),
         TextField(
           controller: _phone,
           keyboardType: TextInputType.phone,
           textDirection: TextDirection.ltr,
-          decoration: const InputDecoration(labelText: AppStrings.phone),
+          textAlign: TextAlign.start,
+          decoration: const InputDecoration(
+            labelText: AppStrings.phone,
+            isDense: false,
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
-        UnitsField(controller: _opening, label: AppStrings.openingBalance),
+        UnitsField(
+          controller: _opening,
+          label: AppStrings.openingBalance,
+          dense: false,
+        ),
         const SizedBox(height: AppSpacing.lg),
         GuardedMutation(
           buttonKey: const Key('save-account'),
@@ -747,13 +906,12 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
   };
 
   Future<String?> _submit(MutationMeta meta) async {
-    final opening = _opening.text.trim().isEmpty
-        ? null
-        : parseUnits(_opening.text);
-    if (_name.text.trim().isEmpty) return AppStrings.integerOnly;
-    if (_opening.text.trim().isNotEmpty && opening == null) {
-      return AppStrings.integerOnly;
-    }
+    final message = createAccountValidationMessage(
+      name: _name.text,
+      opening: _opening.text,
+    );
+    if (message != null) return message;
+    final opening = openingBalanceOrNull(_opening.text);
     try {
       final ack = await ref
           .read(apiLayerProvider)
@@ -807,32 +965,40 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
         onRetry: () => ref.invalidate(assigneesProvider),
       ),
       data: (rows) {
-        final ids = [
-          for (final row in rows)
-            if (row['id'] != null) '${row['id']}',
-        ];
+        final theme = Theme.of(context);
+        final scheme = theme.colorScheme;
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          key: const Key('assignee-field'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            DropdownButton<String>(
-              key: const Key('assignee-field'),
-              isExpanded: true,
-              hint: const Text(AppStrings.assignee),
-              value: ids.contains(_assignee) ? _assignee : null,
-              items: [
-                for (final row in rows)
-                  DropdownMenuItem(
-                    value: '${row['id']}',
-                    child: Text('${row['displayName'] ?? row['id']}'),
-                  ),
-              ],
-              onChanged: (value) => setState(() => _assignee = value),
-            ),
-            GuardedMutation(
-              buttonKey: const Key('save-assignment'),
-              inputs: '${widget.customerIds.join(",")}|$_assignee',
-              label: AppStrings.assign,
-              onSubmit: _submit,
+            Text(AppStrings.assignee, style: theme.textTheme.titleSmall),
+            if (!widget.online) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                AppStrings.offline,
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.error),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.sm),
+            if (rows.isEmpty)
+              Text(AppStrings.noAssignees, style: theme.textTheme.bodyMedium)
+            else
+              for (final row in rows)
+                _AssigneeChoice(
+                  id: '${row['id']}',
+                  label: '${row['displayName'] ?? row['id']}',
+                  selected: _assignee == '${row['id']}',
+                  onSelected: (id) => setState(() => _assignee = id),
+                ),
+            const SizedBox(height: AppSpacing.sm),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: GuardedMutation(
+                buttonKey: const Key('save-assignment'),
+                inputs: '${widget.customerIds.join(",")}|$_assignee',
+                label: AppStrings.assign,
+                onSubmit: _submit,
+              ),
             ),
           ],
         );
@@ -864,5 +1030,180 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
     } catch (error) {
       return ref.read(errorHandlerProvider).toFailure(error).message;
     }
+  }
+}
+
+/// One column when text is large enough that two cards would be unreadably
+/// narrow. [width] is the screen width in logical pixels.
+int accountListColumns(double width, {double textScale = 1}) {
+  final scale = textScale <= 0 ? 1.0 : textScale;
+  return AppBreakpoints.cardColumns(width / scale);
+}
+
+/// Amounts and phone numbers stay left-to-right and sit on the RTL start edge.
+class _StartAlignedText extends StatelessWidget {
+  const _StartAlignedText(this.text, {required this.style, this.mono = false});
+
+  final String text;
+  final TextStyle style;
+  final bool mono;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: Text(
+        text,
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.end,
+        softWrap: true,
+        style: mono
+            ? style.copyWith(
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: const ['Cairo'],
+              )
+            : style,
+      ),
+    );
+  }
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric({
+    required this.label,
+    required this.value,
+    required this.valueStyle,
+    required this.amountStyle,
+  });
+
+  final String label;
+  final String value;
+  final TextStyle? valueStyle;
+  final TextStyle amountStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 140, maxWidth: 420),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: valueStyle),
+          const SizedBox(height: AppSpacing.xs),
+          _StartAlignedText(value, style: amountStyle, mono: true),
+        ],
+      ),
+    );
+  }
+}
+
+class _TickerLine extends StatelessWidget {
+  const _TickerLine({
+    required this.debt,
+    required this.card,
+    required this.money,
+  });
+
+  final OldDebtDto debt;
+  final AccountCardDto? card;
+  final MoneyFormatter money;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final age = singleAgeText(
+      serverLabel: debt.ageStatusLabel,
+      ageStatus: debt.ageStatus,
+      debtAgeDays: debt.debtAgeDays,
+    );
+    final currency = card?.currency ?? debt.currency;
+    final units = card?.balanceUnits ?? debt.balanceUnits;
+    final amount = currency == null
+        ? AppStrings.dash
+        : money.formatOrDash(units, currency);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RichText(
+              textDirection: Directionality.of(context),
+              textAlign: TextAlign.start,
+              text: TextSpan(
+                text: debt.name,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: scheme.onSurface,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            _StartAlignedText(
+              amount,
+              style: context.textExtras.amount,
+              mono: true,
+            ),
+            if (age != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(age, key: Key('ticker-age-${debt.id}')),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AssigneeChoice extends StatelessWidget {
+  const _AssigneeChoice({
+    required this.id,
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String id;
+  final String label;
+  final bool selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: selected ? scheme.secondaryContainer : scheme.surface,
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      child: InkWell(
+        onTap: () => onSelected(id),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                  color: scheme.primary,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(child: Text(label)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

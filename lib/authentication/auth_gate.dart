@@ -44,8 +44,9 @@ String? permissionRedirect(String location, PermissionService permissions) {
       path == '/account/password') {
     return null;
   }
-  if (path == '/settings') {
+  if (path == '/settings' || path.startsWith('/settings/')) {
     final manage = permissions.canDo(ManagementAction.settingsManage);
+    if (path != '/settings') return manage ? null : '/';
     if (permissions.canViewFinancialLedger || manage) return null;
     return '/';
   }

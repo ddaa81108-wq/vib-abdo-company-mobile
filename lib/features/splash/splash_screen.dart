@@ -4,21 +4,61 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/session_providers.dart';
 import '../../ui/strings.dart';
+import '../../ui/tokens.dart';
 
 class SplashScreen extends ConsumerWidget {
   const SplashScreen({super.key});
 
   static const screenKey = Key('splash');
+  static const retryKey = Key('splash-retry');
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final startup = ref.watch(startupProvider);
-    final message = startup.hasError
-        ? ref.watch(errorHandlerProvider).toFailure(startup.error!).message
-        : AppStrings.loading;
-    return Scaffold(
+    if (startup.hasError) {
+      final theme = Theme.of(context);
+      final message = ref
+          .watch(errorHandlerProvider)
+          .toFailure(startup.error!)
+          .message;
+      return Scaffold(
+        key: screenKey,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsetsDirectional.all(AppSpacing.xxl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 40,
+                    color: theme.colorScheme.error,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  FilledButton(
+                    key: retryKey,
+                    onPressed: () => ref.invalidate(startupProvider),
+                    child: const Text(AppStrings.retry),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return const Scaffold(
       key: screenKey,
-      body: Center(child: Text(message)),
+      body: Center(child: Text(AppStrings.loading)),
     );
   }
 }

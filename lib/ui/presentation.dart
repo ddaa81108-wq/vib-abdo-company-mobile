@@ -19,9 +19,43 @@ String formatIsoDate(DateTime? value) {
   return '$y-$m-$d';
 }
 
+/// Shared day count for the ledger and the home row: always «منذ N أيام».
+///
+/// List cards use [ageCountPhrase] instead, so this wording stays stable for
+/// every existing caller.
 String sinceDays(int? days) {
   if (days == null) return AppStrings.dash;
   return '${AppStrings.sinceDays} $days ${AppStrings.days}';
+}
+
+/// List-only Arabic count. 1 → منذ يوم، 2 → منذ يومين، 3–10 → منذ N أيام،
+/// and every other count (including 0 and negatives) → منذ N يومًا.
+String ageCountPhrase(int days) {
+  if (days == 1) return '${AppStrings.sinceDays} ${AppStrings.dayOne}';
+  if (days == 2) return '${AppStrings.sinceDays} ${AppStrings.dayTwo}';
+  final unit = days >= 3 && days <= 10 ? AppStrings.days : AppStrings.dayMany;
+  return '${AppStrings.sinceDays} $days $unit';
+}
+
+/// One age phrase for a card or a ticker row.
+///
+/// The contract's age words are [serverLabel] (`ageStatusLabel`). Colour and
+/// that label come from the server status; [debtAgeDays] is only a raw count.
+/// The count is not printed beside the label, and it is not turned into a
+/// 3/7-day status. It is formatted only when the server sent no label and no
+/// status name, so the row still has a single age.
+String? singleAgeText({
+  String? serverLabel,
+  String? ageStatus,
+  AccountSection? section,
+  int? debtAgeDays,
+}) {
+  final ready = serverLabel?.trim();
+  if (ready != null && ready.isNotEmpty) return serverLabel;
+  final named = _fallbackLabel(ageStatus, section);
+  if (named != null) return named;
+  if (debtAgeDays != null) return ageCountPhrase(debtAgeDays);
+  return null;
 }
 
 /// Colour and label come from the server [ageStatus] only.
@@ -106,6 +140,21 @@ String? _fallbackLabel(String? ageStatus, AccountSection? section) {
     'new' => AppStrings.newDebt,
     _ => null,
   };
+}
+
+/// Shared stack threshold for the ledger and the edit-card screen.
+///
+/// Below this width, or at [stackLayoutTextScale] and above, amounts and
+/// actions stack. At 360 dp and the default text scale they stay on one row.
+const double stackLayoutWidth = 360;
+
+/// Text scale at which the ledger and the edit-card screen stack.
+const double stackLayoutTextScale = 1.3;
+
+bool layoutIsTight(BuildContext context) {
+  final width = MediaQuery.sizeOf(context).width;
+  final scale = MediaQuery.textScalerOf(context).scale(1);
+  return width < stackLayoutWidth || scale >= stackLayoutTextScale;
 }
 
 /// Age colours are the same hex at every width. The tablet flat palette is not
@@ -196,6 +245,10 @@ bool dayIsEditable(String? status) =>
     status == 'open' ||
     status == 'correction' ||
     status == 'correctionOpen';
+
+/// Server day status means a correction session is open.
+bool dayCorrectionIsOpen(String? status) =>
+    status == 'correction' || status == 'correctionOpen';
 
 String notificationFallback(String action) => switch (action) {
   'collection.submit' => 'استلام جديد بانتظار المراجعة',
