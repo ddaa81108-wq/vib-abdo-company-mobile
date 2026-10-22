@@ -29,7 +29,7 @@
 | مطور الواجهة | 4 | 2 | 2 | 0 |
 | DevOps | 3 | 0 | 2 | 1 |
 
-لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. البند 19 يبقى Device-only. لا توقيع.
+لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. مراجعة #56 على `9c0fa4f` لا تغيّر الأعداد: Covered ‏3 وPartial ‏15 وDevice-only ‏1. البند 19 يبقى Device-only. لا توقيع.
 
 أكبر الفجوات لكل مالك في نهاية القسم أ.
 
@@ -65,7 +65,8 @@
 
 - **المالك:** مهندس API
 - **الموجود:** مجلد `packages/api_layer/test/` كله هو مجموعة البند. أمثلة: `fake_flow_test.dart` `fake login -> me -> accounts -> mutation with requestId -> logout`؛ `qa_defects_round1_test.dart` `partial payment stores the new balance and rejects a stale version`؛ `permission_service_test.dart` `employee: write needs BOTH *.write and sectionAccess=manage; read needs *.read and != none`؛ `staging_http_test.dart` (محوّل داخل العملية، لا مضيف)؛ `get_retry_auth_header_test.dart`؛ `release_fake_api_guard_test.dart` `release mode rejects a fake client at runtime`؛ `cookie_csrf_strategy_test.dart`؛ `notification_repository_test.dart`. معرّفات القبول: P0-04، P1-16، وعقود P2 وP3 على الخادم التجريبي.
-- **الفجوة:** **P7-01** دخان staging حي: `POST /api/auth/login` ثم `GET /api/auth/me` ثم قراءة قسم وكتابة واحدة على `STAGING_API_BASE`. المستوى staging.
+- **الفجوة:** **P7-01** دخان staging حي: `POST /api/auth/login` ثم `GET /api/me` ثم قراءة قسم وكتابة واحدة على `STAGING_API_BASE`. المستوى staging. السؤال المفتوح لمالك الخادم: هل `GET /api/me` هو العقد؟ العميل لا ينادي `GET /api/auth/me`.
+- **بعد #56:** `staging_smoke_test.dart` ينادي `markTestSkipped` ويعود قبل `ApiLayer.create` إذا غاب `STAGING_API_BASE` أو `STAGING_ADMIN_USERNAME` أو `STAGING_ADMIN_PASSWORD`. تشغيل `tool/check.sh` على `9c0fa4f` طبع رسالة التخطي ثم `+197 ~1`. هذا **not run** وليس Pass. لا أسرار في المستودع. الحالة Partial.
 - **منع الاستبدال:** لا `FakeApiClient` ولا `HttpClientAdapter` يدوي في P7-01. `staging_http_test.dart` لا يُغلق هذا الصف.
 - **المستوى:** unit اليوم، staging للدخان.
 - **الحالة:** Partial
@@ -75,6 +76,7 @@
 - **المالك:** مهندس API
 - **الموجود:** `test/login_flow_test.dart`: `employee sees only server-granted sections and the server unread count`، `admin with no permission list sees the sections the flag opens`، `rejected sign-in stays on the login screen and shows the server message`، `empty sign-in does not call the session`. `test/authentication/auth_gate_test.dart`: `unknown session stays on the splash route`، `signed-out session is sent to login`، `authenticated session leaves login and splash`، `a required password change blocks every other route`. `test/fake_server_defects_test.dart` `DEF-008 mustchange.demo is kept on the change-password screen`. `test/session_logout_presentation_test.dart` `logout asks first, cancel stays signed in, confirm uses the existing logout`. الحزمة: `packages/api_layer/test/fake_qa_defects_test.dart` `DEF-008 mustchange.demo returns mustChangePassword until it is changed`؛ `permissions/session_permission_negative_test.dart` `login 401 stays invalid credentials and any later 401 or bare 419 does not`. القبول: P1-01، P1-02، P1-03، P1-04، P1-12، P1-13، P1-14، P1-17، P5-13، P5-14.
 - **الفجوة:** **P7-02** دخول staging للأدوار عبر نموذج الدخول و`CookieCsrfAuthStrategy`، وكلمة خاطئة تبقى `INVALID_CREDENTIALS`. **P7-03** إغلاق العملية ثم فتحها فيستعيد `SecureDeviceTokenStore` / مخزن الجلسة الجلسة بلا حقن `SessionAuthenticated`. المستوى: staging ثم device.
+- **بعد #56:** سبعة اختبارات `P7-02` على `SessionManager` و`AuthInterceptor` و`CookieCsrfAuthStrategy`، والمحوّل وحده مزيّف. ودجت واحد لنموذج الدخول على `FakeApiClient`. طلبان مصادقان بـ 401 ينتجان `session_expired` مرة واحدة بلا `GET /api/auth/csrf`. 419 برمز `PAGE_EXPIRED` ينهي الجلسة ولا يجلب CSRF. 419 الذي يحمل CSRF يجدّد مرة ويعيد الكتابة والجلسة تبقى `SessionAuthenticated`؛ الفشل الثاني يرمي `CsrfInvalidException` بلا خروج. دخول 401 يبقى `InvalidCredentialsException` و`INVALID_CREDENTIALS` ولا يمسح جلسة قائمة. دخول الأدوار على staging وP7-03 باقيان. لا اسم اختبار لـ P7-03. الحالة Partial.
 - **منع الاستبدال:** لا تمرير `sessionStateProvider` جاهز في P7-02 وP7-03. لا `MemoryDeviceTokenStore` حين الادعاء إعادة التشغيل.
 - **المستوى:** widget على Fake. الفجوة staging وdevice.
 - **الحالة:** Partial
@@ -83,7 +85,9 @@
 
 - **المالك:** مهندس API
 - **الموجود:** وسم `permissions-negative`. التطبيق: `test/employee_permission_negative_test.dart`، `test/employee_totals_permission_negative_test.dart` `limited admin provider state is forbidden until DEF-002`، `test/permissions/employee_gating_permission_negative_test.dart` `an employee does not see totals or decide, and the fake server rejects both`، `test/permissions/session_permission_negative_test.dart`، `test/permissions/treasury_section_permission_negative_test.dart`، `test/permissions/push_transport_permission_negative_test.dart`، `test/permissions/system_tray_permission_negative_test.dart`. الحزمة: `packages/api_layer/test/employee_permission_negative_test.dart` `a missing session is 401 and limited admin still has decide`، `employee_totals_permission_negative_test.dart`، `permissions/session_permission_negative_test.dart`، `permissions/session_wipe_permission_negative_test.dart` `employee cannot decide, reject, or reach management routes on the fake`، `permissions/treasury_section_permission_negative_test.dart`، `permissions/notifications_permission_negative_test.dart`. أيضًا `permission_service_test.dart` و`test/permissions_ui_test.dart` `explicit fullAccess false opens no sections and no actions`. القبول: P1-05 إلى P1-11، P1-15، P5-10، P5-11، P5-20، P5-21، P5-30، P5-32، P5-40، P5-42، P3-02، P3-03.
-- **الفجوة:** **P7-04** مصفوفة staging: الموظف 403 على الاعتماد والخزينة والإعدادات، والمدير 200 على قراءة قسم، ومن `GET /api/auth/me` لا من `PermissionService()` مبني في الاختبار. DEF-002 يبقى Pending PM: نجاح اعتماد `limited.admin` على Fake لا يُغلق البند.
+- **الفجوة:** **P7-04** مصفوفة staging: الموظف 403 على الاعتماد والخزينة والإعدادات، والمدير 200 على قراءة قسم، ومن `GET /api/me` لا من `PermissionService()` مبني في الاختبار. DEF-002 يبقى Pending PM: نجاح اعتماد `limited.admin` على Fake لا يُغلق البند.
+- **سؤال مفتوح لمالك الخادم:** هل `GET /api/me` هو عقد الصلاحيات؟ الثابت `ApiEndpoints.me` هو `/api/me`. `ProfileRepository.get` وعامل الاستطلاع `notification_poll_worker.dart` يناديانه، وتعليق `SessionManager` يصف الدخول ثم `GET /api/me`. لا سلسلة `auth/me` تحت `lib/` ولا `packages/api_layer/lib`. #56 لا يضيف المسار الآخر.
+- **بعد #56:** سبعة اختبارات باسم P7-04. خمسة أدوار ثم المدير على `FakeApiClient` عبر `session.login`. اختبار الجسم يغيّر رد `GET /api/me` على المحوّل ويؤكد أن المسارات لا تحتوي `/api/auth/me`. مصفوفة staging وDEF-002 باقيان. الحالة Partial.
 - **منع الاستبدال:** لا `applyFromServer` يدوي مكان رد الدخول في P7-04. اختبار الوحدة على `PermissionService` يبقى دليل عقد، لا دليل خادم.
 - **المستوى:** unit + widget. الفجوة staging.
 - **الحالة:** Partial
@@ -163,6 +167,7 @@
 - **المالك:** مهندس API
 - **الموجود:** حقن انقطاع، لا وضع طيران. `test/review_round_test.dart` `offline disables writes and the status line follows connectivity`. `test/review_round2_test.dart`: `an open form save is disabled while offline`، `missing platform connectivity follows the last API result`. `test/ledger_presentation_test.dart` `offline disables ledger writes until the link returns`. `test/account_list_ui_test.dart` `offline keeps permitted writes visible and disabled`. `test/purchases_presentation_test.dart` `offline keeps purchase actions visible and disabled`. `test/collections_presentation_test.dart` `empty, loading, payroll error, and offline stay consistent`. `test/shell_group_test.dart` `offline disables notification writes and account edits`. `test/treasury_reports_polish_test.dart` `treasury tone, empty ledger, offline, and hidden writes`. القبول: P6-21، L6-06.
 - **الفجوة:** **P7-19** وضع الطيران على الجهاز أثناء سداد وأثناء جلب قائمة. بعد القطع لا صف جديد. المستوى device.
+- **بعد #56:** اختبارا ودجت يفقدان الاتصال على Dio (`useFakeApi: false` ومحوّل). القراءة تبقي القائمة والمسودة وتعرض رسالة الشبكة و`AppStrings.offline`. الكتابة تبقي النص وترسل POST واحدًا. `connectivityPortProvider` يُقلب إلى none أثناء الطلب، والصدفة `_CustomersShell` لا `buildAppRoot`، و`retry` يرجع `null`. الحقن لا يُغلق P7-19. وضع الطيران يبقى يدويًا على الجهاز. الحالة Partial.
 - **منع الاستبدال:** `connectivityProvider` أو `ConnectivityResult.none` المحقون لا يُغلق P7-19. الراديو الحقيقي هو الشرط.
 - **المستوى:** widget للعقد. الفجوة device.
 - **الحالة:** Partial
@@ -172,6 +177,7 @@
 - **المالك:** مهندس API
 - **الموجود:** `packages/api_layer/test/get_retry_auth_header_test.dart` يعيد GET بعد 502/503 بلا ترويسة قديمة. `docs/staging.md`: GET/HEAD قد تُعاد لأخطاء الاتصال و502/503/504 مرتين كحد أقصى؛ الكتابة لا يعيدها النقل. `test/section_errors_test.dart` أزرار إعادة الجلب. `test/shell_group_test.dart` `a failed startup offers retry on the splash` و`notifications show an error with retry and an empty state`. `test/submission_lock_test.dart` `a retry of the same inputs reuses the request id`. `packages/api_layer/test/staging_http_test.dart` `401 clears the session once and is not retried`.
 - **الفجوة:** **P7-20** بعد عودة الراديو في P7-19: إعادة السداد من الواجهة تحمل `requestId` المحاولة نفسها، والنقل لا يرسل POST ثانيًا من تلقاء نفسه. جلب القائمة قد يُعاد كـ GET. المستوى device مع staging.
+- **بعد #56:** ثمانية اختبارات لإعادة GET/HEAD (400ms ثم 1200ms، و502/503/504، والمهلات، وRetry-After) ولعدم إعادة الكتابة و4xx و500 و401 و419. إعادة سداد فاشل تعيد `requestId` نفسه وتترك صف دفتر واحدًا. الصف الواحد على المعرّف المكرر من `FakeApiClient._mutate`، لا من `unique()` في الاختبار. المبلغ 10 فلا يُغلق DEF-020. تعارض 409 في المستودع لا يفتح حوار السداد فلا يُغلق DEF-022. عودة الراديو ودفتر staging باقيان. الحالة Partial.
 - **منع الاستبدال:** لا مستودع يعيد النجاح محليًا. لا عدّاد اختبار بدل `GetRetryInterceptor` و`PendingMutation`.
 - **المستوى:** unit + widget. الفجوة device.
 - **الحالة:** Partial
@@ -181,6 +187,7 @@
 - **المالك:** مهندس API
 - **الموجود:** `packages/api_layer/test/fake_qa_defects_test.dart` `DEF-011 a repeated requestId returns the original success once`. `packages/api_layer/test/masraweya_day_test.dart` `DEF-013 a repeated requestId returns the first day and is not applied again`. `packages/api_layer/test/purchase_day_finalized_test.dart` `DEF-014 a stored requestId does not bypass the finalized-day check`. `test/write_safety_test.dart` `a collection form ignores a second tap while the send is in flight`. `test/submission_lock_test.dart`. `test/guarded_mutation_test.dart` `a version conflict keeps the request id when nothing changed`. `test/masraweya_save_test.dart` `a failed retry keeps the request id until the inputs or version change`. القبول: P2-05، P3-04. `requestId` على السلك ما زال بانتظار مالك الخادم (سؤال على #12، ليس عيبًا).
 - **الفجوة:** **P7-21** نقرتان على تأكيد السداد أو الاعتماد ضد staging: محاولة واحدة ظاهرة في الدفتر. إن غاب `requestId` من الجسم يُسجَّل سؤال خادم لا Pass صامت. المستوى staging.
+- **بعد #56:** معرّف مكرر وكتابتان معلّقتان ونقرة ثانية على `save-movement` تترك صف `tx_partial` واحدًا. النقرة الثانية تصطدم بـ `GuardedMutation`: `_lock.busy` يعيد فورًا و`onPressed` يصير `null`. الصف الواحد بعد اكتمال المعرّف هو `_pendingMutations` و`_completedMutations` داخل `FakeApiClient._mutate`. المبلغ 10. لا يُغلق DEF-020 ولا DEF-022. مراقبة دفتر staging باقية. الحالة Partial.
 - **منع الاستبدال:** لا قفل إرسال مستبدل ولا مولّد معرّف ثابت داخل الاختبار. المعرّف يأتي من قفل النموذج الحقيقي.
 - **المستوى:** unit + widget على Fake. الفجوة staging.
 - **الحالة:** Partial
@@ -250,7 +257,7 @@
 
 | المالك | ما يُكتب أولًا |
 |---|---|
-| مهندس API | P7-01 الدخان الحي. P7-02 الدخول الحقيقي. P7-04 مصفوفة الصلاحيات من `me`. P7-19 الطيران على الراديو. P7-20 وP7-21 إعادة المحاولة بلا حركة ثانية، و`requestId` ظاهر في الجسم أو سؤال خادم |
+| مهندس API | بعد #56 على `9c0fa4f` يبقى: دخان P7-01 (not run بلا أسرار staging)، ودخول الأدوار على staging، وP7-03 على الجهاز، ومصفوفة P7-04 الحية، وطيران P7-19، وعودة الراديو، ودفتر staging لـ P7-20 وP7-21. السؤال المفتوح: هل `GET /api/me` هو العقد؟ |
 | Senior Flutter | بعد #51: P7-05 وP7-06 وP7-12 مغلقة على الودجت ولم تُدمج. يبقى P7-07 مع DEF-012، وP7-08، وP7-10 مع DEF-020 وDEF-022، وP7-14 مع DEF-021، وصفوف staging P7-09 وP7-11 وP7-13 وP7-15 |
 | مطور الواجهة | بعد #49 يبقى الجهاز لـ P7-16 وP7-17 وP7-18 وP7-22. قتل العملية Not supported بلا FCM. DEF-023 وDEF-024 وDEF-025 مفتوحة وغير مانعة |
 | DevOps | بعد إعادة اختبار #52 على `f8f7812` يبقى: رقم P7-23 وP7-24 على الجهاز الضعيف في النموذج، وعتبة علي، ونصف الجهاز من P7-25، ومجموعة المعرّفات على مشي الحزمة لا على الشاشة، ونموذج P7-26 على الهواتف A–D. سير المحاكي لا يملأ النموذج |
@@ -262,7 +269,7 @@
 | P7-01 | دخان staging: دخول، `me`، قراءة، كتابة | staging |
 | P7-02 | دخول أدوار staging من النموذج | staging |
 | P7-03 | استعادة الجلسة بعد قتل العملية | device |
-| P7-04 | مصفوفة صلاحيات من `GET /api/auth/me` | staging |
+| P7-04 | مصفوفة صلاحيات من `GET /api/me`. السؤال المفتوح: هل هذا مسار العقد؟ | staging |
 | P7-05 | دور واحد لكل حساب من نموذج الدخول على Fake | widget |
 | P7-06 | قراءة كل `SectionKey` بلا استبدال لوحة الرئيسية | widget |
 | P7-07 | إعدادات الموظفين والتدقيق والعمليات ببيانات أو تبقى DEF-012 | staging |
@@ -760,6 +767,73 @@ CI التشغيل `39706304193` أخضر.
 **merge-tree.** خروج 0 ضد `main`، و#48 `ac4ca04`، و#49 `621f01b`، و#51 `e34504c`، و#52 `f8f7812`، و#53 `08e6b13`، و#54 `ae54838`، و#55 `fc140f9`. الشجرات: `559775c0` و`9734a5c5` و`a2c2944d` و`71ad271e` و`24ebb634` و`a8469fdc` و`367f17eb` و`0380aa74`. `fake_api_client.dart` مشترك مع #52 و#53 والدمج بلا تعارض. لا ملف مشترك مع #49. لم يُنشأ دمج.
 
 DEF-019 لا يُغلق على `main` قبل الدمج. لا عيب جديد. التالي الحر يبقى DEF-026.
+
+---
+
+### مراجعة #56 — الجلسة والمرونة
+
+الطلب [#56](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/56) مسودة. الرأس `9c0fa4ff81763f5496babc97082a81dd2f166479`. الأساس `main` `a5ca26809578dd013430dcaae78c517043e95491`. الفرع `cursor/phase7-api-session-resilience-tests`. التزام واحد: «Add phase 7 API session and resilience tests». 14 ملفًا، +2479/−7. لم يُدمج. هذه المراجعة لم تدفع إلى فرعه ولم تغيّر كوده. لا توقيع. لا عيب جديد. التالي الحر DEF-026. رأس #50 المستخدم في الدمج هو `b7900a2c555aa3cccb3b562ed5f33b6f787fd527`.
+
+**الحكم:** yes with notes. البنود 1 و2 و3 و11 و12 و13 تبقى Partial. البند 19 يبقى Device-only. P7-03 بلا تغطية. وضع الطيران يدوي. DEF-020 وDEF-022 يبقيان مفتوحين.
+
+CI التشغيل [39711134480](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions/runs/39711134480) أخضر على هذا الرأس: Analyze, test, and debug APK، وNegative permission tests، وRelease build rejects fake API. العنوان «Add phase 7 API session and resilience tests». الالتزام في التشغيل هو `9c0fa4f`.
+
+`tool/check.sh` على `/tmp/wt-56`، خروج 0. الأرقام تطابق وصف الطلب:
+
+| الخطوة | النتيجة |
+|---|---|
+| `flutter analyze` للتطبيق | `No issues found! (ran in 6.4s)` |
+| `flutter test --exclude-tags screenshots` | **376/0** |
+| `flutter analyze` في `packages/api_layer` | `No issues found! (ran in 2.8s)` |
+| `flutter test` في `packages/api_layer` | **197 ناجح، و1 تخطي (`~1`)** |
+| `--tags permissions-negative` التطبيق | **27/0** (7 ملفات) |
+| `--tags permissions-negative` الحزمة | **30/0** (7 ملفات) |
+| dry-run | **6/0** |
+| `preflight_test.sh` | `preflight_test ok` |
+| `scan_release_apk.py --self-test` | `scan_release_apk self-test ok` |
+| `USE_FAKE_API=true` في release | `Release compilation rejected USE_FAKE_API=true.` |
+| حارس الإصدار | **4/0** |
+
+**الأسماء والربط.** مجموعات P7-01 وP7-02 وP7-04 وP7-19 وP7-20 وP7-21 تحمل المعرف في اسم الاختبار، ووصف الطلب يربط كل مجموعة بالبند. العدد: P7-01 واحد، وP7-02 ثمانية (7 وحدة + ودجت)، وP7-04 سبعة، وP7-19 اثنان، وP7-20 ثمانية في سياسة الإعادة واثنان في المستودع وودجت واحد، وP7-21 اثنان في المستودع وودجت واحد. ملف `api_contract_test.dart` واحد وعشرون اختبارًا أسماؤها `P7 contract ...` بلا رقم مصفوفة. الوصف يضعها في جدول العقد لا في صف `P7-xx`. لا اسم `P7-03`.
+
+**ما يُزيَّف.** في الحزام و`ApiLayer.create`: المحوّل أو `FakeApiClient` هو حدود الخادم. `SessionManager` و`AuthInterceptor` و`CookieCsrfAuthStrategy` والمستودعات والنماذج هي نسخ الإنتاج. مصنع العميل ينشئ `GetRetryInterceptor()` بلا وسيط تأخير، فالانتظار الافتراضي يبقى `Future.delayed`. ودجت الدخول والسداد يمران على `pumpFakeApp`: مخازن ذاكرة وجدولة فارغة ومنفذ اتصال وخدمة إذن و`sdkInt` وبوابة دفع، فوق `FakeApiClient`. P7-19 يستبدل `connectivityPortProvider` ويضخ `_CustomersShell` لا `buildAppRoot`، و`retry` يرجع `null`. هذا لا يغلق الصفوف.
+
+**P7-01.** التخطي صريح: `markTestSkipped` ثم `return` قبل `ApiLayer.create` إن خلا أحد `STAGING_API_BASE` أو `STAGING_ADMIN_USERNAME` أو `STAGING_ADMIN_PASSWORD`. السجل طبع «P7-01 is opt-in…» ثم بقي العدّاد `~1` حتى `+197 ~1`. جملة المشغّل `All tests passed!` تعني صفر فشل. الدخان ليس داخل الـ 197. الحالة **not run** وليست Pass. كلمة المرور في الوثيقة عنصر نائب `<password>`. `demo-only` كلمة الخادم التجريبي القائمة. `dio: ^5.4.0` تحت `dev_dependencies` فقط. لا أثر على حارس الإصدار: الرفض و**4/0** كما في الجدول.
+
+**P7-02.** المسار هو الجلسة والمعترض الحقيقيان. 401 المصادق: طلبان متزامنان، والسبب `session_expired` مرة، والكعك فارغ، ولا `GET /api/auth/csrf`. 419 غير CSRF (`PAGE_EXPIRED`) يرمي `SessionExpiredException` ولا يجلب CSRF. 419 برمز CSRF على `changePassword`: كتابتان و`GET` واحد لتجديد الرمز، والجلسة تبقى مصادقة. خمس فشل CSRF ما زالت كتابتين وجلبًا واحدًا، والاستثناء `CsrfInvalidException`، بلا حلقة خروج. دخول 401: `INVALID_CREDENTIALS` ورمز 401، وجلسة قائمة لا تُمسح. ودجت النموذج يبقي كلمة خاطئة على الشاشة بجملة `بيانات الدخول غير صحيحة` ثم يصل إلى `HomeShell`.
+
+**P7-04 والمسار.** التطبيق ينادي `GET /api/me`. لا `auth/me` في `lib/` ولا في `packages/api_layer/lib`. نص المصفوفة السابق كان `GET /api/auth/me`؛ صُحّح في فجوة P7-01 وفجوة P7-04 وفهرس P7-04. **سؤال مفتوح لمالك الخادم:** أكّد أن `GET /api/me` هو العقد. #56 لا يضيف `/api/auth/me`. مصفوفة staging وDEF-002 باقيان.
+
+**P7-19.** خطأ اتصال على القراءة والكتابة، ثم `ConnectivityResult` عبر المنفذ إلى none. القائمة والمسودة تبقيان، والكتابة POST واحد. وضع الطيران على الجهاز يبقى يدويًا. الحقن لا يغلق البند 11 ولا P7-26.
+
+**P7-20 وP7-21 وDEF-020 وDEF-022.** معرّف النموذج من `SubmissionLock` عبر `GuardedMutation`. النقرة الثانية أثناء الانشغال لا تضيف طلبًا لأن `_run` يعود إذا كان `_lock.busy` والزر يُعطَّل. اختبار المستودع ينادي `accounts.addTransaction` مرتين بنفس `MutationMeta`، والصف الواحد من خريطة `FakeApiClient._mutate`: المعرّف المعلّق يُنتظر ولا يُسجَّل ثانية، والمعرّف المكتمل يعيد النجاح المخزَّن. الفشل لا يُحفظ، فإعادة المحاولة نفسها تنجح لاحقًا و`mutationRequestIds` يصير `[id, id]` وصف `tx_partial` واحد. المبلغ `inputValue` ‏10 لا 400، فلا سقف DEF-020. اختبار 409 يرمي `ConflictException` و`VERSION_CONFLICT` ولا يفتح حوار السداد، فـ DEF-022 (الحوار يلتقط الخطأ ويعيد `failureText`) يبقى مفتوحًا.
+
+**الإنتاج في الطلب، لا من هذه المراجعة.** `get_retry_interceptor.dart`: وسيط تأخير اختياري، والافتراضي `Future.delayed`. `pubspec.yaml`: `dio` اعتماد تطوير. `pubspec.lock`: `direct dev`. `docs/staging.md`: يوثّق تخطي P7-01 و`GET /api/me` مقابل نص المصفوفة القديم.
+
+**merge-tree.** لم يُنشأ دمج. لا ملف مشترك مع #48 أو #49 أو #50 أو #51.
+
+| الطرف | الخروج | الشجرة |
+|---|---|---|
+| `main` `a5ca26809578dd013430dcaae78c517043e95491` | 0 | `03a22e95ac4b39b4b78de1c8b9392dc82e8470dd` |
+| #48 `9aef5fec1cc72f1b2c2277bee859d65515da3755` | 0 | `18875d40874e155c1539d8437312f6b0476f90c1` |
+| #49 `546a62342eb78140d550abdfd138de5e0821c77a` | 0 | `72138ce32be8d962386bc4f3ed4c72cd3475cd2f` |
+| #50 `b7900a2c555aa3cccb3b562ed5f33b6f787fd527` | 0 | `266b170619c44638dbf840dfa206a8d6f5d528c2` |
+| #51 `e34504c5ee28bca367575ffe9ba2f0edde2817e0` | 0 | `fef710ffd41e04ca89e56a05dbff4315e87af063` |
+| #52 `f8f7812d203bd09fe0c5c124748d043694f3f5f9` | 1 | تعارض في `pubspec.yaml` |
+
+ضد #52 الملفان المشتركان `pubspec.yaml` و`pubspec.lock`. القفل اندمج تلقائيًا. التعارض في الاعتمادات: مراحل `c567d1ac316c90c955403be2c98aa9d8bcc01b95` و`58e9b6a7dac06539bdeec23f2a667f4d3158cb6e` (#52) و`6314bbe19c229339e5b1a6d505004427c2e3e7c2` (#56). لم يُحل.
+
+| المعرف | الحالة بعد #56 |
+|---|---|
+| P7-01 | Partial (not run) |
+| P7-02 | Partial |
+| P7-03 | Device، بلا تغطية |
+| P7-04 | Partial. السؤال المفتوح: `GET /api/me` |
+| P7-19 | Partial. الطيران يدوي |
+| P7-20 | Partial (DEF-020، DEF-022) |
+| P7-21 | Partial (DEF-020، DEF-022) |
+
+الملخص لم يتغير: Covered ‏3، وPartial ‏15، وDevice-only ‏1.
 
 ---
 
