@@ -188,6 +188,16 @@ class FakeApiClient implements ApiClient {
   /// Unlinked receipt fields changed by a decision or cash receipt. Keyed by id.
   final Map<String, Map<String, dynamic>> _unlinkedState = {};
 
+  /// Rows stored by assignment submit and unlinked-receipt submit.
+  ///
+  /// Each row keeps the fields the request sent. `status` is `pending` and
+  /// `version` is 1, matching an undecided fixture row. `submittedByUserId`
+  /// is the same owner id the fixture already stores so the caller still sees
+  /// their own row. `cashStatus` is not written: that wire field is proposed.
+  /// Overview metrics stay the stored literals; these rows are not summed.
+  final List<Map<String, dynamic>> _extraSubmissions = [];
+  final List<Map<String, dynamic>> _extraUnlinked = [];
+
   /// Purchase day fields changed by finalize or correction. Keyed by book|day.
   final Map<String, Map<String, dynamic>> _purchaseDays = {};
 
@@ -1308,6 +1318,12 @@ class FakeApiClient implements ApiClient {
     if (seg.length == 3 && seg[1] == 'days' && seg[2] == 'close') {
       return _applyClose(b);
     }
+    if (seg.length == 4 && seg[1] == 'assignments' && seg[3] == 'submissions') {
+      return _applyAssignmentSubmission(seg[2], b);
+    }
+    if (seg.length == 2 && seg[1] == 'unlinked-receipts') {
+      return _applyUnlinkedCreate(b);
+    }
     return _ok({'id': 'ok', 'version': 1});
   }
 
@@ -1514,6 +1530,12 @@ class FakeApiClient implements ApiClient {
       if (state != null) item.addAll(state);
       items.add(item);
     }
+    for (final extra in _extraSubmissions) {
+      final item = Map<String, dynamic>.from(extra);
+      final state = _submissionState['${item['id']}'];
+      if (state != null) item.addAll(state);
+      items.add(item);
+    }
     body['submissions'] = items;
     final receipts = <Map<String, dynamic>>[];
     for (final raw in body['unlinkedReceipts'] as List) {
@@ -1522,10 +1544,88 @@ class FakeApiClient implements ApiClient {
       if (state != null) item.addAll(state);
       receipts.add(item);
     }
+    for (final extra in _extraUnlinked) {
+      final item = Map<String, dynamic>.from(extra);
+      final state = _unlinkedState['${item['id']}'];
+      if (state != null) item.addAll(state);
+      receipts.add(item);
+    }
     body['unlinkedReceipts'] = receipts;
     final batch = _batchState;
     if (batch != null) body.addAll(batch);
     return body;
+  }
+
+  /// Stores one submission on an assignment the caller can see.
+  ///
+  /// An assignment outside that set is 404, the same body as a missing id.
+  /// The amount is the integer the request sent. This does not copy the
+  /// assignment balance and does not change overview metrics.
+  ApiResponse _applyAssignmentSubmission(String assignmentId, Map b) {
+    _requireVisibleAssignment(assignmentId);
+    final mode = b['mode'];
+    if (mode != 'full' && mode != 'partial') {
+      _fail(400, 'VALIDATION_ERROR', 'mode غير معروف');
+    }
+    int? amount;
+    if (mode == 'partial') {
+      final raw = b['amountUnits'];
+      if (raw is! int) _fail(400, 'VALIDATION_ERROR', 'amountUnits مطلوب');
+      amount = raw;
+    } else if (b['amountUnits'] is int) {
+      amount = b['amountUnits'] as int;
+    }
+    final id = 'sb_posted_${_extraSubmissions.length + 1}';
+    final name = _displayName();
+    _extraSubmissions.add({
+      'id': id,
+      'mode': mode,
+      if (amount != null) 'amountUnits': amount,
+      'status': 'pending',
+      'version': 1,
+      if (_userId != null) 'submittedByUserId': _userId,
+      if (name != null) 'submittedByName': name,
+    });
+    return _ok({'id': id, 'version': 1});
+  }
+
+  /// Stores one unlinked receipt for the signed-in caller.
+  ApiResponse _applyUnlinkedCreate(Map b) {
+    final name = b['customerName'];
+    if (name is! String || name.trim().isEmpty) {
+      _fail(400, 'VALIDATION_ERROR', 'customerName مطلوب');
+    }
+    final amount = b['amountUnits'];
+    if (amount is! int) _fail(400, 'VALIDATION_ERROR', 'amountUnits مطلوب');
+    final id = 'ur_posted_${_extraUnlinked.length + 1}';
+    _extraUnlinked.add({
+      'id': id,
+      'customerName': name,
+      'amountUnits': amount,
+      'status': 'pending',
+      'version': 1,
+      if (_userId != null) 'submittedByUserId': _userId,
+    });
+    return _ok({'id': id, 'version': 1});
+  }
+
+  void _requireVisibleAssignment(String id) {
+    final assignments = _collectionsForCaller()['assignments'];
+    if (assignments is List) {
+      for (final raw in assignments) {
+        if (raw is Map && raw['id'] == id) return;
+      }
+    }
+    _fail(404, 'NOT_FOUND', _notFound);
+  }
+
+  String? _displayName() {
+    final user = _me['user'];
+    if (user is Map && user['displayName'] is String) {
+      final name = user['displayName'] as String;
+      if (name.isNotEmpty) return name;
+    }
+    return null;
   }
 
   /// Compares the stored batch version. A match stores the next batch id.
