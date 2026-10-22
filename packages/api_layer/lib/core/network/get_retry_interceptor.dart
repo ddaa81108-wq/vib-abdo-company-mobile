@@ -11,15 +11,23 @@ import 'package:dio/dio.dart';
 /// Order in the chain: [AuthInterceptor, GetRetryInterceptor, SafeLoggingInterceptor].
 /// (Delay arithmetic here is transport timing, not business/money computation.)
 class GetRetryInterceptor extends Interceptor {
-  GetRetryInterceptor(
-      {this.maxRetries = 2,
-      this.baseDelay = const Duration(milliseconds: 400),
-      Random? random})
-      : _random = random ?? Random();
+  GetRetryInterceptor({
+    this.maxRetries = 2,
+    this.baseDelay = const Duration(milliseconds: 400),
+    Random? random,
+    Future<void> Function(Duration delay)? delay,
+  }) : _random = random ?? Random(),
+       _delay = delay ?? _systemDelay;
 
   final int maxRetries;
   final Duration baseDelay;
   final Random _random;
+
+  /// Production waits with [Future.delayed]. Tests pass a fake clock.
+  final Future<void> Function(Duration delay) _delay;
+
+  static Future<void> _systemDelay(Duration delay) =>
+      Future<void>.delayed(delay);
 
   /// The main Dio (set by ApiStack).
   late Dio retryDio;
@@ -51,7 +59,7 @@ class GetRetryInterceptor extends Interceptor {
       }
     }
 
-    await Future<void>.delayed(delay);
+    await _delay(delay);
     if (req.cancelToken?.isCancelled ?? false) return handler.next(err);
 
     req.extra['retryAttempt'] = attempt + 1;

@@ -31,6 +31,8 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # Widget tests script the real Dio stack. The app does not call Dio itself.
+  dio: ^5.4.0
 
 flutter:
   uses-material-design: true
