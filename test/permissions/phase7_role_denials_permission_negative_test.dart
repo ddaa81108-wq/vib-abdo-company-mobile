@@ -6,9 +6,11 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
-import 'package:vib_abdo_company_mobile/error_handling/error_handler.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/treasury/treasury_screen.dart';
+import 'package:vib_abdo_company_mobile/main.dart' as app_root;
+import 'package:vib_abdo_company_mobile/notifications/device_token_registrar.dart';
+import 'package:vib_abdo_company_mobile/notifications/device_token_store.dart';
 import 'package:vib_abdo_company_mobile/state/employee_totals_provider.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'package:vib_abdo_company_mobile/ui/widgets/common.dart';
@@ -18,8 +20,8 @@ import '../support/pump_app.dart';
 
 /// Negative cases for P7-05 and P7-12. The session comes from the login form.
 /// pumpFakeApp sets retry to null for every error, so it does not prove the
-/// production retry rule. That rule is the container test below, which copies
-/// the callback in lib/main.dart without changing production code.
+/// production retry rule. The container test below uses the callback
+/// [app_root.buildAppRoot] passes to [ProviderScope].
 void main() {
   testWidgets(
     'P7-05 employee treasury and masraweya are forbidden with no retry',
@@ -153,12 +155,26 @@ void main() {
   );
 
   test('a 403 is not retried by the buildAppRoot callback', () async {
-    // Same branches as buildAppRoot in lib/main.dart. Production is left as
-    // it is; this test copies the callback so a 403 can be counted.
-    Duration? appRetry(int retryCount, Object error) {
-      if (error is SessionExpiredException) return null;
-      return retryUnlessForbidden(retryCount, error);
-    }
+    // The closure is the one buildAppRoot installs. It is not reimplemented
+    // here. The server is the fake client inside this ApiLayer.
+    final pushGate = PushSessionGate();
+    final layer = ApiLayer.create(
+      config: const ApiConfig(
+        baseUrl: 'https://fake.invalid',
+        useFakeApi: true,
+      ),
+      fakeLatency: Duration.zero,
+      cleanups: [pushGate.forget],
+    );
+    addTearDown(layer.dispose);
+    final retry = app_root
+        .buildAppRoot(
+          layer: layer,
+          pushGate: pushGate,
+          tokenStore: MemoryDeviceTokenStore(),
+        )
+        .retry;
+    expect(retry, isNotNull);
 
     var calls = 0;
     final probe = FutureProvider<int>((ref) async {
@@ -169,16 +185,8 @@ void main() {
         statusCode: 403,
       );
     });
-    final layer = ApiLayer.create(
-      config: const ApiConfig(
-        baseUrl: 'https://fake.invalid',
-        useFakeApi: true,
-      ),
-      fakeLatency: Duration.zero,
-    );
-    addTearDown(layer.dispose);
     final container = ProviderContainer(
-      retry: appRetry,
+      retry: retry,
       overrides: [apiLayerProvider.overrideWithValue(layer)],
     );
     addTearDown(container.dispose);
@@ -189,9 +197,9 @@ void main() {
     );
     expect(calls, 1);
 
-    expect(appRetry(0, const SessionExpiredException(statusCode: 401)), isNull);
+    expect(retry!(0, const SessionExpiredException(statusCode: 401)), isNull);
     expect(
-      retryUnlessForbidden(
+      retry(
         0,
         const ForbiddenException(
           code: 'FORBIDDEN',
@@ -206,7 +214,7 @@ void main() {
       message: 'العنصر غير موجود',
       statusCode: 404,
     );
-    expect(appRetry(0, notFound), isNotNull);
-    expect(appRetry(0, notFound), ProviderContainer.defaultRetry(0, notFound));
+    expect(retry(0, notFound), isNotNull);
+    expect(retry(0, notFound), ProviderContainer.defaultRetry(0, notFound));
   });
 }
