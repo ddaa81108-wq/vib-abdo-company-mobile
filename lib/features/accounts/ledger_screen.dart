@@ -606,7 +606,7 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
       if (!mounted) return;
       setState(() {
         _extra.addAll(page.page.items);
-        // Pending Ali. Off by default, so a long book keeps every loaded row.
+        // Approved by Ali on 2026-10-22, enabled by default. Off keeps every row.
         if (HistoryWindow.trimEnabled &&
             _extra.length > HistoryWindow.retainLimit) {
           _extra.removeRange(0, _extra.length - HistoryWindow.retainLimit);

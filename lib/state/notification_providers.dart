@@ -97,7 +97,8 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
 
   /// Follows `nextBefore` one page.
   ///
-  /// The cap is pending Ali. With [HistoryWindow.trimEnabled] off, every
+  /// Approved by Ali on 2026-10-22, enabled by default.
+  /// With [HistoryWindow.trimEnabled] off, every
   /// fetched row stays. With it on, the newest
   /// [HistoryWindow.notificationRetain] rows stay and the walk stops.
   Future<void> loadOlder() async {

@@ -17,8 +17,10 @@ void main() {
     HistoryWindow.trimEnabled = HistoryWindow.trimEnabledFromEnvironment;
   });
 
-  testWidgets('P7-25 walks the long ledger to the last page', (tester) async {
-    expect(HistoryWindow.trimEnabled, isFalse);
+  testWidgets('P7-25 HISTORY_WINDOW_TRIM off keeps every loaded ledger row', (
+    tester,
+  ) async {
+    HistoryWindow.trimEnabled = false;
     await pumpFakeApp(
       tester,
       fakeDataset: FakeDataset.large,
@@ -89,6 +91,7 @@ void main() {
   testWidgets('P7-24 P7-25 customer and notification lists stay lazy', (
     tester,
   ) async {
+    HistoryWindow.trimEnabled = false;
     await pumpFakeApp(
       tester,
       fakeDataset: FakeDataset.large,

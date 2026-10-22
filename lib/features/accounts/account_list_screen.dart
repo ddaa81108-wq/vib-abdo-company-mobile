@@ -237,7 +237,8 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     );
   }
 
-  /// Pending Ali. Off, the button keeps the previous cursor behaviour.
+  /// Approved by Ali on 2026-10-22, enabled by default.
+  /// Off, the button keeps the previous cursor behaviour.
   /// On, it follows the last page and keeps [HistoryWindow.retainLimit] rows.
   String? _loadMoreCursor(String? firstPageCursor) {
     if (!HistoryWindow.trimEnabled) return firstPageCursor;
