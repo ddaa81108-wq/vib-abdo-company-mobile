@@ -14,10 +14,11 @@
 | التصنيف | المعرّفات |
 |---|---|
 | Pending PM decision | DEF-002. على `main` `a5ca268` السلوك لم يتغير. الإداري المحدود ما زال `collections.decide`، ومسار الإجماليات المخصص يرفضه بـ 403. الاختبار `limited admin provider state is forbidden until DEF-002` |
-| Blocking مفتوح على `main` | DEF-020 وDEF-022 على `a5ca268`. إصلاحهما على #53 و#55 ولم يُدمج. سداد مباشر 400 من رصيد 320 كان يُخزَّن −80، ورأس الدفتر كان يبقى 320 بعد 409 بينما المخزَّن 319. لا يبقى عيب مانع من DEF-013 أو DEF-014. هما verified on main 451ec58. لا مانع مفتوح للمرحلة 6 |
-| عيب بديل اختبار، بلا أثر إنتاج | DEF-021. الشاشة كانت تُبطل `collectionsProvider` وتعيد قراءة النظرة. الصف يغيب لأن `FakeApiClient` لا يخزّن الإرسال. مفتوح على `main` حتى #54. سلوك الخادم الحقيقي ما زال فحص staging |
+| Blocking مفتوح على `main` | لا يبقى على `c40e03d`. DEF-020 وDEF-022 صارا Verified closed هناك بعد squash #53 و#55. كانا مفتوحين على `a5ca268`: سداد مباشر 400 من رصيد 320 كان يُخزَّن −80، ورأس الدفتر كان يبقى 320 بعد 409 بينما المخزَّن 319. لا يبقى عيب مانع من DEF-013 أو DEF-014. هما verified on main 451ec58. لا مانع مفتوح للمرحلة 6 |
+| عيب بديل اختبار، بلا أثر إنتاج | DEF-021. Verified closed على `main` `c40e03d` بعد squash #54. الشاشة كانت تُبطل `collectionsProvider` وتعيد قراءة النظرة. الصف كان يغيب لأن `FakeApiClient` لا يخزّن الإرسال. فحص الخادم الحقيقي يبقى سؤال staging وليس عيبًا مفتوحًا |
 | Blocking على فرع وليس على `main` | لا يبقى. DEF-018 صار Verified closed على `main` `a5ca268` |
-| Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `a5ca268` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل، والاختبار `DEF-012 admin settings replace the old unavailable sentence` يتوقع `employeesEmpty` و`auditEmpty` و`operationsEmpty`. خارج المرحلة 6. DEF-019 مفتوح على `main` `a5ca268`: فتح الإشعارات بعد دخول بإذن ممنوح يرسل رمز الجهاز مرة ثانية. غير مانع. DEF-023 وDEF-024 وDEF-025 تباين على `main`: العلامة الذهبية 1.59:1، ودور الشريط 1.02:1، ونص داكن 2.94:1 و2.72:1 ومبلغ الخزينة 2.95:1. غير مانعة. [#57](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/57) عند `714c6ea` يرفع الأزواج فوق AA ولم يُدمج، فتبقى Open على `main` |
+| Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `c40e03d` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل، والاختبار `DEF-012 admin settings replace the old unavailable sentence` يتوقع `employeesEmpty` و`auditEmpty` و`operationsEmpty`. خارج المرحلة 6. DEF-023 وDEF-024 وDEF-025 تباين على `main`: العلامة الذهبية 1.59:1، ودور الشريط 1.02:1، ونص داكن 2.94:1 و2.72:1 ومبلغ الخزينة 2.95:1. غير مانعة. [#57](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/57) عند `714c6ea` يرفع الأزواج فوق AA ولم يُدمج، فتبقى Open على `main` |
+| Verified closed على `main` `c40e03d` | DEF-019 وDEF-020 وDEF-021 وDEF-022. DEF-019 كان غير مانع. DEF-020 وDEF-022 كانا مانعين. DEF-021 عيب بديل اختبار |
 | Verified closed على `main` `a5ca268` | DEF-017 وDEF-018. كانا مغلقين على الفرع فقط حتى دمج #46 و#47 |
 | verified on main 8a52160 | DEF-010. «عرض الكل» يتبع قسم النشرة. ما زال مغلقًا على `a5ca268` (`DEF-010 view all opens the section it belongs to when readable`) |
 | verified on main 451ec58 | DEF-001، DEF-003، DEF-004، DEF-005، DEF-006، DEF-013، DEF-014، DEF-015، DEF-016 |
@@ -595,7 +596,7 @@
 
 ### DEF-019 — فتح الإشعارات بعد دخول بإذن ممنوح يرسل الرمز مرة ثانية
 
-**الحالة:** Open on main `a5ca26809578dd013430dcaae78c517043e95491`. غير مانع. كان مفتوحًا على #47 `da9183c` قبل أن يصير الكود على `main`. التالي الحر DEF-020.
+**الحالة:** Verified closed on main `c40e03d3b184dd79e392f8dc384022090862b48f`. كان Open وغير مانع على `a5ca268` وعلى #47 `da9183c`. التالي الحر DEF-026.
 
 | الحقل | القيمة |
 |---|---|
@@ -621,13 +622,15 @@
 
 **على [#50](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/50) `b7900a2c555aa3cccb3b562ed5f33b6f787fd527`:** المسبار المحلي عبر `buildAppRoot` (إذن ممنوح، API 33، `FakePushTransport` و`FakeApiClient` فقط فوق حزام الجذر) نجح ثم حُذف: الدخول يرسل مرة، وأول فتح لـ `/notifications` لا يعيد الرمز، وتغيير الرمز يرسل الرمز الجديد. اختبارات الطلب نفسها تبني `DeviceTokenRegistrar` مباشرة ولا تضخ الجذر. الحالة على `main` تبقى **Open**. لم يُدمج الطلب.
 
-**اختبار #49 المعطّل، ملحق المراجعة.** في `621f01b` و`546a623` الاختبار `a granted login does not register again on the first notifications visit` يبقى `markTestSkipped` لأن `_skipDef019` صحيح، ويستخدم `pumpFakeApp` لا `buildAppRoot`. أُوقف العلم محليًا ثم أُعيد، بلا التزام وبلا دفع. على `621f01b` وحده خرج 1: الدخول يرسل مرة وأول `/notifications` يرسل `phase7-device-token` مرة ثانية. دمج محلي غير مُلتزم لـ `546a623` مع `b7900a2` خرج 0 ونتيجة `+1`: الفتح الأول لا يعيد الرمز. السطر `api_error code=REQUEST_FAILED` طُبع في التشغيلين ولم يغيّر الحكم. الدمج أُلغي. الحالة على `main` تبقى **Open**.
+**اختبار #49 المعطّل، ملحق المراجعة.** في `621f01b` و`546a623` الاختبار `a granted login does not register again on the first notifications visit` يبقى `markTestSkipped` لأن `_skipDef019` صحيح، ويستخدم `pumpFakeApp` لا `buildAppRoot`. أُوقف العلم محليًا ثم أُعيد، بلا التزام وبلا دفع. على `621f01b` وحده خرج 1: الدخول يرسل مرة وأول `/notifications` يرسل `phase7-device-token` مرة ثانية. دمج محلي غير مُلتزم لـ `546a623` مع `b7900a2` خرج 0 ونتيجة `+1`: الفتح الأول لا يعيد الرمز. السطر `api_error code=REQUEST_FAILED` طُبع في التشغيلين ولم يغيّر الحكم. الدمج أُلغي. ذلك الملحق سبق الدمج، والحالة حينها على `main` كانت **Open**.
+
+**على `main` `c40e03d`:** squash `653cedf5094f075a03d7890010f9a372e60dd58b` (#50). الرقعة تطابق رأس المراجعة `b7900a2` في الملفات الستة. `flutter test test/def019_device_token_registrar_test.dart` على هذا الالتزام: **+5** وخروج 0. الأسماء: `same token twice posts once`، و`token change posts the new token`، و`user switch posts again`، و`failed post is retried`، و`forget then registerIfReady posts again`. الاختبارات تبني `DeviceTokenRegistrar` مع `FakeApiClient` و`FakePushTransport` و`MemoryDeviceTokenStore` ولا تستدعي `buildAppRoot`. اسم الملف لم يُطبع في سجل `tool/check.sh` لأن المبلّغ على الطرفية يُسقط الاختبار السريع، والعداد **384/0** يضمه. التشغيل المباشر هو دليل الإغلاق. نفس الخمسة **+5** وخروج 0 على [#52](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/52) `f347a8a`. الحكم: **Verified closed** على `main`. مسبار `buildAppRoot` السابق كان على `b7900a2`، ورقعة squash هي نفسها.
 
 ---
 
 ### DEF-020 — سداد جزئي أكبر من الرصيد يُقبل ويُخزَّن سالبًا
 
-**الحالة:** Open on main `a5ca26809578dd013430dcaae78c517043e95491`. مانع. رصده [#51](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/51) عند `8aec37ee29107bb33541499f9e3be595f422919d` وأعاده مسبار محلي على `main`. التالي الحر DEF-023.
+**الحالة:** Verified closed on main `c40e03d3b184dd79e392f8dc384022090862b48f`. كان Open وBlocking على `a5ca268`. رصده [#51](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/51) عند `8aec37ee29107bb33541499f9e3be595f422919d`. التالي الحر DEF-026.
 
 | الحقل | القيمة |
 |---|---|
@@ -649,11 +652,13 @@
 
 **على [#53](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/53) `08e6b132c3d9bd450d463970da49ad3118fe8cba`:** لم يُدمج. الحالة على `main` تبقى **Open** وBlocking. الحوار يقارن العدد الصحيح بـ `balanceUnits` المخزَّن في `accountCardProvider` ولا يطرح رصيدًا. 400 على `c_55` يُمنع، ولا يُرسل POST، والرأس يبقى `320 د.ل`، والمخزَّن 320 والإصدار 4. الحد: 321 يُمنع بالرسالة `المبلغ أكبر من المتبقي المسجّل.` وبلا POST. 320 يُرسل ويصير الرصيد 0 والإصدار 5. `320.01` يرفضه `parseUnits` بجملة العدد الصحيح قبل المقارنة، وبلا POST. المقارنة تقرأ آخر قيمة في المزوّد ولا تنادي GET قبل الحفظ. بعد سداد خارجي بقيمة 200 (المخزَّن 120 والإصدار 5) والشاشة ما زالت على 320، إدخال 150 لا يُظهر رسالة السقف ويُرسل POST، والرأس يبقى 320. الخادم التجريبي يرفض الزائد بـ HTTP 400 و`VALIDATION_ERROR` قبل التخزين. هذا **مؤقت وليس عقدًا مؤكدًا**. السؤال المفتوح لمالك الخادم: هل يرفض الخادم الحقيقي السداد المباشر الأكبر من المتبقي، وبأي حالة ورمز وجملة؟ سداد القسمة أو الضرب لا يُقارن لأن المعامل ليس مبلغًا، ومقارنة ناتجه تحتاج حسابًا يمنعه العقد. السؤال الثاني: هل يجب رفض ناتج القسمة أو الضرب إذا تجاوز المتبقي؟ ذلك غير محسوم في المتطلب. التالي الحر DEF-026.
 
+**على `main` `c40e03d`:** squash `2861f4df9fcab046e66dac01071269f7346df5bd` (#53). اختبار الودجت `DEF-020 the payment dialog refuses an amount above the server balance` ظهر في `tool/check.sh` ثم أكمل العداد حتى **384/0** وخروج 0. نفس الاسم ظهر على #52 `f347a8a` وأكمل العداد حتى **393/0**. التحميل الكسول لم يكسر رأس الحوار. الحكم: **Verified closed** على `main`. سؤال مالك الخادم عن رفض السداد المباشر وعقد `400` `VALIDATION_ERROR`، وسؤال ناتج القسمة أو الضرب، يبقيان سؤالين مفتوحين ولا يعيدان فتح العيب.
+
 ---
 
 ### DEF-021 — إرسال إسناد واستلام غير مربوط لا يظهران في النظرة التالية
 
-**الحالة:** Open on main `a5ca26809578dd013430dcaae78c517043e95491` كعيب بديل اختبار، بلا أثر إنتاج. رصده #51 وأعاده المسبار على `main`. إصلاح الخادم التجريبي على #54 لم يُدمج. فحص staging للخادم الحقيقي ما زال مطلوبًا.
+**الحالة:** Verified closed on main `c40e03d3b184dd79e392f8dc384022090862b48f` كعيب بديل اختبار، بلا أثر إنتاج. كان Open على `a5ca268` حتى squash #54. فحص الخادم الحقيقي يبقى سؤال staging.
 
 | الحقل | القيمة |
 |---|---|
@@ -674,13 +679,15 @@
 
 **الفعلي على `main`:** المساران سُجّلا: `/api/collections/assignments/as_1/submissions` و`/api/collections/unlinked-receipts`. النظرة تبقى `sb_1` و`sb_2` و`ur_1` و`ur_2`. الإبطال على العميل حقيقي، والرد الثابت هو الذي يسقط الصف. ربط `ur_1` الموجود مسبقًا يخزّن `customerId` ويبقى خارج هذا العيب.
 
-**إعادة التصنيف بعد [#54](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/54) `dc6c5c893f758b834cb23da33ee7e984d8ea58c4`:** لا فرق في `lib/`. `_AssignmentFormState._submit` و`_UnlinkedFormState._submit` يناديان `ref.invalidate(collectionsProvider)` بعد النجاح ثم يغلقان الحوار. الشاشة تراقب `collectionsProvider`، وهو `FutureProvider` ينادي `collections.overview()`. اختبار الودجت يفتح الحوارين الحقيقيين، وبعد الحفظ تظهر `submission-sb_posted_1` و`unlinked-card-ur_posted_1` على الشاشة نفسها، ثم بعد المغادرة والعودة. هذا عيب `FakeApiClient` فقط. #54 يخزّن الصف ويعيد معرّفه وإصداره 1. تكرار `requestId` يعيد النجاح المخزَّن عبر `_mutate` ولا يضيف صفًا ثانيًا. تعيين غير مرئي 404. القرار اللاحق يستخدم الإصدار المخزَّن. `cashStatus` لا يُكتب، وأرقام النظرة تبقى القيم الحرفية. الحالة على `main` تبقى **Open** حتى يُدمج الإصلاح. سلوك الخادم الحقيقي لم يُفحص ويبقى سؤال staging.
+**إعادة التصنيف بعد [#54](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/54) `dc6c5c893f758b834cb23da33ee7e984d8ea58c4`:** لا فرق في `lib/`. `_AssignmentFormState._submit` و`_UnlinkedFormState._submit` يناديان `ref.invalidate(collectionsProvider)` بعد النجاح ثم يغلقان الحوار. الشاشة تراقب `collectionsProvider`، وهو `FutureProvider` ينادي `collections.overview()`. اختبار الودجت يفتح الحوارين الحقيقيين، وبعد الحفظ تظهر `submission-sb_posted_1` و`unlinked-card-ur_posted_1` على الشاشة نفسها، ثم بعد المغادرة والعودة. هذا عيب `FakeApiClient` فقط. #54 يخزّن الصف ويعيد معرّفه وإصداره 1. تكرار `requestId` يعيد النجاح المخزَّن عبر `_mutate` ولا يضيف صفًا ثانيًا. تعيين غير مرئي 404. القرار اللاحق يستخدم الإصدار المخزَّن. `cashStatus` لا يُكتب، وأرقام النظرة تبقى القيم الحرفية. سلوك الخادم الحقيقي لم يُفحص ويبقى سؤال staging.
+
+**على `main` `c40e03d`:** squash `0fd90778bbb48de054aa5b494a884afdae2c1e33` (#54). اختبار `DEF-021 the next collections overview shows the submitted rows` داخل **384/0**، وداخل **393/0** على #52 `f347a8a`. الحكم: **Verified closed** على `main`. سؤال staging للخادم الحقيقي يبقى مفتوحًا وليس عيبًا.
 
 ---
 
 ### DEF-022 — بعد 409 يبقى رأس الدفتر على 320 والمخزَّن 319
 
-**الحالة:** Open on main `a5ca26809578dd013430dcaae78c517043e95491`. مانع لمسار حوار السداد. رصده #51 وأعاده المسبار على `main`.
+**الحالة:** Verified closed on main `c40e03d3b184dd79e392f8dc384022090862b48f`. كان Open وBlocking على `a5ca268`. رصده #51 وأعاده المسبار على ذلك الرأس.
 
 | الحقل | القيمة |
 |---|---|
@@ -702,6 +709,8 @@
 **الفعلي على `main`:** الحوار يعرض جملة الخادم `تم تعديل البيانات من مستخدم آخر` ولا يعرض `AppStrings.versionConflict`. الرأس يبقى `320 د.ل` بعد إغلاق الحوار وبعد مغادرة الشاشة والعودة. قراءة المستودع 319. أزرار اعتماد الاستلامات ترمي الاستثناء، فـ `GuardedMutation` هناك يعرض الجملة الموحّدة ويعيد الجلب. هذا المسار ليس عيب الحوار.
 
 **على [#55](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/55) `fc140f910fd08d6fa215a70892bd44a86b55eb2c`:** لم يُدمج. الحالة على `main` تبقى **Open** وBlocking. `_submit` يعيد رمي `VERSION_CONFLICT` فقط. `GuardedMutation._presentFailure` ينادي `onVersionConflict` مرة واحدة، فيُبطل الكارت والدفتر وقائمة الحسابات والرئيسية، ويعرض `تم تعديل البيانات. أُعيد الجلب من الخادم.`. الرأس `ledger-header-balance` من `accountCardProvider` على المسار نفسه. اختبار الطلب يتوقع `319 د.ل` وغياب `320 د.ل` **قبل** إغلاق الحوار، ثم بعد المغادرة والعودة. المخزَّن 319 والإصدار 5، و100 الحوار لا يُخزَّن. الأخطاء الأخرى ما زالت تُعاد نصًا ويبقى الحوار. 409 ليس انتهاء جلسة، والاختبار يبقى على الدفتر. لا جلب ثانٍ من `_submit`. التالي الحر DEF-026.
+
+**على `main` `c40e03d`:** squash `8d801008139bdab6a4ceea803d47794422987f6b` (#55). اختبار `DEF-022 a payment conflict refetches the card and the ledger` بدأ سجل التطبيق وصار العداد +1 ثم أنهى **384/0**. على #52 `f347a8a` نفس الاسم صار +1 ثم **393/0**. جسم رقعة الدفتر من #52 ومن #53 مع #55 متساوٍ بعد تجاهل ترويسة الـ hunk، فالتعديلان معًا على الرأس. الحكم: **Verified closed** على `main`.
 
 ---
 
@@ -832,3 +841,4 @@
 - مراجعة #53 و#54 و#55 لم تغلق DEF-020 ولا DEF-022 على `main`. DEF-021 صار عيب بديل اختبار بلا أثر إنتاج، وما زال مفتوحًا على `main` حتى دمج #54، وفحص الخادم الحقيقي staging. رد الخادم التجريبي 400 `VALIDATION_ERROR` للسداد الزائد مؤقت وليس عقدًا. السؤال المفتوح: سقف السداد المباشر، وسقف ناتج القسمة أو الضرب. التالي الحر DEF-026.
 - تأكيد #49: الرأس ما زال `546a623`. أسباب التخطي ووصف الطلب يسميان DEF-023 وDEF-024 وDEF-025. الاختبارات الثلاثة ما زالت `markTestSkipped` قبل القياس على هذا الرأس وحده. دمج محلي غير مُلتزم مع #57 `714c6ea`، بعد إيقاف الأعلام الثلاثة ثم إعادتها: `phase7_theme_ui_test.dart` نجح **+6** وخروج 0. تلك الاختبارات تتوقع غياب الأزواج القديمة. المشي على الشاشات في الملف نفسه يقيس 3:1.
 - مراجعة #57 عند `714c6ea` لم تغلق DEF-023 ولا DEF-024 ولا DEF-025 على `main`. الأزواج الثلاثة فوق AA على الرأس. الفرق يضم `theme.dart` و`home_shell.dart` و`treasury_screen.dart`، لا الرموز وحدها. حبر `onSurfaceVariant` الفاتح `#6D7C77` لم يتغير: 3.703585 على `#E5EDF6` و4.375288 على الأبيض و4.053914 على `#EDF9F4` و3.810320 على `#E6F2ED`. فوق 3:1 وتحت 4.5:1 للنص العادي، وموجود على الشاشات الفاتحة. ليس تراجعًا من #57 ولم يُفتح له معرّف. التالي الحر DEF-026.
+- إعادة اختبار #52 عند `f347a8a` على `main` `c40e03d` أغلقت DEF-019 وDEF-020 وDEF-021 وDEF-022 على `main`. squash بالترتيب: `653cedf` (#50) و`2861f4d` (#53) و`0fd9077` (#54) و`8d80100` (#55) و`c40e03d` (#56). `tool/check.sh` على `c40e03d` خرج 0: التطبيق 384/0، والحزمة 201 ناجح وتخطي واحد (P7-01)، والسالب 27/0 و30/0. تشغيل DEF-019 المباشر +5. DEF-023 وDEF-024 وDEF-025 تبقى Open. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail. التالي الحر DEF-026. لا توقيع.
