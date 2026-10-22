@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Turn PHASE7 key=value lines into a job summary.
 
-Acceptance for P7-23 and P7-24 stays `recorded`. A workflow failure is an
-engineering budget, not an invented Pass or Fail in the protocol template.
+Acceptance for P7-23 and P7-24 stays `recorded`. Numeric budgets in the
+summary are engineering proposals. Acceptance thresholds are set by Ali.
+RSS, PSS, and Dart heap lines are report-only.
 """
 
 from __future__ import annotations
@@ -28,6 +29,22 @@ def parse_lines(text: str) -> dict[str, str]:
     return found
 
 
+PROPOSAL_BANNER = """\
+Engineering proposals, not acceptance thresholds. Acceptance thresholds are set by Ali.
+
+| Proposal | Number | Role |
+|---|---|---|
+| Device cold start (`am start -W` TotalTime) | 5000 ms | engineering proposal |
+| Emulator cold start hang | 20000 ms | engineering proposal |
+| Login to home on staging | 60000 ms | engineering proposal |
+| Device worst frame build | 32 ms | engineering proposal |
+| Device average frame build | 16.7 ms | engineering proposal |
+| Widget history walk | 8 s | engineering proposal |
+
+A workflow failure on one of these numbers is not a protocol Pass or Fail. RSS, PSS, and Dart heap are report-only. They are not budgets and they do not pass or fail the job.
+"""
+
+
 def markdown(title: str, values: dict[str, str]) -> str:
     rows = [
         "| device | OS/API | build SHA | tester | date | step | expected | actual | pass/fail | screenshot ref | defect id |",
@@ -38,6 +55,12 @@ def markdown(title: str, values: dict[str, str]) -> str:
         ("P7-23", "p7_23_home_ms", "scripted home ms"),
         ("P7-24", "p7_24_worst_build_ms", "worst build ms"),
         ("P7-24", "p7_24_average_build_ms", "average build ms"),
+        ("P7-24", "p7_24_meminfo_before_pss_kb", "PSS KB before scroll (report-only)"),
+        ("P7-24", "p7_24_meminfo_after_pss_kb", "PSS KB after scroll (report-only)"),
+        ("P7-24", "p7_24_meminfo_before_rss_kb", "RSS KB before scroll (report-only)"),
+        ("P7-24", "p7_24_meminfo_after_rss_kb", "RSS KB after scroll (report-only)"),
+        ("P7-24", "p7_24_dart_heap_before_bytes", "Dart heap bytes before scroll (report-only)"),
+        ("P7-24", "p7_24_dart_heap_after_bytes", "Dart heap bytes after scroll (report-only)"),
         ("P7-25", "p7_25_pages_loaded", "ledger pages loaded"),
     ]
     for step, key, label in interesting:
@@ -66,6 +89,8 @@ def markdown(title: str, values: dict[str, str]) -> str:
         [
             f"### {title}",
             "",
+            PROPOSAL_BANNER.rstrip(),
+            "",
             "Phase 7 matrix: https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/48",
             "(`docs/acceptance/phase-7.md`, not merged into this branch).",
             "",
@@ -93,6 +118,23 @@ def self_test() -> None:
     assert "recorded" in text
     assert "P7-23" in text
     assert "Pass |" not in text
+    assert "Engineering proposals, not acceptance thresholds." in text
+    assert "Acceptance thresholds are set by Ali." in text
+    for needle in ("5000 ms", "20000 ms", "60000 ms", "32 ms", "16.7 ms", "8 s"):
+        assert needle in text, needle
+    assert "report-only" in text
+    memory = markdown(
+        "memory",
+        {
+            "p7_24_meminfo_before_pss_kb": "12000",
+            "p7_24_meminfo_after_pss_kb": "13000",
+            "p7_24_dart_heap_before_bytes": "4000000",
+            "p7_24_dart_heap_after_bytes": "5000000",
+        },
+    )
+    assert "12000" in memory
+    assert "PSS KB before scroll (report-only)" in memory
+    assert "Dart heap bytes after scroll (report-only)" in memory
     print("phase7_summary self-test ok")
 
 

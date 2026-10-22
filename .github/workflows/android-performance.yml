@@ -9,7 +9,13 @@
 # large Fake dataset. P7-26 is the API 29 / 33 / 34 matrix plus the device
 # form in docs/testing/PHASE7_PERFORMANCE.md.
 #
-# Acceptance Pass is not claimed. Ali writes the numeric threshold.
+# Acceptance Pass is not claimed. Ali sets acceptance thresholds.
+#
+# Every budget below is an engineering proposal, not an acceptance threshold:
+# 5000 ms device cold start, 20000 ms emulator cold start, 60000 ms login to
+# home, 32 ms device worst frame, 16.7 ms device average frame, 8 s widget
+# walk. The job summary says this again. RSS, PSS, and Dart heap are
+# report-only and are not budgets.
 
 name: Android performance
 

@@ -50,11 +50,16 @@ void main() {
     watch.stop();
     final homeMs = watch.elapsedMilliseconds;
     phase7('p7_23_home_ms', homeMs);
+    phase7('p7_23_login_home_hang_ms', PerfBudget.stagingHomeHangMs);
+    phase7('p7_23_budget_kind', 'engineering-proposal');
+    phase7('p7_23_acceptance_threshold', 'set-by-ali');
     phase7('p7_23_acceptance', 'recorded');
 
     if (homeMs > PerfBudget.stagingHomeHangMs) {
       fail(
-        'P7-23 home took ${homeMs}ms, past the ${PerfBudget.stagingHomeHangMs}ms hang ceiling',
+        'P7-23 home took ${homeMs}ms, past the ${PerfBudget.stagingHomeHangMs}ms '
+        'engineering proposal for the login-to-home hang. '
+        'Not an acceptance threshold. Acceptance thresholds are set by Ali.',
       );
     }
   });

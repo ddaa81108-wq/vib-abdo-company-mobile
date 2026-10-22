@@ -111,8 +111,17 @@ echo "PHASE7 p7_23_samples_ms=${times[*]}"
 echo "PHASE7 p7_23_surface=$SURFACE"
 echo "PHASE7 p7_23_api=$API"
 echo "PHASE7 p7_23_budget_ms=$BUDGET"
+echo "PHASE7 p7_23_budget_kind=engineering-proposal"
+echo "PHASE7 p7_23_acceptance_threshold=set-by-ali"
 echo "PHASE7 p7_23_acceptance=recorded"
 echo "PHASE7 p7_26_api=$API"
+echo "PHASE7 proposal_device_cold_start_ms=5000"
+echo "PHASE7 proposal_emulator_cold_start_ms=20000"
+echo "PHASE7 proposal_login_home_hang_ms=60000"
+echo "PHASE7 proposal_device_worst_build_ms=32"
+echo "PHASE7 proposal_device_average_build_ms=16.7"
+echo "PHASE7 proposal_widget_walk_ms=8000"
+echo "P7-23 budget ${BUDGET}ms on ${SURFACE} is an engineering proposal, not an acceptance threshold. Acceptance thresholds are set by Ali."
 
 LOG="${PHASE7_LOG:-phase7-cold-start.log}"
 {
@@ -121,8 +130,16 @@ LOG="${PHASE7_LOG:-phase7-cold-start.log}"
   echo "PHASE7 p7_23_surface=$SURFACE"
   echo "PHASE7 p7_23_api=$API"
   echo "PHASE7 p7_23_budget_ms=$BUDGET"
+  echo "PHASE7 p7_23_budget_kind=engineering-proposal"
+  echo "PHASE7 p7_23_acceptance_threshold=set-by-ali"
   echo "PHASE7 p7_23_acceptance=recorded"
   echo "PHASE7 p7_26_api=$API"
+  echo "PHASE7 proposal_device_cold_start_ms=5000"
+  echo "PHASE7 proposal_emulator_cold_start_ms=20000"
+  echo "PHASE7 proposal_login_home_hang_ms=60000"
+  echo "PHASE7 proposal_device_worst_build_ms=32"
+  echo "PHASE7 proposal_device_average_build_ms=16.7"
+  echo "PHASE7 proposal_widget_walk_ms=8000"
 } > "$LOG"
 
 # Scripted home time. This test APK embeds the admin dart-defines.
@@ -151,7 +168,8 @@ python3 tool/phase7_summary.py \
   ${GITHUB_STEP_SUMMARY:+--summary "$GITHUB_STEP_SUMMARY"}
 
 if [[ "$median" -gt "$BUDGET" ]]; then
-  echo "P7-23 engineering budget exceeded: TotalTime ${median}ms > ${BUDGET}ms on ${SURFACE}."
+  echo "P7-23 engineering proposal exceeded: TotalTime ${median}ms > ${BUDGET}ms on ${SURFACE}."
+  echo "This number is an engineering proposal, not an acceptance threshold. Acceptance thresholds are set by Ali."
   echo "Acceptance stays recorded. This is not a protocol Pass or Fail."
   status=1
 fi
