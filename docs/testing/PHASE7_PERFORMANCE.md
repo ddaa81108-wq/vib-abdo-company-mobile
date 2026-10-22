@@ -110,6 +110,8 @@ Use `PERF_SURFACE=emulator` on an emulator and `PERF_SURFACE=device` on a phone.
 
 The script for the CI emulator is `tool/android_performance_emulator_test.sh`. It does not pass `HISTORY_WINDOW_TRIM`.
 
+On that emulator, and on a phone when `PERF_SURFACE=device` is set for the same script, the script runs `adb shell dumpsys meminfo com.example.vib_abdo_company_mobile` before and after the long scroll. It records total PSS and, when dumpsys prints it, total RSS. API 29's app summary often has PSS and no RSS; the missing field is `unavailable`. The integration test records Dart heap bytes through the VM service when that service publishes a URI. When it does not, the line is `unavailable` and the test still passes. Both figures are report-only. They are in the job summary. They do not pass or fail the job.
+
 ## P7-26 devices
 
 From the matrix:
