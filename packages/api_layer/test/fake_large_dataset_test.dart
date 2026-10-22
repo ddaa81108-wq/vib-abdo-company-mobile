@@ -141,6 +141,7 @@ Future<int> _walkLedger(FakeApiClient api, String id) async {
   String? before;
   var pages = 0;
   var seen = 0;
+  final ids = <String>{};
   while (true) {
     final data = (await api.get(
       '/api/customers/$id/ledger',
@@ -150,6 +151,14 @@ Future<int> _walkLedger(FakeApiClient api, String id) async {
     final items = data['items'] as List;
     expect(items.length, lessThanOrEqualTo(FakeLargeCatalog.pageSize));
     expect(items, isNotEmpty);
+    for (final item in items) {
+      final lineId = (item as Map)['id'] as String;
+      expect(
+        ids.add(lineId),
+        isTrue,
+        reason: 'duplicate ledger id $lineId on page ${pages + 1}',
+      );
+    }
     seen += items.length;
     pages++;
     expect(pages, lessThanOrEqualTo(FakeLargeCatalog.ledgerPageCount));
@@ -157,6 +166,10 @@ Future<int> _walkLedger(FakeApiClient api, String id) async {
     if (before == null) break;
   }
   expect(seen, FakeLargeCatalog.ledgerLineCount);
+  expect(ids, {
+    for (var index = 0; index < FakeLargeCatalog.ledgerLineCount; index++)
+      'ltx_${index.toString().padLeft(5, '0')}',
+  });
   return pages;
 }
 
