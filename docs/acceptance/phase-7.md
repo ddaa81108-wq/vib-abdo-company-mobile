@@ -29,7 +29,7 @@
 | مطور الواجهة | 4 | 2 | 2 | 0 |
 | DevOps | 3 | 0 | 2 | 1 |
 
-لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. مراجعة #56 على `9c0fa4f` لا تغيّر الأعداد: Covered ‏3 وPartial ‏15 وDevice-only ‏1. مراجعة #53 و#54 و#55 لا تغيّر الأعداد. البند 19 يبقى Device-only. لا توقيع.
+لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. مراجعة #56 على `9c0fa4f` لا تغيّر الأعداد: Covered ‏3 وPartial ‏15 وDevice-only ‏1. مراجعة #53 و#54 و#55 لا تغيّر الأعداد. مراجعة #57 على `714c6ea` لا تغيّر الأعداد. البند 19 يبقى Device-only. لا توقيع.
 
 أكبر الفجوات لكل مالك في نهاية القسم أ.
 
@@ -200,6 +200,7 @@
 - **المالك:** مطور الواجهة
 - **الموجود:** `test/screens_ui_test.dart` `allowed screens render RTL in dark mode`. `test/shell_group_test.dart` `login, home, settings, account, and notifications hold at phone sizes (light|dark)`. `test/collections_presentation_test.dart` `light and dark keep status colours, RTL, and amount direction`. `test/purchases_presentation_test.dart` `purchases renders RTL in light and dark`. `test/ledger_presentation_test.dart` `ledger layout stays whole across widths, scales, and themes`. `test/treasury_reports_polish_test.dart` `both screens lay out on phones in light and dark`. `test/notifications_presentation_test.dart` `the notifications list fits a small and a large phone in both themes`. `test/forbidden_presentation_test.dart` `forbidden pane fits a small phone in light and dark`. لقطات `screenshots` مستبعدة من `flutter test --exclude-tags screenshots`.
 - **الفجوة:** لا اختبار آلي جديد لإغلاق الصف. التأكيد على الجهاز خطوة 23 في البروتوكول. تباين #49 مسجّل DEF-023 وDEF-024 وDEF-025 ولا ينقل الصف عن Covered.
+- **بعد #57:** الرأس `714c6ea` يرفع الأزواج الثلاثة فوق AA على فرعه. الصف يبقى Covered. العيوب تبقى Open على `main` حتى الدمج.
 - **منع الاستبدال:** لا `ThemeData` مفروض فوق `themeModeProvider` حين يُختبر مبدّل السمة. تثبيت `_DarkTheme` مقبول لمعاينة الشاشة لا لزر التبديل.
 - **المستوى:** widget
 - **الحالة:** Covered
@@ -262,7 +263,7 @@
 |---|---|
 | مهندس API | بعد #56 على `9c0fa4f` يبقى: دخان P7-01 (not run بلا أسرار staging)، ودخول الأدوار على staging، وP7-03 على الجهاز، ومصفوفة P7-04 الحية، وطيران P7-19، وعودة الراديو، ودفتر staging لـ P7-20 وP7-21. السؤال المفتوح: هل `GET /api/me` هو العقد؟ |
 | Senior Flutter | بعد #53 و#54 و#55 يبقى P7-10 وP7-14 Partial لأن الإصلاحات لم تُدمج. DEF-020 وDEF-022 مفتوحان على `main`. DEF-021 عيب بديل اختبار، وفحص staging باقٍ. P7-07 مع DEF-012، وP7-08، وصفوف staging P7-09 وP7-11 وP7-13 وP7-15 |
-| مطور الواجهة | بعد #49 يبقى الجهاز لـ P7-16 وP7-17 وP7-18 وP7-22. قتل العملية Not supported بلا FCM. DEF-023 وDEF-024 وDEF-025 مفتوحة وغير مانعة |
+| مطور الواجهة | بعد #57 على `714c6ea` الحكم yes with notes. DEF-023 وDEF-024 وDEF-025 تبقى Open على `main`. الجهاز لـ P7-16 وP7-17 وP7-18 وP7-22 باقٍ. قتل العملية Not supported بلا FCM |
 | DevOps | بعد إعادة اختبار #52 على `f8f7812` يبقى: رقم P7-23 وP7-24 على الجهاز الضعيف في النموذج، وعتبة علي، ونصف الجهاز من P7-25، ومجموعة المعرّفات على مشي الحزمة لا على الشاشة، ونموذج P7-26 على الهواتف A–D. سير المحاكي لا يملأ النموذج |
 
 ### فهرس `P7`
@@ -945,6 +946,82 @@ CI التشغيل [39711134480](https://github.com/ddaa81108-wq/vib-abdo-company
 | #55 | `afc03aa76e2d8e9a73c75d99a54eb949a435e998` | `1a859242a232e900f4b220d542354fac49a9838f` | `2979e92a6102d4f372528a4d97604f556d63d338` | الشجرتان أعلاه |
 
 ---
+
+### مراجعة #49 عند `546a623` و#57 — DEF-023 وDEF-024 وDEF-025
+
+رأس [#49](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/49) ما زال `546a62342eb78140d550abdfd138de5e0821c77a`. وصف الطلب وأسباب `markTestSkipped` يسميان DEF-023 وDEF-024 وDEF-025. على هذا الرأس وحده الاختبارات الثلاثة تتخطى قبل القياس، فليست Pass. الملحق السابق يبقى ساريًا. `tool/check.sh` لم يُعد تشغيله على #49.
+
+[#57](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/57) مسودة عند `714c6eaf7318eaadab8a8d92c02184f81e99b7e5`. الفرع `cursor/def-020-022-contrast-e77f`. CI [39712790633](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions/runs/39712790633) أخضر على هذا الالتزام. لم يُدفع إلى فرع #57 ولم يُدمج. لا توقيع.
+
+**الحكم:** yes with notes. DEF-023 وDEF-024 وDEF-025 تبقى Open وغير مانعة على `main`. البند 14 يبقى Covered. الأعداد لم تتغير.
+
+`tool/check.sh` على `/tmp/wt-57`، خروج 0:
+
+| الخطوة | النتيجة |
+|---|---|
+| `flutter analyze` للتطبيق | `No issues found! (ran in 4.0s)` |
+| `flutter test --exclude-tags screenshots` | **374/0** |
+| `flutter analyze` في `packages/api_layer` | `No issues found! (ran in 3.0s)` |
+| `flutter test` في `packages/api_layer` | **150/0** |
+| السالب | **27/0** و**23/0** |
+| dry-run | **6/0** |
+| حارس الإصدار | **4/0** |
+| `USE_FAKE_API=true` في release | `Release compilation rejected USE_FAKE_API=true.` |
+
+الأساس كان التطبيق 371. الزيادة ثلاثة اختبارات تباين.
+
+**الملفات.** `lib/ui/theme.dart` و`lib/features/home/home_shell.dart` و`lib/features/treasury/treasury_screen.dart` و`test/contrast_tokens_test.dart`. الفرق ليس رموز `theme.dart` وحدها. `IdentityBlock` يأخذ `roleColor`: الشريط يمرّر `shine`، ورأس الهاتف يبقى `onSurface`. كلمة الدرج صارت `bright`. صف الخزينة الوارد يقرأ `cashPositiveText`. لا مزوّد ولا منطق أعمال. تنسيق حدود في `theme.dart` داخل الفرق نفسه.
+
+**النسب من البايتات، WCAG 2.x.** جدول الطلب يطابق التقريب إلى منزلتين.
+
+| الزوج | النسبة |
+|---|---|
+| `#EAB600` على `#E5EDF6` | 1.588613 |
+| `#7C6100` على `#E5EDF6` | 4.983618 |
+| `#EAB600` على `#0D1522` | 9.751529 |
+| `#172723` على `#102A26` | 1.022427 |
+| `#FFFDE0` على `#102A26` | 14.754121 |
+| `#FFFDE0` على `#101B2A` | 16.810616 |
+| `#FFDB35` على `#102A26` | 11.175754 |
+| `#FFDB35` على `#101B2A` | 12.733481 |
+| `#247763` على `#172333` | 2.939585 |
+| `#36B496` على `#172333` | 6.134279 |
+| `#247763` على `#1A2C24` | 2.723645 |
+| `#36B496` على `#1A2C24` | 5.683660 |
+| `#041510` على `#247763` | 3.476987 |
+| `#041510` على `#36B496` | 7.255721 |
+| `#FFFFFF` على `#087A50` | 5.370877 |
+| `#087A50` على `#E5EDF6` | 4.546331 |
+| `#087A50` على `#172333` | 2.951710 |
+| `#0CB677` على `#172333` | 6.019105 |
+| `#0CB677` على `#1A2C24` | 5.576946 |
+| `#175F50` على `#E5EDF6` | 6.373277 |
+| `#175F50` على `#FFFFFF` | 7.529168 |
+
+`VIB` بحجم 18 ووزن 800 نص عادي. العلامة بحجم 40 نص كبير. دور الشريط بحجم 13 نص عادي. كلمة الدرج بحجم 20 ووزن 800 نص كبير. الأزواج المرسومة أعلاه فوق حدها.
+
+**الخضرة.** التعبئة تبقى `#087A50` (درجة 157.895). الحبر الداكن `#0CB677` درجته 157.765. الفرق 0.130 درجة. السالب يبقى `#B43131`. زر التعبئة يستخدم `onPrimary` `#041510` لا الأبيض. الأبيض على `#36B496` هو 2.584374، وهذا الزوج لا يُرسم على الزر.
+
+**زوج كامن.** `#7C6100` على `#102A26` هو 2.582450. كلمة الدرج انتقلت إلى `bright` حتى لا يُرسم. القارئ الوحيد لـ `base` هو علامة الدخول على `#E5EDF6`.
+
+**الاختبارات.** DEF-023 وDEF-024 وDEF-025 في `contrast_tokens_test.dart` ترسم الودجت الحقيقي: الدخول، والسكة ورأس الهاتف والدرج، ثم زر الرئيسية وبطاقة النقد وصف `ce_1` وزر المشتريات. `_expectTokenPairs` يقيس الثوابت داخل `MaterialApp` بلا تلك الشاشات، والقسم الذي يليه يرسم مواقع العيب.
+
+**دمج محلي #49+#57.** `merge --no-commit` نظيف ثم أُلغي. بعد إيقاف `_skipDef023` و`_skipDef024` و`_skipDef025` نجح `phase7_theme_ui_test.dart` **+6** وخروج 0، ومنها الاختبارات الثلاثة ومشي الشاشات على حد الملف 3:1. تلك الاختبارات تتوقع غياب الأزواج القديمة. مسبار محلي بحد 4.5 للنص العادي و3 للنص الكبير، ثم حُذف: الوضع الداكن بلا نقص. الوضع الفاتح يظهر `#6D7C77` فقط، وهو `onSurfaceVariant` ولم يتغير: 3.703585 على `#E5EDF6` و4.375288 على الأبيض و4.053914 على `#EDF9F4` و3.810320 على `#E6F2ED`. فوق 3:1 وتحت 4.5. ليس تراجعًا من #57 ولم يُفتح له معرّف. التالي الحر DEF-026.
+
+**`merge-tree --write-tree`.** خروج 0 ضد `main` و#48 و#49 و#50 و#51 و#52 و#53 و#54 و#55 و#56. لا أسماء ملفات مشتركة. لم يُنشأ دمج.
+
+| الطرف | الشجرة |
+|---|---|
+| `main` | `5c3d2e16dcc1176e4f5e4cdb52ce1849412d9663` |
+| #48 | `936d04d8e8a3fc12318546cdfaab64326566d4b1` |
+| #49 | `3e4bba98c4bbd03fcfb58c12181a1de4f42772a1` |
+| #50 | `8611e1260697dd70415f4064d527d944dd160628` |
+| #51 | `210e37f4061e3a38185fba6a0eaf6354e16536f8` |
+| #52 | `4d70e57fac49210a64eb5e1f830324b3c473b6dd` |
+| #53 | `117be37b84851b74d65f00fb17c6b54b234f6faa` |
+| #54 | `71d48ca3c3458b130c777b350dd0ae265b50bc4d` |
+| #55 | `21a34de6055b607f8007efe58210f72c6de0814e` |
+| #56 | `48e44ab4cf3c443fa6628dbcdca335060497490e` |
 
 ## د. خط الأساس `tool/check.sh`
 
