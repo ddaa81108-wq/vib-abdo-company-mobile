@@ -15,9 +15,9 @@
 |---|---|
 | Pending PM decision | DEF-002. على `main` عند `8a52160` السلوك لم يتغير. الإداري المحدود ما زال `collections.decide`، ومسار الإجماليات المخصص يرفضه بـ 403 |
 | Blocking مفتوح على `main` | لا يبقى عيب مانع من DEF-013 أو DEF-014. هما verified on main 451ec58 |
-| Blocking على فرع وليس على `main` | DEF-018 على #47 `3f8e009`. موافقة الإذن لا ترسل `POST /api/mobile-push/devices` |
-| Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `8a52160` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل |
-| أُغلق على فرع وليس على `main` | DEF-017. Verified closed on `cursor/phase6-system-tray-bg-poll` `cc1bc83` and still closed on #46 `f6fa327`, not on main. كان مفتوحًا على `82e0e8c` |
+| Blocking على فرع وليس على `main` | لا يبقى. DEF-018 أُغلق على #47 `da9183c` |
+| Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `8a52160` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل. DEF-019 على #47 `da9183c`: فتح الإشعارات بعد دخول بإذن ممنوح يرسل رمز الجهاز مرة ثانية |
+| أُغلق على فرع وليس على `main` | DEF-017. Verified closed on `cursor/phase6-system-tray-bg-poll` `cc1bc83` and still closed on #46 `f6fa327` and on #47 `da9183c`, not on main. كان مفتوحًا على `82e0e8c`. DEF-018. Verified closed on #47 `da9183c`, not on main. كان مفتوحًا على `3f8e009` |
 | verified on main 8a52160 | DEF-010. «عرض الكل» يتبع قسم النشرة |
 | verified on main 451ec58 | DEF-001، DEF-003، DEF-004، DEF-005، DEF-006، DEF-013، DEF-014، DEF-015، DEF-016 |
 | أُغلق بعد إعادة اختبار | DEF-007 وDEF-008 وDEF-009 وDEF-011 بقيت مغلقة ضمن المجموعة على `451ec58` |
@@ -530,7 +530,7 @@
 
 ### DEF-017 — 401 أثناء ابتلاع الدفع يخرج من `presentPush` بلا `sessionEnded`
 
-**الحالة:** Verified closed on `cursor/phase6-system-tray-bg-poll` `cc1bc83b81e4b996cd0a974121e5b057b182726a`, and still closed on #46 `f6fa327bc60e747804356c25ec1dd5b7179be0ae`, not on main. كان Open على `82e0e8c`. غير مانع حين كان مفتوحًا. التالي الحر DEF-019 بعد DEF-018.
+**الحالة:** Verified closed on `cursor/phase6-system-tray-bg-poll` `cc1bc83b81e4b996cd0a974121e5b057b182726a`, and still closed on #46 `f6fa327bc60e747804356c25ec1dd5b7179be0ae` and on #47 `da9183c35b8f7b642d8f348e15221a239526f5f2`, not on main. كان Open على `82e0e8c`. غير مانع حين كان مفتوحًا. التالي الحر DEF-020 بعد DEF-019.
 
 | الحقل | القيمة |
 |---|---|
@@ -555,11 +555,13 @@
 
 **على #47 `3f8e009`:** سيناريوهات DEF-017 ما زالت Pass. لم يُعد فتح DEF-017. التالي الحر صار DEF-019 بعد فتح DEF-018.
 
+**على #47 `da9183c`:** المسبار نفسه **7/0**. لم يُعد فتح DEF-017. DEF-018 أُغلق في القسم التالي، وDEF-019 فُتح. التالي الحر DEF-020.
+
 ---
 
 ### DEF-018 — موافقة إذن الإشعار لا ترسل تسجيل الجهاز
 
-**الحالة:** Open on #47 `3f8e009943f3cdfea6ab60c28cc77b3b62c1303d`, not on main. Blocking لقبول هذا الطلب. التالي الحر DEF-019.
+**الحالة:** Verified closed on #47 `da9183c35b8f7b642d8f348e15221a239526f5f2`, not on main. كان Open وBlocking على `3f8e009`. التالي الحر DEF-020 بعد DEF-019.
 
 | الحقل | القيمة |
 |---|---|
@@ -581,6 +583,34 @@
 **الفعلي:** المسجّل في الجذر وفي الشاشة هو نفسه، والنقل `fake`، و`permission.granted` يبقى false لأن الحاوية الجذر ما زالت على `StubNotificationPermissionService`. `registered` فارغة. اختبارات المؤلف تمر لأنها تستبدل المسجّل ولا تفحص الإرسال.
 
 على المسجّل مباشرة، إذا مُنح الإذن في بنائه: النداء مرتين يرسل الرمز نفسه مرتين بلا مقارنة مع المخزن. 401 بعد ذلك يعطي `session_expired` مرة. 403 يبقي الجلسة ولا يطبع الرمز. فشل الشبكة طلب POST واحد بلا إعادة. هذه المسارات لا تصل من زر الموافقة اليوم.
+
+**إعادة الاختبار على `da9183c`:** `buildAppRoot` في `lib/main.dart` يضع `notificationPermissionRegistrarOverride()` على نطاق الجذر، و`runApp` يستدعي هذه الدالة. المسبار على هذه الدالة، بالمسجّل الحقيقي و`FakePushTransport`، بلا `RecordingDeviceTokenRegistrar`. الموافقة على API 33 ترسل `POST /api/mobile-push/devices` مرة واحدة وفي الجسم الرمز، والرمز لا يُطبع ولا يُرسم. «لاحقًا» والرفض الدائم والرفض بعد الموافقة لا ترسل. الحكم: **Verified closed** على هذا الرأس، وليس على `main`. تكرار الإرسال عند فتح الشاشة بعد دخول بإذن ممنوح هو DEF-019، وليس إعادة فتح لهذا العيب.
+
+---
+
+### DEF-019 — فتح الإشعارات بعد دخول بإذن ممنوح يرسل الرمز مرة ثانية
+
+**الحالة:** Open on #47 `da9183c35b8f7b642d8f348e15221a239526f5f2`, not on main. غير مانع لإغلاق DEF-018. التالي الحر DEF-020.
+
+| الحقل | القيمة |
+|---|---|
+| المرحلة | 6 |
+| الشدة | متوسطة |
+| التصنيف | Non-blocking |
+| الملفات | `lib/features/notifications/notification_permission_registration.dart` (`NotificationPermissionSync` يتذكر الاختيار فقط، ويبدأ فارغًا)؛ `lib/notifications/notification_transport_host.dart` (`syncPushRegistration` يرسل عند الدخول)؛ `lib/features/notifications/notifications_screen.dart` (`_maybeExplain` يستدعي المزامنة عندما تكون الحالة `granted`) |
+
+**خطوات الإعادة**
+
+1. على #47 `da9183c` ابنِ الجذر بـ `buildAppRoot` كما يفعل `main`.
+2. API 33، والإذن `granted` من البداية، و`FakePushTransport` برمز ثابت.
+3. لا تستبدل `deviceTokenRegistrarProvider`.
+4. ادخل `employee.demo`.
+5. افتح `/notifications`.
+6. أرسل `AppLifecycleState.resumed`.
+
+**المتوقع:** `POST /api/mobile-push/devices` مرة واحدة لذلك الرمز. الاستئناف لا يضيف طلبًا.
+
+**الفعلي:** الدخول يرسل مرة. فتح الشاشة يرسل الرمز نفسه مرة ثانية، لأن ذاكرة المزامنة لم تُملأ من مسار الدخول. الاستئناف بعد ذلك لا يرسل ثالثة. الموافقة ثم الاستئناف أو إعادة بناء الشاشة تبقى على طلب واحد، فهذا المسار ليس استئنافًا بعد الموافقة. تغيّر الرمز ثم الاستئناف لا يرسل الرمز الجديد، لأن المقارنة على الاختيار لا على الرمز. إعادة تشغيل العملية ترسل عند الدخول مرة، وهذا غير مكتوب في التعليق؛ ثم فتح الشاشة يضيف المرة الثانية نفسها.
 
 ---
 
@@ -631,3 +661,4 @@
 - إعادة اختبار الإصلاح على `cc1bc83` أغلقت DEF-017 على الفرع وليس على `main`. التالي الحر يبقى DEF-018.
 - إعادة اختبار #46 عند `f6fa327` لم تفتح DEF-018. DEF-017 يبقى مغلقًا على الفرع. تعليم قراءة صف المستخدم الحالي عندما ترجع الفتاحة `forbidden` خيار لمدير المشروع: المسار `/forbidden` والنص «القسم غير مصرح لهذا الحساب» قائمان، والنقرة الثانية لا تنقص العدد. مستلم آخر لا يُعلَّم ولا يفتح المحتوى ولا يسرّب الاسم. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
 - إعادة اختبار #47 عند `3f8e009` فتحت DEF-018 أعلاه. التالي الحر DEF-019. DEF-017 لم يُعد فتحه. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
+- إعادة اختبار #47 عند `da9183c` أغلقت DEF-018 على الفرع وليس على `main`، وفتحت DEF-019 أعلاه. التالي الحر DEF-020. DEF-017 لم يُعد فتحه. إعادة إرسال نفس الرمز عند إعادة تشغيل العملية غير مكتوبة في التعليق، وليست عيبًا ثانيًا. P6-30 قرار لعلي والالتزام `da9183c` يُرجع وحده. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
