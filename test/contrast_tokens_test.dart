@@ -121,8 +121,11 @@ Color _buttonForeground(WidgetTester tester, Finder finder) {
   return color!;
 }
 
+/// DEF-023 is the login brand, DEF-024 is the light sidebar role, and DEF-025
+/// is dark primary text plus cashPositive. DEF-020 through DEF-022 are other
+/// defects in QA's registry. The next free number is DEF-026.
 void main() {
-  testWidgets('DEF-020 login brand meets AA on the scaffold in both themes', (
+  testWidgets('DEF-023 login brand meets AA on the scaffold in both themes', (
     tester,
   ) async {
     for (final dark in [false, true]) {
@@ -154,7 +157,7 @@ void main() {
   });
 
   testWidgets(
-    'DEF-021 rail role uses sidebar shine and the phone role stays onSurface',
+    'DEF-024 rail role uses sidebar shine and the phone role stays onSurface',
     (tester) async {
       await pumpFakeApp(tester, size: const Size(800, 900));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
@@ -179,7 +182,7 @@ void main() {
     },
   );
 
-  testWidgets('DEF-022 primary text, cash ink, and the cash fill meet AA', (
+  testWidgets('DEF-025 primary text, cash ink, and the cash fill meet AA', (
     tester,
   ) async {
     for (final brightness in [Brightness.light, Brightness.dark]) {
