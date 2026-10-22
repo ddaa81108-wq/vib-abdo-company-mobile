@@ -1,5 +1,6 @@
 import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
+import '../../core/network/logging_interceptor.dart';
 import '../models/home_models.dart';
 
 /// Home screen (per API contract). Uses the proposed aggregated `GET /api/home`
@@ -16,6 +17,9 @@ class RemoteHomeRepository implements HomeRepository {
   final ApiClient _api;
 
   @override
-  Future<HomeDto> fetch() async =>
-      HomeDto.fromData((await _api.get(ApiEndpoints.proposedHome)).data);
+  Future<HomeDto> fetch() async {
+    const path = ApiEndpoints.proposedHome;
+    final data = (await _api.get(path)).data;
+    return runWithMoneyEndpoint(path, () => HomeDto.fromData(data));
+  }
 }

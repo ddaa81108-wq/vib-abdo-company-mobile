@@ -47,7 +47,7 @@ class AccountCardDto {
   final String id;
   final String name;
   final String? phone;
-  final int? balanceUnits; // raw server value, display only
+  final MoneyValue? balanceUnits; // raw server value, display only
   final Currency currency;
   final String? activeAssigneeName;
   final DateTime? lastActivityAt;
@@ -76,7 +76,11 @@ class AccountCardDto {
         id: str(j['id']),
         name: str(j['name']),
         phone: strOrNull(j['phone']),
-        balanceUnits: unitsOrNull(j['balanceUnits']),
+        balanceUnits: unitsOrNull(
+          j['balanceUnits'],
+          fieldPath: 'balanceUnits',
+          rowId: strOrNull(j['id']),
+        ),
         currency: currencyOr(j['currency'], s.currency),
         activeAssigneeName: strOrNull(j['activeAssigneeName']),
         lastActivityAt:
@@ -154,8 +158,8 @@ class AccountsSummaryDto {
       this.activeCards,
       this.pendingReviewCount,
       this.tabCounts = const {}});
-  final int? netBalanceUnits;
-  final int? totalDebtUnits;
+  final MoneyValue? netBalanceUnits;
+  final MoneyValue? totalDebtUnits;
   final int? activeCards;
   final int? pendingReviewCount;
 
@@ -163,8 +167,8 @@ class AccountsSummaryDto {
   final Map<String, int> tabCounts;
 
   factory AccountsSummaryDto.fromJson(Json j) => AccountsSummaryDto(
-        netBalanceUnits: unitsOrNull(j['netBalance'] ?? j['netBalanceUnits']),
-        totalDebtUnits: unitsOrNull(j['totalDebt'] ?? j['totalDebtUnits']),
+        netBalanceUnits: _summaryMoney(j, 'netBalance', 'netBalanceUnits'),
+        totalDebtUnits: _summaryMoney(j, 'totalDebt', 'totalDebtUnits'),
         activeCards: intOrNull(j['activeCards']),
         pendingReviewCount: intOrNull(j['pendingReviewCount']),
         tabCounts: {
@@ -172,6 +176,16 @@ class AccountsSummaryDto {
             if (e.value is int) e.key: e.value as int,
         },
       );
+
+  static MoneyValue? _summaryMoney(Json j, String key, String alt) {
+    if (j.containsKey(key)) {
+      return unitsOrNull(j[key], fieldPath: 'summary.$key');
+    }
+    if (j.containsKey(alt)) {
+      return unitsOrNull(j[alt], fieldPath: 'summary.$alt');
+    }
+    return null;
+  }
 }
 
 /// GET /api/{section}?limit&cursor&q&filter -> `{items[], nextCursor, totalItems, summary{…}}`.
@@ -183,7 +197,9 @@ class AccountsPage {
   final int? totalItems; // data.totalItems (top level, not inside summary)
 
   factory AccountsPage.fromData(Object? data, AccountSection s) {
+    requireJsonObject(data is List ? null : data, 'accounts');
     final p = Paged.fromData(data, (j) => AccountCardDto.fromJson(j, s));
+    requireJsonObject(p.raw['summary'], 'summary');
     return AccountsPage(
       page: p,
       summary: AccountsSummaryDto.fromJson(asJson(p.raw['summary'])),
@@ -223,14 +239,14 @@ class LedgerEntryDto {
   final DateTime? date;
   final DateTime? recordedAt;
   final String? note;
-  final int? amountUnits; // server-computed effective amount
-  final int? inputValue; // what the user entered (display only)
+  final MoneyValue? amountUnits; // server-computed effective amount
+  final MoneyValue? inputValue; // what the user entered (display only)
   final CalculationMode? calculationMode;
-  final int?
+  final MoneyValue?
       factorMicros; // rate × 1e6, display via MoneyFormatter.formatScaled(…, 6)
 
   /// Required from the server, per API contract. The app does not compute this.
-  final int? balanceAfterUnits;
+  final MoneyValue? balanceAfterUnits;
   final String? createdByName;
   final bool corrected;
   final int? version;
@@ -251,11 +267,27 @@ class LedgerEntryDto {
         date: dateOrNull(j['date']),
         recordedAt: dateOrNull(j['createdAt']),
         note: strOrNull(j['displayNote'] ?? j['note']),
-        amountUnits: unitsOrNull(j['amountUnits']),
-        inputValue: unitsOrNull(j['inputValue']),
+        amountUnits: unitsOrNull(
+          j['amountUnits'],
+          fieldPath: 'amountUnits',
+          rowId: strOrNull(j['id']),
+        ),
+        inputValue: unitsOrNull(
+          j['inputValue'],
+          fieldPath: 'inputValue',
+          rowId: strOrNull(j['id']),
+        ),
         calculationMode: CalculationMode.fromName(j['calculationMode']),
-        factorMicros: unitsOrNull(j['factorMicros']),
-        balanceAfterUnits: unitsOrNull(j['balanceAfterUnits']),
+        factorMicros: unitsOrNull(
+          j['factorMicros'],
+          fieldPath: 'factorMicros',
+          rowId: strOrNull(j['id']),
+        ),
+        balanceAfterUnits: unitsOrNull(
+          j['balanceAfterUnits'],
+          fieldPath: 'balanceAfterUnits',
+          rowId: strOrNull(j['id']),
+        ),
         createdByName: strOrNull(j['createdByName'] ?? j['actorName']),
         corrected: boolOf(j['corrected']) || j['correctedAt'] != null,
         version: intOrNull(j['version']),
@@ -276,15 +308,19 @@ class LedgerPage {
   final Currency currency;
 
   /// Display only. NEVER used to accumulate a running balance (web client does; we don't).
-  final int? pageOpeningBalanceUnits;
+  final MoneyValue? pageOpeningBalanceUnits;
   final AccountCardDto? account;
 
   factory LedgerPage.fromData(Object? data, AccountSection s) {
+    requireJsonObject(data is List ? null : data, 'ledger');
     final p = Paged.fromData(data, LedgerEntryDto.fromJson);
     return LedgerPage(
       page: p,
       currency: currencyOr(p.raw['currency'], s.currency),
-      pageOpeningBalanceUnits: unitsOrNull(p.raw['pageOpeningBalanceUnits']),
+      pageOpeningBalanceUnits: unitsOrNull(
+        p.raw['pageOpeningBalanceUnits'],
+        fieldPath: 'pageOpeningBalanceUnits',
+      ),
       account: (p.raw['account'] ?? p.raw['customer']) is Map
           ? AccountCardDto.fromJson(
               asJson(p.raw['account'] ?? p.raw['customer']), s)

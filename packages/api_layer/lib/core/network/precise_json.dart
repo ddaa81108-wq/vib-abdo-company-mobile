@@ -3,7 +3,8 @@ import 'dart:convert';
 /// A JSON number that is not a plain integer (it has a fraction or an exponent, or is
 /// too large for `int`), kept as the EXACT text from the response body.
 /// Never converted to `double`. Consumers decide: `DecimalString.fromJson` validates the
-/// text, `unitsOrNull` rejects it as INVALID_SERVER_RESPONSE.
+/// text, `unitsOrNull` marks that one money field invalid. It does not fail
+/// the response and it does not read this text into a number.
 class JsonNumberText {
   const JsonNumberText(this.text);
   final String text;

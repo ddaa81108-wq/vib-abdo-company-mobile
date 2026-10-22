@@ -126,7 +126,7 @@ class _DayView extends StatelessWidget {
     );
   }
 
-  Widget _amount(String key, String label, int? units) {
+  Widget _amount(String key, String label, MoneyValue? units) {
     return Padding(
       padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
       child: LabeledMoney(
@@ -138,12 +138,13 @@ class _DayView extends StatelessWidget {
   }
 }
 
+String _digits(MoneyValue? value) =>
+    value != null && value.isValid ? '${value.units}' : '';
+
 class _EntryFields {
-  _EntryFields({int? value, int? commission})
-    : value = TextEditingController(text: value == null ? '' : '$value'),
-      commission = TextEditingController(
-        text: commission == null ? '' : '$commission',
-      );
+  _EntryFields({MoneyValue? value, MoneyValue? commission})
+    : value = TextEditingController(text: _digits(value)),
+      commission = TextEditingController(text: _digits(commission));
 
   final TextEditingController value;
   final TextEditingController commission;
@@ -174,12 +175,8 @@ class _MasraweyaFormState extends ConsumerState<_MasraweyaForm> {
     super.initState();
     final previous = widget.day.previousValueUnits;
     final purchases = widget.day.purchasesUnits;
-    _previous = TextEditingController(
-      text: previous == null ? '' : '$previous',
-    );
-    _purchases = TextEditingController(
-      text: purchases == null ? '' : '$purchases',
-    );
+    _previous = TextEditingController(text: _digits(previous));
+    _purchases = TextEditingController(text: _digits(purchases));
     _rows = [
       for (final entry in widget.day.entries)
         _EntryFields(
@@ -295,7 +292,10 @@ class _MasraweyaFormState extends ConsumerState<_MasraweyaForm> {
       final commission = parseUnits(row.commission.text);
       if (value == null || commission == null) return null;
       entries.add(
-        MasraweyaEntryDto(valueUnits: value, commissionUnits: commission),
+        MasraweyaEntryDto(
+          valueUnits: MoneyValue.known(value),
+          commissionUnits: MoneyValue.known(commission),
+        ),
       );
     }
     return entries;
@@ -308,8 +308,8 @@ class _MasraweyaFormState extends ConsumerState<_MasraweyaForm> {
   ) {
     final parts = <String>['$previous', '$purchases'];
     for (final entry in entries) {
-      parts.add('${entry.valueUnits}');
-      parts.add('${entry.commissionUnits}');
+      parts.add('${entry.valueUnits?.asInt ?? ''}');
+      parts.add('${entry.commissionUnits?.asInt ?? ''}');
     }
     return parts.join(' · ');
   }

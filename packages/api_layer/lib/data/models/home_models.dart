@@ -40,8 +40,8 @@ class HomeSummaryDto {
   final String key; // e.g. customers.netBalance
   final String section; // customers | companies | … | reports
   final String title; // server text
-  final int?
-      valueUnits; // null -> "—" (some cards, e.g. reports status, have no amount)
+  final MoneyValue?
+      valueUnits; // null -> "—". Invalid is not a number and not a dash.
   final Currency?
       currency; // explicit per card; never inferred from another card
   final SummaryTone? tone;
@@ -54,7 +54,11 @@ class HomeSummaryDto {
         key: str(j['key']),
         section: str(j['section']),
         title: str(j['title']),
-        valueUnits: unitsOrNull(j['valueUnits']),
+        valueUnits: unitsOrNull(
+          j['valueUnits'],
+          fieldPath: 'valueUnits',
+          rowId: strOrNull(j['key']),
+        ),
         currency: Currency.fromCode(j['currency']),
         tone: SummaryTone.fromServer(j['tone']),
         note: strOrNull(j['note']),
@@ -76,7 +80,7 @@ class OldDebtDto {
   final String id;
   final String section;
   final String name;
-  final int? balanceUnits;
+  final MoneyValue? balanceUnits;
   final Currency? currency;
   final int? debtAgeDays; // display text only
   final String? ageStatus; // server status -> colour; no thresholds in the app
@@ -86,7 +90,11 @@ class OldDebtDto {
         id: str(j['id']),
         section: str(j['section']),
         name: str(j['name']),
-        balanceUnits: unitsOrNull(j['balanceUnits']),
+        balanceUnits: unitsOrNull(
+          j['balanceUnits'],
+          fieldPath: 'balanceUnits',
+          rowId: strOrNull(j['id']),
+        ),
         currency: Currency.fromCode(j['currency']),
         debtAgeDays: intOrNull(j['debtAgeDays']),
         ageStatus: strOrNull(j['ageStatus']),

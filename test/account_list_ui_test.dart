@@ -137,7 +137,7 @@ void main() {
       () => layer.accounts.list(AccountSection.customers),
     );
     final zeroCard = customers!.page.items.firstWhere(
-      (card) => card.balanceUnits == 0 && !card.systemManaged,
+      (card) => card.balanceUnits?.asInt == 0 && !card.systemManaged,
     );
     final zeroKey = ValueKey('zero-review-${zeroCard.id}');
     await _expectActions(

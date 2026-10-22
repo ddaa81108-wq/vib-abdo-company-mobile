@@ -108,21 +108,37 @@ void main() {
 
   group('unitsOrNull, per API contract', () {
     test('int passes; null/missing stays null (UI dash)', () {
-      expect(unitsOrNull(150000), 150000);
+      expect(unitsOrNull(150000)?.units, 150000);
       expect(unitsOrNull(null), isNull);
       expect(unitsOrNull(<String, dynamic>{}['missing']), isNull);
       expect(
           const MoneyFormatter().formatOrDash(unitsOrNull(null), Currency.lyd),
           '—');
     });
-    test('string / fractional / exponent / double => INVALID_SERVER_RESPONSE',
+    test('string / fractional / exponent / double => invalid field, not a number',
         () {
-      expect(() => unitsOrNull('1500'), _invalid);
+      final logs = <String>[];
+      SafeLog.sink = (message, {wrapWidth}) {
+        if (message != null) logs.add(message);
+      };
+      addTearDown(() => SafeLog.sink = null);
+      expect(unitsOrNull('1500', fieldPath: 'amountUnits')?.units, isNot(1500));
+      expect(
+        unitsOrNull('1500', fieldPath: 'amountUnits')!.isInvalid,
+        isTrue,
+      );
       final d = PreciseJson.decode('{"a":15.5,"b":1e5}') as Map;
-      expect(() => unitsOrNull(d['a']), _invalid);
-      expect(() => unitsOrNull(d['b']), _invalid);
-      expect(() => unitsOrNull(15.0), _invalid);
-      expect(() => unitsOrNull(true), _invalid);
+      expect(unitsOrNull(d['a'], fieldPath: 'a')!.isInvalid, isTrue);
+      expect(unitsOrNull(d['b'], fieldPath: 'b')!.isInvalid, isTrue);
+      final doubled = unitsOrNull(15.0, fieldPath: 'doubled');
+      expect(doubled, isA<MoneyValue>());
+      expect(doubled is double, isFalse);
+      expect(doubled!.isInvalid, isTrue);
+      expect(doubled.units, isNull);
+      expect(unitsOrNull(true, fieldPath: 'flag')!.isInvalid, isTrue);
+      expect(logs.join('\n').contains('15.5'), isFalse);
+      expect(logs.join('\n').contains('1500'), isFalse);
+      expect(logs.any((line) => line.contains('field=amountUnits')), isTrue);
     });
   });
 
@@ -169,7 +185,7 @@ void main() {
             .replaceFirst('}', ',"data":{"egpPerLyd":9.50,"amountUnits":12}}'));
       final res = await DioApiClient(dio).get('/api/x');
       expect(DecimalString.fromJson(res.dataMap['egpPerLyd'])!.value, '9.50');
-      expect(unitsOrNull(res.dataMap['amountUnits']), 12);
+      expect(unitsOrNull(res.dataMap['amountUnits'])?.units, 12);
     });
   });
 

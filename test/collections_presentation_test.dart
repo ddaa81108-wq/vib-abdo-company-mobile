@@ -264,7 +264,7 @@ void main() {
               UnlinkedReceiptDto(
                 id: 'ur_ok',
                 customerName: 'استلام معتمد تجريبي',
-                amountUnits: 15,
+                amountUnits: MoneyValue.known(15),
                 status: 'approved',
               ),
             ],

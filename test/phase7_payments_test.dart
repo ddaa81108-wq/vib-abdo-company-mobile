@@ -115,7 +115,7 @@ void main() {
         ),
       );
       final card = await layer.accounts.get(AccountSection.customers, 'c_55');
-      expect(card.balanceUnits, 320);
+      expect(card.balanceUnits?.units, 320);
     },
   );
 }

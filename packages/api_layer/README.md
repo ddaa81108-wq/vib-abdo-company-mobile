@@ -13,7 +13,7 @@ Behavior follows the API contract. Contract notes stay outside this repository.
 - Bearer stub (pending server answer): `--dart-define=AUTH_BEARER=true`
 - `--dart-define=MONEY_UNIT_SCALE=0` (default; to confirm)
 
-RULE: no business calculations anywhere. `*Units` are raw ints; rates are `DecimalString` (text, no double); displayed only via `MoneyFormatter`, one value + its own currency.
+RULE: no business calculations anywhere. A JSON integer `*Units` field stays that integer (`MoneyValue.known`). A non-integer money field (string, fraction, exponent, `double`, or an integer too large for `int`) is `MoneyValue.invalid` for that field only: the rest of the response still parses, nothing is rounded, and a `double` is never stored. A container that is present but is not a JSON object (`summary`, `totals`, `opening`, `lifetimeTotals`, or the response object) still fails the whole response. Null money stays null. Rates are `DecimalString` (text, no double); displayed only via `MoneyFormatter`, one value + its own currency. Invalid money is the label `مبلغ غير صالح`, never a number and never `0`.
 Permissions (final PM rule): server `role` matched EXACTLY (`"admin"`/`"employee"`) ONLY inside PermissionService; precedence (permission_service.dart L50-69): unknown/missing role = nothing; else fullAccess if sent; else admin with BOTH lists empty = full; else lists (write needs code AND manage; reports never writable; collections by codes only); disallowed controls are HIDDEN.
 - `--dart-define=RATE_WIRE_FORMAT=string` (default `number`): wire encoding of rates only; inside the app they are DecimalString text.
 

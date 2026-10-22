@@ -413,7 +413,7 @@ void main() {
                 id: 'co_1',
                 section: 'companies',
                 name: 'شركة تجريبية',
-                balanceUnits: 10,
+                balanceUnits: MoneyValue.known(10),
                 currency: Currency.lyd,
               ),
             ],
@@ -447,7 +447,7 @@ void main() {
                   id: 'row-${section.key}',
                   section: section.key,
                   name: 'سجل ${section.key}',
-                  balanceUnits: 10,
+                  balanceUnits: MoneyValue.known(10),
                   currency: Currency.lyd,
                 ),
               ],
@@ -556,7 +556,7 @@ void main() {
                 id: 'labeled',
                 section: 'customers',
                 name: 'عميل موسوم',
-                balanceUnits: 15,
+                balanceUnits: MoneyValue.known(15),
                 currency: Currency.lyd,
                 debtAgeDays: 2,
                 ageStatus: 'warning',
@@ -593,7 +593,7 @@ void main() {
                 id: 'counted',
                 section: 'customers',
                 name: 'عميل بلا وسم',
-                balanceUnits: 8,
+                balanceUnits: MoneyValue.known(8),
                 currency: Currency.lyd,
                 debtAgeDays: 2,
                 ageStatus: 'warning',
@@ -670,11 +670,11 @@ void main() {
     expect(find.byKey(const Key('ledger-total-LYD')), findsOneWidget);
     expect(find.byKey(const Key('ledger-total-EGP')), findsOneWidget);
     expect(
-      tester.widget<Text>(find.byKey(const Key('ledger-total-LYD'))).data,
+      tester.widget<MoneyText>(find.byKey(const Key('ledger-total-LYD'))).text,
       '0 د.ل',
     );
     expect(
-      tester.widget<Text>(find.byKey(const Key('ledger-total-EGP'))).data,
+      tester.widget<MoneyText>(find.byKey(const Key('ledger-total-EGP'))).text,
       '0 ج.م',
     );
 

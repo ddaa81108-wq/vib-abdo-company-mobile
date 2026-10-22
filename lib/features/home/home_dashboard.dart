@@ -385,9 +385,14 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tone = toneColor(context.statusColors, card.tone);
-    final value = card.currency != null
-        ? money.formatOrDash(card.valueUnits, card.currency!)
-        : (card.valueUnits == null ? AppStrings.dash : '${card.valueUnits}');
+    final units = card.valueUnits;
+    final value = units != null && units.isInvalid
+        ? MoneyValue.invalidLabel
+        : card.currency != null
+        ? money.formatOrDash(units, card.currency!)
+        : (units == null || !units.isValid
+              ? AppStrings.dash
+              : money.formatNumber(units.units!));
     final status = reportStatusLabel(card.status);
     final theme = Theme.of(context);
     return Card(

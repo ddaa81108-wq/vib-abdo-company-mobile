@@ -27,8 +27,8 @@ void main() {
       purchasesUnits: purchasesUnits,
       entries: [
         MasraweyaEntryDto(
-          valueUnits: valueUnits,
-          commissionUnits: commissionUnits,
+          valueUnits: MoneyValue.known(valueUnits),
+          commissionUnits: MoneyValue.known(commissionUnits),
         ),
       ],
     );
@@ -37,20 +37,20 @@ void main() {
   test('DEF-013 PUT stores the submitted day and GET returns it', () async {
     final api = await login('admin.demo');
     final before = await api.masraweya.getDay();
-    expect(before.previousValueUnits, 10000);
-    expect(before.purchasesUnits, 2000);
+    expect(before.previousValueUnits?.units, 10000);
+    expect(before.purchasesUnits?.units, 2000);
     expect(before.version, 2);
-    expect(before.workTotalUnits, 3050);
-    expect(before.remainingUnits, 8950);
+    expect(before.workTotalUnits?.units, 3050);
+    expect(before.remainingUnits?.units, 8950);
 
     final saved = await api.masraweya.saveDay(
       request(),
       MutationMeta(expectedVersion: before.version, requestId: 'day-1'),
     );
-    expect(saved.previousValueUnits, 1);
-    expect(saved.purchasesUnits, 9);
-    expect(saved.entries.single.valueUnits, 4);
-    expect(saved.entries.single.commissionUnits, 60);
+    expect(saved.previousValueUnits?.units, 1);
+    expect(saved.purchasesUnits?.units, 9);
+    expect(saved.entries.single.valueUnits?.units, 4);
+    expect(saved.entries.single.commissionUnits?.units, 60);
     expect(saved.version, 3);
     expect(saved.businessDate, '2026-10-19');
     // Server-owned totals are not recomputed from the submitted inputs.
@@ -60,13 +60,13 @@ void main() {
     expect(saved.status, before.status);
 
     final again = await api.masraweya.getDay();
-    expect(again.previousValueUnits, 1);
-    expect(again.purchasesUnits, 9);
-    expect(again.entries.single.valueUnits, 4);
-    expect(again.entries.single.commissionUnits, 60);
+    expect(again.previousValueUnits?.units, 1);
+    expect(again.purchasesUnits?.units, 9);
+    expect(again.entries.single.valueUnits?.units, 4);
+    expect(again.entries.single.commissionUnits?.units, 60);
     expect(again.version, 3);
-    expect(again.workTotalUnits, 3050);
-    expect(again.remainingUnits, 8950);
+    expect(again.workTotalUnits?.units, 3050);
+    expect(again.remainingUnits?.units, 8950);
   });
 
   test('DEF-013 a stale expectedVersion is VERSION_CONFLICT', () async {
@@ -85,7 +85,7 @@ void main() {
       ),
     );
     final day = await api.masraweya.getDay();
-    expect(day.previousValueUnits, 10000);
+    expect(day.previousValueUnits?.units, 10000);
     expect(day.version, 2);
 
     await api.masraweya.saveDay(
@@ -106,7 +106,7 @@ void main() {
       ),
     );
     final stored = await api.masraweya.getDay();
-    expect(stored.previousValueUnits, 1);
+    expect(stored.previousValueUnits?.units, 1);
     expect(stored.version, 3);
   });
 
@@ -129,8 +129,8 @@ void main() {
       expect(fake.mutationRequestIds.where((id) => id == 'same'), ['same']);
 
       final day = await api.masraweya.getDay();
-      expect(day.previousValueUnits, 1);
-      expect(day.purchasesUnits, 9);
+      expect(day.previousValueUnits?.units, 1);
+      expect(day.purchasesUnits?.units, 9);
       expect(day.version, 3);
     },
   );
@@ -156,8 +156,8 @@ void main() {
     await api.session.logout();
     await api.session.login(username: 'admin.demo', password: 'x');
     final day = await api.masraweya.getDay();
-    expect(day.previousValueUnits, 10000);
-    expect(day.purchasesUnits, 2000);
+    expect(day.previousValueUnits?.units, 10000);
+    expect(day.purchasesUnits?.units, 2000);
     expect(day.version, 2);
   });
 }

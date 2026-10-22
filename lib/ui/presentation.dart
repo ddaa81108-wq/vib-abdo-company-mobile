@@ -219,9 +219,10 @@ String? reportStatusLabel(String? status) => switch (status) {
 }
 
 /// Sign of a server integer, used only for labels the spec ties to direction.
-String? vodafoneCaption(int? units) {
-  if (units == null || units == 0) return null;
-  return units > 0 ? AppStrings.vodafoneOurs : AppStrings.vodafoneOwed;
+String? vodafoneCaption(MoneyValue? units) {
+  final value = units?.asInt;
+  if (value == null || value == 0) return null;
+  return value > 0 ? AppStrings.vodafoneOurs : AppStrings.vodafoneOwed;
 }
 
 /// Visual band only. Not a financial status.

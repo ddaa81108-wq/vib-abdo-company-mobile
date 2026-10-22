@@ -3,13 +3,17 @@ import 'common.dart';
 /// Masraweya (EGP daily book). GET/PUT /api/masraweya/day.
 class MasraweyaEntryDto {
   const MasraweyaEntryDto({this.valueUnits, this.commissionUnits});
-  final int? valueUnits;
-  final int? commissionUnits;
+  final MoneyValue? valueUnits;
+  final MoneyValue? commissionUnits;
   factory MasraweyaEntryDto.fromJson(Json j) => MasraweyaEntryDto(
-      valueUnits: unitsOrNull(j['valueUnits']),
-      commissionUnits: unitsOrNull(j['commissionUnits']));
-  Json toJson() =>
-      {'valueUnits': valueUnits, 'commissionUnits': commissionUnits};
+        valueUnits: unitsOrNull(j['valueUnits'], fieldPath: 'valueUnits'),
+        commissionUnits:
+            unitsOrNull(j['commissionUnits'], fieldPath: 'commissionUnits'),
+      );
+  Json toJson() => {
+        'valueUnits': wireMoney(valueUnits),
+        'commissionUnits': wireMoney(commissionUnits),
+      };
 }
 
 class MasraweyaDayDto {
@@ -26,33 +30,39 @@ class MasraweyaDayDto {
   });
   final String businessDate;
   final int? version;
-  final int? previousValueUnits;
-  final int? purchasesUnits;
+  final MoneyValue? previousValueUnits;
+  final MoneyValue? purchasesUnits;
   final List<MasraweyaEntryDto> entries;
 
   /// Required from the server, per API contract. The app does not compute these.
-  final int? workTotalUnits;
-  final int? remainingUnits;
-  final int? historicalAdjustmentUnits;
+  final MoneyValue? workTotalUnits;
+  final MoneyValue? remainingUnits;
+  final MoneyValue? historicalAdjustmentUnits;
   final String? status;
 
   Currency get currency => Currency.egp;
 
   factory MasraweyaDayDto.fromData(Object? data) {
+    requireJsonObject(data, 'masraweya');
     final d = asJson(data);
-    final day = d['day'] is Map ? asJson(d['day']) : d;
+    final dayRaw = d['day'];
+    requireJsonObject(dayRaw, 'day');
+    final day = dayRaw is Map ? asJson(dayRaw) : d;
+    MoneyValue? money(String key) =>
+        unitsOrNull(day[key], fieldPath: 'day.$key');
     return MasraweyaDayDto(
       businessDate: str(day['businessDate']),
       version: intOrNull(day['version']),
-      previousValueUnits: unitsOrNull(day['previousValueUnits']),
-      purchasesUnits: unitsOrNull(day['purchasesUnits']),
+      previousValueUnits: money('previousValueUnits'),
+      purchasesUnits: money('purchasesUnits'),
       entries: asJsonList(day['entries'])
           .map(MasraweyaEntryDto.fromJson)
           .toList(growable: false),
-      workTotalUnits: unitsOrNull(day['workTotalUnits']),
-      remainingUnits: unitsOrNull(day['remainingUnits'] ??
-          day['finalUnits']), // per API contract: server returns finalUnits
-      historicalAdjustmentUnits: unitsOrNull(day['historicalAdjustmentUnits']),
+      workTotalUnits: money('workTotalUnits'),
+      remainingUnits: day.containsKey('remainingUnits')
+          ? money('remainingUnits')
+          : unitsOrNull(day['finalUnits'], fieldPath: 'day.finalUnits'),
+      historicalAdjustmentUnits: money('historicalAdjustmentUnits'),
       status: strOrNull(day['status']),
     );
   }

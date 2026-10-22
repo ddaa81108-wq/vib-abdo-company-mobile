@@ -56,8 +56,17 @@ void main() {
       final chosen = AccountTransactionRequest.fullPayment(date: DateTime.utc(2026, 1, 15));
       expect(chosen.toJson()['date'], '2026-01-15T00:00:00.000Z');
     });
-    test('malformed amountUnits fails the whole entry', () {
-      expect(() => LedgerEntryDto.fromJson(_j('{"id":"t","type":"debt","status":"posted","amountUnits":1.5}')), _invalid);
+    test('malformed amountUnits marks that field and keeps the entry', () {
+      final entry = LedgerEntryDto.fromJson(
+        _j('{"id":"t","type":"debt","status":"posted","amountUnits":1.5}'),
+      );
+      expect(entry.id, 't');
+      expect(entry.type, 'debt');
+      expect(entry.status, 'posted');
+      expect(entry.amountUnits, const MoneyValue.invalid());
+      expect(entry.amountUnits?.units, isNull);
+      expect(entry.amountUnits?.units, isNot(1));
+      expect(entry.amountUnits?.units, isNot(2));
     });
   });
 
@@ -69,7 +78,7 @@ void main() {
       expect(o.assignedCount, 7);
       expect(o.pendingCount, 3); // from server, not counted from submissions (1 here)
       expect(o.unlinkedPendingCount, 1);
-      expect(o.cashOutstandingUnits, 450);
+      expect(o.cashOutstandingUnits?.units, 450);
     });
     test('assignedCount falls back to metrics; absent => null', () {
       final o = CollectionsOverviewDto.fromData(_j('{"metrics":{"assignedCount":4}}'));
@@ -77,9 +86,18 @@ void main() {
       final n = CollectionsOverviewDto.fromData(_j('{"metrics":{}}'));
       expect([n.assignedCount, n.pendingCount, n.unlinkedPendingCount, n.cashOutstandingUnits], everyElement(isNull));
     });
-    test('malformed cashOutstandingUnits => INVALID_SERVER_RESPONSE (whole response)', () {
-      expect(() => CollectionsOverviewDto.fromData(_j('{"metrics":{"cashOutstandingUnits":"450"}}')), _invalid);
-      expect(() => CollectionsOverviewDto.fromData(_j('{"metrics":{"cashOutstandingUnits":4.5e2}}')), _invalid);
+    test('malformed cashOutstandingUnits marks that metric only', () {
+      final text = CollectionsOverviewDto.fromData(
+        _j('{"metrics":{"cashOutstandingUnits":"450","collectedUnits":12}}'),
+      );
+      expect(text.cashOutstandingUnits!.isInvalid, isTrue);
+      expect(text.cashOutstandingUnits?.units, isNot(450));
+      expect(text.collectedUnits?.units, 12);
+      final exponent = CollectionsOverviewDto.fromData(
+        _j('{"metrics":{"cashOutstandingUnits":4.5e2,"collectedUnits":12}}'),
+      );
+      expect(exponent.cashOutstandingUnits!.isInvalid, isTrue);
+      expect(exponent.collectedUnits?.units, 12);
     });
   });
 
@@ -87,9 +105,17 @@ void main() {
     PurchasesBookPage pageOf(String json) =>
         PurchasesBookPage.fromData(PreciseJson.decode(json));
 
-    expect(() => pageOf('{"days":[],"lifetimeTotals":{"paidUnits":"47447"}}'), _invalid);
-    expect(() => pageOf('{"days":[],"lifetimeTotals":{"resultUnits":1.5}}'), _invalid);
-    expect(() => pageOf('{"days":[],"lifetimeTotals":{"remainingUnits":4.5e2}}'), _invalid);
+    final paid = pageOf('{"days":[],"lifetimeTotals":{"paidUnits":"47447","resultUnits":50000}}');
+    expect(paid.lifetimeTotals?.paidUnits!.isInvalid, isTrue);
+    expect(paid.lifetimeTotals?.paidUnits?.units, isNot(47447));
+    expect(paid.lifetimeTotals?.resultUnits?.units, 50000);
+    final fraction = pageOf('{"days":[],"lifetimeTotals":{"resultUnits":1.5,"paidUnits":2}}');
+    expect(fraction.lifetimeTotals?.resultUnits!.isInvalid, isTrue);
+    expect(fraction.lifetimeTotals?.resultUnits?.units, isNot(1));
+    expect(fraction.lifetimeTotals?.resultUnits?.units, isNot(2));
+    expect(fraction.lifetimeTotals?.paidUnits?.units, 2);
+    final exponent = pageOf('{"days":[],"lifetimeTotals":{"remainingUnits":4.5e2}}');
+    expect(exponent.lifetimeTotals?.remainingUnits!.isInvalid, isTrue);
     expect(() => pageOf('{"days":[],"lifetimeTotals":[50000]}'), _invalid);
 
     expect(pageOf('{"days":[]}').lifetimeTotals, isNull);
@@ -98,18 +124,20 @@ void main() {
     final page = pageOf(
       '{"days":[],"lifetimeTotals":{"resultUnits":50000,"paidUnits":null,"remainingUnits":2553}}',
     );
-    expect(page.lifetimeTotals?.resultUnits, 50000);
+    expect(page.lifetimeTotals?.resultUnits?.units, 50000);
     expect(page.lifetimeTotals?.paidUnits, isNull);
-    expect(page.lifetimeTotals?.remainingUnits, 2553);
+    expect(page.lifetimeTotals?.remainingUnits?.units, 2553);
   });
 
   test('proposed changeUnits and activeCashTone stay null when absent', () {
     final reason = ReportReasonDto.fromJson(_j('{"text":"سبب"}'));
     expect(reason.changeUnits, isNull);
-    expect(
-      () => ReportReasonDto.fromJson(_j('{"text":"سبب","changeUnits":"1200"}')),
-      _invalid,
+    final badReason = ReportReasonDto.fromJson(
+      _j('{"text":"سبب","changeUnits":"1200"}'),
     );
+    expect(badReason.text, 'سبب');
+    expect(badReason.changeUnits!.isInvalid, isTrue);
+    expect(badReason.changeUnits?.units, isNot(1200));
     final treasury = TreasurySummaryDto.fromData({
       'totals': {'activeCashUnits': 10, 'netUnits': 10},
     });

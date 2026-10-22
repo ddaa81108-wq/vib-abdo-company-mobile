@@ -148,7 +148,7 @@ class _AmountLine extends StatelessWidget {
   const _AmountLine(this.label, this.units, this.currency, this.money);
 
   final String label;
-  final int? units;
+  final MoneyValue? units;
   final Currency currency;
   final MoneyFormatter money;
 
@@ -306,7 +306,7 @@ class _DayCard extends ConsumerWidget {
     );
   }
 
-  Widget _line(String label, int? units, Currency currency) {
+  Widget _line(String label, MoneyValue? units, Currency currency) {
     return _AmountLine(label, units, currency, money);
   }
 
@@ -392,11 +392,9 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
       if (label != null && label != PurchaseItemCodes.customCaption) {
         _customLabel.text = label;
       }
-      if (entry.egpValueUnits != null) _egp.text = '${entry.egpValueUnits}';
-      if (entry.paidUnits != null) _paid.text = '${entry.paidUnits}';
-      if (entry.vodafoneConsumedUnits != null) {
-        _vodafone.text = '${entry.vodafoneConsumedUnits}';
-      }
+      _prefill(_egp, entry.egpValueUnits);
+      _prefill(_paid, entry.paidUnits);
+      _prefill(_vodafone, entry.vodafoneConsumedUnits);
       if (entry.exchangeRate != null) _rate.text = entry.exchangeRate!.value;
       if (entry.calculationMode != null) _mode = entry.calculationMode!;
     }
@@ -406,6 +404,12 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
   }
 
   void _changed() => setState(() {});
+
+  void _prefill(TextEditingController controller, MoneyValue? value) {
+    if (value != null && value.isValid && value.units != null) {
+      controller.text = '${value.units}';
+    }
+  }
 
   @override
   void dispose() {
@@ -594,7 +598,7 @@ class _MoneyLine extends StatelessWidget {
   const _MoneyLine(this.label, this.units, this.currency, this.money);
 
   final String label;
-  final int? units;
+  final MoneyValue? units;
   final Currency currency;
   final MoneyFormatter money;
 
@@ -631,8 +635,10 @@ class _OpeningFormState extends ConsumerState<_OpeningForm> {
     super.initState();
     final debt = widget.opening.previousDebtUnits;
     final vodafone = widget.opening.previousVodafoneUnits;
-    if (debt != null) _debt.text = '$debt';
-    if (vodafone != null) _vodafone.text = '$vodafone';
+    if (debt != null && debt.isValid) _debt.text = '${debt.units}';
+    if (vodafone != null && vodafone.isValid) {
+      _vodafone.text = '${vodafone.units}';
+    }
     for (final controller in [_debt, _vodafone]) {
       controller.addListener(_changed);
     }
