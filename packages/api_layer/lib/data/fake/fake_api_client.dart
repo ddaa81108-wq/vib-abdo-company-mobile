@@ -226,6 +226,14 @@ class FakeApiClient implements ApiClient {
   static const dayFinalizedMessage =
       'اليوم مرحّل. لا يمكن إضافة أو تعديل أو حذف بند.';
 
+  /// Direct partial payment larger than the stored card balance.
+  ///
+  /// Whether the real server rejects this is an open question for the
+  /// backend owner. This fake refuses the write so the stored balance cannot
+  /// change, using the same HTTP 400 `VALIDATION_ERROR` envelope as its other
+  /// rejected inputs. That code is not a confirmed server contract.
+  static const amountAboveRemainingMessage = 'المبلغ أكبر من المتبقي المسجّل.';
+
   /// Routes later public calls through [gateway] (the auth interceptor).
   void bindGateway(ApiClient gateway) => _gateway = gateway;
 
@@ -1432,16 +1440,26 @@ class FakeApiClient implements ApiClient {
   /// Debt or partial payment. The version is the card's stored version.
   ///
   /// A direct partial payment stores the previous card balance with the
-  /// received `inputValue` applied. That result is what later reads return.
-  /// The app does not calculate it. A rate-based movement only bumps the
-  /// version; this fake does not turn a factor into an amount.
+  /// received `inputValue` applied when that integer is not larger than the
+  /// stored balance. A larger integer is refused and the stored balance is
+  /// left as it was. The app does not calculate the new balance. A rate-based
+  /// movement only bumps the version; this fake does not turn a factor into
+  /// an amount, and it does not compare that factor with the balance.
   ApiResponse _applyMovement(String section, String id, Map b) {
     final card = _cardView(section, id);
     _requireVersion(b['expectedVersion'], card['version']);
-    final version = (card['version'] as int) + 1;
-    final state = <String, dynamic>{'version': version};
     final previous = card['balanceUnits'];
     final entered = b['inputValue'];
+    if (b['type'] == 'payment' &&
+        b['paymentMode'] == 'partial' &&
+        b['calculationMode'] == 'direct' &&
+        previous is int &&
+        entered is int &&
+        entered > previous) {
+      _fail(400, 'VALIDATION_ERROR', amountAboveRemainingMessage);
+    }
+    final version = (card['version'] as int) + 1;
+    final state = <String, dynamic>{'version': version};
     if (b['type'] == 'payment' &&
         b['paymentMode'] == 'partial' &&
         b['calculationMode'] == 'direct' &&
