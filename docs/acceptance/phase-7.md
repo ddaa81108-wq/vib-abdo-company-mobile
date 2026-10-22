@@ -22,6 +22,8 @@
 | Device-only | 1 | 19 |
 | Staging-only | 0 | — |
 
+اللقطة النهائية على `main` `86324a4ea528a684a07c568f24d95803aee2e720` في القسم هـ. الأعداد لم تتغير. DEF-026 وDEF-027 مُغلقان على ذلك الرأس. لا توقيع.
+
 | المالك | البنود | Covered | Partial | Device-only |
 |---|---|---|---|---|
 | مهندس API | 6 | 0 | 6 | 0 |
@@ -57,8 +59,8 @@
 | 14 الوضع الداكن والفاتح | مطور الواجهة | Covered | widget | — |
 | 15 RTL | مطور الواجهة | Covered | widget | — |
 | 16 مقاسات الشاشة | مطور الواجهة | Partial | widget | P7-22 |
-| 17 الأداء | DevOps | Partial | release مسجّل على #52؛ القص افتراضيًا على #58 | P7-23، P7-24 |
-| 18 سجل أو تاريخ طويل | DevOps | Partial | widget على #52؛ فجوة القص DEF-027 على #58 | P7-25 |
+| 17 الأداء | DevOps | Partial | release مسجّل؛ القص المصحّح هو الافتراض على `main` `86324a4` | P7-23، P7-24 |
+| 18 سجل أو تاريخ طويل | DevOps | Partial | النافذة المتصلة مُتحقَّق منها على `main` `86324a4`؛ DEF-027 مغلق | P7-25 نصف الجهاز |
 | 19 هاتف حقيقي | DevOps | Device-only | سير محاكٍ منفصل على #52 | P7-26 |
 
 ### 1 — اختبارات API
@@ -1217,3 +1219,102 @@ CI التشغيل [39711134480](https://github.com/ddaa81108-wq/vib-abdo-company
 | حارس الإصدار بعد `USE_FAKE_API=false` | **4/0** |
 
 وسم `screenshots` خارج الـ 371. السالب خارج 371 و150. CI السابق على الالتزام نفسه: التشغيل `39699625496`، ونجحت فحوصه الثلاثة، وبلا محاكٍ.
+
+## هـ. اللقطة النهائية على `main` `86324a4`
+
+التاريخ 2026-10-22. الالتزام `86324a4ea528a684a07c568f24d95803aee2e720`. الرسالة «Enable history trimming and keep the newest rows (DEF-027) (#58)». `origin/main` يساوي هذا الالتزام. #49 و#51 و#52 و#57 و#59 و#58 مدموجة. لم يُدفع إلى `main` من هذه الجولة. لم يُمس كود الإنتاج. التوقيع عند علي. هذه اللقطة لا تعيد كتابة أقسام المراجعات أعلاه.
+
+رأسا الوثائق قبل الدمج طابقا المتوقع: #48 `21b7f3f792587a7a93aad3623fe587dcd6f45b2c` و#12 `91c3a59c2e73bca01dcf5e7fbe19187709b3ba5f`. لا التزام أجنبي على أي منهما.
+
+### البوابة
+
+Flutter 3.47.7 / Dart 3.13.5. `bash tool/check.sh` على شجرة منفصلة عند `86324a4` خرج **0**.
+
+| الخطوة | النتيجة |
+|---|---|
+| `flutter analyze` للتطبيق | `No issues found! (ran in 5.3s)` |
+| `flutter test --exclude-tags screenshots` | **471/0** |
+| `flutter analyze` في `packages/api_layer` | `No issues found! (ran in 2.7s)` |
+| `flutter test` في `packages/api_layer` | **209** ناجح، تخطي **1** (P7-01) |
+| `--tags permissions-negative` التطبيق | **32/0** |
+| `--tags permissions-negative` الحزمة | **33/0** |
+| `tool/staging_negative_tests/run.sh --dry-run` | **6/0** |
+| `preflight_test.sh` | `preflight_test ok` |
+| `scan_release_apk.py --self-test` | `scan_release_apk self-test ok` |
+| `USE_FAKE_API=true` في release | `Release compilation rejected USE_FAKE_API=true.` |
+| حارس الإصدار بعد `USE_FAKE_API=false` | **4/0** |
+
+CI على الدفع إلى `main`: التشغيل [39815316603](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions/runs/39815316603) نجح. الفحوص الثلاثة نجحت: Analyze, test, and debug APK؛ وNegative permission tests؛ وRelease build rejects fake API. `headSha` هو `86324a4`.
+
+`HISTORY_WINDOW_TRIM` غير مُمرَّر في CI ولا في السكربتات، فالافتراض `true` هو ما اشتغل. موثّق في `docs/testing/PHASE7_PERFORMANCE.md`.
+
+### DEF-026 وDEF-027 على هذا الرأس
+
+DEF-026 مغلق. الحبر الفاتح `#5F6E69` في `lib/ui/theme.dart`. إعادة الحساب WCAG 2.x: 4.533623 على `#E5EDF6`، و5.355865 على الأبيض، و4.962466 على `#EDF9F4`، و4.664279 على `#E6F2ED`، و4.839225 على `#FFF0F0`، و5.034139 على `#F6F8FB`، و4.544270 على `#E7EDF4`، و4.976024 على `#FFF6E0`. الأدنى بين خلفيات الرسم 4.533623، وهو ≥ 4.5:1. `#FDE1E5` و`outline` ليسا خلفية لهذا الحبر. الاختبار `DEF-026 light onSurfaceVariant meets AA on the four measured surfaces` نجح داخل **471/0**. الإصلاح #59.
+
+DEF-027 مغلق. القص يبقي أحدث الصفوف متصلة. الدفتر يحذف من `retainLimit` إلى آخر القائمة. الحسابات تبقي `sublist(0, retainLimit)`. الإشعارات تبقي أول `cap`. الصفحة المسقطة تُعاد من الزر أو من السحب حتى نهاية القائمة، والتحديث يصفّر النافذة. أربعة اختبارات `def027_history_window_test.dart` ومشي P7-25 مع العلم مشغّلًا نجحت داخل **471/0**. الإصلاح #58 `6b3e8e6`.
+
+DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail. التالي الحر DEF-028. لا عيب جديد.
+
+### بنود علي التسعة عشر
+
+أعداد «اختبارات الدليل» هي `test` و`testWidgets` في ملفات الدليل المذكورة في القسم أ. تتداخل بين البنود ولا تُجمع إلى 471. الرقم الحاكم للبوابة هو **471/0** و**209** وتخطي واحد.
+
+| # | البند | الحكم | اختبارات الدليل | عيوب مفتوحة |
+|---|---|---|---|---|
+| 1 | اختبارات API | Partial | 209 ناجح + 1 تخطي (البوابة) | — |
+| 2 | الدخول | Partial | 19 | — |
+| 3 | الصلاحيات | Partial | 70 | DEF-002 |
+| 4 | أدوار المدير والموظف | Pass | 57 | — |
+| 5 | كل قسم | Partial | 21 | DEF-012 |
+| 6 | الحسابات | Partial | 29 | — |
+| 7 | سداد جزئي وكامل | Partial | 39 | — |
+| 8 | اعتماد ورفض | Partial | 18 | DEF-002 |
+| 9 | كروت مربوطة وغير مربوطة | Partial | 13 | — |
+| 10 | الإشعارات | Partial | 66 | — |
+| 11 | انقطاع الإنترنت | Partial | 13 | — |
+| 12 | إعادة المحاولة | Partial | 25 | — |
+| 13 | بلا حركة مكررة | Partial | 21 | — |
+| 14 | الوضع الداكن والفاتح | Pass | 10 | — |
+| 15 | RTL | Pass | 2 | — |
+| 16 | مقاسات الشاشة | Partial | 10 | — |
+| 17 | الأداء | Partial | 3 | — |
+| 18 | سجل أو تاريخ طويل | Partial | 17 | — |
+| 19 | هاتف حقيقي | Needs device | 3 | — |
+
+الحكم Pass يطابق Covered في المصفوفة. Partial يعني أن الدليل الآلي موجود والفجوة المسماة باقية، سواء كانت staging أو جهازًا. Needs device للبند 19 لأن إغلاقه هو نموذج الهاتف. Needs staging لمعرّفات `P7` التي لا تُغلق إلا بمضيف حي في الجدول التالي.
+
+الأعداد لم تتغير: Pass ‏3 (4 و14 و15). Partial ‏15. Needs device ‏1 (البند 19). لا Missing.
+
+### `P7-01` … `P7-26`
+
+| المعرف | الحالة على `86324a4` | الدليل |
+|---|---|---|
+| P7-01 | Needs staging | `staging_smoke_test.dart` يتخطى بلا أسرار. التخطي الوحيد في 209. not run وليس Pass |
+| P7-02 | Partial | اختبارات الجلسة وودجت النموذج على Fake. دخول الأدوار على staging باقٍ |
+| P7-03 | Device-only | لا اسم اختبار لاستعادة الجلسة بعد قتل العملية |
+| P7-04 | Partial | مصفوفة Fake من `GET /api/me`. المصفوفة الحية وDEF-002 باقيان |
+| P7-05 | Covered | `phase7_roles_test.dart` خمسة أدوار من نموذج الدخول |
+| P7-06 | Covered | قراءة كل `SectionKey` بلا استبدال لوحة الرئيسية |
+| P7-07 | Partial | البلاطات الثلاث ما زالت `employeesEmpty` و`auditEmpty` و`operationsEmpty`. DEF-012 Fail |
+| P7-08 | Partial | لا اختبار إنشاء كارت ورفض التكرار عبر المتحكّم |
+| P7-09 | Needs staging | عينة 10 كروت مقابل الويب |
+| P7-10 | Covered | جزئي ثم كامل على Fake. DEF-020 وDEF-022 مغلقان على `main` |
+| P7-11 | Needs staging | مطابقة السداد على staging |
+| P7-12 | Covered | اعتماد ورفض من الشاشة على Fake |
+| P7-13 | Needs staging | اعتمادان متزامنان بإصدار واحد |
+| P7-14 | Covered | صف الإرسال يظهر في النظرة التالية. DEF-021 مغلق كبديل اختبار |
+| P7-15 | Needs staging | الزوج نفسه على staging |
+| P7-16 | Partial | ودجت الصينية والإذن والنقر. نصف الجهاز مفتوح |
+| P7-17 | Device-only | الخلفية والعملية المقتولة. بلا FCM النتيجة Not supported لا Fail |
+| P7-18 | Partial | `sdkInt` ‏29/33/34 في الودجت. الجهاز باقٍ |
+| P7-19 | Device-only | حقن الانقطاع لا يُغلق وضع الطيران |
+| P7-20 | Partial | إعادة GET/HEAD وعدم إعادة الكتابة على المحوّل. عودة الراديو على الجهاز باقية |
+| P7-21 | Partial | نقرة ثانية تترك صفًا واحدًا على Fake. مراقبة دفتر staging باقية |
+| P7-22 | Partial | تدوير 320 و430 في الودجت. الجهاز الصغير والكبير في البروتوكول باقيان |
+| P7-23 | Partial | `acceptance=recorded`. عتبة علي والنموذج فارغان |
+| P7-24 | Partial | إطارات `recorded`. النموذج فارغ. الذاكرة تقرير فقط |
+| P7-25 | Partial | المشي حتى آخر صفحة مع القص المتصل نجح على `main`. نصف الجهاز مع P7-24 باقٍ. DEF-027 مغلق |
+| P7-26 | Device-only | نموذج الهواتف A–D فارغ. سير المحاكي ليس النموذج |
+
+البند 17 يبقى Partial. البند 18 يبقى Partial لأن نصف الجهاز مفتوح، لا لأن الفجوة عادت. البند 14 يبقى Pass. البند 10 يبقى Partial. البند 19 يبقى Needs device.
