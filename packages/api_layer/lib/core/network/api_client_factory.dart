@@ -34,6 +34,7 @@ class ApiStack {
     TokenStorage? tokenStorage,
     Duration? fakeLatency,
     HttpClientAdapter? httpClientAdapter,
+    String? fakeDataset,
   }) {
     if (config.useFakeApi) {
       rejectFakeApiInRelease(true);
@@ -48,6 +49,7 @@ class ApiStack {
               onForcedLogout: onForcedLogout,
               cookieStore: cookieStore,
               tokenStorage: tokenStorage,
+              fakeDataset: fakeDataset,
             )
           : buildFakeStack(
               config: config,
@@ -55,6 +57,7 @@ class ApiStack {
               onForcedLogout: onForcedLogout,
               cookieStore: cookieStore,
               tokenStorage: tokenStorage,
+              fakeDataset: fakeDataset,
             );
       // dio stays null on the stack: realtime must not start in fake mode.
       return ApiStack._(fake.client, fake.strategy, null);

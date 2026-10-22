@@ -142,6 +142,9 @@ void main() {
     ).readAsStringSync();
     expect(releaseSource.contains('FakeApiClient'), isFalse);
     expect(releaseSource.contains('fake_fixtures'), isFalse);
+    expect(releaseSource.contains('fake_large_catalog'), isFalse);
+    expect(releaseSource.contains('FakeLargeCatalog'), isFalse);
+    expect(releaseSource.contains('FAKE_DATASET'), isFalse);
     expect(releaseSource.contains('example.invalid'), isFalse);
     expect(releaseSource.contains('demo-only'), isFalse);
   });

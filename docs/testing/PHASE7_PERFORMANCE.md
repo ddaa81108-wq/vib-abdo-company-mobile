@@ -1,0 +1,207 @@
+# Phase 7 performance
+
+This file is the run book for P7-23, P7-24, P7-25, and P7-26. The acceptance matrix is [PR #48](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/48), file `docs/acceptance/phase-7.md` at `e98d85e5b1a7853384ab2885717418ce00649ff3`. That file is not merged into this branch. Read it there. Do not treat this run book as a substitute for the matrix.
+
+The workflow is `.github/workflows/android-performance.yml`, name `Android performance`. It runs on `workflow_dispatch` and at 04:30 UTC. It does not run on pull requests. A `workflow_dispatch` workflow cannot be dispatched until the file is on the default branch. Do not add a push trigger to try it earlier.
+
+The three required checks stay as they are: `Analyze, test, and debug APK`, `Negative permission tests`, and `Release build rejects fake API`.
+
+## What this covers
+
+| ID | Level | Where | Acceptance |
+| --- | --- | --- | --- |
+| P7-23 | device | Release cold start until interactive home. `integration_test/p7_release_cold_start_test.dart`, `tool/measure_release_cold_start.sh`. | Record the seconds. Do not mark Pass until Ali writes the threshold. |
+| P7-24 | device | Scroll the long ledger and record frame timings. `integration_test/p7_long_history_test.dart`. | Record worst and average build time and the page count. Do not mark Pass until Ali writes the threshold. |
+| P7-25 | widget, then device | Walk a known 20-page ledger through the real `load-older` control. `test/p7_long_history_test.dart` and `packages/api_layer/test/fake_large_dataset_test.dart`. The device half is the same walk as P7-24. | The widget walk can complete in CI. The device row stays on the protocol form. |
+| P7-26 | device and emulator | API 29, 33, and 34. The workflow boots those images. A physical phone still has to fill the form. | An emulator log is not the protocol form. |
+
+Other P7 ids in the matrix are out of scope for this change.
+
+Release cold start is real mode. Large-history frames are profile or debug with the fake client. Do not mix them.
+
+## Dropping loaded rows
+
+Approved by Ali on 2026-10-22, enabled by default.
+
+`HISTORY_WINDOW_TRIM` is **on** by default. The flag remains, and `--dart-define=HISTORY_WINDOW_TRIM=false` (or `HistoryWindow.trimEnabled = false` in a test) turns it off.
+
+With the default (DEF-027):
+
+- The visible rows are a contiguous block that starts at the newest row. There is no hole between the first page and an older tail.
+- The ledger and the account list drop the oldest loaded rows past 80 extras. Notifications keep the newest 120.
+- Those dropped older rows stay reachable. Load-older, load-more, or scrolling to the end of the list fetches that page again and shows it next to the rows already on screen.
+- Pull-to-refresh clears the extra pages and starts again at the newest page.
+
+With the flag off, a long ledger keeps every row the load-older control has fetched, notifications stay on the first page, and account load-more does not discard cards. The lazy builders used above 24 rows do not drop data. They only avoid building every tile at once, which the P7-25 widget test checks.
+
+`tool/android_performance_emulator_test.sh` and the required CI jobs do not pass `HISTORY_WINDOW_TRIM`. The compile-time default applies, so trimming is active in the emulator measurements. Pass `--dart-define=HISTORY_WINDOW_TRIM=false` to measure with trimming off.
+
+## Engineering proposals
+
+Every number in this table is an **engineering proposal**. It is not an acceptance threshold. Acceptance thresholds are set by Ali. A proposal can fail the separate performance workflow. That failure is not Pass or Fail on the protocol form. The protocol column stays `recorded` until Ali writes the threshold.
+
+The job summary prints the same sentence and the same numbers. `tool/measure_release_cold_start.sh`, `tool/android_performance_emulator_test.sh`, and `.github/workflows/android-performance.yml` label them the same way.
+
+| Measurement | Device | Emulator | Host `flutter test` |
+| --- | --- | --- | --- |
+| P7-23 process `am start -W` TotalTime | proposal: fail above 5000 ms | proposal: fail above 20000 ms (hang only) | report only |
+| P7-23 scripted time to home on staging (login) | proposal: hang ceiling 60000 ms | proposal: hang ceiling 60000 ms | skipped |
+| P7-24 screen open, fake latency 0 | proposal: fail above 2000 ms | proposal: fail above 5000 ms | report only |
+| P7-24 worst build | proposal: fail above 32 ms, or above 500 ms | proposal: fail only above 500 ms | report only |
+| P7-24 average build | proposal: fail above 16.7 ms | report only | report only |
+| P7-25 widget walk | proposal: under 8 s in `test/p7_long_history_test.dart` | same test, host only | same |
+| Empty frame timings | fail | fail | report only |
+| APK size | warn above 64 MiB, fail above 72 MiB | same | same |
+
+32 ms is two frames at 60 Hz. 16.7 ms is one frame. 500 ms is a freeze. The 8 s bound is only the widget walk. The size baseline comment is the previous fat release APK, about 58.9 MiB. The numbers live in `lib/performance/perf_budget.dart` and `tool/apk_size_budget.py`.
+
+Pending Ali decision: none of 5000 ms, 20000 ms, 60000 ms, 32 ms, 16.7 ms, or 8 s is an acceptance threshold.
+
+## Dataset
+
+`FAKE_DATASET=large` is read only by the debug fake builder. Profile and debug and test can use it. Release does not import the catalog. `FAKE_LATENCY_MS=0` is for the measurement. The default fake latency stays 250 ms.
+
+The catalog is generated by index. It does not keep every row in memory.
+
+| Kind | Count | Page size | Pages |
+| --- | --- | --- | --- |
+| Customers | 4000 | 40 | 100 |
+| Companies | 2000 | 40 | 50 |
+| Collections | 3000 (1500 for a demo employee) | 40 | 75 (38) |
+| Notifications | 3000, unread literal 1500 | 40 | 75 |
+| Long ledger `lc_00000` | 800 lines | 40 | 20 |
+
+Other customer cards stay on the short fixture. A two-line ledger is not P7-24. Money figures on the summary are stored literals, not a sum of the rows. Names are `عميل سجل` / `شركة سجل` and are not the demo needles the release scan looks for.
+
+The ledger screen keeps the eager tree when the page has 24 rows or fewer, so the short fixture tests still find every row. Above that it uses a lazy list. The lazy list does not drop rows. The screen keeps asking the server until `nextBefore` is null. `HISTORY_WINDOW_TRIM` is on by default (approved by Ali on 2026-10-22, enabled by default). The window keeps the newest rows. Past 80 older rows it drops the oldest and replays that boundary once, so a full walk takes 20 presses of `load-older` (`تحميل الأقدم`) and the page counter key is `ledger-pages-21`. With the flag off, every loaded older row stays (760 after the first page) and 19 presses land on `ledger-pages-20`. That button is the real control. P7-25 does not inject two pages.
+
+Account load-more uses `cursorAfter` and keeps the newest 80 extra cards when the flag is on, which is the default. The next press reloads the dropped older page. With the flag off it resends the first page's cursor, which is the previous behaviour.
+
+## P7-23 release build
+
+```bash
+flutter build apk --release \
+  --dart-define=USE_FAKE_API=false \
+  --dart-define=API_BASE="$STAGING_API_BASE"
+```
+
+`tool/measure_release_cold_start.sh` reads `STAGING_API_BASE`, `STAGING_ADMIN_USERNAME`, and `STAGING_ADMIN_PASSWORD` from the environment. If any name is unset, or `classify_origin` in `tool/staging_negative_tests/preflight.py` is not `ok`, the script exits 1 and says which name is missing. It does not print the values. It does not skip.
+
+The GitHub job uses the `staging` environment so those secrets are the ones already used by the staging permission workflow. The APK that logs in also receives the admin name and password as dart-defines. That binary is deleted at the end of the script and is not uploaded. Do not attach it to an issue or a Test Lab run.
+
+The size job builds with `https://staging.example.com`. Preflight refuses that host. The size APK is not the protocol install.
+
+`am start -W` TotalTime is the real release process until the first frame. The integration test then times login through home on a second release build that includes the test harness. Write both numbers. Neither one is Pass by itself. Device D is a weak phone, not the emulator.
+
+Host `flutter test integration_test/p7_release_cold_start_test.dart` prints `p7_23=skipped` because the fake API is the default and the surface is host. That skip is intentional.
+
+## P7-24 and P7-25 on an emulator or a phone
+
+Profile, fake, large dataset, zero latency:
+
+```bash
+flutter drive \
+  --profile \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/p7_long_history_test.dart \
+  -d <device> \
+  --dart-define=USE_FAKE_API=true \
+  --dart-define=FAKE_DATASET=large \
+  --dart-define=FAKE_LATENCY_MS=0 \
+  --dart-define=PERF_SURFACE=device
+```
+
+Use `PERF_SURFACE=emulator` on an emulator and `PERF_SURFACE=device` on a phone. Android without the define is treated as an emulator. The widget test in `test/p7_long_history_test.dart` runs in the normal suite and does not need a device.
+
+The script for the CI emulator is `tool/android_performance_emulator_test.sh`. It does not pass `HISTORY_WINDOW_TRIM`, and neither do the required CI jobs, so trimming is active in the emulator measurements. The default is approved by Ali on 2026-10-22, enabled by default. Pass `--dart-define=HISTORY_WINDOW_TRIM=false` to measure with trimming off.
+
+On that emulator, and on a phone when `PERF_SURFACE=device` is set for the same script, the script runs `adb shell dumpsys meminfo com.example.vib_abdo_company_mobile` before and after the long scroll. It records total PSS and, when dumpsys prints it, total RSS. API 29's app summary often has PSS and no RSS; the missing field is `unavailable`. The integration test records Dart heap bytes through the VM service when that service publishes a URI. When it does not, the line is `unavailable` and the test still passes. Both figures are report-only. They are in the job summary. They do not pass or fail the job.
+
+## P7-26 devices
+
+From the matrix:
+
+| Device | Requirement |
+| --- | --- |
+| A | Android API 29 or newer, small screen |
+| B | API 33, large screen |
+| C | API 34 |
+| D | A weak phone for startup and scroll. It may be one of A–C if that phone is weak. Name it. |
+
+The workflow boots a Nexus 6 Google APIs image at API 29, 33, and 34. That covers the emulator half. It does not replace A–D, airplane mode, or the system tray. Record `git rev-parse HEAD` and the build time. Do not commit secrets or `google-services.json`.
+
+Debug with `USE_FAKE_API=true` is a developer loop. Do not fill the protocol form with it.
+
+### Physical device
+
+```bash
+adb uninstall com.example.vib_abdo_company_mobile || true
+flutter build apk --release \
+  --dart-define=USE_FAKE_API=false \
+  --dart-define=API_BASE="$STAGING_API_BASE"
+adb install -r build/app/outputs/flutter-apk/app-release.apk
+adb shell am force-stop com.example.vib_abdo_company_mobile
+adb shell am start -W -n com.example.vib_abdo_company_mobile/.MainActivity
+```
+
+Then run the profile drive command above with `PERF_SURFACE=device` for the long ledger. For the release home timing, export the three staging names and run `PERF_SURFACE=device bash tool/measure_release_cold_start.sh` with the phone as the only adb device.
+
+### Manual checklist
+
+Map these protocol steps onto the form. The full step list is in the matrix.
+
+| Step | What to record |
+| --- | --- |
+| 1 | Clean install of the release APK. A real request hits staging, or the app fails closed with no network. SHA of the commit. |
+| 9 | Admin opens each section. Rows come from the server, or the empty state is the real one. |
+| 24 | On device D, after a clean install: cold start until interactive home, in seconds. Then scroll the longest ledger to the last page. Write the page count and any visible jank. |
+| 25 | Sign out and in as the second account. No rows from the previous account. |
+
+Large-history scrolling on a phone uses the profile fake build and is labeled as such on the row. It is not the release APK. The release row is step 24's cold start.
+
+### Result template
+
+Copy one row per step per device. Values are `Pass`, `Fail`, `Blocked`, or `Not supported`. Leave P7-23 and P7-24 as `recorded` until Ali writes the threshold. A new defect starts at DEF-020 and is added to `docs/acceptance/defects.md` on [PR #12](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/12), not in this file. This change does not file a defect. It does not close DEF-002, DEF-012, or DEF-019.
+
+| device | OS/API | build SHA | tester | date | step | expected | actual | pass/fail | screenshot ref | defect id |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| | | | | | | | | | | |
+
+## Firebase Test Lab
+
+Official page, fetched for this change: [Usage levels, quotas, and pricing](https://firebase.google.com/docs/test-lab/usage-quotas-pricing).
+
+Test Lab is deprecated and shuts down on 2027-09-30. The page points at the Developer Device Platform. Do not plan a new long-term dependency on Test Lab without Ali accepting that date.
+
+Spark (no cost): 10 virtual-device test runs per day and 5 physical-device test runs per day.
+
+Blaze: 60 minutes per day of virtual devices and 30 minutes per day of physical devices at no cost, then $1 per hour virtual and $5 per hour physical, billed per minute and rounded up. A 22-second test is one minute. A 75-second test is two minutes. Install time is not billed.
+
+Cloud Testing API: 10,000,000 calls per day and 120,000 per minute. Tool Results API: 200,000 calls per day and 2,400 per minute.
+
+Secret name only: `FIREBASE_TEST_LAB_SERVICE_ACCOUNT_JSON`. Do not commit the key. Do not upload the release APK that has dart-define credentials.
+
+```bash
+gcloud auth activate-service-account --key-file="$FIREBASE_TEST_LAB_SERVICE_ACCOUNT_JSON"
+gcloud firebase test android run \
+  --type instrumentation \
+  --app build/app/outputs/flutter-apk/app-profile.apk \
+  --test build/app/outputs/flutter-apk/app-profile-test.apk \
+  --device model=MediumPhone.arm,version=29 \
+  --device model=MediumPhone.arm,version=33 \
+  --device model=MediumPhone.arm,version=34 \
+  --environment-variables FAKE_DATASET=large,PERF_SURFACE=emulator,USE_FAKE_API=true \
+  --timeout 20m
+```
+
+That example is the fake profile history, not the release protocol. A release Test Lab run would pass `USE_FAKE_API=false` and `API_BASE` from `STAGING_API_BASE`, and must not also pass the password into an APK that gets stored by Test Lab. Prefer the adb script on a phone Ali controls for P7-23.
+
+## What Ali provides
+
+1. Device A, B, C, and D (D can be one of the others if it is the weak one), with free space for a clean install.
+2. The `staging` GitHub environment secrets already named for the permission workflow: `STAGING_API_BASE`, `STAGING_ADMIN_USERNAME`, `STAGING_ADMIN_PASSWORD`, plus the employee pairs if step 25 is run. The performance job fails, on purpose, when the admin names are unset.
+3. The numeric threshold for P7-23 (seconds to interactive home) and P7-24 (scroll) before anyone writes Pass.
+4. Either a tester who fills the template, or a Firebase project on Blaze with `FIREBASE_TEST_LAB_SERVICE_ACCOUNT_JSON` and a budget alert. Spark's 15 runs per day will not cover three API levels plus retries. Budget alerts do not cap the bill.
+5. A decision on Test Lab versus a phone, given the 2027-09-30 shutdown.
+
+No product defect was filed from this change. The next id, if a later run finds one, is DEF-020.

@@ -78,6 +78,23 @@ tool/check.sh
 
 That runs `flutter analyze` and `flutter test` for the app and for `packages/api_layer`.
 
+## P7-01 staging smoke
+
+`packages/api_layer/test/phase7/staging_smoke_test.dart` is skipped unless all three variables are set. `tool/check.sh` and CI do not set them, and the test does not open a socket in that case. It uses the real client (`useFakeApi: false`) with no custom HTTP adapter.
+
+```bash
+STAGING_API_BASE=https://<staging-host> \
+STAGING_ADMIN_USERNAME='<account>' \
+STAGING_ADMIN_PASSWORD='<password>' \
+flutter test packages/api_layer/test/phase7/staging_smoke_test.dart
+```
+
+`STAGING_API_BASE` is an origin only, same rules as `API_BASE`. The password is read from the environment and is not written into the repo.
+
+The smoke signs in, reads `GET /api/me` (the client path; the phase-7 matrix text says `GET /api/auth/me`), reads one section (`STAGING_SMOKE_SECTION`, default `customers`), then `POST /api/auth/logout`. That logout is the write. Set `STAGING_SMOKE_ACCOUNT_ID` as well to send one `setPinned` of that card's current flag before logout. The smoke does not add a ledger line unless that id is set.
+
+An on-device airplane-mode check (P7-19) is not this script. It is a manual pass on a release build.
+
 ## Open questions for the backend owner
 
 These are assumed, not confirmed. The contract notes are outside this repository.

@@ -74,7 +74,7 @@ packages:
     source: hosted
     version: "0.8.0"
   dio:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: dio
       sha256: "852ec3b48cc431ac04fff978413c541502b67ffc3e26921e74e3d994694192c1"
@@ -753,7 +753,7 @@ packages:
     source: hosted
     version: "2.4.0"
   vm_service:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: vm_service
       sha256: "89b11d62e1040ee681af3b4f1c97a803ecbf010c6e8b9c5896ee5b08c3bf7b78"

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../performance/history_window.dart';
 import '../../state/section_providers.dart';
 import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
@@ -67,6 +68,9 @@ class LedgerScreen extends ConsumerWidget {
               final showBalance = page.page.items.any(
                 (entry) => entry.balanceAfterUnits != null,
               );
+              HistoryWindowTrace.ledgerPage = [
+                for (final entry in page.page.items) entry.id,
+              ];
               final tight = layoutIsTight(context);
               final writes = <Widget>[
                 GatedButton(
@@ -103,71 +107,105 @@ class LedgerScreen extends ConsumerWidget {
                   onSubmit: (meta) => _full(context, ref, meta),
                 ),
               ];
-              return ListView(
-                padding: pagePadding(MediaQuery.sizeOf(context).width)
-                    .copyWith(top: AppSpacing.sm),
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      IconButton(
-                        tooltip: AppStrings.back,
-                        onPressed: () => context.go('/${section.path}'),
-                        icon: const Icon(Icons.arrow_back),
+              return RefreshIndicator(
+                key: const Key('ledger-refresh'),
+                onRefresh: () async {
+                  ref.invalidate(ledgerProvider((section, id)));
+                  ref.invalidate(accountCardProvider((section, id)));
+                  await ref.read(ledgerProvider((section, id)).future);
+                },
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: pagePadding(MediaQuery.sizeOf(context).width)
+                      .copyWith(top: AppSpacing.sm),
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        IconButton(
+                          tooltip: AppStrings.back,
+                          onPressed: () => context.go('/${section.path}'),
+                          icon: const Icon(Icons.arrow_back),
+                        ),
+                        Expanded(
+                          child: _Header(
+                            section: section,
+                            card: loadedCard,
+                            money: money,
+                            title: _ledgerTitle(section),
+                          ),
+                        ),
+                      ],
+                    ),
+                    EditAccountCardButton(section: section, card: loadedCard),
+                    if (canWrite) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      _ActionRow(children: writes),
+                    ],
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      AppStrings.noPreview,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    if (!showBalance)
+                      Text(
+                        AppStrings.statementHidden,
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
-                      Expanded(
-                        child: _Header(
+                    const SizedBox(height: AppSpacing.xs),
+                    if (page.page.items.isEmpty)
+                      const EmptyPane(message: AppStrings.emptyLedger)
+                    else if (page.page.items.length <=
+                        HistoryWindow.eagerLimit) ...[
+                      if (!tight) _LedgerColumnHeader(showBalance: showBalance),
+                      for (final entry in page.page.items)
+                        _EntryTile(
                           section: section,
-                          card: loadedCard,
+                          accountId: id,
+                          entry: entry,
                           money: money,
-                          title: _ledgerTitle(section),
+                          showBalance: showBalance,
+                          canWrite: canWrite,
+                          onCancel: (meta) =>
+                              _cancel(context, ref, entry, meta),
+                        ),
+                    ] else ...[
+                      if (!tight) _LedgerColumnHeader(showBalance: showBalance),
+                      SizedBox(
+                        height: 560,
+                        child: ListView.builder(
+                          key: const Key('ledger-entries-list'),
+                          itemCount: page.page.items.length,
+                          itemBuilder: (context, index) {
+                            final entry = page.page.items[index];
+                            return _EntryTile(
+                              section: section,
+                              accountId: id,
+                              entry: entry,
+                              money: money,
+                              showBalance: showBalance,
+                              canWrite: canWrite,
+                              onCancel: (meta) =>
+                                  _cancel(context, ref, entry, meta),
+                            );
+                          },
                         ),
                       ),
                     ],
-                  ),
-                  EditAccountCardButton(section: section, card: loadedCard),
-                  if (canWrite) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    _ActionRow(children: writes),
-                  ],
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    AppStrings.noPreview,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (!showBalance)
-                    Text(
-                      AppStrings.statementHidden,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  const SizedBox(height: AppSpacing.xs),
-                  if (page.page.items.isEmpty)
-                    const EmptyPane(message: AppStrings.emptyLedger)
-                  else ...[
-                    if (!tight) _LedgerColumnHeader(showBalance: showBalance),
-                    for (final entry in page.page.items)
-                      _EntryTile(
+                    if (page.page.nextCursor != null)
+                      _LoadOlderLedger(
+                        key: ObjectKey(page),
                         section: section,
-                        accountId: id,
-                        entry: entry,
+                        id: id,
+                        cursor: page.page.nextCursor!,
                         money: money,
                         showBalance: showBalance,
                         canWrite: canWrite,
-                        onCancel: (meta) => _cancel(context, ref, entry, meta),
+                        onCancel: (entry, meta) =>
+                            _cancel(context, ref, entry, meta),
                       ),
                   ],
-                  if (page.page.nextCursor != null)
-                    _LoadOlderLedger(
-                      section: section,
-                      id: id,
-                      cursor: page.page.nextCursor!,
-                      money: money,
-                      showBalance: showBalance,
-                      canWrite: canWrite,
-                      onCancel: (entry, meta) =>
-                          _cancel(context, ref, entry, meta),
-                    ),
-                ],
+                ),
               );
             },
           );
@@ -364,6 +402,12 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
               ?.value
               .version,
           label: AppStrings.save,
+          onVersionConflict: () {
+            ref.invalidate(ledgerProvider((widget.section, widget.id)));
+            ref.invalidate(accountCardProvider((widget.section, widget.id)));
+            ref.invalidate(accountsProvider(widget.section));
+            ref.invalidate(homeDashboardProvider);
+          },
           onSubmit: _submit,
         ),
       ],
@@ -373,6 +417,18 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
   Future<String?> _submit(MutationMeta meta) async {
     final units = parseUnits(_amount.text);
     if (units == null) return AppStrings.integerOnly;
+    // Direct partial payment only. A rate is not an amount, so it is not
+    // compared. This reads the server balance; it does not compute one.
+    if (widget.type == 'payment' && _mode == CalculationMode.direct) {
+      final remaining = ref
+          .read(accountCardProvider((widget.section, widget.id)))
+          .asData
+          ?.value
+          .balanceUnits;
+      if (remaining != null && units > remaining) {
+        return AppStrings.amountAboveRemaining;
+      }
+    }
     final parsedDate = DateTime.tryParse(_date.text);
     if (parsedDate == null) return AppStrings.dateInvalid;
     DecimalString? factorValue;
@@ -407,7 +463,11 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       Navigator.of(context).pop(true);
       return null;
     } catch (error) {
-      return failureText(ref.read(errorHandlerProvider).toFailure(error));
+      // A returned string never reaches GuardedMutation's conflict path.
+      // Rethrow so it refetches and shows the shared conflict sentence.
+      final failure = ref.read(errorHandlerProvider).toFailure(error);
+      if (failure.code == 'VERSION_CONFLICT') rethrow;
+      return failureText(failure);
     }
   }
 }
@@ -508,6 +568,7 @@ class _Header extends StatelessWidget {
 
 class _LoadOlderLedger extends ConsumerStatefulWidget {
   const _LoadOlderLedger({
+    super.key,
     required this.section,
     required this.id,
     required this.cursor,
@@ -536,6 +597,18 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
   String? _error;
   var _busy = false;
 
+  /// The newest prefix is full and the next load should show the page that
+  /// was just dropped, without opening a gap in front of it.
+  var _replay = false;
+
+  /// The user already reloaded a dropped page, so later pages stay attached
+  /// to that newest prefix.
+  var _extend = false;
+  var _scrollArmed = true;
+
+  /// First page is already on screen. Each successful load-more adds one.
+  var _pagesLoaded = 1;
+
   @override
   void initState() {
     super.initState();
@@ -556,8 +629,7 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
           .ledger(widget.section, widget.id, before: cursor);
       if (!mounted) return;
       setState(() {
-        _extra.addAll(page.page.items);
-        _cursor = page.page.nextCursor;
+        _applyPage(page);
         _busy = false;
       });
     } catch (error) {
@@ -569,22 +641,111 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
     }
   }
 
+  /// Newest rows stay. Overflow drops the oldest extras and remembers the
+  /// boundary so the next load can show that page again (DEF-027).
+  void _applyPage(LedgerPage page) {
+    final incoming = page.page.items;
+    if (!HistoryWindow.trimEnabled || _extend) {
+      _addFresh(incoming);
+      _cursor = page.page.nextCursor;
+      _pagesLoaded++;
+      return;
+    }
+    if (_replay) {
+      _addFresh(incoming);
+      _cursor = page.page.nextCursor;
+      _replay = false;
+      _extend = true;
+      _pagesLoaded++;
+      return;
+    }
+    _extra.addAll(incoming);
+    if (_extra.length > HistoryWindow.retainLimit) {
+      final boundary = _extra[HistoryWindow.retainLimit - 1];
+      _extra.removeRange(HistoryWindow.retainLimit, _extra.length);
+      _cursor = boundary.id;
+      _replay = true;
+    } else {
+      _cursor = page.page.nextCursor;
+    }
+    _pagesLoaded++;
+  }
+
+  void _addFresh(List<LedgerEntryDto> incoming) {
+    final known = {for (final entry in _extra) entry.id};
+    for (final entry in incoming) {
+      if (known.add(entry.id)) _extra.add(entry);
+    }
+  }
+
+  bool _onOlderScroll(ScrollNotification notification) {
+    if (notification is! ScrollUpdateNotification) return false;
+    final metrics = notification.metrics;
+    if (metrics.maxScrollExtent > 0 &&
+        metrics.pixels < metrics.maxScrollExtent - 24) {
+      _scrollArmed = true;
+      return false;
+    }
+    if (!historyDraggedToEnd(notification)) return false;
+    if (!_scrollArmed || _cursor == null || _busy) return false;
+    _scrollArmed = false;
+    _load();
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
+    HistoryWindowTrace.ledgerExtra = [for (final entry in _extra) entry.id];
     final scheme = Theme.of(context).colorScheme;
+    final older = _extra.length <= HistoryWindow.eagerLimit
+        ? <Widget>[
+            for (final entry in _extra)
+              _EntryTile(
+                section: widget.section,
+                accountId: widget.id,
+                entry: entry,
+                money: widget.money,
+                showBalance: widget.showBalance,
+                canWrite: widget.canWrite,
+                onCancel: (meta) => widget.onCancel(entry, meta),
+              ),
+          ]
+        : <Widget>[
+            SizedBox(
+              height: 560,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: _onOlderScroll,
+                child: ListView.builder(
+                  key: const Key('ledger-older-list'),
+                  itemCount: _extra.length,
+                  itemBuilder: (context, index) {
+                    final entry = _extra[index];
+                    return _EntryTile(
+                      section: widget.section,
+                      accountId: widget.id,
+                      entry: entry,
+                      money: widget.money,
+                      showBalance: widget.showBalance,
+                      canWrite: widget.canWrite,
+                      onCancel: (meta) => widget.onCancel(entry, meta),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final entry in _extra)
-          _EntryTile(
-            section: widget.section,
-            accountId: widget.id,
-            entry: entry,
-            money: widget.money,
-            showBalance: widget.showBalance,
-            canWrite: widget.canWrite,
-            onCancel: (meta) => widget.onCancel(entry, meta),
-          ),
+        KeyedSubtree(
+          key: Key('ledger-pages-$_pagesLoaded'),
+          child: const SizedBox.shrink(),
+        ),
+        KeyedSubtree(
+          key: Key('ledger-retained-${_extra.length}'),
+          child: const SizedBox.shrink(),
+        ),
+        ...older,
         if (_error != null)
           Padding(
             padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),

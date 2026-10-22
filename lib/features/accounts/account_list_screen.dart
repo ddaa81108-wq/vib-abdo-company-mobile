@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_providers.dart';
+import '../../performance/history_window.dart';
 import '../../error_handling/app_failure.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/section_providers.dart';
@@ -35,6 +36,8 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   final _search = TextEditingController();
   var _assigning = false;
   var _showAllDebts = false;
+  var _paging = false;
+  var _scrollArmed = true;
   final _selected = <String>{};
   String? _reply;
 
@@ -48,6 +51,10 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(accountsProvider(section), (previous, next) {
+      if (!next.isRefreshing && !next.isReloading) return;
+      ref.read(accountExtraCardsProvider(section).notifier).clear();
+    });
     final permissions = permissionsOf(ref);
     if (!permissions.canRead(section.sectionKey)) {
       return const ForbiddenPane();
@@ -89,147 +96,243 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       ),
       builder: (data) {
         final cards = [...data.page.items, ...extra];
-        return ListView(
-          key: Key('screen-${section.path}'),
-          padding: pagePadding(width),
-          children: [
-            ScreenTitle(sectionLabel(section.sectionKey)),
-            const SizedBox(height: AppSpacing.md),
-            if (_showTicker)
-              _ticker(home, money, width, cards, data.page.nextCursor),
-            _SummaryStrip(
-              summary: data.summary,
-              currency: section.currency,
-              money: money,
-            ),
-            if (section == AccountSection.egyptianDeposits) const _RateCard(),
-            const SizedBox(height: AppSpacing.md),
-            _Tabs(section: section, summary: data.summary),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              key: const Key('account-search'),
-              controller: _search,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                labelText: AppStrings.filterSearch,
-                isDense: false,
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: _search,
-                  builder: (context, value, _) {
-                    if (value.text.isEmpty) return const SizedBox.shrink();
-                    return IconButton(
-                      key: const Key('clear-account-search'),
-                      tooltip: AppStrings.clearSearch,
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        _search.clear();
-                        ref
-                            .read(accountExtraCardsProvider(section).notifier)
-                            .clear();
-                        ref.read(accountQueryProvider(section).notifier).state =
-                            '';
-                      },
-                    );
-                  },
+        HistoryWindowTrace.accountWindow = [for (final card in cards) card.id];
+        return RefreshIndicator(
+          key: const Key('accounts-refresh'),
+          onRefresh: () async {
+            ref.read(accountExtraCardsProvider(section).notifier).clear();
+            ref.invalidate(accountsProvider(section));
+            await ref.read(accountsProvider(section).future);
+          },
+          child: ListView(
+            key: Key('screen-${section.path}'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: pagePadding(width),
+            children: [
+              ScreenTitle(sectionLabel(section.sectionKey)),
+              const SizedBox(height: AppSpacing.md),
+              if (_showTicker)
+                _ticker(
+                  home,
+                  money,
+                  width,
+                  cards,
+                  data.page.nextCursor,
+                  HistoryWindow.trimEnabled &&
+                          data.page.items.length > HistoryWindow.eagerLimit
+                      ? HistoryWindow.retainLimit
+                      : null,
                 ),
+              _SummaryStrip(
+                summary: data.summary,
+                currency: section.currency,
+                money: money,
               ),
-              onSubmitted: (value) {
-                ref.read(accountExtraCardsProvider(section).notifier).clear();
-                ref.read(accountQueryProvider(section).notifier).state = value;
-              },
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Wrap(
-              spacing: AppSpacing.md,
-              runSpacing: AppSpacing.md,
-              children: [
-                GatedButton(
-                  buttonKey: const Key('add-account'),
-                  allowed: permissions.canWrite(section.sectionKey),
-                  online: online,
-                  label: _addLabel,
-                  onPressed: () => _create(context),
+              if (section == AccountSection.egyptianDeposits) const _RateCard(),
+              const SizedBox(height: AppSpacing.md),
+              _Tabs(section: section, summary: data.summary),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                key: const Key('account-search'),
+                controller: _search,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  labelText: AppStrings.filterSearch,
+                  isDense: false,
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _search,
+                    builder: (context, value, _) {
+                      if (value.text.isEmpty) return const SizedBox.shrink();
+                      return IconButton(
+                        key: const Key('clear-account-search'),
+                        tooltip: AppStrings.clearSearch,
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          _search.clear();
+                          ref
+                              .read(accountExtraCardsProvider(section).notifier)
+                              .clear();
+                          ref
+                                  .read(accountQueryProvider(section).notifier)
+                                  .state =
+                              '';
+                        },
+                      );
+                    },
+                  ),
                 ),
-                GatedButton(
-                  buttonKey: const Key('assign-mode'),
-                  allowed: _canAssign(permissions),
-                  online: online,
-                  filled: false,
-                  label: AppStrings.assign,
-                  onPressed: () => setState(() => _assigning = !_assigning),
-                ),
-              ],
-            ),
-            if (_assigning)
-              _AssignSubmit(
-                section: section,
-                customerIds: assignmentTargetIds(_selected, cards),
-                online: online,
-              ),
-            if (_reply != null) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                _reply!,
-                key: const Key('server-reply'),
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
-            const SizedBox(height: AppSpacing.md),
-            if (cards.isEmpty)
-              EmptyPane(message: AppStrings.emptyAccounts)
-            else
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final cardWidth = _cardWidth(constraints.maxWidth, columns);
-                  return Wrap(
-                    spacing: AppSpacing.md,
-                    runSpacing: AppSpacing.md,
-                    children: [
-                      for (final card in cards)
-                        SizedBox(
-                          width: cardWidth,
-                          child: _AccountCard(
-                            section: section,
-                            card: card,
-                            money: money,
-                            canWrite: canWrite && !card.systemManaged,
-                            assigning: _assigning,
-                            selected: _selected.contains(card.id),
-                            onOpen: () =>
-                                context.go('/${section.path}/${card.id}'),
-                            onToggle: () => setState(() {
-                              if (!canSelectAccountForAssignment(card)) return;
-                              _selected.contains(card.id)
-                                  ? _selected.remove(card.id)
-                                  : _selected.add(card.id);
-                            }),
-                            onPin: (meta) => _pin(card, meta),
-                            onZero:
-                                showCustomerZeroReview(
-                                  permissions: permissions,
-                                  section: section,
-                                  card: card,
-                                )
-                                ? (meta) => _zero(card, meta)
-                                : null,
-                          ),
-                        ),
-                    ],
-                  );
+                onSubmitted: (value) {
+                  ref.read(accountExtraCardsProvider(section).notifier).clear();
+                  ref.read(accountQueryProvider(section).notifier).state =
+                      value;
                 },
               ),
-            if (data.page.nextCursor != null)
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton(
-                  onPressed: online ? () => _more(data.page.nextCursor!) : null,
-                  child: const Text(AppStrings.loadMore),
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                spacing: AppSpacing.md,
+                runSpacing: AppSpacing.md,
+                children: [
+                  GatedButton(
+                    buttonKey: const Key('add-account'),
+                    allowed: permissions.canWrite(section.sectionKey),
+                    online: online,
+                    label: _addLabel,
+                    onPressed: () => _create(context),
+                  ),
+                  GatedButton(
+                    buttonKey: const Key('assign-mode'),
+                    allowed: _canAssign(permissions),
+                    online: online,
+                    filled: false,
+                    label: AppStrings.assign,
+                    onPressed: () => setState(() => _assigning = !_assigning),
+                  ),
+                ],
+              ),
+              if (_assigning)
+                _AssignSubmit(
+                  section: section,
+                  customerIds: assignmentTargetIds(_selected, cards),
+                  online: online,
+                ),
+              if (_reply != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  _reply!,
+                  key: const Key('server-reply'),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              if (cards.isEmpty)
+                EmptyPane(message: AppStrings.emptyAccounts)
+              else if (cards.length <= HistoryWindow.eagerLimit)
+                _cardWrap(
+                  cards: cards,
+                  columns: columns,
+                  canWrite: canWrite,
+                  permissions: permissions,
+                )
+              else
+                SizedBox(
+                  height: 560,
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notification) =>
+                        _onCardsScroll(notification, data.page.nextCursor),
+                    child: ListView.builder(
+                      key: const Key('account-cards-list'),
+                      itemCount: cards.length,
+                      itemBuilder: (context, index) {
+                        final card = cards[index];
+                        return Padding(
+                          padding: const EdgeInsetsDirectional.only(
+                            bottom: AppSpacing.md,
+                          ),
+                          child: _accountCard(
+                            card: card,
+                            canWrite: canWrite,
+                            permissions: permissions,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              if (_loadMoreCursor(data.page.nextCursor) != null)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton(
+                    key: const Key('load-more-accounts'),
+                    onPressed: online
+                        ? () => _more(
+                            _loadMoreCursor(data.page.nextCursor)!,
+                            retainLimit: _accountRetainLimit(data.page.items),
+                          )
+                        : null,
+                    child: const Text(AppStrings.loadMore),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Approved by Ali on 2026-10-22, enabled by default.
+  /// Off, the button keeps the previous cursor behaviour.
+  /// On, it follows the newest prefix and keeps [HistoryWindow.retainLimit]
+  /// extra rows. A later press reloads the oldest page that was dropped.
+  String? _loadMoreCursor(String? firstPageCursor) {
+    if (!HistoryWindow.trimEnabled) return firstPageCursor;
+    return ref
+        .read(accountExtraCardsProvider(section).notifier)
+        .cursorAfter(firstPageCursor);
+  }
+
+  int? _accountRetainLimit(List<AccountCardDto> firstPage) {
+    if (!HistoryWindow.trimEnabled) return null;
+    if (firstPage.length <= HistoryWindow.eagerLimit) return null;
+    return HistoryWindow.retainLimit;
+  }
+
+  Widget _cardWrap({
+    required List<AccountCardDto> cards,
+    required int columns,
+    required bool canWrite,
+    required PermissionService permissions,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = _cardWidth(constraints.maxWidth, columns);
+        return Wrap(
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.md,
+          children: [
+            for (final card in cards)
+              SizedBox(
+                width: cardWidth,
+                child: _accountCard(
+                  card: card,
+                  canWrite: canWrite,
+                  permissions: permissions,
                 ),
               ),
           ],
         );
       },
+    );
+  }
+
+  Widget _accountCard({
+    required AccountCardDto card,
+    required bool canWrite,
+    required PermissionService permissions,
+  }) {
+    return _AccountCard(
+      section: section,
+      card: card,
+      money: ref.watch(apiLayerProvider).money,
+      canWrite: canWrite && !card.systemManaged,
+      assigning: _assigning,
+      selected: _selected.contains(card.id),
+      onOpen: () => context.go('/${section.path}/${card.id}'),
+      onToggle: () => setState(() {
+        if (!canSelectAccountForAssignment(card)) return;
+        _selected.contains(card.id)
+            ? _selected.remove(card.id)
+            : _selected.add(card.id);
+      }),
+      onPin: (meta) => _pin(card, meta),
+      onZero:
+          showCustomerZeroReview(
+            permissions: permissions,
+            section: section,
+            card: card,
+          )
+          ? (meta) => _zero(card, meta)
+          : null,
     );
   }
 
@@ -261,6 +364,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     double width,
     List<AccountCardDto> cards,
     String? nextCursor,
+    int? retainLimit,
   ) {
     final debts = home.asData?.value?.oldDebts;
     if (debts == null) return const SizedBox.shrink();
@@ -299,7 +403,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             alignment: AlignmentDirectional.centerStart,
             child: TextButton(
               key: const Key('show-all-debts'),
-              onPressed: () => _showAll(nextCursor),
+              onPressed: () => _showAll(nextCursor, retainLimit: retainLimit),
               child: const Text(AppStrings.showAll),
             ),
           ),
@@ -332,29 +436,60 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
 
   String _message(Object error) => failureText(_failure(error));
 
-  Future<void> _more(String cursor) async {
-    final query = ref.read(accountQueryProvider(section)).trim();
-    final filter = ref.read(accountFilterProvider(section));
-    final next = await ref
-        .read(apiLayerProvider)
-        .accounts
-        .list(
-          section,
-          cursor: cursor,
-          q: query.isEmpty ? null : query,
-          filter: filter,
-        );
-    if (!mounted) return;
-    if (ref.read(accountQueryProvider(section)).trim() != query) return;
-    if (ref.read(accountFilterProvider(section)) != filter) return;
-    ref
-        .read(accountExtraCardsProvider(section).notifier)
-        .append(next.page.items, nextCursor: next.page.nextCursor);
+  bool _onCardsScroll(ScrollNotification notification, String? firstCursor) {
+    if (notification is! ScrollUpdateNotification) return false;
+    final metrics = notification.metrics;
+    if (metrics.maxScrollExtent > 0 &&
+        metrics.pixels < metrics.maxScrollExtent - 24) {
+      _scrollArmed = true;
+      return false;
+    }
+    if (!historyDraggedToEnd(notification)) return false;
+    final cursor = _loadMoreCursor(firstCursor);
+    if (!_scrollArmed || cursor == null || _paging) return false;
+    _scrollArmed = false;
+    _more(cursor, retainLimit: _accountRetainLimit(_firstPageItems()));
+    return false;
+  }
+
+  List<AccountCardDto> _firstPageItems() {
+    final page = ref.read(accountsProvider(section)).asData?.value;
+    return page?.page.items ?? const [];
+  }
+
+  Future<void> _more(String cursor, {int? retainLimit}) async {
+    if (_paging) return;
+    _paging = true;
+    try {
+      final query = ref.read(accountQueryProvider(section)).trim();
+      final filter = ref.read(accountFilterProvider(section));
+      final next = await ref
+          .read(apiLayerProvider)
+          .accounts
+          .list(
+            section,
+            cursor: cursor,
+            q: query.isEmpty ? null : query,
+            filter: filter,
+          );
+      if (!mounted) return;
+      if (ref.read(accountQueryProvider(section)).trim() != query) return;
+      if (ref.read(accountFilterProvider(section)) != filter) return;
+      ref
+          .read(accountExtraCardsProvider(section).notifier)
+          .append(
+            next.page.items,
+            nextCursor: next.page.nextCursor,
+            retainLimit: retainLimit,
+          );
+    } finally {
+      _paging = false;
+    }
   }
 
   /// Phone «عرض الكل»: keep the bulletin's existing flag, and load every
   /// remaining account page for the filter and search that are active now.
-  void _showAll(String? firstPageCursor) {
+  void _showAll(String? firstPageCursor, {int? retainLimit}) {
     setState(() => _showAllDebts = true);
     if (!ref.read(onlineProvider)) return;
     final query = ref.read(accountQueryProvider(section)).trim();
@@ -363,6 +498,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
         .read(accountExtraCardsProvider(section).notifier)
         .loadRemaining(
           firstPageCursor: firstPageCursor,
+          retainLimit: retainLimit,
           fetch: (cursor) => ref
               .read(apiLayerProvider)
               .accounts

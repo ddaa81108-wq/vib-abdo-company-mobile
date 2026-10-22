@@ -7,7 +7,11 @@ ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
   final scheme = dark ? _darkScheme : _lightScheme;
   final colors = dark ? AppColors.dark : AppColors.light;
   final status = dark ? AppStatusColors.dark : AppStatusColors.light;
-  final sidebar = AppSidebarPalette.gold;
+  // Light login is gold on a pale canvas, so that theme's base is darker.
+  // Dark mode keeps the bright gold. The sidebar word uses bright.
+  final sidebar = dark
+      ? AppSidebarPalette.gold
+      : AppSidebarPalette.gold.copyWith(base: const Color(0xFF7C6100));
   final extras = AppTextExtras.standard;
   final base = cairo(13, 500, color: scheme.onSurface);
 
@@ -56,7 +60,9 @@ ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
       fillColor: colors.fieldBg,
       isDense: true,
       labelStyle: cairo(13, 600, color: colors.label),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.md)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadii.md),
         borderSide: BorderSide(color: scheme.outline),
@@ -68,7 +74,9 @@ ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
         textStyle: cairo(16, 700),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.lg)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -84,7 +92,9 @@ ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
       backgroundColor: colors.sidebarBg,
       indicatorColor: sidebar.glow,
       height: 68,
-      labelTextStyle: WidgetStatePropertyAll(cairo(11, 700, color: sidebar.shine)),
+      labelTextStyle: WidgetStatePropertyAll(
+        cairo(11, 700, color: sidebar.shine),
+      ),
       iconTheme: WidgetStatePropertyAll(IconThemeData(color: sidebar.light)),
     ),
     navigationRailTheme: NavigationRailThemeData(
@@ -98,7 +108,9 @@ ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
     dividerTheme: DividerThemeData(color: scheme.outlineVariant, space: 1),
     dialogTheme: DialogThemeData(
       backgroundColor: scheme.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.xl)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+      ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: scheme.surface,
@@ -133,7 +145,7 @@ const _lightScheme = ColorScheme(
   onErrorContainer: Color(0xFF8D2C2C),
   surface: Color(0xFFFFFFFF),
   onSurface: Color(0xFF172723),
-  onSurfaceVariant: Color(0xFF6D7C77),
+  onSurfaceVariant: Color(0xFF5F6E69),
   outline: Color(0xFFD5DEE9),
   outlineVariant: Color(0xFFE8EDF3),
   shadow: Color(0x12172723),
@@ -151,7 +163,7 @@ const _lightScheme = ColorScheme(
 
 const _darkScheme = ColorScheme(
   brightness: Brightness.dark,
-  primary: Color(0xFF247763),
+  primary: Color(0xFF36B496),
   onPrimary: Color(0xFF041510),
   primaryContainer: Color(0xFF193B37),
   onPrimaryContainer: Color(0xFFEDF2FA),
@@ -159,7 +171,7 @@ const _darkScheme = ColorScheme(
   onSecondary: Color(0xFF24180E),
   secondaryContainer: Color(0xFF3A2E16),
   onSecondaryContainer: Color(0xFFFFF6E0),
-  tertiary: Color(0xFF247763),
+  tertiary: Color(0xFF36B496),
   onTertiary: Color(0xFF041510),
   error: Color(0xFFFFB1B7),
   onError: Color(0xFF3A1216),
@@ -175,7 +187,7 @@ const _darkScheme = ColorScheme(
   inverseSurface: Color(0xFFEDF2FA),
   onInverseSurface: Color(0xFF172333),
   inversePrimary: Color(0xFF175F50),
-  surfaceTint: Color(0xFF247763),
+  surfaceTint: Color(0xFF36B496),
   surfaceContainerLowest: Color(0xFF0D1522),
   surfaceContainerLow: Color(0xFF1C2A3D),
   surfaceContainer: Color(0xFF1C2A3D),
@@ -183,7 +195,12 @@ const _darkScheme = ColorScheme(
   surfaceContainerHighest: Color(0xFF25354A),
 );
 
-TextStyle cairo(double size, double weight, {Color? color, double height = 1.35}) {
+TextStyle cairo(
+  double size,
+  double weight, {
+  Color? color,
+  double height = 1.35,
+}) {
   return TextStyle(
     fontFamily: 'Cairo',
     fontSize: size,
@@ -401,6 +418,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
     required this.creditText,
     required this.badgeBg,
     required this.cashPositive,
+    required this.cashPositiveText,
     required this.cashNegative,
     required this.chipNormalBg,
     required this.chipNormalFg,
@@ -434,7 +452,12 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
   final Color debtText;
   final Color creditText;
   final Color badgeBg;
+
+  /// Fill for a positive cash tile. Dark enough that white labels stay AA.
   final Color cashPositive;
+
+  /// Positive amount ink. Same hue as [cashPositive], lighter on dark surfaces.
+  final Color cashPositiveText;
   final Color cashNegative;
   final Color chipNormalBg;
   final Color chipNormalFg;
@@ -496,6 +519,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
     creditText: Color(0xFF23705D),
     badgeBg: Color(0xFFDC2626),
     cashPositive: Color(0xFF087A50),
+    cashPositiveText: Color(0xFF087A50),
     cashNegative: Color(0xFFB43131),
     chipNormalBg: Color(0xFFE7F7F1),
     chipNormalFg: Color(0xFF08795C),
@@ -557,6 +581,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
     creditText: Color(0xFF92DFC2),
     badgeBg: Color(0xFFDC2626),
     cashPositive: Color(0xFF087A50),
+    cashPositiveText: Color(0xFF0CB677),
     cashNegative: Color(0xFFB43131),
     chipNormalBg: Color(0xFFE7F7F1),
     chipNormalFg: Color(0xFF08795C),
@@ -628,8 +653,10 @@ class AppTextExtras extends ThemeExtension<AppTextExtras> {
 
 extension AppThemeContext on BuildContext {
   AppColors get appColors => Theme.of(this).extension<AppColors>()!;
-  AppStatusColors get statusColors => Theme.of(this).extension<AppStatusColors>()!;
-  AppSidebarPalette get sidebarPalette => Theme.of(this).extension<AppSidebarPalette>()!;
+  AppStatusColors get statusColors =>
+      Theme.of(this).extension<AppStatusColors>()!;
+  AppSidebarPalette get sidebarPalette =>
+      Theme.of(this).extension<AppSidebarPalette>()!;
   AppTextExtras get textExtras => Theme.of(this).extension<AppTextExtras>()!;
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
 

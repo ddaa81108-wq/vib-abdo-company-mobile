@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_providers.dart';
 import '../error_handling/app_failure.dart';
 import '../error_handling/error_handler.dart';
+import '../performance/history_window.dart';
 import '../ui/strings.dart';
 import 'notification_merge.dart';
 import 'session_providers.dart';
@@ -72,8 +73,20 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
   String? _allReadId;
   Future<void>? _allReadFlight;
 
+  /// The newest window is full and the next [loadOlder] should show the
+  /// page that was just dropped.
+  var _replay = false;
+
+  /// The user already reloaded a dropped page, so later pages stay attached
+  /// to the newest rows.
+  var _extend = false;
+  var _loadingOlder = false;
+
   @override
   Future<NotificationsPage> build() async {
+    _replay = false;
+    _extend = false;
+    _loadingOlder = false;
     final session = ref.watch(sessionStateProvider);
     _writes.clear();
     _oneReadIds.clear();
@@ -94,7 +107,83 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     return _page(visible, unreadCount: page.unreadCount, base: page);
   }
 
-  /// GET /api/notifications and ingest first, then GET the unread-count route.
+  /// Follows `nextBefore` one page.
+  ///
+  /// Approved by Ali on 2026-10-22, enabled by default.
+  /// With [HistoryWindow.trimEnabled] off, every fetched row stays. With it
+  /// on, the newest [HistoryWindow.notificationRetain] rows stay contiguous.
+  /// The oldest overflow is dropped and the cursor stays on that boundary so
+  /// the next call can show it again (DEF-027).
+  Future<void> loadOlder() async {
+    if (_loadingOlder) return;
+    final current = state.asData?.value;
+    final before = current?.nextBefore;
+    if (current == null || before == null || before.isEmpty) return;
+    final cap = HistoryWindow.trimEnabled
+        ? HistoryWindow.notificationRetain
+        : null;
+    _loadingOlder = true;
+    try {
+      final page = await ref
+          .read(apiLayerProvider)
+          .notifications
+          .list(before: before);
+      final session = ref.read(sessionStateProvider);
+      if (session is! SessionAuthenticated) return;
+      final merged = mergeAppNotifications(
+        current: current.appNotifications,
+        incoming: page.appNotifications,
+        currentUserId: session.profile.id,
+        source: NotificationSource.fetch,
+      );
+      final visible = _window(merged, cap);
+      final nextBefore = _resumeCursor(
+        visible: visible,
+        cap: cap,
+        serverCursor: page.nextBefore,
+      );
+      state = AsyncData(
+        _page(
+          visible,
+          unreadCount: page.unreadCount,
+          base: NotificationsPage(
+            items: page.items,
+            appNotifications: page.appNotifications,
+            unreadCount: page.unreadCount,
+            nextBefore: nextBefore,
+          ),
+        ),
+      );
+    } finally {
+      _loadingOlder = false;
+    }
+  }
+
+  List<AppNotification> _window(List<AppNotification> merged, int? cap) {
+    if (cap == null || _extend || _replay || merged.length <= cap) {
+      if (_replay) {
+        _replay = false;
+        _extend = true;
+      }
+      return merged;
+    }
+    _replay = true;
+    return merged.sublist(0, cap);
+  }
+
+  String? _resumeCursor({
+    required List<AppNotification> visible,
+    required int? cap,
+    required String? serverCursor,
+  }) {
+    if (cap != null && _replay && visible.isNotEmpty) {
+      return visible.last.notificationId;
+    }
+    return serverCursor;
+  }
+
+  /// GET /api/notifications and replace the window with that first page, then
+  /// GET the unread-count route.
   ///
   /// A 404 or any other non-auth failure of the count route falls back to the
   /// list response's `unreadCount`. If that field is absent too, the previous
@@ -106,14 +195,46 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
   /// `refresh(announce: true)` so a newly seen unread row can raise a banner.
   /// The initial load uses the default and stays quiet.
   Future<void> refresh({bool announce = false}) async {
+    _extend = false;
+    _replay = false;
     final page = await ref.read(apiLayerProvider).notifications.list();
-    await ingest(
-      page.appNotifications,
+    final session = ref.read(sessionStateProvider);
+    final userId = session is SessionAuthenticated ? session.profile.id : null;
+    if (userId == null) {
+      state = const AsyncData(NotificationsPage(items: [], unreadCount: null));
+      return;
+    }
+    final previousPage = state.value;
+    final previous = _records(previousPage);
+    final visible = mergeAppNotifications(
+      current: const [],
+      incoming: page.appNotifications,
+      currentUserId: userId,
       source: NotificationSource.fetch,
-      announce: announce,
     );
-    final count = await _resolveUnread(listUnread: page.unreadCount);
-    if (count != null) _applyCount(count, pageUnread: page.unreadCount);
+    final unread = page.unreadCount ?? previousPage?.unreadCount;
+    state = AsyncData(
+      _page(
+        visible,
+        unreadCount: unread,
+        base: NotificationsPage(
+          items: page.items,
+          appNotifications: page.appNotifications,
+          unreadCount: unread,
+          nextBefore: page.nextBefore,
+        ),
+      ),
+    );
+    if (announce) {
+      final bus = ref.read(_foregroundBusProvider);
+      if (!bus.isClosed) {
+        for (final item in newlySeenUnread(before: previous, after: visible)) {
+          bus.add(item);
+        }
+      }
+    }
+    final count = await _resolveUnread(listUnread: unread);
+    if (count != null) _applyCount(count, pageUnread: unread);
   }
 
   Future<void> ingest(
@@ -196,10 +317,10 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     );
     final result = await _send(
       requestId,
-      () => ref.read(apiLayerProvider).notifications.markRead(
-        notificationId,
-        requestId: requestId,
-      ),
+      () => ref
+          .read(apiLayerProvider)
+          .notifications
+          .markRead(notificationId, requestId: requestId),
     );
     _oneReadIds.remove(notificationId);
     await _applyWrite(result, onlyId: notificationId);
@@ -222,9 +343,10 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     final requestId = _allReadId ??= RequestIds.newRequestId();
     final result = await _send(
       requestId,
-      () => ref.read(apiLayerProvider).notifications.markAllRead(
-        requestId: requestId,
-      ),
+      () => ref
+          .read(apiLayerProvider)
+          .notifications
+          .markAllRead(requestId: requestId),
     );
     _allReadId = null;
     await _applyWrite(result);
@@ -288,7 +410,9 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
   void _applyCount(int count, {int? pageUnread}) {
     ref.read(unreadNotificationsCountProvider.notifier).applyServerCount(count);
     final current = state.value;
-    if (current != null && pageUnread != null && current.unreadCount != pageUnread) {
+    if (current != null &&
+        pageUnread != null &&
+        current.unreadCount != pageUnread) {
       state = AsyncData(
         NotificationsPage(
           items: current.items,
@@ -314,11 +438,12 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     int? unreadCount,
     NotificationsPage? base,
   }) {
-    final sorted = [...records]..sort((a, b) {
-      final byTime = b.createdAt.compareTo(a.createdAt);
-      if (byTime != 0) return byTime;
-      return a.notificationId.compareTo(b.notificationId);
-    });
+    final sorted = [...records]
+      ..sort((a, b) {
+        final byTime = b.createdAt.compareTo(a.createdAt);
+        if (byTime != 0) return byTime;
+        return a.notificationId.compareTo(b.notificationId);
+      });
     return NotificationsPage(
       items: [for (final item in sorted) item.toDto()],
       appNotifications: sorted,

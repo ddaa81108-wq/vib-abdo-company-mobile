@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../error_handling/error_handler.dart';
 import '../../notifications/push_providers.dart';
+import '../../performance/history_window.dart';
 import '../../state/notification_providers.dart';
 import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
@@ -29,6 +30,7 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  var _scrollArmed = true;
   @override
   void initState() {
     super.initState();
@@ -158,34 +160,39 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         child: ForbiddenPane(),
       );
     }
-    return ListView(
-      key: NotificationsScreen.screenKey,
-      padding: pagePadding(MediaQuery.sizeOf(context).width),
-      children: [
-        const ScreenTitle(AppStrings.notifications),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          '${AppStrings.unreadFull} ${count ?? AppStrings.dash}',
-          key: const Key('unread-full'),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: BusyAction(
-            buttonKey: const Key('mark-all-read'),
-            enabled: online && (count ?? 0) > 0,
-            label: AppStrings.markAllRead,
-            onSubmit: () => _markAll(context),
+    return RefreshIndicator(
+      key: const Key('notifications-refresh'),
+      onRefresh: () => ref.read(notificationsProvider.notifier).refresh(),
+      child: ListView(
+        key: NotificationsScreen.screenKey,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: pagePadding(MediaQuery.sizeOf(context).width),
+        children: [
+          const ScreenTitle(AppStrings.notifications),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '${AppStrings.unreadFull} ${count ?? AppStrings.dash}',
+            key: const Key('unread-full'),
           ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _body(state, online),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          AppStrings.noLanguage,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      ],
+          const SizedBox(height: AppSpacing.md),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: BusyAction(
+              buttonKey: const Key('mark-all-read'),
+              enabled: online && (count ?? 0) > 0,
+              label: AppStrings.markAllRead,
+              onSubmit: () => _markAll(context),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _body(state, online),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            AppStrings.noLanguage,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
     );
   }
 
@@ -205,11 +212,81 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         retryKey: NotificationsScreen.retryKey,
         onRetry: online ? () => ref.invalidate(notificationsProvider) : null,
       ),
-      NotificationsReady(:final items) => Column(
-        children: [for (final item in items) _NoticeTile(item: item)],
-      ),
+      NotificationsReady(:final items) => () {
+        HistoryWindowTrace.notificationWindow = [
+          for (final item in items) item.notificationId,
+        ];
+        return items.length <= HistoryWindow.eagerLimit
+            ? Column(
+                children: [for (final item in items) _NoticeTile(item: item)],
+              )
+            : Column(
+                children: [
+                  SizedBox(
+                    height: 560,
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: _onNoticesScroll,
+                      child: ListView.builder(
+                        key: const Key('notifications-list'),
+                        itemCount: items.length,
+                        itemBuilder: (context, index) =>
+                            _NoticeTile(item: items[index]),
+                      ),
+                    ),
+                  ),
+                  KeyedSubtree(
+                    key: Key('notifications-retained-${items.length}'),
+                    child: const SizedBox.shrink(),
+                  ),
+                  // Approved by Ali on 2026-10-22, enabled by default.
+                  // The control stays while an older page can still be loaded.
+                  // Off, the control stays hidden and the first page remains.
+                  if (HistoryWindow.trimEnabled && _olderCursor() != null)
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton(
+                        key: const Key('load-older-notifications'),
+                        onPressed: online ? _loadOlderNotifications : null,
+                        child: const Text(AppStrings.loadOlder),
+                      ),
+                    ),
+                ],
+              );
+      }(),
       NotificationsForbidden() => const SizedBox.shrink(),
     };
+  }
+
+  bool _onNoticesScroll(ScrollNotification notification) {
+    if (notification is! ScrollUpdateNotification) return false;
+    final metrics = notification.metrics;
+    if (metrics.maxScrollExtent > 0 &&
+        metrics.pixels < metrics.maxScrollExtent - 24) {
+      _scrollArmed = true;
+      return false;
+    }
+    if (!historyDraggedToEnd(notification)) return false;
+    if (!_scrollArmed || _olderCursor() == null) return false;
+    _scrollArmed = false;
+    _loadOlderNotifications();
+    return false;
+  }
+
+  String? _olderCursor() {
+    final page = ref.read(notificationsProvider).asData?.value;
+    return page?.nextBefore;
+  }
+
+  Future<void> _loadOlderNotifications() async {
+    try {
+      await ref.read(notificationsProvider.notifier).loadOlder();
+    } catch (error) {
+      if (!mounted) return;
+      showFailureSnackBar(
+        context,
+        ref.read(errorHandlerProvider).toFailure(error),
+      );
+    }
   }
 
   Future<void> _markAll(BuildContext context) async {
