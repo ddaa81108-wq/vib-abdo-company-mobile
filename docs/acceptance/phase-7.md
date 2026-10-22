@@ -29,7 +29,7 @@
 | مطور الواجهة | 4 | 2 | 2 | 0 |
 | DevOps | 3 | 0 | 2 | 1 |
 
-لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. مراجعة #56 على `9c0fa4f` لا تغيّر الأعداد: Covered ‏3 وPartial ‏15 وDevice-only ‏1. مراجعة #53 و#54 و#55 لا تغيّر الأعداد. مراجعة #57 على `714c6ea` لا تغيّر الأعداد. إعادة اختبار #52 على `f347a8a` بعد دمج `main` `c40e03d` لا تغيّر الأعداد. إعادة اختبار #51 على `721edef` لا تغيّر الأعداد. DEF-019 وDEF-020 وDEF-021 وDEF-022 صارت Verified closed على `main` `c40e03d`. تأكيد `main` `2a45cfb` (squash #52 ثم #57 ثم #51) وإعادة اختبار #49 على `653a07c` لا يغيّران الأعداد. DEF-023 وDEF-024 وDEF-025 صارت Verified closed على `2a45cfb`. فُتح DEF-026 وغير مانع. البند 10 يبقى Partial لنصف الجهاز. البند 14 يبقى Covered. البند 15 يبقى Covered. البند 16 يبقى Partial لنصف الجهاز. البند 7 يبقى Partial لأن P7-11 staging. البند 9 يبقى Partial لأن P7-15 staging. البند 19 يبقى Device-only. التالي الحر DEF-027. لا توقيع.
+لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. مراجعة #56 على `9c0fa4f` لا تغيّر الأعداد: Covered ‏3 وPartial ‏15 وDevice-only ‏1. مراجعة #53 و#54 و#55 لا تغيّر الأعداد. مراجعة #57 على `714c6ea` لا تغيّر الأعداد. إعادة اختبار #52 على `f347a8a` بعد دمج `main` `c40e03d` لا تغيّر الأعداد. إعادة اختبار #51 على `721edef` لا تغيّر الأعداد. DEF-019 وDEF-020 وDEF-021 وDEF-022 صارت Verified closed على `main` `c40e03d`. تأكيد `main` `2a45cfb` (squash #52 ثم #57 ثم #51) وإعادة اختبار #49 على `653a07c` لا يغيّران الأعداد. DEF-023 وDEF-024 وDEF-025 صارت Verified closed على `2a45cfb`. فُتح DEF-026 وغير مانع. مراجعة #58 على `6e7a76c` لا تغيّر الأعداد. فُتح DEF-027 وغير مانع. البند 17 يبقى Partial. البند 18 يبقى Partial. البند 10 يبقى Partial لنصف الجهاز. البند 14 يبقى Covered. البند 15 يبقى Covered. البند 16 يبقى Partial لنصف الجهاز. البند 7 يبقى Partial لأن P7-11 staging. البند 9 يبقى Partial لأن P7-15 staging. البند 19 يبقى Device-only. التالي الحر DEF-028. لا توقيع.
 
 أكبر الفجوات لكل مالك في نهاية القسم أ.
 
@@ -57,8 +57,8 @@
 | 14 الوضع الداكن والفاتح | مطور الواجهة | Covered | widget | — |
 | 15 RTL | مطور الواجهة | Covered | widget | — |
 | 16 مقاسات الشاشة | مطور الواجهة | Partial | widget | P7-22 |
-| 17 الأداء | DevOps | Partial | release مسجّل على #52 | P7-23، P7-24 |
-| 18 سجل أو تاريخ طويل | DevOps | Partial | widget على #52 | P7-25 |
+| 17 الأداء | DevOps | Partial | release مسجّل على #52؛ القص افتراضيًا على #58 | P7-23، P7-24 |
+| 18 سجل أو تاريخ طويل | DevOps | Partial | widget على #52؛ فجوة القص DEF-027 على #58 | P7-25 |
 | 19 هاتف حقيقي | DevOps | Device-only | سير محاكٍ منفصل على #52 | P7-26 |
 
 ### 1 — اختبارات API
@@ -239,6 +239,7 @@
 - **الموجود على الأساس:** لا اختبار `Timeline` ولا ميزانية إقلاع ولا قياس تمرير. `integration_test/android_notifications_test.dart` يفحص قناة الإشعار لا الزمن.
 - **بعد #52:** `tool/measure_release_cold_start.sh` يبني release بـ `USE_FAKE_API=false` ويطبع وسيط `am start -W`. `integration_test/p7_long_history_test.dart` يطبع أزمنة الإطارات. الحكم والأدلة في مراجعة #52. العتبة ما زالت قرار علي، والرقم في نموذج الهاتف فارغ.
 - **إعادة الاختبار `f8f7812`:** الميزانيات مسمّاة engineering proposal وعمود القبول يبقى `recorded`. PSS وRSS وDart heap تقرير فقط في أثر السير المنفصل. التفاصيل في إعادة اختبار #52. الحالة Partial.
+- **بعد #58 على `6e7a76c`:** `tool/android_performance_emulator_test.sh` و`tool/measure_release_cold_start.sh` وCI لا يمررون `HISTORY_WINDOW_TRIM`، فالقص يعمل في قياس المحاكي لأن الافتراض صار true. الميزانيات ونموذج الجهاز ونصف P7-24 ما زالت مفتوحة. الحالة Partial.
 - **الفجوة:** **P7-23** إقلاع بارد لإصدار release على جهاز ضعيف حتى الرئيسية التفاعلية، مع رقم الثواني في النموذج. **P7-24** تمرير أطول دفتر حتى آخر صفحة مع عدد الصفحات. المستوى device. العتبة الرقمية يكتبها علي في النموذج قبل أول تشغيل؛ بلا عتبة تُسجَّل الأرقام ولا يُخترع Pass.
 - **منع الاستبدال:** لا وضع debug ولا `FakeApiClient` في قياس الإصدار. لا قائمة من سطرين تُسمى سجلًا طويلًا.
 - **المستوى:** device للنموذج. القياس على #52 release للعملية، وprofile للتاريخ الطويل.
@@ -250,6 +251,7 @@
 - **الموجود على الأساس:** صفحات قصيرة. `test/qa_round_test.dart` `load older shows the error and a retry`. `test/treasury_reports_polish_test.dart`: `treasury shows server cards, movements, and older pages`، `treasury load older shows the error and retries`. `test/account_list_actions_test.dart` `phone show-all loads the remaining pages for the active filter`. `test/account_list_logic_test.dart` `a late load-more page is not mixed into the new filter`.
 - **بعد #52:** `test/p7_long_history_test.dart` يمشي 20 صفحة عبر زر `load-older` الحقيقي و`FakeDataset.large`. `packages/api_layer/test/fake_large_dataset_test.dart` يجمع 800 سطرًا على 20 صفحة من `FakeApiClient`. نصف الجهاز ما زال مفتوحًا. التفاصيل في مراجعة #52.
 - **إعادة الاختبار `f8f7812`:** مع `HISTORY_WINDOW_TRIM` مطفأ يبقي المتحكّم `ledger-retained-760`. مجموعة `ltx_00000`..`ltx_00799` في مشي `FakeApiClient` داخل الحزمة، لا على الشاشة. الحالة Partial.
+- **بعد #58 على `6e7a76c`:** الافتراض صار القص. اختبار العلم المطفأ يضبط `HistoryWindow.trimEnabled = false` ويتوقع `ledger-retained-760`. اختبار العلم المشغّل يتوقع `ledger-retained-80` وسقف إشعارات 120. الشاشة مع الافتراض تُبقي الصفحة الأولى ثم أبعد 80، فوسط الدفتر فجوة (DEF-027). نصف الجهاز من P7-25 ما زال مفتوحًا. الحالة Partial.
 - **الفجوة:** **P7-25** دفتر من عدة صفحات عبر `load more` الحقيقي حتى الصفحة الأخيرة، على `FakeApiClient` بعدد صفحات معلوم، ثم على جهاز P7-24. المستوى widget ثم device.
 - **منع الاستبدال:** لا حقن صفحتين ثم ادّعاء تاريخ طويل. مصدر الصفوف المستودع أو الخادم.
 - **المستوى:** widget للصفحات. القياس device.
@@ -273,7 +275,7 @@
 | مهندس API | بعد #56 على `9c0fa4f` يبقى: دخان P7-01 (not run بلا أسرار staging)، ودخول الأدوار على staging، وP7-03 على الجهاز، ومصفوفة P7-04 الحية، وطيران P7-19، وعودة الراديو، ودفتر staging لـ P7-20 وP7-21. السؤال المفتوح: هل `GET /api/me` هو العقد؟ |
 | Senior Flutter | على `main` `c40e03d` أُغلق DEF-020 وDEF-022، وأُغلق DEF-021 كبديل اختبار. البند 7 يبقى Partial لـ P7-11. البند 9 يبقى Partial لـ P7-15. P7-07 مع DEF-012، وP7-08، وصفوف staging P7-09 وP7-13 باقية. إعادة اختبار #51 على `721edef` و#52 على `f347a8a` لم تنقل عددًا |
 | مطور الواجهة | بعد #49 على `653a07c` الحكم **YES**. DEF-023 وDEF-024 وDEF-025 Verified closed على `main` `2a45cfb`. DEF-026 مفتوح وغير مانع. الجهاز لـ P7-16 وP7-17 وP7-18 وP7-22 باقٍ. قتل العملية Not supported بلا FCM. البنود 10 و16 Partial، و14 و15 Covered |
-| DevOps | بعد إعادة اختبار #52 على `f347a8a` يبقى: رقم P7-23 وP7-24 على الجهاز الضعيف في النموذج، وعتبة علي، ونصف الجهاز من P7-25، ومجموعة المعرّفات على مشي الحزمة لا على الشاشة، ونموذج P7-26 على الهواتف A–D. سير المحاكي لا يملأ النموذج. `HISTORY_WINDOW_TRIM` مطفأ. الذاكرة تقرير فقط |
+| DevOps | بعد #58 على `6e7a76c` يبقى: رقم P7-23 وP7-24 على الجهاز الضعيف في النموذج، وعتبة علي، ونصف الجهاز من P7-25، ونموذج P7-26 على الهواتف A–D. سير المحاكي لا يملأ النموذج. القص صار الافتراض لأن السكربتات لا تمرر `HISTORY_WINDOW_TRIM`. DEF-027 مفتوح وغير مانع: فجوة وسط الدفتر والحسابات، وسقف الإشعارات 120، ولا سحب يعيد النافذة. الذاكرة تقرير فقط |
 
 ### فهرس `P7`
 
@@ -1119,6 +1121,43 @@ CI التشغيل [39711134480](https://github.com/ddaa81108-wq/vib-abdo-company
 | #48 `f295d38` | `792b18a7233354c75ed5695c215a2d63fd46341d` |
 
 لا سطور `CONFLICT`. الأعداد لم تتغير: Covered ‏3 وPartial ‏15 وDevice-only ‏1. البند 10 يبقى Partial. البند 14 يبقى Covered. البند 15 يبقى Covered. البند 16 يبقى Partial. DEF-012 يبقى Fail. DEF-002 يبقى Pending PM. التالي الحر DEF-027.
+
+## مراجعة #58 — الرأس `6e7a76c` ودمج محلي مع #49
+
+الطلب [#58](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/58) مسودة. الرأس `6e7a76cd4d03c3b35be62d4fcb38478f8cd10ad8`. الوالد `main` `2a45cfb16962e16170d10c818bc0ce4cbcc46eb7` وهو سلف. لم يُدمج ولم يُدفع. لا توقيع. الحكم: **مقبول للدمج YES**. [#49](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/49) عند `653a07c2fbac3b8aa6cd7fdd8dc4548244c9c4fc` يبقى **YES**. دمج #49 ثم #58 محليًا بلا تعارض وبلا كسر للاختبارات.
+
+**الملفات التسعة** (`git diff --stat 2a45cfb 6e7a76c`: +36/−23). التغيير السلوكي الوحيد هو `defaultValue: true` في `lib/performance/history_window.dart`. الباقي تعليقات أو اختبارات أو وثيقة:
+
+| الملف | التغيير |
+|---|---|
+| `lib/performance/history_window.dart` | `HISTORY_WINDOW_TRIM` الافتراض `true`. الإطفاء `--dart-define=HISTORY_WINDOW_TRIM=false` أو `HistoryWindow.trimEnabled = false` |
+| `lib/features/accounts/account_list_screen.dart` | تعليق |
+| `lib/features/accounts/ledger_screen.dart` | تعليق |
+| `lib/features/notifications/notifications_screen.dart` | تعليق |
+| `lib/state/notification_providers.dart` | تعليق |
+| `test/p7_history_window_test.dart` | الافتراض `isTrue`، والحالتان تبقيان |
+| `test/p7_long_history_test.dart` | اختبار الإبقاء الكامل يضبط العلم `false` صراحة |
+| `docs/testing/PHASE7_PERFORMANCE.md` | الوثيقة |
+| `tool/android_performance_emulator_test.sh` | تعليق. السكربت لا يمرر العلم |
+
+**العلم في البنائين.** `ci.yml` و`android-performance.yml` و`tool/check_release_rejects_fake_api.sh` و`tool/measure_release_cold_start.sh` و`tool/android_notification_emulator_test.sh` و`tool/android_performance_emulator_test.sh` لا يمررون `HISTORY_WINDOW_TRIM`. إصدار release وCI يأخذان الافتراض، وهو تشغيل القص. تشغيل الملفّين بالمبلّغ الموسّع **+7** وخروج 0: الافتراض مشغّل ويمكن إطفاؤه، وإضافات الحساب 100 عند الإطفاء وآخر 80 عند التشغيل، وP7-25 المطفأ يبقي كل صفوف الدفتر، والمشغّل يبقي 80 ويمشي لآخر صفحة، والإشعارات تُسقَف عند 120.
+
+**ما بقي صحيحًا مع القص.** لا `fold` ولا `reduce` لقوائم الصفوف تحت `lib/`. رأس الدفتر `balanceUnits` للكارت. ملخص الحسابات وعدادات التصفية من `AccountsSummaryDto`. الرئيسية `HomeDto`. نظرة الاستلامات `CollectionsOverviewDto`. بحث الحسابات والبحث الموحّد (`accounts.suggestions`) استعلام خادم، ومسح الإضافات يعيد بطاقة كانت في الفجوة (`lc_00050`). الدفتر والإشعارات بلا بحث صفوف. فتح إشعار خارج النافذة من الصينية ومن الإقلاع البارد يجلب الحساب بالمعرّف ويفتح `/customers/lc_00000`، وتعليم القراءة ينقص `unreadCount` من 1500 إلى 1499. حارس DEF-020 على الرصيد 0 يمنع المبلغ 1 بلا POST. رأس DEF-022 يبقى من الكارت المعاد جلبه.
+
+**DEF-027.** غير مانع. شدة متوسطة. المالك DevOps. مع الافتراض يبقي الدفتر الصفحة الأولى ثم أبعد 80 ملحقة (`ltx_00000` حاضر، `ltx_00720` حاضر، `ltx_00040` و`ltx_00100` غائبان، `ledger-retained-80`، والزر يختفي بعد 19 ضغطة). إبطال المزوّد لا يعيد النافذة. مغادرة الشاشة تعيد `ledger-retained-0` والزر، فبيانات الخادم باقية. قائمة الحسابات بعد ثلاث ضغطات `childCount` ‏120 وفيها الفجوة نفسها. الإشعارات أحدث 120 و`nextBefore` يُمسح، و`refresh` لا يعيد المؤشر. لا `RefreshIndicator` على الشاشات الثلاث. التفاصيل في `defects.md` على #12. التالي الحر DEF-028.
+
+**`tool/check.sh` على `6e7a76c`.** خرج 0. تحليل التطبيق 4.0s والتطبيق **432/0**. تحليل الحزمة 2.6s والحزمة **209** ناجح وتخطي واحد (P7-01 not run). السالب **32/0** و**33/0**. التجربة الجافة **6/0**. الحارس **4/0**. release يرفض `USE_FAKE_API=true`. CI [39786843720](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions/runs/39786843720) ناجح، والفحوص الثلاثة SUCCESS.
+
+**`merge-tree --write-tree`.** خروج 0 في الاتجاهين. لا سطور `CONFLICT`.
+
+| الطرف | الشجرة |
+|---|---|
+| `main` `2a45cfb` | `8b5c2fc0ecf62570234983b3983af86c5b896609` (شجرة #58 نفسها) |
+| #49 `653a07c` | `b10cad271a1fea4bc26a202d0e788199e92247e0` |
+
+**دمج محلي #49 ثم #58.** من `653a07c` ثم `git merge --no-ff --no-commit 6e7a76c`. الدمج التلقائي نجح، تسعة ملفات، بلا غير مدمج. لم يُلتزم ولم يُدفع. `tool/check.sh` على الشجرة المدموجة خرج 0. تحليل التطبيق 4.0s والتطبيق **466/0**. تحليل الحزمة 3.0s والحزمة **209** ناجح وتخطي واحد (P7-01). السالب **32/0** و**33/0**. التجربة الجافة **6/0**. الحارس **4/0**. release يرفض Fake. اختبارات #49 التي كانت على قص مطفأ ما زالت تمر مع الافتراض المشغّل، لأن قوائمها أقصر من 80 و120. أسماء `HISTORY_WINDOW_TRIM off` و`DEF-023` و`DEF-024` ظهرت في السجل وأكمل العداد حتى 466.
+
+الأعداد لم تتغير: Covered ‏3 وPartial ‏15 وDevice-only ‏1. البند 17 يبقى Partial. البند 18 يبقى Partial. DEF-012 يبقى Fail. DEF-002 يبقى Pending PM. DEF-026 يبقى مفتوحًا. التالي الحر DEF-028.
 
 ## د. خط الأساس `tool/check.sh`
 
