@@ -122,8 +122,8 @@ Color _buttonForeground(WidgetTester tester, Finder finder) {
 }
 
 /// DEF-023 is the login brand, DEF-024 is the light sidebar role, and DEF-025
-/// is dark primary text plus cashPositive. DEF-020 through DEF-022 are other
-/// defects in QA's registry. The next free number is DEF-026.
+/// is dark primary text plus cashPositive. DEF-026 is the light secondary text.
+/// DEF-020 through DEF-022 are other defects in QA's registry.
 void main() {
   testWidgets('DEF-023 login brand meets AA on the scaffold in both themes', (
     tester,
@@ -208,6 +208,42 @@ void main() {
     await _settle(tester);
     await _expectRenderedInk(tester, dark: true);
   });
+
+  testWidgets(
+    'DEF-026 light onSurfaceVariant meets AA on the four measured surfaces',
+    (tester) async {
+      const previous = Color(0xFF6D7C77);
+      const ink = Color(0xFF5F6E69);
+      const surfaces = <Color>[
+        Color(0xFFE5EDF6),
+        Color(0xFFFFFFFF),
+        Color(0xFFEDF9F4),
+        Color(0xFFE6F2ED),
+      ];
+      final light = buildAppTheme();
+      final dark = buildAppTheme(Brightness.dark);
+
+      expect(light.colorScheme.onSurfaceVariant, ink);
+      expect(dark.colorScheme.onSurfaceVariant, const Color(0xFFACBBCE));
+      expect(light.colorScheme.outline, const Color(0xFFD5DEE9));
+      expect(light.colorScheme.outlineVariant, const Color(0xFFE8EDF3));
+      expect(light.colorScheme.outline, isNot(previous));
+      expect(light.colorScheme.outline, isNot(ink));
+      _expectSameHue(ink, previous);
+      for (final surface in surfaces) {
+        _expectContrast(ink, surface, 4.5);
+      }
+
+      await pumpFakeApp(tester, size: const Size(360, 780));
+      final note = tester.widget<Text>(find.text(AppStrings.noLanguage));
+      final theme = Theme.of(tester.element(find.text(AppStrings.noLanguage)));
+      expect(note.style?.color, theme.colorScheme.onSurfaceVariant);
+      expect(note.style?.fontSize, 11);
+      expect(_isLargeText(note.style!), isFalse);
+      _expectTextContrast(note, const Color(0xFFE5EDF6));
+      expect(theme.scaffoldBackgroundColor, const Color(0xFFE5EDF6));
+    },
+  );
 }
 
 void _expectRole(
