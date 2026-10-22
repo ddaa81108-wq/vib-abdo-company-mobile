@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../error_handling/error_handler.dart';
 import '../../notifications/push_providers.dart';
+import '../../performance/history_window.dart';
 import '../../state/notification_providers.dart';
 import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
@@ -205,11 +206,52 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         retryKey: NotificationsScreen.retryKey,
         onRetry: online ? () => ref.invalidate(notificationsProvider) : null,
       ),
-      NotificationsReady(:final items) => Column(
-        children: [for (final item in items) _NoticeTile(item: item)],
-      ),
+      NotificationsReady(:final items) =>
+        items.length <= HistoryWindow.eagerLimit
+            ? Column(
+                children: [for (final item in items) _NoticeTile(item: item)],
+              )
+            : Column(
+                children: [
+                  SizedBox(
+                    height: 560,
+                    child: ListView.builder(
+                      key: const Key('notifications-list'),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) =>
+                          _NoticeTile(item: items[index]),
+                    ),
+                  ),
+                  if (_olderCursor() != null)
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton(
+                        key: const Key('load-older-notifications'),
+                        onPressed: online ? _loadOlderNotifications : null,
+                        child: const Text(AppStrings.loadOlder),
+                      ),
+                    ),
+                ],
+              ),
       NotificationsForbidden() => const SizedBox.shrink(),
     };
+  }
+
+  String? _olderCursor() {
+    final page = ref.read(notificationsProvider).asData?.value;
+    return page?.nextBefore;
+  }
+
+  Future<void> _loadOlderNotifications() async {
+    try {
+      await ref.read(notificationsProvider.notifier).loadOlder();
+    } catch (error) {
+      if (!mounted) return;
+      showFailureSnackBar(
+        context,
+        ref.read(errorHandlerProvider).toFailure(error),
+      );
+    }
   }
 
   Future<void> _markAll(BuildContext context) async {

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../performance/history_window.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/presentation.dart';
@@ -77,13 +78,20 @@ class CollectionsScreen extends ConsumerWidget {
                     key: Key('collections-empty-assignments'),
                     message: AppStrings.emptyAssignments,
                   )
-                else
+                else if (data.assignments.length <= HistoryWindow.eagerLimit)
                   for (final assignment in data.assignments)
                     _Assignment(
                       assignment: assignment,
                       money: money,
                       online: online,
-                    ),
+                    )
+                else
+                  _LargeAssignmentList(
+                    initial: data.assignments,
+                    nextCursor: strOrNull(data.raw['nextCursor']),
+                    money: money,
+                    online: online,
+                  ),
                 const SizedBox(height: AppSpacing.sm),
                 GatedButton(
                   buttonKey: const Key('unlinked-collection'),
@@ -99,12 +107,27 @@ class CollectionsScreen extends ConsumerWidget {
                   key: Key('collections-empty-receipts'),
                   message: AppStrings.emptyCollections,
                 ),
-              for (final submission in data.submissions)
-                _Submission(
-                  submission: submission,
-                  money: money,
-                  manage: manage,
-                  cash: cash,
+              if (data.submissions.length <= HistoryWindow.eagerLimit)
+                for (final submission in data.submissions)
+                  _Submission(
+                    submission: submission,
+                    money: money,
+                    manage: manage,
+                    cash: cash,
+                  )
+              else
+                SizedBox(
+                  height: 480,
+                  child: ListView.builder(
+                    key: const Key('collections-submissions-list'),
+                    itemCount: data.submissions.length,
+                    itemBuilder: (context, index) => _Submission(
+                      submission: data.submissions[index],
+                      money: money,
+                      manage: manage,
+                      cash: cash,
+                    ),
+                  ),
                 ),
               for (final receipt in data.unlinkedReceipts)
                 _Unlinked(
@@ -1075,6 +1098,89 @@ class _Figure extends StatelessWidget {
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Text(value, softWrap: true, style: style),
+    );
+  }
+}
+
+class _LargeAssignmentList extends ConsumerStatefulWidget {
+  const _LargeAssignmentList({
+    required this.initial,
+    required this.nextCursor,
+    required this.money,
+    required this.online,
+  });
+
+  final List<CollectionAssignmentDto> initial;
+  final String? nextCursor;
+  final MoneyFormatter money;
+  final bool online;
+
+  @override
+  ConsumerState<_LargeAssignmentList> createState() =>
+      _LargeAssignmentListState();
+}
+
+class _LargeAssignmentListState extends ConsumerState<_LargeAssignmentList> {
+  late final List<CollectionAssignmentDto> _items = [...widget.initial];
+  late String? _cursor = widget.nextCursor;
+  var _busy = false;
+
+  Future<void> _more() async {
+    final cursor = _cursor;
+    if (cursor == null || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final page = await ref
+          .read(apiLayerProvider)
+          .collections
+          .overviewPage(cursor: cursor);
+      if (!mounted) return;
+      setState(() {
+        final merged = [..._items, ...page.assignments];
+        _items
+          ..clear()
+          ..addAll(
+            merged.length > HistoryWindow.retainLimit
+                ? merged.sublist(merged.length - HistoryWindow.retainLimit)
+                : merged,
+          );
+        final next = page.raw['nextCursor'];
+        _cursor = next == null || '$next'.isEmpty ? null : '$next';
+        _busy = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: 480,
+          child: ListView.builder(
+            key: const Key('collections-assignments-list'),
+            itemCount: _items.length,
+            itemBuilder: (context, index) => _Assignment(
+              assignment: _items[index],
+              money: widget.money,
+              online: widget.online,
+            ),
+          ),
+        ),
+        if (_cursor != null)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton(
+              key: const Key('load-more-collections'),
+              onPressed: widget.online && !_busy ? _more : null,
+              child: const Text(AppStrings.loadMore),
+            ),
+          ),
+      ],
     );
   }
 }

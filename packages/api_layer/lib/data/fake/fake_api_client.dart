@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../../core/config/api_config.dart';
+import '../../core/config/release_fake_api_guard.dart';
 import '../../core/network/precise_json.dart';
 import '../../core/network/wire_json.dart';
 
@@ -13,6 +14,7 @@ import '../../core/permissions/permission_codes.dart';
 import '../../core/permissions/permission_service.dart';
 import '../models/purchase_models.dart';
 import 'fake_fixtures.dart';
+import 'fake_large_catalog.dart';
 
 /// In-memory fake of the REAL API shapes so the UI can be built with zero contact
 /// with the production system. Same ApiClient interface => Remote*Repository run unchanged.
@@ -52,10 +54,23 @@ class FakeApiClient implements ApiClient {
   FakeApiClient({
     this.latency = const Duration(milliseconds: 250),
     this.rateWireFormat = RateWireFormat.number,
-  });
+    String? dataset,
+  }) : dataset = FakeDataset.resolve(dataset) {
+    // Release AOT never reaches this constructor: the release builder does
+    // not import this library. The check is for a test that forces
+    // dart.vm.product and still tries to build a fake client.
+    if (const bool.fromEnvironment('dart.vm.product')) {
+      throw StateError(releaseFakeApiRejectedMessage);
+    }
+  }
 
   final Duration latency;
   final RateWireFormat rateWireFormat;
+
+  /// [FakeDataset.standard] or [FakeDataset.large]. Large is debug/profile/test.
+  final String dataset;
+
+  bool get _large => dataset == FakeDataset.large;
 
   /// Last request body exactly as it would go on the wire (for tests).
   String? lastWireBody;
@@ -173,6 +188,11 @@ class FakeApiClient implements ApiClient {
   final Map<String, List<Map<String, dynamic>>> _notices = {};
   final Map<String, int> _unreadByUser = {};
   final Map<String, Map<String, dynamic>> _notificationReplays = {};
+
+  /// Large-history reads are generated, not stored. These record mark-read
+  /// without keeping every notice map.
+  final Set<String> _largeReadIds = {};
+  bool _largeAllRead = false;
   static const _noticeReadStamp = '2026-10-21T18:00:00Z';
 
   /// Card fields changed by a full payment or a cancel. Keyed by section|id.
@@ -620,6 +640,11 @@ class FakeApiClient implements ApiClient {
 
   String? _notificationOwner(String id) {
     _ensureNotices();
+    if (_large) {
+      for (final userId in FakeLargeCatalog.noticeUsers) {
+        if (FakeLargeCatalog.noticeOrNull(userId, id) != null) return userId;
+      }
+    }
     for (final entry in _notices.entries) {
       for (final item in entry.value) {
         if ('${item['id']}' == id) return entry.key;
@@ -791,6 +816,10 @@ class FakeApiClient implements ApiClient {
   }
 
   Map<String, dynamic>? _cardOrNull(String head, String id) {
+    if (_large) {
+      final generated = FakeLargeCatalog.cardOrNull(head, id);
+      if (generated != null) return Map<String, dynamic>.from(generated);
+    }
     final card = FakeFixtures.cardById(head, id);
     return card.isEmpty ? null : card;
   }
@@ -1031,7 +1060,7 @@ class FakeApiClient implements ApiClient {
       case 'egyptian-deposits':
         return _accounts(method, head, seg, b, query);
       case 'collections':
-        return _collections(method, seg, b);
+        return _collections(method, seg, b, query);
       case 'masraweya':
         if (method == 'GET') {
           _requireRead(SectionKey.masraweya);
@@ -1158,6 +1187,16 @@ class FakeApiClient implements ApiClient {
         accountListQueries.add(
           AccountListQuery(section: head, filter: filter, q: q, cursor: cursor),
         );
+        if (_large && FakeLargeCatalog.pagesAccounts(head)) {
+          final generated = FakeLargeCatalog.accountPage(
+            section: head,
+            cursor: cursor,
+            limit: _pageLimit(query),
+            q: q,
+            filter: filter,
+          );
+          return _ok(_overlayCards(head, generated));
+        }
         final page = _sectionPage(head);
         if (cursor != null) {
           return _ok({...page, 'items': accountNextItems, 'nextCursor': null});
@@ -1189,7 +1228,7 @@ class FakeApiClient implements ApiClient {
           failOlderRemaining--;
           _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
         }
-        return _ok(_ledgerView(head, before));
+        return _ok(_ledgerView(head, before, accountId: seg[1]));
       }
       if (seg.length == 2) return _ok(_cardView(head, seg[1]));
       _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
@@ -1230,11 +1269,12 @@ class FakeApiClient implements ApiClient {
     String method,
     List<String> seg,
     Map b,
+    Map<String, dynamic>? query,
   ) async {
     if (method == 'GET' && seg.length == 1) {
       _requireRead(SectionKey.collections);
       collectionOverviewReads++;
-      return _ok(_collectionsForCaller());
+      return _ok(_collectionsForCaller(query));
     }
     if (method == 'GET' && _isSalaryPath(seg)) {
       return _ok(_salaryRecord(seg[3]));
@@ -1396,7 +1436,16 @@ class FakeApiClient implements ApiClient {
     return body;
   }
 
-  Map<String, dynamic> _ledgerView(String section, String? before) {
+  Map<String, dynamic> _ledgerView(
+    String section,
+    String? before, {
+    String? accountId,
+  }) {
+    if (_large &&
+        accountId != null &&
+        FakeLargeCatalog.isLongLedger(section, accountId)) {
+      return FakeLargeCatalog.ledgerPage(before: before);
+    }
     if (before != null && before.isNotEmpty) {
       return FakeFixtures.ledger(before: before);
     }
@@ -1854,7 +1903,65 @@ class FakeApiClient implements ApiClient {
     return _ok({'id': entry['id'], 'version': version});
   }
 
-  Map<String, dynamic> _collectionsForCaller() {
+  Map<String, dynamic> _overlayCards(
+    String section,
+    Map<String, dynamic> page,
+  ) {
+    final items = <Map<String, dynamic>>[];
+    for (final raw in page['items'] as List) {
+      final card = Map<String, dynamic>.from(raw as Map);
+      final state = _cardState['$section|${card['id']}'];
+      if (state != null) card.addAll(state);
+      items.add(card);
+    }
+    return {...page, 'items': items};
+  }
+
+  int _pageLimit(Map<String, dynamic>? query) {
+    final raw = query?['limit'];
+    final parsed = raw is int ? raw : int.tryParse('${raw ?? ''}');
+    final limit = parsed ?? FakeLargeCatalog.pageSize;
+    if (limit < 1) return 1;
+    if (limit > FakeLargeCatalog.pageSize) return FakeLargeCatalog.pageSize;
+    return limit;
+  }
+
+  /// First page of the large catalog, with fixture metrics left as stored
+  /// literals. Assignments and submissions come from the page, not a sum.
+  Map<String, dynamic> _largeCollections(Map<String, dynamic>? query) {
+    final page = FakeLargeCatalog.collectionsPage(
+      cursor: _queryText(query, 'cursor'),
+      limit: _pageLimit(query),
+      seesAll: _seesEveryCollection,
+      userId: _userId,
+    );
+    final body = _copy(FakeFixtures.collections());
+    body['assignments'] = page['assignments'];
+    body['submissions'] = page['submissions'];
+    body['nextCursor'] = page['nextCursor'];
+    body['assignedCount'] = page['visibleCount'];
+    body['historyPageCount'] = page['historyPageCount'];
+    if (_seesEveryCollection) return body;
+    final id = _userId;
+    body['unlinkedReceipts'] = const [];
+    body['employeeTotals'] = _owned(body['employeeTotals'], 'userId', id);
+    if (id == FakeFixtures.demoEmployeeId) {
+      body['metrics'] =
+          Map<String, dynamic>.from(FakeFixtures.ownCollectionMetrics);
+    } else {
+      body['metrics'] = {
+        'collectedUnits': 0,
+        'dayTotalUnits': 0,
+        'pendingCount': 0,
+        'unlinkedPendingCount': 0,
+        'cashOutstandingUnits': 0,
+      };
+    }
+    return body;
+  }
+
+  Map<String, dynamic> _collectionsForCaller([Map<String, dynamic>? query]) {
+    if (_large) return _largeCollections(query);
     final body = _collectionsView();
     if (_seesEveryCollection) return body;
     final id = _userId;
@@ -1947,6 +2054,10 @@ class FakeApiClient implements ApiClient {
   void _ensureNotices() {
     if (_noticesReady) return;
     _noticesReady = true;
+    if (_large) {
+      _unreadByUser.addAll(FakeLargeCatalog.unreadLiterals);
+      return;
+    }
     for (final raw in FakeFixtures.notificationCatalog()) {
       final item = Map<String, dynamic>.from(raw);
       final owner = '${item['recipientUserId']}';
@@ -1956,6 +2067,26 @@ class FakeApiClient implements ApiClient {
   }
 
   Map<String, dynamic> _notificationsPage(Map<String, dynamic>? query) {
+    if (_large && FakeLargeCatalog.hasNotices(_userId)) {
+      final generated = FakeLargeCatalog.notificationPage(
+        userId: _userId!,
+        before: query?['before']?.toString(),
+      );
+      final items = <Map<String, dynamic>>[];
+      for (final raw in generated['items'] as List) {
+        final item = Map<String, dynamic>.from(raw as Map);
+        if (_largeAllRead || _largeReadIds.contains('${item['id']}')) {
+          item['readAt'] = _noticeReadStamp;
+        }
+        items.add(item);
+      }
+      return {
+        'items': items,
+        'unreadCount': _unreadByUser[_userId] ?? 0,
+        'nextBefore': generated['nextBefore'],
+        'historyPageCount': generated['historyPageCount'],
+      };
+    }
     final own = _notices[_userId] ?? const <Map<String, dynamic>>[];
     final sorted = [...own]..sort(_noticeOrder);
     final before = query?['before']?.toString();
@@ -1993,6 +2124,7 @@ class FakeApiClient implements ApiClient {
     final item = found;
     if (item['readAt'] == null) {
       item['readAt'] = _noticeReadStamp;
+      if (_large) _largeReadIds.add(id);
       _decrementUnread(_userId!);
     }
     notificationMutationApplies++;
@@ -2010,6 +2142,18 @@ class FakeApiClient implements ApiClient {
     final stored = _storedNotificationReplay(b);
     if (stored != null) return stored;
     _failNextNotificationWrite();
+    if (_large) {
+      _largeAllRead = true;
+      _unreadByUser[_userId!] = 0;
+      notificationMutationApplies++;
+      final result = <String, dynamic>{
+        'unreadCount': 0,
+        'readAt': _noticeReadStamp,
+      };
+      if (omitNotificationWriteUnreadCount) result.remove('unreadCount');
+      _storeNotificationReplay(b, result);
+      return result;
+    }
     final own = _notices[_userId] ?? const <Map<String, dynamic>>[];
     for (final item in own) {
       if (item['readAt'] == null) item['readAt'] = _noticeReadStamp;
@@ -2048,6 +2192,16 @@ class FakeApiClient implements ApiClient {
   }
 
   Map<String, dynamic>? _ownNotice(String id) {
+    if (_large) {
+      final generated = FakeLargeCatalog.noticeOrNull(_userId, id);
+      if (generated != null) {
+        final item = Map<String, dynamic>.from(generated);
+        if (_largeAllRead || _largeReadIds.contains(id)) {
+          item['readAt'] = _noticeReadStamp;
+        }
+        return item;
+      }
+    }
     final own = _notices[_userId];
     if (own == null) return null;
     for (final item in own) {

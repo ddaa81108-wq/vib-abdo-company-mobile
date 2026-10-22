@@ -1,0 +1,273 @@
+# Phase 7 performance. Not part of the required pull-request checks.
+#
+# Dispatch it, or wait for the nightly schedule. There is no pull_request and
+# no push trigger: a workflow_dispatch file is not dispatchable until it is on
+# the default branch, and a temporary push trigger was rejected before.
+#
+# P7-23 release cold start uses real mode (USE_FAKE_API=false, API_BASE from
+# the secret STAGING_API_BASE). P7-24 and P7-25 use a profile build and the
+# large Fake dataset. P7-26 is the API 29 / 33 / 34 matrix plus the device
+# form in docs/testing/PHASE7_PERFORMANCE.md.
+#
+# Acceptance Pass is not claimed. Ali writes the numeric threshold.
+
+name: Android performance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 4 * * *"
+
+concurrency:
+  group: android-performance-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  apk-size:
+    name: APK size budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            **/*.gradle*
+            **/gradle.properties
+            **/gradle-wrapper.properties
+            **/pubspec.lock
+
+      - name: Set up Flutter 3.47.7
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          flutter-version: "3.47.7"
+          cache: true
+          pub-cache: true
+
+      - name: Resolve packages
+        run: flutter pub get
+
+      - name: Install Android NDK
+        uses: ./.github/actions/install-android-ndk
+
+      - name: Build size APK
+        run: |
+          python3 - << 'PY'
+          from pathlib import Path
+          path = Path("android/gradle.properties")
+          text = path.read_text(encoding="utf-8")
+          old = "org.gradle.jvmargs=-Xmx8G -XX:MaxMetaspaceSize=4G -XX:ReservedCodeCacheSize=512m -XX:+HeapDumpOnOutOfMemoryError"
+          new = "org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=512m -XX:+HeapDumpOnOutOfMemoryError"
+          if old not in text:
+              raise SystemExit("android/gradle.properties jvmargs changed; update the CI heap override")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+          # Placeholder origin. Not the protocol install. No credentials.
+          flutter build apk --release \
+            --dart-define=USE_FAKE_API=false \
+            --dart-define=API_BASE=https://staging.example.com
+
+      - name: Check size budget
+        run: |
+          python3 tool/apk_size_budget.py \
+            --apk build/app/outputs/flutter-apk/app-release.apk \
+            --out phase7-apk-size.md \
+            --json-out phase7-apk-size.json
+          python3 tool/phase7_summary.py \
+            --title "P7 APK size (not a protocol Pass)" \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload size report
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: phase7-apk-size
+          path: |
+            phase7-apk-size.md
+            phase7-apk-size.json
+          if-no-files-found: warn
+
+  long-history:
+    name: P7-24 P7-25 API ${{ matrix.api }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 33, 34]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            **/*.gradle*
+            **/gradle.properties
+            **/gradle-wrapper.properties
+            **/pubspec.lock
+
+      - name: Set up Flutter 3.47.7
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          flutter-version: "3.47.7"
+          cache: true
+          pub-cache: true
+
+      - name: Verify Flutter and Dart versions
+        run: |
+          flutter --version
+          flutter --version | grep -q 'Flutter 3.47.7'
+          dart --version | grep -q '3.13.5'
+
+      - name: Resolve packages
+        run: flutter pub get
+
+      - name: Install Android NDK
+        uses: ./.github/actions/install-android-ndk
+
+      - name: Enable KVM
+        run: |
+          if [[ ! -e /dev/kvm ]]; then
+            echo "/dev/kvm is missing. Hardware acceleration is required."
+            exit 1
+          fi
+          sudo chmod 666 /dev/kvm
+
+      - name: Cache AVD
+        uses: actions/cache@v4.2.3
+        with:
+          path: |
+            ~/.android/avd
+            ~/.android/adb*
+          key: avd-api-${{ matrix.api }}-x86_64-google_apis-nexus6-perf-v1
+
+      - name: Long history frames
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          cores: 2
+          ram-size: 2048M
+          heap-size: 512M
+          force-avd-creation: false
+          emulator-boot-timeout: 600
+          disable-animations: true
+          disable-linux-hw-accel: auto
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -wipe-data
+          script: bash tool/android_performance_emulator_test.sh
+
+      - name: Upload frame report
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: phase7-long-history-api-${{ matrix.api }}
+          path: |
+            phase7-long-history.log
+            phase7-long-history-api-*.md
+          if-no-files-found: warn
+
+  release-cold-start:
+    name: P7-23 P7-26 API ${{ matrix.api }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: staging
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 33, 34]
+    env:
+      STAGING_API_BASE: ${{ secrets.STAGING_API_BASE }}
+      STAGING_ADMIN_USERNAME: ${{ secrets.STAGING_ADMIN_USERNAME }}
+      STAGING_ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
+      PERF_SURFACE: emulator
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            **/*.gradle*
+            **/gradle.properties
+            **/gradle-wrapper.properties
+            **/pubspec.lock
+
+      - name: Set up Flutter 3.47.7
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          flutter-version: "3.47.7"
+          cache: true
+          pub-cache: true
+
+      - name: Resolve packages
+        run: flutter pub get
+
+      - name: Install Android NDK
+        uses: ./.github/actions/install-android-ndk
+
+      - name: Enable KVM
+        run: |
+          if [[ ! -e /dev/kvm ]]; then
+            echo "/dev/kvm is missing. Hardware acceleration is required."
+            exit 1
+          fi
+          sudo chmod 666 /dev/kvm
+
+      - name: Cache AVD
+        uses: actions/cache@v4.2.3
+        with:
+          path: |
+            ~/.android/avd
+            ~/.android/adb*
+          key: avd-api-${{ matrix.api }}-x86_64-google_apis-nexus6-perf-v1
+
+      - name: Release cold start
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          cores: 2
+          ram-size: 2048M
+          heap-size: 512M
+          force-avd-creation: false
+          emulator-boot-timeout: 600
+          disable-animations: true
+          disable-linux-hw-accel: auto
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -wipe-data
+          script: bash tool/measure_release_cold_start.sh
+
+      - name: Upload cold-start report
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: phase7-cold-start-api-${{ matrix.api }}
+          path: |
+            phase7-cold-start.log
+            phase7-cold-start-api-*.md
+          if-no-files-found: warn

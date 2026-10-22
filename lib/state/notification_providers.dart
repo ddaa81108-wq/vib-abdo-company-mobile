@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_providers.dart';
 import '../error_handling/app_failure.dart';
 import '../error_handling/error_handler.dart';
+import '../performance/history_window.dart';
 import '../ui/strings.dart';
 import 'notification_merge.dart';
 import 'session_providers.dart';
@@ -92,6 +93,48 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
       source: NotificationSource.fetch,
     );
     return _page(visible, unreadCount: page.unreadCount, base: page);
+  }
+
+  /// Follows `nextBefore` one page. Keeps at most
+  /// [HistoryWindow.notificationRetain] rows (the newest stay, the walk stops
+  /// once the cap is full so memory does not grow with the catalog).
+  Future<void> loadOlder() async {
+    final current = state.asData?.value;
+    final before = current?.nextBefore;
+    if (current == null || before == null || before.isEmpty) return;
+    if (current.appNotifications.length >= HistoryWindow.notificationRetain) {
+      return;
+    }
+    final page = await ref
+        .read(apiLayerProvider)
+        .notifications
+        .list(before: before);
+    final session = ref.read(sessionStateProvider);
+    if (session is! SessionAuthenticated) return;
+    final merged = mergeAppNotifications(
+      current: current.appNotifications,
+      incoming: page.appNotifications,
+      currentUserId: session.profile.id,
+      source: NotificationSource.fetch,
+    );
+    final capped = merged.length > HistoryWindow.notificationRetain
+        ? merged.sublist(0, HistoryWindow.notificationRetain)
+        : merged;
+    final nextBefore = capped.length >= HistoryWindow.notificationRetain
+        ? null
+        : page.nextBefore;
+    state = AsyncData(
+      _page(
+        capped,
+        unreadCount: page.unreadCount,
+        base: NotificationsPage(
+          items: page.items,
+          appNotifications: page.appNotifications,
+          unreadCount: page.unreadCount,
+          nextBefore: nextBefore,
+        ),
+      ),
+    );
   }
 
   /// GET /api/notifications and ingest first, then GET the unread-count route.
@@ -196,10 +239,10 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     );
     final result = await _send(
       requestId,
-      () => ref.read(apiLayerProvider).notifications.markRead(
-        notificationId,
-        requestId: requestId,
-      ),
+      () => ref
+          .read(apiLayerProvider)
+          .notifications
+          .markRead(notificationId, requestId: requestId),
     );
     _oneReadIds.remove(notificationId);
     await _applyWrite(result, onlyId: notificationId);
@@ -222,9 +265,10 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     final requestId = _allReadId ??= RequestIds.newRequestId();
     final result = await _send(
       requestId,
-      () => ref.read(apiLayerProvider).notifications.markAllRead(
-        requestId: requestId,
-      ),
+      () => ref
+          .read(apiLayerProvider)
+          .notifications
+          .markAllRead(requestId: requestId),
     );
     _allReadId = null;
     await _applyWrite(result);
@@ -288,7 +332,9 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
   void _applyCount(int count, {int? pageUnread}) {
     ref.read(unreadNotificationsCountProvider.notifier).applyServerCount(count);
     final current = state.value;
-    if (current != null && pageUnread != null && current.unreadCount != pageUnread) {
+    if (current != null &&
+        pageUnread != null &&
+        current.unreadCount != pageUnread) {
       state = AsyncData(
         NotificationsPage(
           items: current.items,
@@ -314,11 +360,12 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     int? unreadCount,
     NotificationsPage? base,
   }) {
-    final sorted = [...records]..sort((a, b) {
-      final byTime = b.createdAt.compareTo(a.createdAt);
-      if (byTime != 0) return byTime;
-      return a.notificationId.compareTo(b.notificationId);
-    });
+    final sorted = [...records]
+      ..sort((a, b) {
+        final byTime = b.createdAt.compareTo(a.createdAt);
+        if (byTime != 0) return byTime;
+        return a.notificationId.compareTo(b.notificationId);
+      });
     return NotificationsPage(
       items: [for (final item in sorted) item.toDto()],
       appNotifications: sorted,

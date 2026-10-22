@@ -39,11 +39,18 @@ class AccountExtraCards extends Notifier<List<AccountCardDto>> {
   String? cursorAfter(String? firstPageCursor) =>
       _started ? _cursor : firstPageCursor;
 
-  void append(List<AccountCardDto> items, {String? nextCursor}) {
+  void append(
+    List<AccountCardDto> items, {
+    String? nextCursor,
+    int? retainLimit,
+  }) {
     _started = true;
     _cursor = nextCursor;
     if (items.isEmpty) return;
-    state = [...state, ...items];
+    final merged = [...state, ...items];
+    state = retainLimit != null && merged.length > retainLimit
+        ? merged.sublist(merged.length - retainLimit)
+        : merged;
   }
 
   void clear() {
@@ -60,6 +67,7 @@ class AccountExtraCards extends Notifier<List<AccountCardDto>> {
     required String? firstPageCursor,
     required Future<AccountsPage> Function(String cursor) fetch,
     required bool Function() stillCurrent,
+    int? retainLimit,
   }) async {
     var cursor = cursorAfter(firstPageCursor);
     while (cursor != null && cursor.isNotEmpty) {
@@ -67,7 +75,7 @@ class AccountExtraCards extends Notifier<List<AccountCardDto>> {
       final page = await fetch(requested);
       if (!ref.mounted || !stillCurrent()) return;
       final next = page.page.nextCursor;
-      append(page.page.items, nextCursor: next);
+      append(page.page.items, nextCursor: next, retainLimit: retainLimit);
       if (next == null || next.isEmpty || next == requested) return;
       cursor = next;
     }
