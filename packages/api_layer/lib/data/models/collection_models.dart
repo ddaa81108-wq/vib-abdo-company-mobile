@@ -20,7 +20,7 @@ class CollectionAssignmentDto {
   final String?
       section; // customers | companies | libyan-deposits | egyptian-deposits
   final String? phone;
-  final int? balanceUnits;
+  final MoneyValue? balanceUnits;
   final String? assigneeName;
   final String? status;
   final Json raw;
@@ -30,7 +30,11 @@ class CollectionAssignmentDto {
         customerName: str(j['customerName'] ?? j['name']),
         section: strOrNull(j['section']),
         phone: strOrNull(j['phone']),
-        balanceUnits: unitsOrNull(j['balanceUnits']),
+        balanceUnits: unitsOrNull(
+          j['balanceUnits'],
+          fieldPath: 'balanceUnits',
+          rowId: strOrNull(j['id']),
+        ),
         assigneeName: strOrNull(j['assigneeName']),
         status: strOrNull(j['status']),
         raw: j,
@@ -73,7 +77,7 @@ class CollectionSubmissionDto {
       this.raw = const {}});
   final String id;
   final String mode; // full | partial
-  final int? amountUnits;
+  final MoneyValue? amountUnits;
   final String
       status; // pending | approved | rejected (server value, shown as-is)
   final CashStatus?
@@ -88,7 +92,11 @@ class CollectionSubmissionDto {
   factory CollectionSubmissionDto.fromJson(Json j) => CollectionSubmissionDto(
         id: str(j['id']),
         mode: str(j['mode']),
-        amountUnits: unitsOrNull(j['amountUnits']),
+        amountUnits: unitsOrNull(
+          j['amountUnits'],
+          fieldPath: 'amountUnits',
+          rowId: strOrNull(j['id']),
+        ),
         status: str(j['status']),
         cashStatus: CashStatus.fromServer(j),
         cashReceivedAt: dateOrNull(j['cashReceivedAt']),
@@ -112,7 +120,7 @@ class UnlinkedReceiptDto {
       this.raw = const {}});
   final String id;
   final String customerName;
-  final int? amountUnits;
+  final MoneyValue? amountUnits;
   final String status;
   final CashStatus? cashStatus;
   final DateTime? cashReceivedAt;
@@ -121,7 +129,11 @@ class UnlinkedReceiptDto {
   factory UnlinkedReceiptDto.fromJson(Json j) => UnlinkedReceiptDto(
         id: str(j['id']),
         customerName: str(j['customerName'] ?? j['name']),
-        amountUnits: unitsOrNull(j['amountUnits']),
+        amountUnits: unitsOrNull(
+          j['amountUnits'],
+          fieldPath: 'amountUnits',
+          rowId: strOrNull(j['id']),
+        ),
         status: str(j['status']),
         cashStatus: CashStatus.fromServer(j),
         cashReceivedAt: dateOrNull(j['cashReceivedAt']),
@@ -137,12 +149,16 @@ class EmployeeTotalDto {
       this.approvedCount,
       this.pendingCount});
   final String employeeName;
-  final int? collectedUnits;
+  final MoneyValue? collectedUnits;
   final int? approvedCount;
   final int? pendingCount;
   factory EmployeeTotalDto.fromJson(Json j) => EmployeeTotalDto(
         employeeName: str(j['employeeName'] ?? j['displayName']),
-        collectedUnits: unitsOrNull(j['collectedUnits']),
+        collectedUnits: unitsOrNull(
+          j['collectedUnits'],
+          fieldPath: 'collectedUnits',
+          rowId: strOrNull(j['userId'] ?? j['employeeId']),
+        ),
         approvedCount: intOrNull(j['approvedCount']),
         pendingCount: intOrNull(j['pendingCount']),
       );
@@ -168,22 +184,25 @@ class CollectionsOverviewDto {
   final List<CollectionSubmissionDto> submissions;
   final List<UnlinkedReceiptDto> unlinkedReceipts;
   final List<EmployeeTotalDto> employeeTotals;
-  final int? collectedUnits; // metrics.collectedUnits
+  final MoneyValue? collectedUnits; // metrics.collectedUnits
 
   /// Required from the server, per API contract: the day total is not summed on the device.
-  final int? dayTotalUnits;
+  final MoneyValue? dayTotalUnits;
   final int? assignedCount;
   final int? pendingCount;
   final int? unlinkedPendingCount;
-  final int? cashOutstandingUnits;
+  final MoneyValue? cashOutstandingUnits;
   final String? batchId;
   final Json raw;
 
   Currency get currency => Currency.lyd;
 
   factory CollectionsOverviewDto.fromData(Object? data) {
+    requireJsonObject(data, 'collections');
     final d = asJson(data);
-    final metrics = asJson(d['metrics']);
+    final metricsRaw = d['metrics'];
+    requireJsonObject(metricsRaw, 'metrics');
+    final metrics = asJson(metricsRaw);
     return CollectionsOverviewDto(
       assignments: asJsonList(d['assignments'])
           .map(CollectionAssignmentDto.fromJson)
@@ -197,14 +216,24 @@ class CollectionsOverviewDto {
       employeeTotals: asJsonList(d['employeeTotals'])
           .map(EmployeeTotalDto.fromJson)
           .toList(growable: false),
-      collectedUnits: unitsOrNull(metrics['collectedUnits']),
-      dayTotalUnits:
-          unitsOrNull(metrics['dayTotalUnits'] ?? d['dayTotalUnits']),
+      collectedUnits: unitsOrNull(
+        metrics['collectedUnits'],
+        fieldPath: 'metrics.collectedUnits',
+      ),
+      dayTotalUnits: metrics.containsKey('dayTotalUnits')
+          ? unitsOrNull(
+              metrics['dayTotalUnits'],
+              fieldPath: 'metrics.dayTotalUnits',
+            )
+          : unitsOrNull(d['dayTotalUnits'], fieldPath: 'dayTotalUnits'),
       // Top-level in data, per API contract; metrics is only a fallback.
       assignedCount: intOrNull(d['assignedCount'] ?? metrics['assignedCount']),
       pendingCount: intOrNull(metrics['pendingCount']),
       unlinkedPendingCount: intOrNull(metrics['unlinkedPendingCount']),
-      cashOutstandingUnits: unitsOrNull(metrics['cashOutstandingUnits']),
+      cashOutstandingUnits: unitsOrNull(
+        metrics['cashOutstandingUnits'],
+        fieldPath: 'metrics.cashOutstandingUnits',
+      ),
       batchId: strOrNull(d['batchId'] ?? asJson(d['batch'])['id']),
       raw: d,
     );
@@ -226,20 +255,40 @@ class PayrollEmployeeDto {
       this.entries = const []});
   final String userId;
   final String name;
-  final int? baseSalaryUnits;
-  final int? openingCarryUnits;
-  final int? commissionsUnits;
-  final int? withdrawalsUnits;
-  final int? remainingUnits; // "الباقي من المرتب" — server only
+  final MoneyValue? baseSalaryUnits;
+  final MoneyValue? openingCarryUnits;
+  final MoneyValue? commissionsUnits;
+  final MoneyValue? withdrawalsUnits;
+  final MoneyValue? remainingUnits; // "الباقي من المرتب" — server only
   final List<Json> entries;
   factory PayrollEmployeeDto.fromJson(Json j) => PayrollEmployeeDto(
         userId: str(j['userId'] ?? j['employeeUserId'] ?? j['id']),
         name: str(j['displayName'] ?? j['name']),
-        baseSalaryUnits: unitsOrNull(j['baseSalaryUnits']),
-        openingCarryUnits: unitsOrNull(j['openingCarryUnits']),
-        commissionsUnits: unitsOrNull(j['commissionsUnits']),
-        withdrawalsUnits: unitsOrNull(j['withdrawalsUnits']),
-        remainingUnits: unitsOrNull(j['remainingUnits']),
+        baseSalaryUnits: unitsOrNull(
+          j['baseSalaryUnits'],
+          fieldPath: 'baseSalaryUnits',
+          rowId: strOrNull(j['userId'] ?? j['id']),
+        ),
+        openingCarryUnits: unitsOrNull(
+          j['openingCarryUnits'],
+          fieldPath: 'openingCarryUnits',
+          rowId: strOrNull(j['userId'] ?? j['id']),
+        ),
+        commissionsUnits: unitsOrNull(
+          j['commissionsUnits'],
+          fieldPath: 'commissionsUnits',
+          rowId: strOrNull(j['userId'] ?? j['id']),
+        ),
+        withdrawalsUnits: unitsOrNull(
+          j['withdrawalsUnits'],
+          fieldPath: 'withdrawalsUnits',
+          rowId: strOrNull(j['userId'] ?? j['id']),
+        ),
+        remainingUnits: unitsOrNull(
+          j['remainingUnits'],
+          fieldPath: 'remainingUnits',
+          rowId: strOrNull(j['userId'] ?? j['id']),
+        ),
         entries: asJsonList(j['entries']),
       );
 }

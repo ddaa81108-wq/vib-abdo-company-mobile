@@ -27,7 +27,7 @@ void main() {
     );
 
     final card = await api.accounts.get(AccountSection.customers, 'c_55');
-    expect(card.balanceUnits, 320);
+    expect(card.balanceUnits?.units, 320);
     expect(card.version, 4);
     final ledger = await api.accounts.ledger(AccountSection.customers, 'c_55');
     expect(
@@ -45,7 +45,7 @@ void main() {
     );
     expect(paid.version, 5);
     final after = await api.accounts.get(AccountSection.customers, 'c_55');
-    expect(after.balanceUnits, 0);
+    expect(after.balanceUnits?.units, 0);
     expect(after.version, 5);
   });
 
@@ -67,7 +67,7 @@ void main() {
     );
     expect(ack.version, 5);
     final card = await api.accounts.get(AccountSection.customers, 'c_55');
-    expect(card.balanceUnits, 320);
+    expect(card.balanceUnits?.units, 320);
     expect(card.version, 5);
   });
 }

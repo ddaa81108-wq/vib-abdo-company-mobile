@@ -13,9 +13,9 @@ import 'common.dart';
 /// Collections `GET /api/collections` reads the `employeeTotals` array
 /// (contract gap 14, also unconfirmed). Currency falls back to LYD (🔶 gaps
 /// 23 and 27). Money fields are integer `*Units` only. A non-integer money
-/// value is `INVALID_SERVER_RESPONSE`. `MONEY_UNIT_SCALE` is still gap 29:
+/// value is [MoneyValue.invalid] on that field. `MONEY_UNIT_SCALE` is still gap 29:
 /// this parser does not scale, add, or copy `metrics` onto a row or the
-/// totals. A non-integer money value throws `InvalidServerResponseException`.
+/// totals. A non-integer money value does not fail the rest of the body.
 ///
 /// 🔶 Not provided by the collections source, so these stay null. They are
 /// not fabricated as `0` or `''`. Null money is "not sent"; the UI shows
@@ -133,13 +133,13 @@ class EmployeeTotalsItemDto {
   /// null. Do not invent an id. The UI shows '—'.
   final String? employeeId;
   final String employeeName;
-  final int? collectedUnits;
+  final MoneyValue? collectedUnits;
 
   /// Integer units from the server. 🔶 Not provided by the collections source:
   /// left null, not `0`. Null money is "not sent"; the UI shows '—'
   /// (`MoneyFormatter.formatOrDash`). A real zero, such as `collectedUnits`
   /// on the collections row, stays `0`.
-  final int? pendingUnits;
+  final MoneyValue? pendingUnits;
   final int? approvedCount;
 
   /// 🔶 Not provided by the collections source: left null, not `0`.
@@ -150,7 +150,7 @@ class EmployeeTotalsItemDto {
   /// employee by the server. Not copied from the page metric. 🔶 Not provided
   /// by the collections `employeeTotals` row: left null, not `0`. The UI
   /// shows '—'.
-  final int? cashOutstandingUnits;
+  final MoneyValue? cashOutstandingUnits;
 
   /// 🔶 Assumed LYD when the server omits it (gaps 23 and 27).
   final Currency currency;
@@ -162,24 +162,36 @@ class EmployeeTotalsItemDto {
       EmployeeTotalsItemDto(
         employeeId: strOrNull(j['employeeId']),
         employeeName: str(j['employeeName'] ?? j['displayName']),
-        collectedUnits: unitsOrNull(j['collectedUnits']),
-        pendingUnits: unitsOrNull(j['pendingUnits']),
+        collectedUnits: unitsOrNull(
+          j['collectedUnits'],
+          fieldPath: 'collectedUnits',
+          rowId: strOrNull(j['employeeId'] ?? j['userId']),
+        ),
+        pendingUnits: unitsOrNull(
+          j['pendingUnits'],
+          fieldPath: 'pendingUnits',
+          rowId: strOrNull(j['employeeId'] ?? j['userId']),
+        ),
         approvedCount: intOrNull(j['approvedCount']),
         rejectedCount: intOrNull(j['rejectedCount']),
         pendingCount: intOrNull(j['pendingCount']),
-        cashOutstandingUnits: unitsOrNull(j['cashOutstandingUnits']),
+        cashOutstandingUnits: unitsOrNull(
+          j['cashOutstandingUnits'],
+          fieldPath: 'cashOutstandingUnits',
+          rowId: strOrNull(j['employeeId'] ?? j['userId']),
+        ),
         currency: currencyOr(j['currency'], fallback),
       );
 
   Json toJson() => {
         'employeeId': employeeId,
         'employeeName': employeeName,
-        'collectedUnits': collectedUnits,
-        'pendingUnits': pendingUnits,
+        'collectedUnits': wireMoney(collectedUnits),
+        'pendingUnits': wireMoney(pendingUnits),
         'approvedCount': approvedCount,
         'rejectedCount': rejectedCount,
         'pendingCount': pendingCount,
-        'cashOutstandingUnits': cashOutstandingUnits,
+        'cashOutstandingUnits': wireMoney(cashOutstandingUnits),
         'currency': currency.code,
       };
 }
@@ -190,16 +202,20 @@ class EmployeeTotalsItemDto {
 class EmployeeTotalsSummaryDto {
   const EmployeeTotalsSummaryDto({this.collectedUnits, this.pendingUnits});
 
-  final int? collectedUnits;
-  final int? pendingUnits;
+  final MoneyValue? collectedUnits;
+  final MoneyValue? pendingUnits;
 
   factory EmployeeTotalsSummaryDto.fromJson(Json j) => EmployeeTotalsSummaryDto(
-        collectedUnits: unitsOrNull(j['collectedUnits']),
-        pendingUnits: unitsOrNull(j['pendingUnits']),
+        collectedUnits: unitsOrNull(
+          j['collectedUnits'],
+          fieldPath: 'totals.collectedUnits',
+        ),
+        pendingUnits:
+            unitsOrNull(j['pendingUnits'], fieldPath: 'totals.pendingUnits'),
       );
 
   Json toJson() => {
-        'collectedUnits': collectedUnits,
-        'pendingUnits': pendingUnits,
+        'collectedUnits': wireMoney(collectedUnits),
+        'pendingUnits': wireMoney(pendingUnits),
       };
 }

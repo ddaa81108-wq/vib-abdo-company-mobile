@@ -226,15 +226,23 @@ HomeSummaryDto _card({
   required String key,
   required String section,
   required String title,
-  required int? units,
+  required Object? units,
   Currency? currency,
   String? status,
 }) {
+  final MoneyValue? value;
+  if (units is MoneyValue) {
+    value = units;
+  } else if (units is int) {
+    value = MoneyValue.known(units);
+  } else {
+    value = null;
+  }
   return HomeSummaryDto(
     key: key,
     section: section,
     title: title,
-    valueUnits: units,
+    valueUnits: value,
     currency: currency,
     status: status,
   );

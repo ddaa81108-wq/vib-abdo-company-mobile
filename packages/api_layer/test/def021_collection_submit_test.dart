@@ -10,7 +10,7 @@ void main() {
     expect(before.unlinkedReceipts.map((row) => row.id), ['ur_1', 'ur_2']);
     expect(before.pendingCount, 1);
     expect(before.unlinkedPendingCount, 1);
-    expect(before.dayTotalUnits, 40);
+    expect(before.dayTotalUnits?.units, 40);
 
     final submission = await api.collections.submit(
       'as_1',
@@ -60,14 +60,14 @@ void main() {
     ]);
     final stored = overview.submissions.last;
     expect(stored.mode, 'partial');
-    expect(stored.amountUnits, 40);
+    expect(stored.amountUnits?.units, 40);
     expect(stored.status, 'pending');
     expect(stored.version, 1);
     expect(stored.cashStatus, isNull);
     expect(stored.submittedByName, 'موظف استلام تجريبي');
     final created = overview.unlinkedReceipts.last;
     expect(created.customerName, 'زبون جديد');
-    expect(created.amountUnits, 25);
+    expect(created.amountUnits?.units, 25);
     expect(created.status, 'pending');
     expect(created.version, 1);
     expect(created.cashStatus, isNull);
@@ -100,7 +100,7 @@ void main() {
     final row = overview.submissions.singleWhere((item) => item.id == ack.id);
     expect(row.status, 'approved');
     expect(row.version, 2);
-    expect(row.amountUnits, 40);
+    expect(row.amountUnits?.units, 40);
   });
 }
 

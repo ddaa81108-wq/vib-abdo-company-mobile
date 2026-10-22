@@ -52,7 +52,7 @@ void main() {
     final stored = await tester.runAsync(
       () => layer.accounts.get(AccountSection.customers, 'c_55'),
     );
-    expect(stored!.balanceUnits, 319);
+    expect(stored!.balanceUnits?.units, 319);
     expect(stored.version, 5);
 
     await go(tester, '/customers');

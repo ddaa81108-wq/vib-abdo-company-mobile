@@ -1,3 +1,5 @@
+import 'package:flutter_api_layer/api_layer.dart';
+
 /// User-facing copy. Arabic is the only locale of this app.
 abstract final class AppStrings {
   static const appTitle = 'سجل التحصيل';
@@ -89,6 +91,7 @@ abstract final class AppStrings {
   static const noNotifications = 'لا توجد إشعارات';
   static const refresh = 'تحديث';
   static const integerOnly = 'أدخل عددًا صحيحًا كما هو، بلا كسور.';
+  static const invalidAmount = MoneyValue.invalidLabel;
 
   /// Direct partial payment compared with the card balance the server sent.
   /// The app does not subtract or store a new balance.

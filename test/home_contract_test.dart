@@ -27,7 +27,7 @@ void main() {
       ],
     });
     expect(home.businessDate, '2026-10-19');
-    expect(home.summaries.single.valueUnits, 320);
+    expect(home.summaries.single.valueUnits?.units, 320);
     expect(home.counters['collections'], 1);
     expect(home.oldDebts?.single.ageStatusLabel, 'منذ 4 أيام');
 
@@ -41,7 +41,7 @@ void main() {
     });
     expect(submission.cashStatus, CashStatus.pending);
     expect(submission.version, 3);
-    expect(submission.amountUnits, 250);
+    expect(submission.amountUnits?.units, 250);
 
     final rate = ExchangeRateDto.fromData({'egpPerLyd': '9.5', 'version': 2});
     expect(rate.egpPerLyd?.value, '9.5');

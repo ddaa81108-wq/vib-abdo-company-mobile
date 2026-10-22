@@ -1,5 +1,6 @@
 import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
+import '../../core/network/logging_interceptor.dart';
 import '../models/report_models.dart';
 
 /// Read-only: daily smart reports, admin financial ledger, statement PDF.
@@ -18,23 +19,31 @@ class RemoteReportsRepository implements ReportsRepository {
   final ApiClient _api;
 
   @override
-  Future<ReportsDto> daily({int limit = 30}) async => ReportsDto.fromData(
-      (await _api.get(ApiEndpoints.reports, query: {'limit': limit})).data);
+  Future<ReportsDto> daily({int limit = 30}) async {
+    const path = ApiEndpoints.reports;
+    final data = (await _api.get(path, query: {'limit': limit})).data;
+    return runWithMoneyEndpoint(path, () => ReportsDto.fromData(data));
+  }
 
   @override
   Future<FinancialLedgerPage> financialLedger(
-          {String? before,
-          String? section,
-          String? currency,
-          String? q}) async =>
-      FinancialLedgerPage.fromData((await _api.get(ApiEndpoints.financialLedger,
-              query: {
-            'before': before,
-            'section': section,
-            'currency': currency,
-            'q': q
-          }))
-          .data);
+      {String? before,
+      String? section,
+      String? currency,
+      String? q}) async {
+    const path = ApiEndpoints.financialLedger;
+    final data = (await _api.get(path, query: {
+      'before': before,
+      'section': section,
+      'currency': currency,
+      'q': q
+    }))
+        .data;
+    return runWithMoneyEndpoint(
+      path,
+      () => FinancialLedgerPage.fromData(data),
+    );
+  }
 
   @override
   Future<StatementFile> statementPdf({String? section, String? accountId}) async {

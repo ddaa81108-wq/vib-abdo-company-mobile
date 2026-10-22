@@ -8,8 +8,8 @@ void main() {
     final fake = api.client as FakeApiClient;
     final before = await api.treasury.summary();
     expect(before.version, 7);
-    expect(before.activeCashUnits, 8000);
-    expect(before.netUnits, 51000);
+    expect(before.activeCashUnits?.units, 8000);
+    expect(before.netUnits?.units, 51000);
 
     final cashIn = await api.treasury.addCashEntry(
       const CashEntryRequest(
@@ -71,36 +71,36 @@ void main() {
     final incoming = ledger.items[1];
     final original = ledger.items[2];
     expect(out.direction, 'out');
-    expect(out.amountUnits, 200);
-    expect(out.balanceAfterUnits, 9050);
+    expect(out.amountUnits?.units, 200);
+    expect(out.balanceAfterUnits?.units, 9050);
     expect(out.description, 'صرف');
     expect(out.createdByName, 'مدير تجريبي');
     expect(incoming.direction, 'in');
-    expect(incoming.amountUnits, 1250);
-    expect(incoming.balanceAfterUnits, 9250);
+    expect(incoming.amountUnits?.units, 1250);
+    expect(incoming.balanceAfterUnits?.units, 9250);
     expect(incoming.description, 'قبض');
-    expect(original.amountUnits, 1000);
-    expect(original.balanceAfterUnits, 8000);
+    expect(original.amountUnits?.units, 1000);
+    expect(original.balanceAfterUnits?.units, 8000);
 
     final older = await api.treasury.cashLedger(before: ledger.nextCursor);
     expect(older.items.map((entry) => entry.id), ['ce_old']);
-    expect(older.items.single.balanceAfterUnits, 7000);
+    expect(older.items.single.balanceAfterUnits?.units, 7000);
 
     final summary = await api.treasury.summary();
     expect(summary.version, 9);
-    expect(summary.activeCashUnits, 9050);
-    expect(summary.netUnits, 52050);
-    expect(summary.receivablesUnits, 45000);
-    expect(summary.liabilitiesUnits, 12000);
-    expect(summary.egyptianSourceUnits, 95000);
-    expect(summary.egyptianConvertedUnits, 10000);
+    expect(summary.activeCashUnits?.units, 9050);
+    expect(summary.netUnits?.units, 52050);
+    expect(summary.receivablesUnits?.units, 45000);
+    expect(summary.liabilitiesUnits?.units, 12000);
+    expect(summary.egyptianSourceUnits?.units, 95000);
+    expect(summary.egyptianConvertedUnits?.units, 10000);
     expect(summary.activeCashTone, SummaryTone.positive);
 
     final home = await api.home.fetch();
     final card = home.summaries.singleWhere(
       (item) => item.key == 'treasury.activeCash',
     );
-    expect(card.valueUnits, 9050);
+    expect(card.valueUnits?.units, 9050);
     expect(card.tone, SummaryTone.positive);
 
     await api.session.logout();
@@ -131,7 +131,7 @@ void main() {
       'ce_8',
       'ce_1',
     ]);
-    expect((await api.treasury.summary()).activeCashUnits, 9050);
+    expect((await api.treasury.summary()).activeCashUnits?.units, 9050);
   });
 
   test(

@@ -96,7 +96,7 @@ bool showCustomerZeroReview({
   )) {
     return false;
   }
-  if (card.balanceUnits != 0) return false;
+  if (card.balanceUnits?.asInt != 0) return false;
   return readZeroReview(card.zeroReview) == ZeroReviewRead.pending;
 }
 

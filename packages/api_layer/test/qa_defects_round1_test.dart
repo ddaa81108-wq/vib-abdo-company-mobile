@@ -56,9 +56,9 @@ void main() {
       final api = await login('admin@example.invalid');
       final before = await api.accounts.list(AccountSection.customers);
       expect(before.totalItems, 10);
-      expect(before.summary.netBalanceUnits, 10635);
+      expect(before.summary.netBalanceUnits?.units, 10635);
       final demo = before.page.items.firstWhere((card) => card.id == 'c_55');
-      expect(demo.balanceUnits, 320);
+      expect(demo.balanceUnits?.units, 320);
       final ack = await api.accounts.addTransaction(
         AccountSection.customers,
         'c_55',
@@ -68,16 +68,16 @@ void main() {
       expect(ack.version, 5);
 
       final card = await api.accounts.get(AccountSection.customers, 'c_55');
-      expect(card.balanceUnits, 0);
+      expect(card.balanceUnits?.units, 0);
       expect(card.version, 5);
       final after = await api.accounts.list(AccountSection.customers);
       expect(
-        after.page.items.firstWhere((item) => item.id == 'c_55').balanceUnits,
+        after.page.items.firstWhere((item) => item.id == 'c_55').balanceUnits?.units,
         0,
       );
       // The fixture summary is 10635. The stored change is 320 -> 0.
-      expect(after.summary.netBalanceUnits, 10315);
-      expect(after.summary.totalDebtUnits, 10315);
+      expect(after.summary.netBalanceUnits?.units, 10315);
+      expect(after.summary.totalDebtUnits?.units, 10315);
 
       await expectLater(
         api.accounts.addTransaction(
@@ -95,7 +95,7 @@ void main() {
         ),
       );
       final still = await api.accounts.get(AccountSection.customers, 'c_55');
-      expect(still.balanceUnits, 0);
+      expect(still.balanceUnits?.units, 0);
       expect(still.version, 5);
     },
   );
@@ -111,7 +111,7 @@ void main() {
       final payment = ledger.page.items.firstWhere(
         (entry) => entry.id == 'tx_2',
       );
-      expect(payment.balanceAfterUnits, 320);
+      expect(payment.balanceAfterUnits?.units, 320);
       await api.accounts.cancelTransaction(
         AccountSection.customers,
         'c_55',
@@ -121,14 +121,14 @@ void main() {
 
       final card = await api.accounts.get(AccountSection.customers, 'c_55');
       // tx_1 already stores balanceAfterUnits 500. The fake copies that value.
-      expect(card.balanceUnits, 500);
+      expect(card.balanceUnits?.units, 500);
       final page = await api.accounts.list(AccountSection.customers);
       expect(
-        page.page.items.firstWhere((item) => item.id == 'c_55').balanceUnits,
+        page.page.items.firstWhere((item) => item.id == 'c_55').balanceUnits?.units,
         500,
       );
       // The fixture summary is 10635. The stored change is 320 -> 500.
-      expect(page.summary.netBalanceUnits, 10815);
+      expect(page.summary.netBalanceUnits?.units, 10815);
       final again = await api.accounts.ledger(AccountSection.customers, 'c_55');
       expect(
         again.page.items.firstWhere((entry) => entry.id == 'tx_2').status,
@@ -193,7 +193,7 @@ void main() {
       ),
     );
     final untouched = await api.accounts.get(AccountSection.customers, 'c_55');
-    expect(untouched.balanceUnits, 320);
+    expect(untouched.balanceUnits?.units, 320);
     expect(untouched.version, 4);
 
     final ack = await api.accounts.addTransaction(
@@ -208,16 +208,16 @@ void main() {
     // The server stores 220: the card's 320 with the received 100 applied.
     expect(ack.version, 5);
     final card = await api.accounts.get(AccountSection.customers, 'c_55');
-    expect(card.balanceUnits, 220);
+    expect(card.balanceUnits?.units, 220);
     expect(card.version, 5);
     final page = await api.accounts.list(AccountSection.customers);
     expect(
-      page.page.items.firstWhere((item) => item.id == 'c_55').balanceUnits,
+      page.page.items.firstWhere((item) => item.id == 'c_55').balanceUnits?.units,
       220,
     );
     // The fixture summary is 10635. The stored change is 320 -> 220.
-    expect(page.summary.netBalanceUnits, 10535);
-    expect(page.summary.totalDebtUnits, 10535);
+    expect(page.summary.netBalanceUnits?.units, 10535);
+    expect(page.summary.totalDebtUnits?.units, 10535);
 
     await expectLater(
       api.accounts.addTransaction(
@@ -238,7 +238,7 @@ void main() {
       ),
     );
     final still = await api.accounts.get(AccountSection.customers, 'c_55');
-    expect(still.balanceUnits, 220);
+    expect(still.balanceUnits?.units, 220);
     expect(still.version, 5);
   });
 
@@ -246,13 +246,13 @@ void main() {
     final api = await login('admin@example.invalid');
     final before = await api.home.fetch();
     expect(
-      before.oldDebts!.singleWhere((row) => row.id == 'c_55').balanceUnits,
+      before.oldDebts!.singleWhere((row) => row.id == 'c_55').balanceUnits?.units,
       320,
     );
     expect(
       before.summaries
           .firstWhere((item) => item.section == 'customers')
-          .valueUnits,
+          .valueUnits?.units,
       10635,
     );
 
@@ -265,21 +265,21 @@ void main() {
     final card = await api.accounts.get(AccountSection.customers, 'c_55');
     final after = await api.home.fetch();
     final row = after.oldDebts!.singleWhere((item) => item.id == 'c_55');
-    expect(card.balanceUnits, 0);
+    expect(card.balanceUnits?.units, 0);
     expect(row.balanceUnits, card.balanceUnits);
-    expect(row.balanceUnits, isNot(320));
+    expect(row.balanceUnits?.units, isNot(320));
     expect(row.section, 'customers');
     expect(row.debtAgeDays, 4);
     expect(
       after.summaries
           .firstWhere((item) => item.section == 'customers')
-          .valueUnits,
+          .valueUnits?.units,
       10315,
     );
     expect(
       after.summaries
           .firstWhere((item) => item.section == 'egyptian-deposits')
-          .valueUnits,
+          .valueUnits?.units,
       23750,
     );
 
@@ -308,7 +308,7 @@ void main() {
         'c_55',
       );
       final partialHome = await partial.home.fetch();
-      expect(partialCard.balanceUnits, 220);
+      expect(partialCard.balanceUnits?.units, 220);
       expect(
         partialHome.oldDebts!
             .singleWhere((item) => item.id == 'c_55')
@@ -318,7 +318,7 @@ void main() {
       expect(
         partialHome.summaries
             .firstWhere((item) => item.section == 'customers')
-            .valueUnits,
+            .valueUnits?.units,
         10535,
       );
 
@@ -344,7 +344,7 @@ void main() {
         'c_55',
       );
       final afterHome = await cancelled.home.fetch();
-      expect(afterCard.balanceUnits, 500);
+      expect(afterCard.balanceUnits?.units, 500);
       expect(
         afterHome.oldDebts!
             .singleWhere((item) => item.id == 'c_55')

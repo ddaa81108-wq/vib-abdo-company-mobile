@@ -236,6 +236,14 @@ class LedgerScreen extends ConsumerWidget {
     WidgetRef ref,
     MutationMeta meta,
   ) async {
+    final balance = ref
+        .read(accountCardProvider((section, id)))
+        .asData
+        ?.value
+        .balanceUnits;
+    if (balance != null && balance.isInvalid) {
+      return AppStrings.invalidAmount;
+    }
     try {
       final ack = await ref
           .read(apiLayerProvider)
@@ -419,13 +427,18 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
     if (units == null) return AppStrings.integerOnly;
     // Direct partial payment only. A rate is not an amount, so it is not
     // compared. This reads the server balance; it does not compute one.
+    // An invalid balance is refused. It is not treated as 0.
     if (widget.type == 'payment' && _mode == CalculationMode.direct) {
       final remaining = ref
           .read(accountCardProvider((widget.section, widget.id)))
           .asData
           ?.value
           .balanceUnits;
-      if (remaining != null && units > remaining) {
+      if (remaining != null && remaining.isInvalid) {
+        return AppStrings.invalidAmount;
+      }
+      final remainingUnits = remaining?.asInt;
+      if (remainingUnits != null && units > remainingUnits) {
         return AppStrings.amountAboveRemaining;
       }
     }
@@ -889,13 +902,10 @@ class _EntryTile extends StatelessWidget {
               children: [
                 Text(calculationLabel(entry.calculationMode), style: body),
                 Text(AppStrings.inputValue, style: body),
-                LtrText('${entry.inputValue ?? AppStrings.dash}', style: body),
+                _InputFigure(entry.inputValue, body),
                 if (entry.factorMicros != null) ...[
                   Text(AppStrings.factor, style: body),
-                  LtrText(
-                    money.formatScaled(entry.factorMicros!, 6),
-                    style: body,
-                  ),
+                  _FactorFigure(entry.factorMicros!, money, body),
                 ],
               ],
             ),
@@ -1096,7 +1106,7 @@ class _AmountBlock extends StatelessWidget {
           if (showBalance && entry.balanceAfterUnits != null) ...[
             const SizedBox(height: AppSpacing.xxs),
             MoneyText(
-              money.format(entry.balanceAfterUnits!, section.currency),
+              money.formatOrDash(entry.balanceAfterUnits, section.currency),
               key: Key('ledger-balance-${entry.id}'),
               style: context.textExtras.tableNumber.copyWith(
                 color: scheme.onSurface,
@@ -1159,5 +1169,39 @@ class _EntryActions extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class _InputFigure extends StatelessWidget {
+  const _InputFigure(this.value, this.style);
+
+  final MoneyValue? value;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    if (value != null && value!.isInvalid) {
+      return MoneyText(MoneyValue.invalidLabel, style: style);
+    }
+    final text = value == null || !value!.isValid
+        ? AppStrings.dash
+        : '${value!.units}';
+    return LtrText(text, style: style);
+  }
+}
+
+class _FactorFigure extends StatelessWidget {
+  const _FactorFigure(this.value, this.money, this.style);
+
+  final MoneyValue value;
+  final MoneyFormatter money;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    if (value.isInvalid || value.units == null) {
+      return MoneyText(MoneyValue.invalidLabel, style: style);
+    }
+    return LtrText(money.formatScaled(value.units!, 6), style: style);
   }
 }

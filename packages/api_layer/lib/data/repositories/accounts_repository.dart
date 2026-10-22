@@ -52,9 +52,10 @@ class RemoteAccountsRepository implements AccountsRepository {
   @override
   Future<AccountsPage> list(AccountSection s,
       {String? cursor, int limit = 100, String? q, String? filter}) async {
-    final res = await _api.get(ApiEndpoints.accounts(s.path),
+    final path = ApiEndpoints.accounts(s.path);
+    final res = await _api.get(path,
         query: {'limit': limit, 'cursor': cursor, 'q': q, 'filter': filter});
-    return AccountsPage.fromData(res.data, s);
+    return runWithMoneyEndpoint(path, () => AccountsPage.fromData(res.data, s));
   }
 
   @override
@@ -74,9 +75,14 @@ class RemoteAccountsRepository implements AccountsRepository {
 
   @override
   Future<AccountCardDto> get(AccountSection s, String id) async {
-    final d = asJson((await _api.get(ApiEndpoints.account(s.path, id))).data);
-    final inner = d['account'] ?? d['customer'] ?? d['company'];
-    return AccountCardDto.fromJson(inner is Map ? asJson(inner) : d, s);
+    final path = ApiEndpoints.account(s.path, id);
+    final data = (await _api.get(path)).data;
+    requireJsonObject(data, 'account');
+    return runWithMoneyEndpoint(path, () {
+      final d = asJson(data);
+      final inner = d['account'] ?? d['customer'] ?? d['company'];
+      return AccountCardDto.fromJson(inner is Map ? asJson(inner) : d, s);
+    });
   }
 
   @override
@@ -89,9 +95,9 @@ class RemoteAccountsRepository implements AccountsRepository {
   @override
   Future<LedgerPage> ledger(AccountSection s, String id,
       {String? before, int limit = 100}) async {
-    final res = await _api.get(ApiEndpoints.accountLedger(s.path, id),
-        query: {'limit': limit, 'before': before});
-    return LedgerPage.fromData(res.data, s);
+    final path = ApiEndpoints.accountLedger(s.path, id);
+    final res = await _api.get(path, query: {'limit': limit, 'before': before});
+    return runWithMoneyEndpoint(path, () => LedgerPage.fromData(res.data, s));
   }
 
   @override

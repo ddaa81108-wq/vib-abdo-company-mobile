@@ -26,6 +26,48 @@ class MoneyText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final extras = context.textExtras;
+    if (text == MoneyValue.invalidLabel) {
+      final labelStyle = (style ?? extras.amount).copyWith(
+        fontFamily: 'Cairo',
+      );
+      return Semantics(
+        label: MoneyValue.invalidLabel,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final icon = Icon(
+              Icons.error_outline,
+              size: 18,
+              color: Theme.of(context).colorScheme.error,
+            );
+            final label = Text(
+              MoneyValue.invalidLabel,
+              softWrap: true,
+              style: labelStyle,
+            );
+            // A narrow card has a finite width. Wrap the words there. A
+            // FittedBox parent passes infinite width and scales the line.
+            if (!constraints.maxWidth.isFinite) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  icon,
+                  const SizedBox(width: AppSpacing.xs),
+                  label,
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                icon,
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(child: label),
+              ],
+            );
+          },
+        ),
+      );
+    }
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Text(

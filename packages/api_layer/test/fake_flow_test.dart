@@ -20,11 +20,14 @@ void main() {
       expect(api.permissions.canRead(SectionKey.treasury), isFalse);
 
       final page = await api.accounts.list(AccountSection.customers);
-      expect(page.summary.totalDebtUnits, 10635);
-      expect(page.summary.netBalanceUnits, 10635);
+      expect(page.summary.totalDebtUnits?.units, 10635);
+      expect(page.summary.netBalanceUnits?.units, 10635);
       expect(page.totalItems, 10);
       final demo = page.page.items.firstWhere((card) => card.id == 'c_55');
-      expect(api.money.format(demo.balanceUnits!, demo.currency), '320 د.ل');
+      expect(
+        api.money.format(demo.balanceUnits!.units!, demo.currency),
+        '320 د.ل',
+      );
 
       final meta = MutationMeta(expectedVersion: demo.version);
       await expectLater(
@@ -72,7 +75,7 @@ void main() {
     final customers = home.summaries.firstWhere(
       (s) => s.section == 'customers',
     );
-    expect(customers.valueUnits, 10635);
+    expect(customers.valueUnits?.units, 10635);
     expect(home.counters['customers'], 10);
     expect(
       home.summaries.firstWhere((s) => s.section == 'reports').valueUnits,

@@ -77,9 +77,14 @@ class RemoteCollectionsRepository implements CollectionsRepository {
   }
 
   @override
-  Future<CollectionsOverviewDto> overview() async =>
-      CollectionsOverviewDto.fromData(
-          (await _api.get(ApiEndpoints.collections)).data);
+  Future<CollectionsOverviewDto> overview() async {
+    const path = ApiEndpoints.collections;
+    final data = (await _api.get(path)).data;
+    return runWithMoneyEndpoint(
+      path,
+      () => CollectionsOverviewDto.fromData(data),
+    );
+  }
 
   @override
   Future<List<Json>> assignees() async => Paged.fromData(
@@ -171,8 +176,11 @@ class RemoteCollectionsRepository implements CollectionsRepository {
           {...meta.toBody(), 'batchId': batchId, 'confirmed': true});
 
   @override
-  Future<PayrollDto> payroll() async =>
-      PayrollDto.fromData((await _api.get(ApiEndpoints.payroll)).data);
+  Future<PayrollDto> payroll() async {
+    const path = ApiEndpoints.payroll;
+    final data = (await _api.get(path)).data;
+    return runWithMoneyEndpoint(path, () => PayrollDto.fromData(data));
+  }
 
   @override
   Future<MutationAck> addPayrollEntry(

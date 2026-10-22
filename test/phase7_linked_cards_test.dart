@@ -53,7 +53,7 @@ void main() {
       final card = await tester.runAsync(
         () => layer.accounts.get(AccountSection.customers, 'c_55'),
       );
-      expect(card!.balanceUnits, 320);
+      expect(card!.balanceUnits?.units, 320);
     },
   );
 
@@ -78,7 +78,7 @@ void main() {
       expect(card!.systemManaged, isTrue);
       expect(card.systemLinkKey, 'masraweya_remainder');
       expect(card.systemKind, isNull);
-      expect(card.balanceUnits, 8950);
+      expect(card.balanceUnits?.units, 8950);
       expect(canSelectAccountForAssignment(card), isFalse);
 
       await go(tester, '/customers/c_masraweya_remainder');

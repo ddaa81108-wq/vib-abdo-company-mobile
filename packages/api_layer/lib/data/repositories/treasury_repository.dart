@@ -15,16 +15,21 @@ class RemoteTreasuryRepository implements TreasuryRepository {
   final ApiClient _api;
 
   @override
-  Future<TreasurySummaryDto> summary() async =>
-      TreasurySummaryDto.fromData((await _api.get(ApiEndpoints.treasury)).data);
+  Future<TreasurySummaryDto> summary() async {
+    const path = ApiEndpoints.treasury;
+    final data = (await _api.get(path)).data;
+    return runWithMoneyEndpoint(path, () => TreasurySummaryDto.fromData(data));
+  }
 
   @override
-  Future<Paged<CashEntryDto>> cashLedger({String? before}) async =>
-      Paged.fromData(
-          (await _api.get(ApiEndpoints.treasuryCashLedger,
-                  query: {'before': before}))
-              .data,
-          CashEntryDto.fromJson);
+  Future<Paged<CashEntryDto>> cashLedger({String? before}) async {
+    const path = ApiEndpoints.treasuryCashLedger;
+    final data = (await _api.get(path, query: {'before': before})).data;
+    return runWithMoneyEndpoint(
+      path,
+      () => Paged.fromData(data, CashEntryDto.fromJson),
+    );
+  }
 
   @override
   Future<MutationAck> addCashEntry(
