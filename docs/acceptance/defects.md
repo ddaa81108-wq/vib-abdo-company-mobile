@@ -18,6 +18,7 @@
 | عيب بديل اختبار، بلا أثر إنتاج | DEF-021. Verified closed على `main` `c40e03d` بعد squash #54. الشاشة كانت تُبطل `collectionsProvider` وتعيد قراءة النظرة. الصف كان يغيب لأن `FakeApiClient` لا يخزّن الإرسال. فحص الخادم الحقيقي يبقى سؤال staging وليس عيبًا مفتوحًا |
 | Blocking على فرع وليس على `main` | لا يبقى. DEF-018 صار Verified closed على `main` `a5ca268` |
 | Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `86324a4` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل، والاختبار `DEF-012 admin settings replace the old unavailable sentence` يتوقع `employeesEmpty` و`auditEmpty` و`operationsEmpty`. خارج المرحلة 6 |
+| Non-blocking مفتوح — المرحلة 8 | DEF-028. جرد على `main` `54884d7`. `FakeApiClient` يطرح مبلغ السداد الجزئي من الرصيد ويزيح `netBalance` و`totalDebt` بنفس الفرق. الشاشة تعرض الحقل بعد إعادة الجلب. غير مانع لمسار الخادم الحقيقي. التالي الحر DEF-029 |
 | Verified closed على `main` `86324a4` | DEF-026 وDEF-027. DEF-026 أُغلق بإصلاح #59 (`6957df3`، الحبر `#5F6E69`). DEF-027 أُغلق بإصلاح #58 (`6b3e8e6`، squash على `main` هو `86324a4`). كانا غير مانعين |
 | Verified closed على `main` `2a45cfb` | DEF-023 وDEF-024 وDEF-025. squash #57 `213e04a`. اختبارات التباين الثلاثة نجحت داخل `tool/check.sh` **432/0**. `#7C6100` في سمة الوضع الفاتح |
 | Verified closed على `main` `c40e03d` | DEF-019 وDEF-020 وDEF-021 وDEF-022. DEF-019 كان غير مانع. DEF-020 وDEF-022 كانا مانعين. DEF-021 عيب بديل اختبار |
@@ -956,3 +957,23 @@ CI [39815316603](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions
 - سؤال `requestId` على السلك، وسقف السداد على الخادم الحقيقي، وبطاقة «الاستلامات المعتمدة اليوم»، ومراجعة التصفير بلا كتابة القسم.
 
 تفاصيل البنود التسعة عشر و`P7-01`…`P7-26` في `docs/acceptance/phase-7.md` على #48، القسم هـ.
+
+## جرد المرحلة 8 على `main` `54884d7`
+
+التاريخ 2026-10-22. الالتزام `54884d7e103102b1b9c3bb5bbedff1a2006666ff`. جرد مصادر فقط. لا اختبارات. لا توقيع. لم يُمس كود الإنتاج. جدول المطابقة وقيم Fake في `docs/acceptance/phase-8-reconciliation.md`. عمود الموقع فارغ. لا قيمة موقع مُخترعة.
+
+### DEF-028 — Fake يحسب رصيد السداد الجزئي ويزيح ملخص القسم
+
+**الحالة:** Open على جرد `main` `54884d7`. غير مانع لمسار القراءة من الخادم الحقيقي. التالي الحر DEF-029.
+
+| الحقل | القيمة |
+|---|---|
+| المرحلة | 8 |
+| الشدة | منخفضة |
+| التصنيف | Non-blocking |
+| المالك المقترح | مهندس API (Fake). شاشة Flutter تعرض الحقل بعد إعادة الجلب |
+| الحالة | Open |
+
+**الدليل:** حوار السداد يرسل `inputValue` ثم يعيد جلب الكارت. لا طرح في `lib/` (`lib/features/accounts/ledger_screen.dart:417`). `FakeApiClient._applyMovement` يخزّن `previous - entered` في `balanceUnits` و`balanceAfterUnits` (`packages/api_layer/lib/data/fake/fake_api_client.dart:1559`). `_accountsView` يجمع الفرق (`fake_api_client.dart:1471`) ثم يضيفه إلى `summary.netBalance` و`summary.totalDebt` (`fake_api_client.dart:1478`). تعليق `AccountsSummaryDto` يقول إن `totalDebt` مجموع الأرصدة الموجبة و`netBalance` الصافي (`packages/api_layer/lib/data/models/account_models.dart:148`). السداد الكلي يخزّن 0 بلا طرح (`fake_api_client.dart:1525`). إلغاء حركة ينسخ آخر `balanceAfterUnits` مرحَّل (`fake_api_client.dart:1581`). سيناريو `test/phase7_payments_test.dart` على `c_55` بإدخال `100` يرسم `220 د.ل`. 220 ليست قيمة موقع.
+
+الحالات العشر في جدول المرحلة 8 لها شاشة ومسار. لم يُفتح عيب غياب شاشة ولا عيب تقريب. `MoneyFormatter` عند `moneyUnitScale` 0 لا يقرّب.
