@@ -6,6 +6,7 @@ import '../../core/network/precise_json.dart';
 import '../../core/network/wire_json.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/network/api_endpoints.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/error_mapper.dart';
 import '../../core/network/reachability.dart';
@@ -112,6 +113,14 @@ class FakeApiClient implements ApiClient {
 
   /// The next N GET /api/notifications/unread-count calls answer 404 (tests).
   int failUnreadCountRemaining = 0;
+
+  /// Registration POSTs to the existing proposed device route (tests).
+  /// Unregister posts are not counted. The token is not stored here.
+  int mobilePushRegisterPosts = 0;
+
+  /// The next N of those registration POSTs fail. A failure is still counted,
+  /// and it is not treated as a stored success by the app.
+  int failMobilePushDevicesRemaining = 0;
 
   /// The next authenticated request fails with this status, once (tests).
   /// 419 uses `PAGE_EXPIRED`, which ends the session and is not a CSRF error.
@@ -882,6 +891,12 @@ class FakeApiClient implements ApiClient {
       return _ok(_me);
     }
 
+    // 🔶 Existing proposed route. Not a new API. Accepted here so a successful
+    // registration can be told apart from a failure. The token is not stored.
+    if (method == 'POST' && path == ApiEndpoints.proposedMobilePushDevices) {
+      return _mobilePushDevices(b);
+    }
+
     if (method != 'GET' &&
         head != 'notifications' &&
         head != 'notification-preferences') {
@@ -897,6 +912,17 @@ class FakeApiClient implements ApiClient {
       );
     }
     return _route(method, b, seg, head, query);
+  }
+
+  /// Proposed `POST /api/mobile-push/devices`. The body is not kept.
+  Future<ApiResponse> _mobilePushDevices(Map<dynamic, dynamic> body) async {
+    if (body['unregister'] == true) return _ok(const <String, Object?>{});
+    mobilePushRegisterPosts++;
+    if (failMobilePushDevicesRemaining > 0) {
+      failMobilePushDevicesRemaining--;
+      _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تسجيل الجهاز.');
+    }
+    return _ok(const <String, Object?>{});
   }
 
   /// Cookie session check. A missing, revoked, or expired cookie is 401
