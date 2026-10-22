@@ -29,7 +29,7 @@
 | مطور الواجهة | 4 | 2 | 2 | 0 |
 | DevOps | 3 | 0 | 2 | 1 |
 
-لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. مراجعة #56 على `9c0fa4f` لا تغيّر الأعداد: Covered ‏3 وPartial ‏15 وDevice-only ‏1. مراجعة #53 و#54 و#55 لا تغيّر الأعداد. مراجعة #57 على `714c6ea` لا تغيّر الأعداد. البند 19 يبقى Device-only. لا توقيع.
+لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. مراجعة #56 على `9c0fa4f` لا تغيّر الأعداد: Covered ‏3 وPartial ‏15 وDevice-only ‏1. مراجعة #53 و#54 و#55 لا تغيّر الأعداد. مراجعة #57 على `714c6ea` لا تغيّر الأعداد. إعادة اختبار #52 على `f347a8a` بعد دمج `main` `c40e03d` لا تغيّر الأعداد. DEF-019 وDEF-020 وDEF-021 وDEF-022 صارت Verified closed على ذلك الـ `main`. البند 7 يبقى Partial لأن P7-11 staging. البند 9 يبقى Partial لأن P7-15 staging. البند 19 يبقى Device-only. لا توقيع.
 
 أكبر الفجوات لكل مالك في نهاية القسم أ.
 
@@ -130,6 +130,7 @@
 - **الفجوة:** **P7-10** المسار السعيد موجود والصف Partial بسبب DEF-020 وDEF-022 على `main`. **P7-11** المطابقة على staging مقابل الويب.
 - **بعد #53:** حوار السداد المباشر يرفض 400 و321 قبل POST، ويقبل 320. `320.01` يرفضه `parseUnits`. المقارنة من رصيد المزوّد المخزَّن لا من GET جديد. رد الخادم التجريبي 400 `VALIDATION_ERROR` مؤقت. القسمة والضرب بلا مقارنة، والسؤال مفتوح. لم يُدمج. الحالة Partial.
 - **بعد #55:** تعارض الإصدار يعيد الرمي، والرأس يصير `319 د.ل` قبل إغلاق الحوار وبعد العودة. لم يُدمج. الحالة Partial.
+- **على `main` `c40e03d`:** اختبارا DEF-020 وDEF-022 داخل `tool/check.sh` **384/0**، ثم مرة أخرى على #52 `f347a8a` **393/0** مع التحميل الكسول. العيبان Verified closed. P7-11 staging باقٍ. الحالة Partial.
 - **منع الاستبدال:** لا متحكّم دفتر يضع الرصيد 0 محليًا. الأمانات لا تُمرَّر فيها سداد كامل إن كان الزر غائبًا (P2-04).
 - **المستوى:** unit + widget. P7-11 staging.
 - **الحالة:** Partial
@@ -151,6 +152,7 @@
 - **بعد #51:** الإرسال من `submit-as_1` و`save-unlinked` حقيقي، والنظرة لا تحتوي الصف الجديد (DEF-021). ربط `ur_1` يخزّن `customerId` ولا يحرّك رصيد `c_55`. P7-15 staging باقٍ.
 - **الفجوة:** **P7-14** Partial. الإبطال وإعادة القراءة كانا على الشاشة. الغياب من النظرة عيب `FakeApiClient`. **P7-15** الزوج نفسه على staging.
 - **بعد #54:** الخادم التجريبي يخزّن `sb_posted_1` و`ur_posted_1`، والحواران الحقيقيان يُظهرانهما على الشاشة نفسها. لا فرق في `lib/`. DEF-021 صار عيب بديل اختبار. فحص الخادم الحقيقي باقٍ. لم يُدمج. الحالة Partial.
+- **على `main` `c40e03d`:** اختبار DEF-021 داخل **384/0** وعلى `f347a8a` داخل **393/0**. العيب Verified closed كبديل اختبار. P7-15 staging باقٍ. الحالة Partial.
 - **منع الاستبدال:** لا `onSubmit` فارغ. حالة الربط تُقرأ من الرد (`assignment` / غياب الربط) لا من علم اختبار.
 - **المستوى:** widget. P7-15 staging.
 - **الحالة:** Partial
@@ -160,7 +162,8 @@
 - **المالك:** مطور الواجهة
 - **الموجود:** `test/notifications_controller_test.dart` `push and poll dedupe, and a push does not increment the count` و`mark-read updates readAt and the server count, without a second decrement`. `test/notifications_presentation_test.dart`: `rows and the bell use the server notification fields`، `a foreground event shows a banner and the tap uses origin banner`، `notification permission asks, then grants, denies, or opens settings`. `test/notifications_wiring_test.dart`: `a list tap marks the row read once`، `below Android 33 registers without asking`، `Android 33 asks before the device post`، `allow posts the device token once`. `test/system_tray_bg_poll_test.dart`: `scheduling uses at least 15 minutes, the network, and keep`، `tray dedup is shared by push, poll, and the worker`. `test/system_tray_navigation_test.dart` `a cold tray payload for the signed-in user opens collections`. `test/permissions/system_tray_permission_negative_test.dart` `the lock-screen public version has no name and no amount`. `test/notifications/notification_channels_test.dart` `collections channel id, Arabic name, and badge flag stay stable`. `integration_test/android_notifications_test.dart` `notification permission matches NOTIF_CASE` غير داخل `check.sh` وهذا التشغيل بلا محاكٍ. القبول: P6-01 إلى P6-40. حكم المرحلة 6 على #12: مقبول بشروط، بلا توقيع.
 - **الفجوة:** **P7-16** جهاز: صينية المقدمة، حوار الإذن على API 33، نص القفل `إشعار جديد`، والنقر يفتح الكيان وينقص العدد مرة. **P7-17** الخلفية، ثم العملية المقتولة. إن لم يصل شيء بعد الإيقاف الإجباري فالنتيجة Not supported (لا FCM) لا Fail وهمي. **P7-18** API 29 بلا حوار تشغيل، وAPI 34 كـ 33. المستوى device.
-- **بعد #49:** ودجت للحوار والقفل والنقرة والاستطلاع و`sdkInt` ‏29/33/34. نصف الجهاز مفتوح. DEF-019 ما زال مفتوحًا على `main`. التفاصيل في مراجعة #49 و#50. الحالة Partial.
+- **بعد #49:** ودجت للحوار والقفل والنقرة والاستطلاع و`sdkInt` ‏29/33/34. نصف الجهاز مفتوح. DEF-019 ما زال مفتوحًا على `main` `a5ca268` في تلك المراجعة. التفاصيل في مراجعة #49 و#50. الحالة Partial.
+- **على `main` `c40e03d`:** اختبارات DEF-019 الخمسة **+5** وخروج 0، وعلى `f347a8a` أيضًا **+5**. العيب Verified closed. نصف الجهاز من P7-16 وP7-17 وP7-18 ما زال مفتوحًا. الحالة Partial.
 - **منع الاستبدال:** `granting permission registers with signedIn true` يستبدل المسجّل (`RecordingDeviceTokenRegistrar`) ولا يُغلق الإرسال. درس DEF-018: الموافقة تُقاس على `buildAppRoot` والمسجّل الحقيقي. لا `notificationOpenSeamProvider` مسجّل حين يُحكم على النقر. نقل `FakePushTransport` مسموح في ودجت Fake فقط.
 - **المستوى:** unit + widget. الفجوة device.
 - **الحالة:** Partial
@@ -262,9 +265,9 @@
 | المالك | ما يُكتب أولًا |
 |---|---|
 | مهندس API | بعد #56 على `9c0fa4f` يبقى: دخان P7-01 (not run بلا أسرار staging)، ودخول الأدوار على staging، وP7-03 على الجهاز، ومصفوفة P7-04 الحية، وطيران P7-19، وعودة الراديو، ودفتر staging لـ P7-20 وP7-21. السؤال المفتوح: هل `GET /api/me` هو العقد؟ |
-| Senior Flutter | بعد #53 و#54 و#55 يبقى P7-10 وP7-14 Partial لأن الإصلاحات لم تُدمج. DEF-020 وDEF-022 مفتوحان على `main`. DEF-021 عيب بديل اختبار، وفحص staging باقٍ. P7-07 مع DEF-012، وP7-08، وصفوف staging P7-09 وP7-11 وP7-13 وP7-15 |
+| Senior Flutter | على `main` `c40e03d` أُغلق DEF-020 وDEF-022، وأُغلق DEF-021 كبديل اختبار. البند 7 يبقى Partial لـ P7-11. البند 9 يبقى Partial لـ P7-15. P7-07 مع DEF-012، وP7-08، وصفوف staging P7-09 وP7-13 باقية. إعادة اختبار #52 على `f347a8a` لم تنقل عددًا |
 | مطور الواجهة | بعد #57 على `714c6ea` الحكم yes with notes. DEF-023 وDEF-024 وDEF-025 تبقى Open على `main`. الجهاز لـ P7-16 وP7-17 وP7-18 وP7-22 باقٍ. قتل العملية Not supported بلا FCM |
-| DevOps | بعد إعادة اختبار #52 على `f8f7812` يبقى: رقم P7-23 وP7-24 على الجهاز الضعيف في النموذج، وعتبة علي، ونصف الجهاز من P7-25، ومجموعة المعرّفات على مشي الحزمة لا على الشاشة، ونموذج P7-26 على الهواتف A–D. سير المحاكي لا يملأ النموذج |
+| DevOps | بعد إعادة اختبار #52 على `f347a8a` يبقى: رقم P7-23 وP7-24 على الجهاز الضعيف في النموذج، وعتبة علي، ونصف الجهاز من P7-25، ومجموعة المعرّفات على مشي الحزمة لا على الشاشة، ونموذج P7-26 على الهواتف A–D. سير المحاكي لا يملأ النموذج. `HISTORY_WINDOW_TRIM` مطفأ. الذاكرة تقرير فقط |
 
 ### فهرس `P7`
 
@@ -1022,6 +1025,33 @@ CI التشغيل [39711134480](https://github.com/ddaa81108-wq/vib-abdo-company
 | #54 | `71d48ca3c3458b130c777b350dd0ae265b50bc4d` |
 | #55 | `21a34de6055b607f8007efe58210f72c6de0814e` |
 | #56 | `48e44ab4cf3c443fa6628dbcdca335060497490e` |
+
+## إعادة اختبار #52 — الرأس `f347a8a` على `main` `c40e03d`
+
+الطلب [#52](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/52) ما زال مسودة. الرأس `f347a8ac6128ed47a76133ee17f3485cf2bd6eec`. الأب الأول `f8f7812d203bd09fe0c5c124748d043694f3f5f9`، وهو سلف للرأس. الأب الثاني `main` `c40e03d3b184dd79e392f8dc384022090862b48f`. الرسالة `Merge remote-tracking branch 'origin/main'`. دمج بوالدين، لا إعادة قاعدة ولا إعادة كتابة لـ `f8f7812`. لم يُدفع إلى فرع #52. لا تغيير لكود الإنتاج من هذه الجولة. لا توقيع. الحكم: **مقبول للدمج YES**.
+
+**محتوى `main` `c40e03d`.** خمسة squash بوالد واحد بعد `a5ca268`، بالترتيب: `653cedf` (#50) و`2861f4d` (#53) و`0fd9077` (#54) و`8d80100` (#55) و`c40e03d` (#56). رؤوس المراجعة ليست أسلافًا لأن الدمج squash، وأجسام الرقع تطابق ما رُوجع. `origin/main` هو `c40e03d`.
+
+**حل التعارض.** `git merge-tree --write-tree f8f7812 c40e03d` خرج 1. التعارض الوحيد `pubspec.yaml`. اندمج تلقائيًا: `ledger_screen.dart` و`fake_api_client.dart` و`pubspec.lock`. الملفات التي تختلف عن الوالدين معًا في `f347a8a` هي هذه الأربعة فقط. الملف المحلول يضم `dio: ^5.4.0` من #56 و`vm_service: 15.4.0` من #52. القفل: `dio` ‏5.11.1 اعتماد `direct dev`، و`vm_service` ‏15.4.0 اعتماد `direct dev`. `flutter pub get` في التطبيق وفي `packages/api_layer` لم يغيّر الشجرة. `packages/api_layer/pubspec.yaml` و`pubspec.lock` مطابقان لـ `c40e03d`.
+
+**ما يضيفه #52 فوق `main`.** `git diff --stat c40e03d f347a8a` هو 34 ملفًا، +3129/−84، ويطابق `a5ca268..f8f7812`. ملفات الإنتاج 15: شاشات الحسابات والدفتر والإشعارات، و`history_window.dart` و`perf_budget.dart` و`perf_surface.dart`، ومزوّدا الإشعارات والأقسام، و`api_layer.dart` ومصنع العميل وبنّاءا الخادم التجريبي و`fake_api_client.dart` و`fake_large_catalog.dart`، و`pubspec.yaml`. جسم رقعة الدفتر وجسم رقعة الخادم التجريبي من جهة #52 ومن جهة `main` متساويان بعد تجاهل ترويسة الـ hunk. `HISTORY_WINDOW_TRIM` هو `bool.fromEnvironment` والقيمة الافتراضية false. الميزانيات مقترحات هندسية وعمود القبول يبقى `recorded`. RSS وPSS وDart heap تقرير فقط. لا ملف إنتاج جديد خارج المراجعة السابقة.
+
+**`tool/check.sh`.** على `c40e03d` خرج 0: تحليل التطبيق 4.6s، والتطبيق **384/0**، وتحليل الحزمة 2.6s، والحزمة **201** ناجح وتخطي واحد (P7-01 not run)، والسالب **27/0** و**30/0**، والتجربة الجافة **6/0**، وحارس الإصدار **4/0**، وrelease يرفض `USE_FAKE_API=true`. على `f347a8a` خرج 0: تحليل التطبيق 6.3s، والتطبيق **393/0** (+9)، وتحليل الحزمة 3.1s، والحزمة **206** ناجح وتخطي واحد (+5)، وباقي الخطوات بالأعداد نفسها. الفرق يساوي ما أضافه #52 فوق `a5ca268`. CI على الرأس: التشغيل `39775424693`، والثلاثة ناجحة.
+
+**التفاعل.** DEF-022 وDEF-021 وDEF-020 ظهرت أسماؤها في السجلين وأكملت العداد حتى النهاية. اختبارات `retry_policy_test.dart` من +78 إلى +85 مع التخطي الواحد نجحت على الرأسين. DEF-019 لم يُطبع اسمه في سجل البوابة؛ التشغيل المباشر على الرأسين **+5** وخروج 0. التحميل الكسول لم يكسر حارس السداد الزائد ولا إعادة الجلب بعد 409.
+
+**`merge-tree --write-tree`.** خروج 0. لم يُنشأ دمج.
+
+| الطرف | الشجرة | تحرير من الجهتين |
+|---|---|---|
+| `main` `c40e03d` | `adf44ae7133dd211b38a4e3077ef41e1ea5348e3` | لا |
+| #57 `714c6ea` | `0053c12c98999c707de86a8e2978ff99caf5cb37` | لا |
+| #51 `e34504c` | `3ba703ffb2752e0d1f7b42d846f8cebe8405afea` | لا |
+| #51 الرأس الحالي `721edef` | `bd1bee11f0aac7d0a3a43ddd12d4ab81e62ae095` | لا |
+| #49 `546a623` | `b6e2375085ebc899e554e25df09dfed464967894` | `test/support/pump_app.dart` |
+| #48 `6ed2d15` | `5e007753e383a7ef55c5910fb4fd04ad5940e5b3` | لا |
+
+عند `e34504c` يبقى اختبار `DEF-020 a partial payment above the remaining balance is stored` ويتوقع السلوك القديم. الدمج النصي نظيف، ولم يُشغَّل الجمع. رأس #51 الحالي `721edef` أسقط تلك النسخ بعد دمج `main`، ولم تُعد مراجعة مجموعته في هذه الجولة. الأعداد في المصفوفة لم تتغير: Covered ‏3 وPartial ‏15 وDevice-only ‏1. DEF-023 وDEF-024 وDEF-025 تبقى Open. التالي الحر DEF-026.
 
 ## د. خط الأساس `tool/check.sh`
 
