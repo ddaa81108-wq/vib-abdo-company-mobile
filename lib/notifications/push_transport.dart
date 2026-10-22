@@ -32,9 +32,18 @@ abstract interface class PushTransport {
   /// Raw maps from the platform. The ingress whitelists them before parse.
   Stream<Map<String, dynamic>> get payloads;
 
+  /// New tokens from the platform (`onTokenRefresh`). Empty when this
+  /// adapter has no refresh stream. Values must not be logged.
+  Stream<String> get onTokenRefresh;
+
   /// Drops the platform token. Must not throw past the session wipe.
   Future<void> deleteToken();
 }
+
+/// Shared by adapters that never emit a token refresh. A broadcast stream so
+/// more than one registrar can listen, including the const noop and the stub.
+final Stream<String> _silentTokenRefresh = Stream<String>.empty()
+    .asBroadcastStream();
 
 /// Default. The server has no FCM or APNs registration.
 class NoopPushTransport implements PushTransport {
@@ -53,6 +62,9 @@ class NoopPushTransport implements PushTransport {
   Stream<Map<String, dynamic>> get payloads => const Stream.empty();
 
   @override
+  Stream<String> get onTokenRefresh => _silentTokenRefresh;
+
+  @override
   Future<void> deleteToken() async {}
 }
 
@@ -61,6 +73,7 @@ class FakePushTransport implements PushTransport {
   FakePushTransport({this.token});
 
   final _payloads = StreamController<Map<String, dynamic>>.broadcast();
+  final _tokens = StreamController<String>.broadcast();
   String? token;
   var _deleted = false;
 
@@ -73,8 +86,12 @@ class FakePushTransport implements PushTransport {
   bool get deleted => _deleted;
 
   void setToken(String? value) {
+    final previous = _deleted ? null : token;
     token = value;
     _deleted = false;
+    if (value == null || value.isEmpty || value == previous) return;
+    if (_tokens.isClosed) return;
+    _tokens.add(value);
   }
 
   void inject(Map<String, dynamic> payload) {
@@ -88,12 +105,18 @@ class FakePushTransport implements PushTransport {
   Stream<Map<String, dynamic>> get payloads => _payloads.stream;
 
   @override
+  Stream<String> get onTokenRefresh => _tokens.stream;
+
+  @override
   Future<void> deleteToken() async {
     _deleted = true;
     token = null;
   }
 
-  Future<void> dispose() => _payloads.close();
+  Future<void> dispose() async {
+    if (!_payloads.isClosed) await _payloads.close();
+    if (!_tokens.isClosed) await _tokens.close();
+  }
 }
 
 /// Compile-time seam for FCM. `firebase_messaging` is not a dependency.
@@ -101,7 +124,7 @@ class FakePushTransport implements PushTransport {
 /// The Android build of that plugin expects `google-services.json` and the
 /// Google Services Gradle plugin. This repo must not contain that file or any
 /// API key. Until a build can isolate the plugin without that file, this
-/// adapter yields no token and no messages.
+/// adapter yields no token, no token-refresh events, and no messages.
 class FcmPushTransport implements PushTransport {
   const FcmPushTransport();
 
@@ -116,6 +139,9 @@ class FcmPushTransport implements PushTransport {
 
   @override
   Stream<Map<String, dynamic>> get payloads => const Stream.empty();
+
+  @override
+  Stream<String> get onTokenRefresh => _silentTokenRefresh;
 
   @override
   Future<void> deleteToken() async {}
