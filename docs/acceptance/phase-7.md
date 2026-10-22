@@ -29,7 +29,7 @@
 | مطور الواجهة | 4 | 2 | 2 | 0 |
 | DevOps | 3 | 0 | 2 | 1 |
 
-لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. مراجعة #56 على `9c0fa4f` لا تغيّر الأعداد: Covered ‏3 وPartial ‏15 وDevice-only ‏1. مراجعة #53 و#54 و#55 لا تغيّر الأعداد. مراجعة #57 على `714c6ea` لا تغيّر الأعداد. إعادة اختبار #52 على `f347a8a` بعد دمج `main` `c40e03d` لا تغيّر الأعداد. DEF-019 وDEF-020 وDEF-021 وDEF-022 صارت Verified closed على ذلك الـ `main`. البند 7 يبقى Partial لأن P7-11 staging. البند 9 يبقى Partial لأن P7-15 staging. البند 19 يبقى Device-only. لا توقيع.
+لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. مراجعة #56 على `9c0fa4f` لا تغيّر الأعداد: Covered ‏3 وPartial ‏15 وDevice-only ‏1. مراجعة #53 و#54 و#55 لا تغيّر الأعداد. مراجعة #57 على `714c6ea` لا تغيّر الأعداد. إعادة اختبار #52 على `f347a8a` بعد دمج `main` `c40e03d` لا تغيّر الأعداد. إعادة اختبار #51 على `721edef` لا تغيّر الأعداد. DEF-019 وDEF-020 وDEF-021 وDEF-022 صارت Verified closed على ذلك الـ `main`. البند 7 يبقى Partial لأن P7-11 staging. البند 9 يبقى Partial لأن P7-15 staging. البند 19 يبقى Device-only. لا توقيع.
 
 أكبر الفجوات لكل مالك في نهاية القسم أ.
 
@@ -131,6 +131,7 @@
 - **بعد #53:** حوار السداد المباشر يرفض 400 و321 قبل POST، ويقبل 320. `320.01` يرفضه `parseUnits`. المقارنة من رصيد المزوّد المخزَّن لا من GET جديد. رد الخادم التجريبي 400 `VALIDATION_ERROR` مؤقت. القسمة والضرب بلا مقارنة، والسؤال مفتوح. لم يُدمج. الحالة Partial.
 - **بعد #55:** تعارض الإصدار يعيد الرمي، والرأس يصير `319 د.ل` قبل إغلاق الحوار وبعد العودة. لم يُدمج. الحالة Partial.
 - **على `main` `c40e03d`:** اختبارا DEF-020 وDEF-022 داخل `tool/check.sh` **384/0**، ثم مرة أخرى على #52 `f347a8a` **393/0** مع التحميل الكسول. العيبان Verified closed. P7-11 staging باقٍ. الحالة Partial.
+- **على #51 `721edef`:** حُذف اختبارا `known-bug` اللذان يتوقعان رأس `-80 د.ل` وبقاء الرأس 320 بعد 409. تغطية السلوك المصحّح على `main`: `DEF-020 the payment dialog refuses an amount above the server balance` (حوار 400 على `c_55`، بلا POST، الرأس `320 د.ل`، المخزَّن 320 والإصدار 4) و`DEF-022 a payment conflict refetches the card and the ledger` (الرأس `319 د.ل` قبل إغلاق الحوار وبعد العودة، المخزَّن 319 والإصدار 5). مسار P7-10 السعيد بقي. الحالة Partial.
 - **منع الاستبدال:** لا متحكّم دفتر يضع الرصيد 0 محليًا. الأمانات لا تُمرَّر فيها سداد كامل إن كان الزر غائبًا (P2-04).
 - **المستوى:** unit + widget. P7-11 staging.
 - **الحالة:** Partial
@@ -153,6 +154,7 @@
 - **الفجوة:** **P7-14** Partial. الإبطال وإعادة القراءة كانا على الشاشة. الغياب من النظرة عيب `FakeApiClient`. **P7-15** الزوج نفسه على staging.
 - **بعد #54:** الخادم التجريبي يخزّن `sb_posted_1` و`ur_posted_1`، والحواران الحقيقيان يُظهرانهما على الشاشة نفسها. لا فرق في `lib/`. DEF-021 صار عيب بديل اختبار. فحص الخادم الحقيقي باقٍ. لم يُدمج. الحالة Partial.
 - **على `main` `c40e03d`:** اختبار DEF-021 داخل **384/0** وعلى `f347a8a` داخل **393/0**. العيب Verified closed كبديل اختبار. P7-15 staging باقٍ. الحالة Partial.
+- **على #51 `721edef`:** حُذف اختبار `known-bug` الذي يتوقع غياب الصف من النظرة. التغطية على `DEF-021 the next collections overview shows the submitted rows`: الحواران 40 و25، والصفان `sb_posted_1` و`ur_posted_1`، والمبلغان، وبعد المغادرة والعودة. اختبار الحزمة يثبت الإصدار 1. سلاسل `mutationPaths` الخام لم تُنسخ. الحالة Partial.
 - **منع الاستبدال:** لا `onSubmit` فارغ. حالة الربط تُقرأ من الرد (`assignment` / غياب الربط) لا من علم اختبار.
 - **المستوى:** widget. P7-15 staging.
 - **الحالة:** Partial
@@ -265,7 +267,7 @@
 | المالك | ما يُكتب أولًا |
 |---|---|
 | مهندس API | بعد #56 على `9c0fa4f` يبقى: دخان P7-01 (not run بلا أسرار staging)، ودخول الأدوار على staging، وP7-03 على الجهاز، ومصفوفة P7-04 الحية، وطيران P7-19، وعودة الراديو، ودفتر staging لـ P7-20 وP7-21. السؤال المفتوح: هل `GET /api/me` هو العقد؟ |
-| Senior Flutter | على `main` `c40e03d` أُغلق DEF-020 وDEF-022، وأُغلق DEF-021 كبديل اختبار. البند 7 يبقى Partial لـ P7-11. البند 9 يبقى Partial لـ P7-15. P7-07 مع DEF-012، وP7-08، وصفوف staging P7-09 وP7-13 باقية. إعادة اختبار #52 على `f347a8a` لم تنقل عددًا |
+| Senior Flutter | على `main` `c40e03d` أُغلق DEF-020 وDEF-022، وأُغلق DEF-021 كبديل اختبار. البند 7 يبقى Partial لـ P7-11. البند 9 يبقى Partial لـ P7-15. P7-07 مع DEF-012، وP7-08، وصفوف staging P7-09 وP7-13 باقية. إعادة اختبار #51 على `721edef` و#52 على `f347a8a` لم تنقل عددًا |
 | مطور الواجهة | بعد #57 على `714c6ea` الحكم yes with notes. DEF-023 وDEF-024 وDEF-025 تبقى Open على `main`. الجهاز لـ P7-16 وP7-17 وP7-18 وP7-22 باقٍ. قتل العملية Not supported بلا FCM |
 | DevOps | بعد إعادة اختبار #52 على `f347a8a` يبقى: رقم P7-23 وP7-24 على الجهاز الضعيف في النموذج، وعتبة علي، ونصف الجهاز من P7-25، ومجموعة المعرّفات على مشي الحزمة لا على الشاشة، ونموذج P7-26 على الهواتف A–D. سير المحاكي لا يملأ النموذج. `HISTORY_WINDOW_TRIM` مطفأ. الذاكرة تقرير فقط |
 
@@ -1051,7 +1053,39 @@ CI التشغيل [39711134480](https://github.com/ddaa81108-wq/vib-abdo-company
 | #49 `546a623` | `b6e2375085ebc899e554e25df09dfed464967894` | `test/support/pump_app.dart` |
 | #48 `6ed2d15` | `5e007753e383a7ef55c5910fb4fd04ad5940e5b3` | لا |
 
-عند `e34504c` يبقى اختبار `DEF-020 a partial payment above the remaining balance is stored` ويتوقع السلوك القديم. الدمج النصي نظيف، ولم يُشغَّل الجمع. رأس #51 الحالي `721edef` أسقط تلك النسخ بعد دمج `main`، ولم تُعد مراجعة مجموعته في هذه الجولة. الأعداد في المصفوفة لم تتغير: Covered ‏3 وPartial ‏15 وDevice-only ‏1. DEF-023 وDEF-024 وDEF-025 تبقى Open. التالي الحر DEF-026.
+عند `e34504c` يبقى اختبار `DEF-020 a partial payment above the remaining balance is stored` ويتوقع السلوك القديم. الدمج النصي نظيف، ولم يُشغَّل الجمع على ذلك الرأس. رأس #51 `721edef` أسقط تلك النسخ، ومراجعته في القسم التالي. الأعداد في المصفوفة لم تتغير: Covered ‏3 وPartial ‏15 وDevice-only ‏1. DEF-023 وDEF-024 وDEF-025 تبقى Open. التالي الحر DEF-026.
+
+## إعادة اختبار #51 — الرأس `721edef`
+
+الطلب [#51](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/51) ما زال مسودة. الرأس `721edef74d44de273ff59211a49170ca0dd2eb6c`. `e34504c5ee28bca367575ffe9ba2f0edde2817e0` سلف. الدمج `931800f5d2429cbebe14fe1f911288ea036b0345` بوالدين: الأول `e34504c` والثاني `main` `c40e03d`. `git merge-tree --write-tree` لذلك الدمج خرج 0. الالتزام التالي `721edef` والد واحد فوق الدمج ويحذف نسخ الاختبارات. لا إعادة قاعدة ولا إعادة كتابة لـ `e34504c`. لم يُدفع إلى فرع #51. لا توقيع. الحكم: **مقبول للدمج YES**. حكم #52 `f347a8a` يبقى **YES**.
+
+**فوق `main`.** `git diff c40e03d 721edef -- lib packages/api_layer/lib` فارغ. لا تغيير إنتاج في #51 فوق `main`. الفرق هو ملفات اختبار المرحلة 7 التي كانت على `e34504c`.
+
+**ما تغيّر بعد الدمج.** `git diff 931800f 721edef` ملفان: `test/phase7_payments_test.dart` و`test/phase7_linked_cards_test.dart`، +14/−155. الحذف ثلاثة اختبارات `known-bug` كانت تتوقع العيب:
+
+| المحذوف | ما كان يتوقعه | التغطية الآن |
+|---|---|---|
+| `DEF-020 a partial payment above the remaining balance is stored` | حوار 400 على `c_55` يخزّن رأس `-80 د.ل` | `test/def020_overpayment_test.dart` `DEF-020 the payment dialog refuses an amount above the server balance`: الحوار نفسه، الرسالة، بلا POST، الرأس `320 د.ل`، المخزَّن 320 والإصدار 4، و`-80` غائب بعد العودة. الحزمة: `DEF-020 a direct partial payment above the stored balance is refused` يرفض بـ `VALIDATION_ERROR` ويبقي الإصدار 4، ثم 320 يصير الرصيد 0 والإصدار 5 |
+| `DEF-022 the payment dialog shows the server conflict sentence and does not refetch` | جملة الخادم، والرأس يبقى `320 د.ل` بعد العودة، والمخزَّن 319 | `test/def022_payment_conflict_test.dart` `DEF-022 a payment conflict refetches the card and the ledger`: الجملة الموحّدة، الرأس `319 د.ل` قبل إغلاق الحوار وبعد العودة، المخزَّن 319 والإصدار 5، و`320` و`220` غائبان |
+| `DEF-021 a real submit for a linked card and an unlinked card is not on the next overview` | إرسال 40 و25، والنظرة تبقى `sb_1`/`sb_2` و`ur_1`/`ur_2` | `test/def021_collection_submit_test.dart` `DEF-021 the next collections overview shows the submitted rows`: الحواران نفسهما، `sb_posted_1` و`ur_posted_1`، المبلغان 40 و25، والاسم، وبعد العودة. الحزمة: `DEF-021 assignment submit and unlinked submit are on the next overview` يثبت الإصدار 1 وتكرار `requestId` |
+
+سلاسل `mutationPaths` الخام (`/api/collections/assignments/as_1/submissions` و`/api/collections/unlinked-receipts`) ونص الجسم `"amountUnits"` لم تُنسخ حرفيًا. السيناريو والحوار والمبالغ والمعرّفات والإصدارات مغطاة. لا فقدان لمسار 400 على الحوار، ولا للرأس، ولا لصفوف النظرة، ولا لتحديث الرأس بعد 409، ولا لأرقام الإصدار.
+
+**ما بقي كما كان على `e34504c`.** اختبارات `pending-decision` وDEF-012 بصمتها واحدة بين `e34504c` و`721edef`: `phase7_sections_test.dart` (ومنها `P7-07 empty settings tiles show the DEF-012 placeholders and do not close the row` بوسم `known-bug`)، و`phase7_totals_test.dart`، و`phase7_role_denials_permission_negative_test.dart`، و`phase7_status_order_permission_negative_test.dart`، و`shell_group_test.dart` (`DEF-012 admin settings replace the old unavailable sentence`، وهو أيضًا مطابق لـ `main`). داخل الملفين المعدّلين بقي: `P7-10 a partial payment then a full payment on the same card`، و`P7-10 libyan deposits have no full-payment button`، و`a stale expectedVersion is rejected and the balance stays 320`، و`P7-14 linking ur_1 approves it, stores customerId, and does not move money`، و`a system-managed card shows its stored balance and hides writes`، و`P7-14 cash buttons follow the stored cash status` بوسم `pending-decision`.
+
+**`tool/check.sh`.** خرج 0: تحليل التطبيق 3.9s، والتطبيق **420/0**، وتحليل الحزمة 2.6s، والحزمة **204** ناجح وتخطي واحد (P7-01 not run)، والسالب **32/0** و**33/0**، والتجربة الجافة **6/0**، والحارس **4/0**، وrelease يرفض Fake. الفرق عن `main` 384/201/27/30 هو اختبارات #51 بعد حذف الثلاثة: +36 و+3 و+5 و+3. أسماء العيب القديمة غائبة من السجل. DEF-020 وDEF-021 وDEF-022 وP7-10 وP7-14 وDEF-012 ظهرت وأكمل العداد حتى 420. CI [39775704570](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions/runs/39775704570) ناجح على هذا الرأس.
+
+**`merge-tree --write-tree`.** خروج 0. لم يُنشأ دمج.
+
+| الطرف | الشجرة |
+|---|---|
+| `main` `c40e03d` | `5451ff4abf393d2a11ed323abf3967de7fbc004a` |
+| #52 `f347a8a` | `bd1bee11f0aac7d0a3a43ddd12d4ab81e62ae095` |
+| #57 `714c6ea` | `6be254d23590d727bfc06991f3fa7e25dd4a6956` |
+| #49 `546a623` | `b439d0c39db6710e5180328ea6b2764445f2fb48` |
+| #48 `5307b84` | `12a232feece4a17964db8b07c673218c44d0174b` |
+
+لا تحرير من الجهتين مع هؤلاء. الأعداد لم تتغير: Covered ‏3 وPartial ‏15 وDevice-only ‏1. DEF-012 يبقى Fail. DEF-002 يبقى Pending PM. التالي الحر DEF-026.
 
 ## د. خط الأساس `tool/check.sh`
 
