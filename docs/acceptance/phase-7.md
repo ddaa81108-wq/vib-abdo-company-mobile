@@ -17,9 +17,9 @@
 | الحالة | العدد | البنود |
 |---|---|---|
 | Covered | 2 | 14، 15 |
-| Partial | 15 | 1، 2، 3، 4، 5، 6، 7، 8، 9، 10، 11، 12، 13، 16، 18 |
+| Partial | 16 | 1، 2، 3، 4، 5، 6، 7، 8، 9، 10، 11، 12، 13، 16، 17، 18 |
 | Missing | 0 | — |
-| Device-only | 2 | 17، 19 |
+| Device-only | 1 | 19 |
 | Staging-only | 0 | — |
 
 | المالك | البنود | Covered | Partial | Device-only |
@@ -27,7 +27,9 @@
 | مهندس API | 6 | 0 | 6 | 0 |
 | Senior Flutter | 6 | 0 | 6 | 0 |
 | مطور الواجهة | 4 | 2 | 2 | 0 |
-| DevOps | 3 | 0 | 1 | 2 |
+| DevOps | 3 | 0 | 2 | 1 |
+
+لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 في القسم ج تنقل البند 17 إلى Partial: القياس موجود على ذلك الطلب ولم يُدمج في `main`. البند 19 يبقى Device-only. لا توقيع.
 
 أكبر الفجوات لكل مالك في نهاية القسم أ.
 
@@ -55,9 +57,9 @@
 | 14 الوضع الداكن والفاتح | مطور الواجهة | Covered | widget | — |
 | 15 RTL | مطور الواجهة | Covered | widget | — |
 | 16 مقاسات الشاشة | مطور الواجهة | Partial | widget | P7-22 |
-| 17 الأداء | DevOps | Device-only | — | P7-23، P7-24 |
-| 18 سجل أو تاريخ طويل | DevOps | Partial | widget | P7-25 |
-| 19 هاتف حقيقي | DevOps | Device-only | — | P7-26 |
+| 17 الأداء | DevOps | Partial | release مسجّل على #52 | P7-23، P7-24 |
+| 18 سجل أو تاريخ طويل | DevOps | Partial | widget على #52 | P7-25 |
+| 19 هاتف حقيقي | DevOps | Device-only | سير محاكٍ منفصل على #52 | P7-26 |
 
 ### 1 — اختبارات API
 
@@ -206,16 +208,18 @@
 ### 17 — الأداء
 
 - **المالك:** DevOps
-- **الموجود:** لا اختبار `Timeline` ولا ميزانية إقلاع ولا قياس تمرير. `integration_test/android_notifications_test.dart` يفحص قناة الإشعار لا الزمن.
+- **الموجود على الأساس:** لا اختبار `Timeline` ولا ميزانية إقلاع ولا قياس تمرير. `integration_test/android_notifications_test.dart` يفحص قناة الإشعار لا الزمن.
+- **بعد #52:** `tool/measure_release_cold_start.sh` يبني release بـ `USE_FAKE_API=false` ويطبع وسيط `am start -W`. `integration_test/p7_long_history_test.dart` يطبع أزمنة الإطارات. الحكم والأدلة في مراجعة #52. العتبة ما زالت قرار علي، والرقم في نموذج الهاتف فارغ.
 - **الفجوة:** **P7-23** إقلاع بارد لإصدار release على جهاز ضعيف حتى الرئيسية التفاعلية، مع رقم الثواني في النموذج. **P7-24** تمرير أطول دفتر حتى آخر صفحة مع عدد الصفحات. المستوى device. العتبة الرقمية يكتبها علي في النموذج قبل أول تشغيل؛ بلا عتبة تُسجَّل الأرقام ولا يُخترع Pass.
 - **منع الاستبدال:** لا وضع debug ولا `FakeApiClient` في قياس الإصدار. لا قائمة من سطرين تُسمى سجلًا طويلًا.
-- **المستوى:** device
-- **الحالة:** Device-only
+- **المستوى:** device للنموذج. القياس على #52 release للعملية، وprofile للتاريخ الطويل.
+- **الحالة:** Partial
 
 ### 18 — سجل أو تاريخ طويل
 
 - **المالك:** DevOps
-- **الموجود:** صفحات قصيرة. `test/qa_round_test.dart` `load older shows the error and a retry`. `test/treasury_reports_polish_test.dart`: `treasury shows server cards, movements, and older pages`، `treasury load older shows the error and retries`. `test/account_list_actions_test.dart` `phone show-all loads the remaining pages for the active filter`. `test/account_list_logic_test.dart` `a late load-more page is not mixed into the new filter`.
+- **الموجود على الأساس:** صفحات قصيرة. `test/qa_round_test.dart` `load older shows the error and a retry`. `test/treasury_reports_polish_test.dart`: `treasury shows server cards, movements, and older pages`، `treasury load older shows the error and retries`. `test/account_list_actions_test.dart` `phone show-all loads the remaining pages for the active filter`. `test/account_list_logic_test.dart` `a late load-more page is not mixed into the new filter`.
+- **بعد #52:** `test/p7_long_history_test.dart` يمشي 20 صفحة عبر زر `load-older` الحقيقي و`FakeDataset.large`. `packages/api_layer/test/fake_large_dataset_test.dart` يجمع 800 سطرًا على 20 صفحة من `FakeApiClient`. نصف الجهاز ما زال مفتوحًا. التفاصيل في مراجعة #52.
 - **الفجوة:** **P7-25** دفتر من عدة صفحات عبر `load more` الحقيقي حتى الصفحة الأخيرة، على `FakeApiClient` بعدد صفحات معلوم، ثم على جهاز P7-24. المستوى widget ثم device.
 - **منع الاستبدال:** لا حقن صفحتين ثم ادّعاء تاريخ طويل. مصدر الصفوف المستودع أو الخادم.
 - **المستوى:** widget للصفحات. القياس device.
@@ -224,7 +228,8 @@
 ### 19 — هاتف حقيقي
 
 - **المالك:** DevOps (تجهيز التشغيل). التنفيذ على قائد الاختبار والمالكين حسب البروتوكول.
-- **الموجود:** لا مصفوفة جهاز في CI التشغيل `39699625496`. `tool/android_notification_emulator_test.sh` يبني debug بـ `USE_FAKE_API=true` وهو خارج هذه البوابة. `integration_test/android_notifications_test.dart` لا يطلب الإذن بنفسه.
+- **الموجود على الأساس:** لا مصفوفة جهاز في CI التشغيل `39699625496`. `tool/android_notification_emulator_test.sh` يبني debug بـ `USE_FAKE_API=true` وهو خارج هذه البوابة. `integration_test/android_notifications_test.dart` لا يطلب الإذن بنفسه.
+- **بعد #52:** `.github/workflows/android-performance.yml` سير منفصل لمستويات API ‏29 و33 و34. `docs/testing/PHASE7_PERFORMANCE.md` يطابق أعمدة النموذج وينص على أن سجل المحاكي ليس نموذج البروتوكول. النموذج نفسه فارغ.
 - **الفجوة:** **P7-26** تنفيذ القسم ب على API 29 و33 و34، وشاشة صغيرة وكبيرة، وجهاز ضعيف، وإرفاق النموذج. المستوى device.
 - **منع الاستبدال:** بناء release المشار إليه في القسم ب. لقطة محاكٍ بلا راديو لا تغلق وضع الطيران ولا الصينية.
 - **المستوى:** device
@@ -237,7 +242,7 @@
 | مهندس API | P7-01 الدخان الحي. P7-02 الدخول الحقيقي. P7-04 مصفوفة الصلاحيات من `me`. P7-19 الطيران على الراديو. P7-20 وP7-21 إعادة المحاولة بلا حركة ثانية، و`requestId` ظاهر في الجسم أو سؤال خادم |
 | Senior Flutter | P7-05 الأدوار من نموذج الدخول. P7-06 الأقسام بلا استبدال الرئيسية. P7-07 لا تُمرَّر بلاطات DEF-012 الفارغة. P7-10 السداد من الحوار. P7-12 الاعتماد والرفض من المتحكّم. P7-14 إرسال المربوط وغير المربوط لا تخطيط النموذج فقط |
 | مطور الواجهة | P7-16 الصينية والإذن والقفل والنقر على المسجّل والفتاحة الحقيقيين. P7-17 الخلفية، والقتل Not supported بلا FCM. P7-18 مصفوفة 29/33/34. P7-22 التدوير |
-| DevOps | P7-23 إقلاع release على جهاز ضعيف. P7-25 ثم P7-24 التاريخ الطويل. P7-26 تجهيز الأجهزة والبناء والنموذج |
+| DevOps | بعد #52 يبقى: رقم P7-23 وP7-24 على الجهاز الضعيف في النموذج، وعتبة علي، ونصف الجهاز من P7-25، ونموذج P7-26 على الهواتف A–D. سير المحاكي لا يملأ النموذج |
 
 ### فهرس `P7`
 
@@ -361,6 +366,53 @@ flutter build apk --release \
 5. **العيوب.** عيب جديد من DEF-020 فصاعدًا في [`docs/acceptance/defects.md`](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/blob/cursor/acceptance-docs-13b0/docs/acceptance/defects.md) على [#12](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/12). التالي الحر عند كتابة هذه الخطة: **DEF-020**. لا يُغلق DEF-002 ولا DEF-012 من طلب مرحلة 7 إلا بقرار علي أو ببيانات الإعدادات. DEF-019 يبقى مفتوحًا وغير مانع حتى يُصلح تكرار تسجيل الجهاز.
 6. **لا دمج من هذه الخطة.** المراجعة لا تدمج `main`. لا دفع قسري.
 7. **المستوى مكتوب** على الاختبار أو في وصف الطلب: unit أو widget أو integration أو device أو staging. اختبار Fake لا يُغلق صفًا حالته Device-only أو شرطه staging.
+
+### مراجعة #52 — الأداء والتاريخ الطويل
+
+الطلب [#52](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/52) مسودة. الرأس `dc713ffd09442d0499ab2270ef88ce7f5f47a1a1`. الأب والأساس `main` `a5ca26809578dd013430dcaae78c517043e95491`. الفرع `cursor/phase7-performance-cc01`. 31 ملفًا. لم يُدمج. هذه المراجعة لم تدفع إلى فرعه ولم تغيّر كود الإنتاج. لا توقيع.
+
+**الحكم:** yes with notes. لم يُفتح DEF-020.
+
+`tool/check.sh` على هذا الرأس، شجرة محلية `/tmp/wt-52`، رمز الخروج 0:
+
+| الخطوة | النتيجة |
+|---|---|
+| `flutter analyze` للتطبيق | `No issues found! (ran in 4.9s)` |
+| `flutter test --exclude-tags screenshots` | **375/0** |
+| `flutter analyze` في `packages/api_layer` | `No issues found! (ran in 2.5s)` |
+| `flutter test` في `packages/api_layer` | **155/0** |
+| `--tags permissions-negative` التطبيق | **27/0** |
+| `--tags permissions-negative` الحزمة | **23/0** |
+| dry-run | **6/0** |
+| `preflight_test.sh` | `preflight_test ok` |
+| `scan_release_apk.py --self-test` | `scan_release_apk self-test ok` |
+| `USE_FAKE_API=true` في release | `Release compilation rejected USE_FAKE_API=true.` |
+| حارس الإصدار | **4/0** |
+
+CI التشغيل `39707007033` أخضر: Analyze, test, and debug APK نجاح (7m38s)، وNegative permission tests نجاح (1m21s)، وRelease build rejects fake API نجاح (4m51s). الرابط: https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions/runs/39707007033
+
+**تغيير `lib/` و`packages/api_layer/lib`:** 16 ملفًا، +1205/−91. المبرر: نافذة `HistoryWindow` (`eagerLimit` ‏24، `retainLimit` ‏80، `notificationRetain` ‏120) حتى يمشي دفتر 800 سطرًا دون بناء كل الصفوف، وكتالوج `FakeLargeCatalog` يُختار بـ `FAKE_DATASET=large` في debug وprofile والاختبار. بانٍ الإصدار `fake_client_builder_release.dart` يرمي `StateError` إذا وُجد `fakeDataset` ولا يستورد الكتالوج ولا `FakeApiClient`. القوائم التي طولها 24 أو أقل تبقى شجرة كاملة، واختبار المجموعة القياسية يتوقع أقل من 24 زبونًا وبلا `lc_00000`. الأثر: أثناء مشي الدفتر تُحذف الصفوف الأقدم بعد 80 سطرًا في `_extra`، و`NotificationsController.loadOlder` يرجع عند 120 صفًا ويصفّر `nextBefore`. القوائم القصيرة لم تتغير. هذا لا يغلق نموذج الهاتف.
+
+**P7-24 وP7-25 ومنع الاستبدال.** `test/p7_long_history_test.dart` يبني الطبقة بـ `ApiLayer.create` و`useFakeApi: true` و`FakeDataset.large` داخل `pumpFakeApp`، ثم يسجّل الدخول ويفتح `/customers/lc_00000` عبر `GoRouter`. زر `load-older` هو `TextButton` الشاشة، و`_LoadOlderLedgerState._load` ينادي `apiLayerProvider.accounts.ledger(section, id, before: cursor)`. لا تجاوز لمتحكّم الدفتر. الصفحة الأولى معروضة، و19 ضغطة تصل إلى المفتاح `ledger-pages-20`. الاختبار يستدعي `onPressed` لأن شريط الصدفة العريض يغطي مركز الزر؛ المعالج هو `_load`. الحزمة `pumpFakeApp` تستبدل أيضًا بوابة الدفع والاتصال ومخازن الإشعار، وهذه ليست متحكّم القائمة.
+
+`packages/api_layer/test/fake_large_dataset_test.dart` يمشي `FakeApiClient` مباشرة: 20 صفحة و`seen == 800` (`ledgerLineCount`). زيادة الطول تكشف التداخل، ونقصه يكشف الفجوة. لا مجموعة معرّفات، فتبديل معرّف مع ثبات العدد يمر. الشاشة لا تجمع المعرّفات لأن `_extra` يُقص إلى آخر 80. الصفحة الأولى تبقى في قائمة الشاشة الأولى. صفوف الكتالوج تُولَّد من الفهرس `ltx_` و`_ledgerStart` يقدّم المؤشر بمقدار واحد. اختبارا الزبائن والإشعارات في الودجت يتحققان من أن المبني أقل من `pageSize` ولا يمشيان حتى آخر صفحة. مشي الإشعارات في المتحكّم يتوقف عند 120، وهو ليس مشي دفتر P7-25.
+
+**P7-23.** القياس في `tool/measure_release_cold_start.sh`: `flutter build apk --release` مع `USE_FAKE_API=false` و`API_BASE` من `STAGING_API_BASE`. السكربت يخرج إن كان الأصل فارغًا أو `classify_origin` ليس `ok`، ولا يطبع السر. `am start -W` ثلاث عينات ووسيط `TotalTime`، ثم `flutter drive --release` لاختبار `integration_test/p7_release_cold_start_test.dart`، ثم حذف `build/app/outputs/flutter-apk` و`build/app/outputs/apk`. النسخة التي تحمل اسم المدير وكلمة المرور لا تُرفع. السطر `PHASE7 p7_23_acceptance=recorded`. إن تجاوز الوسيط 5000 مللي ثانية على جهاز أو 20000 على محاكٍ يصير خروج السكربت 1. اختبار التكامل يتخطى المضيف وأي تشغيل `USE_FAKE_API` (الافتراضي true) ويطبع `p7_23=skipped`. على الوضع الحقيقي يفشل إن نقص `API_BASE` أو اسم المدير أو كلمة المرور، ويفشل إن تجاوز زمن المنزل 60000. زمن المنزل داخل العملية رقم ثانٍ. إقلاع العملية حتى أول إطار هو `am start -W`. الجهاز D هاتف ضعيف. `release_fake_api_guard_test.dart` يتحقق أن مصدر الباني لا يحتوي `FakeApiClient` ولا `fake_large_catalog` ولا `FakeLargeCatalog` ولا `FAKE_DATASET`. لا مقياس ذاكرة (لا RSS ولا heap).
+
+**الإطارات.** `integration_test/p7_long_history_test.dart` يطبع `PHASE7 p7_24_frame_count` و`p7_24_worst_build_ms` و`p7_24_average_build_ms` و`p7_24_acceptance=recorded`. على المضيف النتيجة `report-only`. على الجهاز والمحاكي `fail()` إذا غابت الإطارات أو تجاوزت `PerfBudget` (تجميد 500 مللي ثانية، وأسوأ إطار جهاز 32، ومتوسط جهاز 16.7). الودجت يفرض ساعة حائط أقل من 8 ثوانٍ داخل المجموعة العادية. `docs/testing/PHASE7_PERFORMANCE.md` يقول إن بوابة خضراء تبقى `recorded` في جدول البروتوكول حتى يكتب علي العتبة. سير التاريخ الطويل profile مع `USE_FAKE_API=true` و`FAKE_DATASET=large`، وهو ليس APK الإصدار.
+
+**P7-26.** `.github/workflows/android-performance.yml` اسمه `Android performance`. ليس من فحوص طلب السحب المطلوبة. المشغّلات `workflow_dispatch` و`schedule` `30 4 * * *`. لا `pull_request` ولا `push`. التعليق في الملف يقول إن `workflow_dispatch` لا يُشغَّل حتى يصل الملف إلى الفرع الافتراضي. المصفوفة API ‏29 و33 و34، صورة Nexus 6 ‏`google_apis` ‏`x86_64`. الصلاحيات `contents: read` و`actions: write`. أسرار `STAGING_API_BASE` و`STAGING_ADMIN_USERNAME` و`STAGING_ADMIN_PASSWORD` من بيئة `staging` عبر `${{ secrets.* }}`، غير مكتوبة في المستودع. لا `google-services.json` في ملفات الطلب. بناء الحجم release مع `USE_FAKE_API=false` و`API_BASE=https://staging.example.com`؛ الوثيقة تقول إن preflight يرفض هذا المضيف وإن هذا الـ APK ليس تثبيت البروتوكول. إقلاع الإصدار يفشل مغلقًا إذا كان `STAGING_API_BASE` غير مضبوط. الرفع `if: always()` بالأسماء `phase7-apk-size` و`phase7-long-history-api-*` و`phase7-cold-start-api-*`، و`if-no-files-found: warn`.
+
+**النموذج.** أعمدة `docs/testing/PHASE7_PERFORMANCE.md` هي أعمدة القسم ب: device، OS/API، build SHA، tester، date، step، expected، actual، pass/fail، screenshot ref، defect id. القيم Pass وFail وBlocked وNot supported. P7-23 وP7-24 يبقيان `recorded` حتى عتبة علي. النص يقول إن سجل المحاكي ليس نموذج البروتوكول، وإن الجهاز D هاتف ضعيف. الربط يغطي الخطوات 1 و9 و24 و25 من قائمة الخمس والعشرين. تمرير التاريخ الطويل على الهاتف يُبنى profile مع Fake ويُسمّى كذلك. صف الإصدار هو إقلاع الخطوة 24. الوثيقة لا تغلق DEF-002 ولا DEF-012 ولا DEF-019، وتوجّه العيب الجديد إلى `defects.md` على #12.
+
+**merge-tree.** ضد `origin/main` `a5ca26809578dd013430dcaae78c517043e95491`: خروج 0 وشجرة `f61019fa9729779228b9ef6a3cf67a8501ed0a43`. ضد رأس #48 `e98d85e5b1a7853384ab2885717418ce00649ff3`: خروج 0 وشجرة `e0de622c4854e4c81bb7f0cd6c5d84e5d8d866fa`. لم يُنشأ دمج.
+
+| المعرف | الحالة بعد #52 | الدليل |
+|---|---|---|
+| P7-23 | Partial | release و`am start -W` يطبعان `acceptance=recorded`، ويفشلان مغلقين بلا أصل staging مقبول. ميزانية هندسية إضافية (5000 / 20000 وخروج 1، وسقف منزل 60000). نموذج الجهاز فارغ. |
+| P7-24 | Partial | إطارات الشاشة الحقيقية تُطبع `recorded`، وسير المحاكي profile مع Fake يفشلها إن تجاوزت الميزانية. لا مقياس ذاكرة. النموذج فارغ. |
+| P7-25 | Partial | 20 صفحة عبر `load-older` و`FakeApiClient`، والمجموع 800. الشاشة تحتفظ بآخر 80 سطرًا أقدم. نصف الجهاز مفتوح. ساعة الودجت أقل من 8 ثوانٍ مفروضة. |
+| P7-26 | Device-only | سير المحاكي نصف البروتوكول. أعمدة النموذج مطابقة والصفوف فارغة. التشغيل اليدوي ينتظر وصول الملف إلى `main`. |
 
 ---
 
