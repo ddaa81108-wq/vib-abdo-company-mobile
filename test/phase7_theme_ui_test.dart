@@ -6,11 +6,14 @@ import 'package:vib_abdo_company_mobile/state/theme_controller.dart';
 import 'support/phase7_ui.dart';
 import 'support/pump_app.dart';
 
-bool get _skipDef020 => true;
-bool get _skipDef021 => true;
-bool get _skipDef022 => true;
+/// QA's registry already uses DEF-020, DEF-021, and DEF-022 for other defects.
+/// Login brand is DEF-023, the light sidebar role is DEF-024, and dark primary
+/// text plus cashPositive is DEF-025. The next free number is DEF-026.
+bool get _skipDef023 => true;
+bool get _skipDef024 => true;
+bool get _skipDef025 => true;
 
-/// Pairs the skipped contrast tests already record. Anything else still fails.
+/// Pairs DEF-023, DEF-024, and DEF-025 already record. Anything else still fails.
 bool _knownContrast(String failure) {
   const pairs = [
     '#eab600 on #e5edf6',
@@ -41,11 +44,11 @@ void main() {
     });
   });
 
-  testWidgets('login brand stays readable on the light scaffold', (
+  testWidgets('DEF-023 login brand stays readable on the light scaffold', (
     tester,
   ) async {
-    if (_skipDef020) {
-      markTestSkipped('DEF-020 known failure');
+    if (_skipDef023) {
+      markTestSkipped('DEF-023 known failure');
       return;
     }
     await pumpFakeApp(tester, size: const Size(800, 1400));
@@ -54,9 +57,11 @@ void main() {
     expect(brand, isEmpty);
   });
 
-  testWidgets('the sidebar role stays readable in light mode', (tester) async {
-    if (_skipDef021) {
-      markTestSkipped('DEF-021 known failure');
+  testWidgets('DEF-024 the sidebar role stays readable in light mode', (
+    tester,
+  ) async {
+    if (_skipDef024) {
+      markTestSkipped('DEF-024 known failure');
       return;
     }
     await pumpFakeApp(tester, size: const Size(800, 1600));
@@ -66,9 +71,11 @@ void main() {
     expect(role, isEmpty);
   });
 
-  testWidgets('dark theme text stays readable', (tester) async {
-    if (_skipDef022) {
-      markTestSkipped('DEF-022 known failure');
+  testWidgets('DEF-025 dark primary text and cash amounts stay readable', (
+    tester,
+  ) async {
+    if (_skipDef025) {
+      markTestSkipped('DEF-025 known failure');
       return;
     }
     await pumpFakeApp(tester, size: const Size(800, 2400));
