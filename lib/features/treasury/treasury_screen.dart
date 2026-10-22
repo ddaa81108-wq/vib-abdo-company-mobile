@@ -386,14 +386,12 @@ class _Egyptian extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Absence of the server rate text. `rateMissing` is the same signal,
+    // derived in the model when `egyptianRate` is null. No other field is read.
     final missing = data.rateMissing || data.egyptianRate == null;
     final scheme = Theme.of(context).colorScheme;
-    final source = missing
-        ? AppStrings.dash
-        : money.formatOrDash(data.egyptianSourceUnits, Currency.egp);
-    final converted = missing
-        ? AppStrings.dash
-        : money.formatOrDash(data.egyptianConvertedUnits, Currency.lyd);
+    // The original EGP amount is the server field, with or without a rate.
+    final source = money.formatOrDash(data.egyptianSourceUnits, Currency.egp);
     return Card(
       child: Padding(
         padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
@@ -404,8 +402,15 @@ class _Egyptian extends StatelessWidget {
               AppStrings.egyptianTransfers,
               style: Theme.of(context).textTheme.labelLarge,
             ),
-            if (missing) ...[
-              const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.sm),
+            LabeledMoney(label: AppStrings.egyptianSource, value: source),
+            const SizedBox(height: AppSpacing.xs),
+            LabeledMoney(
+              label: AppStrings.rate,
+              value: money.formatDecimalOrDash(data.egyptianRate),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            if (missing)
               Container(
                 key: const Key('rate-missing'),
                 width: double.infinity,
@@ -420,17 +425,15 @@ class _Egyptian extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall
                       ?.copyWith(color: scheme.onErrorContainer),
                 ),
+              )
+            else
+              LabeledMoney(
+                label: AppStrings.converted,
+                value: money.formatOrDash(
+                  data.egyptianConvertedUnits,
+                  Currency.lyd,
+                ),
               ),
-            ],
-            const SizedBox(height: AppSpacing.sm),
-            LabeledMoney(label: AppStrings.egyptianSource, value: source),
-            const SizedBox(height: AppSpacing.xs),
-            LabeledMoney(
-              label: AppStrings.rate,
-              value: money.formatDecimalOrDash(data.egyptianRate),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            LabeledMoney(label: AppStrings.converted, value: converted),
           ],
         ),
       ),
