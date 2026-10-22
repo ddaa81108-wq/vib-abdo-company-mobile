@@ -364,6 +364,12 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
               ?.value
               .version,
           label: AppStrings.save,
+          onVersionConflict: () {
+            ref.invalidate(ledgerProvider((widget.section, widget.id)));
+            ref.invalidate(accountCardProvider((widget.section, widget.id)));
+            ref.invalidate(accountsProvider(widget.section));
+            ref.invalidate(homeDashboardProvider);
+          },
           onSubmit: _submit,
         ),
       ],
@@ -419,7 +425,11 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       Navigator.of(context).pop(true);
       return null;
     } catch (error) {
-      return failureText(ref.read(errorHandlerProvider).toFailure(error));
+      // A returned string never reaches GuardedMutation's conflict path.
+      // Rethrow so it refetches and shows the shared conflict sentence.
+      final failure = ref.read(errorHandlerProvider).toFailure(error);
+      if (failure.code == 'VERSION_CONFLICT') rethrow;
+      return failureText(failure);
     }
   }
 }
