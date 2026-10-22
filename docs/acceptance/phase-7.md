@@ -29,7 +29,7 @@
 | مطور الواجهة | 4 | 2 | 2 | 0 |
 | DevOps | 3 | 0 | 2 | 1 |
 
-لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. البند 19 يبقى Device-only. لا توقيع.
+لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. البند 19 يبقى Device-only. لا توقيع.
 
 أكبر الفجوات لكل مالك في نهاية القسم أ.
 
@@ -487,6 +487,56 @@ CI التشغيل `39708173062` أخضر على هذا الرأس: Analyze, test
 | P7-14 | Partial (DEF-021) |
 
 البندان 4 Covered. البنود 5 و6 و7 و8 و9 Partial. DEF-002 وDEF-012 وDEF-019 على حالها.
+
+### إعادة اختبار #51 — الرأس `e34504c`
+
+الطلب [#51](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/51) ما زال مسودة. الرأس `e34504c5ee28bca367575ffe9ba2f0edde2817e0`. السابق `8aec37ee29107bb33541499f9e3be595f422919d`. الأساس `main` `a5ca268`. الفرع `cursor/phase7-tests-3169`. التزام واحد فوق المراجعة الأولى: «Use the real buildAppRoot retry callback for the 403 test». الفرق عن `8aec37e` ملف اختبار واحد، +30/−22. فرق `lib/` و`packages/api_layer/lib` فارغ مقابل `8aec37e` ومقابل `main`. مقابل `main` ما زال 11 ملف اختبار، +1451. لم يُدمج. هذه الجولة لم تدفع إلى فرعه. لا توقيع.
+
+**الحكم:** yes with notes. الأعداد لم تتغير. P7-10 يبقى Partial. DEF-020 يبقى Open ومانعًا.
+
+CI التشغيل [39710370296](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions/runs/39710370296) أخضر على هذا الرأس: Analyze, test, and debug APK، وNegative permission tests، وRelease build rejects fake API. الالتزام في التشغيل هو `e34504c`.
+
+`tool/check.sh` على `/tmp/wt-51b`، خروج 0. الأرقام تطابق الادعاء:
+
+| الخطوة | النتيجة |
+|---|---|
+| `flutter analyze` للتطبيق | `No issues found! (ran in 5.7s)` |
+| `flutter test --exclude-tags screenshots` | **410/0** |
+| `flutter analyze` في `packages/api_layer` | `No issues found! (ran in 3.2s)` |
+| `flutter test` في `packages/api_layer` | **153/0** |
+| `--tags permissions-negative` التطبيق | **32/0** |
+| `--tags permissions-negative` الحزمة | **26/0** |
+| dry-run | **6/0** |
+| `preflight_test.sh` | `preflight_test ok` |
+| `scan_release_apk.py --self-test` | `scan_release_apk self-test ok` |
+| `USE_FAKE_API=true` في release | `Release compilation rejected USE_FAKE_API=true.` |
+| حارس الإصدار | **4/0** |
+
+**جدول الوصف.** صف DEF-020 صار في جدول المصفوفة في وصف الطلب: `DEF-020 a partial payment above the remaining balance is stored`، والنتيجة المكتوبة «Known bug. 400 on a 320 balance is stored as -80. Does not close a cap.» الاختبار في `test/phase7_payments_test.dart` يتوقع الرأس `-80 د.ل` بعد إدخال 400 على `c_55`، والوسم `known-bug`. تعليق `dart_test.yaml` يقول إن الوسم يثبت السلوك الحالي وليس Pass. التشغيل الافتراضي يضم الوسم، فالاختبار داخل الـ 410 الناجحة. هذا توثيق للعيب المفتوح، لا إغلاق لمتطلب السقف. P7-10 يبقى Partial بسبب DEF-020 وDEF-022. البند 7 يبقى Partial.
+
+**منع الاستبدال في اختبار 403.** `a 403 is not retried by the buildAppRoot callback` يستدعي `buildAppRoot` ويقرأ الحقل `retry` من `ProviderScope` الراجع. الدالة الممرَّرة إلى `ProviderContainer` هي تلك الدالة، لا نسخة منسوخة من فرع `lib/main.dart`. الاستثناء يُرمى من `FutureProvider` محلي، والنداء مرة واحدة عند 403. نفس الدالة تُستدعى مباشرة: 401 جلسة و403 يرجعان `null`، و404 يطابق `ProviderContainer.defaultRetry`. البديل هو `ApiLayer.create(useFakeApi: true)` و`MemoryDeviceTokenStore` لأن توقيع الجذر يطلبهما. `CompanyApp` لا يُضخ. الاختبار في جدول «اختبارات أخرى» وليس صف إغلاق. ملاحظة النسخ في مراجعة `8aec37e` انتهت على هذا الرأس.
+
+**merge-tree.** خروج 0. لم يُنشأ دمج. لا ملف مشترك مع #48 أو #49 أو #50 أو #52.
+
+| الطرف | الشجرة |
+|---|---|
+| `main` `a5ca26809578dd013430dcaae78c517043e95491` | `9da14af43073e3fc7a67a8ee693e087fe9c2f20d` |
+| #48 `f376b9bb5a0d6a9932f55957131794fbf37d16bc` | `b0da38ec9a60640bf442bff6c829ab6fe68245a0` |
+| #52 `f8f7812d203bd09fe0c5c124748d043694f3f5f9` | `410b8e52346c38bfa8ac3aa7caa4391d4f19e824` |
+| #49 `546a62342eb78140d550abdfd138de5e0821c77a` | `8406bbc3e892c307f50c6a2c55b91f5c345a411e` |
+| #50 `b7900a2c555aa3cccb3b562ed5f33b6f787fd527` | `71ad271eca01245934b761f1369b280b19123e87` |
+
+| المعرف | الحالة بعد إعادة #51 |
+|---|---|
+| P7-05 | Covered |
+| P7-06 | Covered |
+| P7-07 | مفتوح (DEF-012) |
+| P7-08 | لم يُضف |
+| P7-10 | Partial (DEF-020، DEF-022) |
+| P7-12 | Covered |
+| P7-14 | Partial (DEF-021) |
+
+البند 4 يبقى Covered. البنود 5–9 تبقى Partial. التالي الحر DEF-026.
 
 ### إعادة اختبار #52 — الرأس `f8f7812`
 
