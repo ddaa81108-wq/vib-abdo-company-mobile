@@ -29,7 +29,7 @@
 | مطور الواجهة | 4 | 2 | 2 | 0 |
 | DevOps | 3 | 0 | 2 | 1 |
 
-لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. مراجعة #56 على `9c0fa4f` لا تغيّر الأعداد: Covered ‏3 وPartial ‏15 وDevice-only ‏1. البند 19 يبقى Device-only. لا توقيع.
+لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. مراجعة #56 على `9c0fa4f` لا تغيّر الأعداد: Covered ‏3 وPartial ‏15 وDevice-only ‏1. مراجعة #53 و#54 و#55 لا تغيّر الأعداد. البند 19 يبقى Device-only. لا توقيع.
 
 أكبر الفجوات لكل مالك في نهاية القسم أ.
 
@@ -127,7 +127,9 @@
 - **المالك:** Senior Flutter
 - **الموجود:** `packages/api_layer/test/qa_defects_round1_test.dart`: `DEF-003 full payment stores balance 0`، `partial payment stores the new balance and rejects a stale version`، `DEF-016 partial payment and cancel publish the stored home balance`. `test/qa_defects_round1_test.dart`: `DEF-003 full payment refreshes the ledger header and the list`، `DEF-016 a partial payment shows the stored home balance`، `DEF-016 full payment no longer shows the 320 home debt row`. `test/transaction_correction_test.dart` `full payment sends a chosen date and omits an unchosen one`. `packages/api_layer/test/v027_fields_test.dart` `full payment omits a date the user did not choose`. `test/write_safety_test.dart` `a payment dialog ignores a second confirm while the send is in flight`. القبول: P2-03، P2-04، P2-05، P2-06.
 - **بعد #51:** `P7-10 a partial payment then a full payment on the same card` من `add-payment` ثم `full-payment` على `c_55`، والنقرة الثانية أثناء الإيقاف طلب واحد، والرأس 220 ثم 0. DEF-020 وDEF-022 يمنعان إغلاق الصف. P7-11 staging باقٍ.
-- **الفجوة:** **P7-10** المسار السعيد موجود والصف Partial بسبب DEF-020 وDEF-022. **P7-11** المطابقة على staging مقابل الويب.
+- **الفجوة:** **P7-10** المسار السعيد موجود والصف Partial بسبب DEF-020 وDEF-022 على `main`. **P7-11** المطابقة على staging مقابل الويب.
+- **بعد #53:** حوار السداد المباشر يرفض 400 و321 قبل POST، ويقبل 320. `320.01` يرفضه `parseUnits`. المقارنة من رصيد المزوّد المخزَّن لا من GET جديد. رد الخادم التجريبي 400 `VALIDATION_ERROR` مؤقت. القسمة والضرب بلا مقارنة، والسؤال مفتوح. لم يُدمج. الحالة Partial.
+- **بعد #55:** تعارض الإصدار يعيد الرمي، والرأس يصير `319 د.ل` قبل إغلاق الحوار وبعد العودة. لم يُدمج. الحالة Partial.
 - **منع الاستبدال:** لا متحكّم دفتر يضع الرصيد 0 محليًا. الأمانات لا تُمرَّر فيها سداد كامل إن كان الزر غائبًا (P2-04).
 - **المستوى:** unit + widget. P7-11 staging.
 - **الحالة:** Partial
@@ -147,7 +149,8 @@
 - **المالك:** Senior Flutter
 - **الموجود:** `test/collections_presentation_test.dart`: `the unlinked and assignment forms stay inside a narrow large-text sheet`، `approved unlinked receipts keep the locked status colour`. `test/unlinked_receipt_actions_test.dart` `a pending receipt is not offered cash until the server says so`. `packages/api_layer/test/qa_defects_round1_test.dart` `unlinked decision stores status and version and rejects a stale one`. القبول: P3-07، P3-08، P3-09، P3-10.
 - **بعد #51:** الإرسال من `submit-as_1` و`save-unlinked` حقيقي، والنظرة لا تحتوي الصف الجديد (DEF-021). ربط `ur_1` يخزّن `customerId` ولا يحرّك رصيد `c_55`. P7-15 staging باقٍ.
-- **الفجوة:** **P7-14** Partial بسبب DEF-021. **P7-15** الزوج نفسه على staging.
+- **الفجوة:** **P7-14** Partial. الإبطال وإعادة القراءة كانا على الشاشة. الغياب من النظرة عيب `FakeApiClient`. **P7-15** الزوج نفسه على staging.
+- **بعد #54:** الخادم التجريبي يخزّن `sb_posted_1` و`ur_posted_1`، والحواران الحقيقيان يُظهرانهما على الشاشة نفسها. لا فرق في `lib/`. DEF-021 صار عيب بديل اختبار. فحص الخادم الحقيقي باقٍ. لم يُدمج. الحالة Partial.
 - **منع الاستبدال:** لا `onSubmit` فارغ. حالة الربط تُقرأ من الرد (`assignment` / غياب الربط) لا من علم اختبار.
 - **المستوى:** widget. P7-15 staging.
 - **الحالة:** Partial
@@ -258,7 +261,7 @@
 | المالك | ما يُكتب أولًا |
 |---|---|
 | مهندس API | بعد #56 على `9c0fa4f` يبقى: دخان P7-01 (not run بلا أسرار staging)، ودخول الأدوار على staging، وP7-03 على الجهاز، ومصفوفة P7-04 الحية، وطيران P7-19، وعودة الراديو، ودفتر staging لـ P7-20 وP7-21. السؤال المفتوح: هل `GET /api/me` هو العقد؟ |
-| Senior Flutter | بعد #51: P7-05 وP7-06 وP7-12 مغلقة على الودجت ولم تُدمج. يبقى P7-07 مع DEF-012، وP7-08، وP7-10 مع DEF-020 وDEF-022، وP7-14 مع DEF-021، وصفوف staging P7-09 وP7-11 وP7-13 وP7-15 |
+| Senior Flutter | بعد #53 و#54 و#55 يبقى P7-10 وP7-14 Partial لأن الإصلاحات لم تُدمج. DEF-020 وDEF-022 مفتوحان على `main`. DEF-021 عيب بديل اختبار، وفحص staging باقٍ. P7-07 مع DEF-012، وP7-08، وصفوف staging P7-09 وP7-11 وP7-13 وP7-15 |
 | مطور الواجهة | بعد #49 يبقى الجهاز لـ P7-16 وP7-17 وP7-18 وP7-22. قتل العملية Not supported بلا FCM. DEF-023 وDEF-024 وDEF-025 مفتوحة وغير مانعة |
 | DevOps | بعد إعادة اختبار #52 على `f8f7812` يبقى: رقم P7-23 وP7-24 على الجهاز الضعيف في النموذج، وعتبة علي، ونصف الجهاز من P7-25، ومجموعة المعرّفات على مشي الحزمة لا على الشاشة، ونموذج P7-26 على الهواتف A–D. سير المحاكي لا يملأ النموذج |
 
@@ -865,6 +868,81 @@ CI التشغيل [39711134480](https://github.com/ddaa81108-wq/vib-abdo-company
 | إلغاء أثناء انتظار 250 مللي ثانية | المستقبل `DioExceptionType.cancel`، وبعد 400 مللي ثانية إضافية النداء ما زال واحدًا |
 
 **عدّ الاختبارات الجديدة.** 53 اختبارًا مسجّلًا، لا 52. التفصيل: عقد 21، وP7-02 جلسة 7، وP7-01 دخان 1 (المتخطى)، وسياسة إعادة 8، ومفتاح كتابة 4، وP7-04 أدوار 7 (خمسة في الحلقة زائد اثنان)، وودجت دخول 1، وP7-19 اثنان، وP7-20/P7-21 ودجت 2. في `check.sh` نجح 52 وتخطى 1. الـ 52 هي الناجحة فقط.
+
+---
+
+### مراجعة #53 و#54 و#55 — DEF-020 وDEF-021 وDEF-022
+
+ثلاثة طلبات مسودة من `main` `a5ca268`. لم يُدمج أي منها. هذه الجولة لم تدفع إلى فروعها. لا توقيع. التالي الحر DEF-026. الأعداد لم تتغير: Covered ‏3، وPartial ‏15، وDevice-only ‏1.
+
+الحزام `pumpFakeApp` يستبدل أيضًا بوابة الدفع ومخازن الإشعار والاتصال و`sdkInt`. الحوار والمتحكّم والمزوّدات التي يختبرها الطلب لا تُستبدل. بديل الخادم في الاختبار هو `FakeApiClient`.
+
+اختبارات `known-bug` على #51 `e34504c` ما زالت تتوقع السلوك القديم (`-80 د.ل`، وغياب الصف، وبقاء الرأس 320). `merge-tree` معها نظيف لأن الملفات لا تتقاطع، والجمع المنطقي يفشل حتى يُحدَّث #51. هذه الفروع لا تعدّل #51.
+
+#### #53 — DEF-020
+
+الطلب [#53](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/53). الرأس `08e6b132c3d9bd450d463970da49ad3118fe8cba`. CI [39710423501](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions/runs/39710423501) أخضر على هذا الالتزام.
+
+**الحكم:** yes with notes. DEF-020 يبقى Open وBlocking على `main`.
+
+`tool/check.sh` على `/tmp/wt-53`، خروج 0:
+
+| الخطوة | النتيجة |
+|---|---|
+| `flutter analyze` للتطبيق | `No issues found! (ran in 5.8s)` |
+| `flutter test --exclude-tags screenshots` | **372/0** |
+| `flutter analyze` في `packages/api_layer` | `No issues found! (ran in 2.4s)` |
+| `flutter test` في `packages/api_layer` | **152/0** |
+| السالب | **27/0** (7 ملفات) و**23/0** (6 ملفات) |
+| dry-run | **6/0** |
+| `preflight_test.sh` | `preflight_test ok` |
+| `scan_release_apk.py --self-test` | `scan_release_apk self-test ok` |
+| `USE_FAKE_API=true` في release | `Release compilation rejected USE_FAKE_API=true.` |
+| حارس الإصدار | **4/0** |
+
+**`lib/`:** `ledger_screen.dart` و`strings.dart` و`fake_api_client.dart`. المقارنة `units > remaining` بعد `parseUnits`، للسداد المباشر فقط. لا طرح في الحوار. الرسالة `المبلغ أكبر من المتبقي المسجّل.`.
+
+اختبار الطلب: 400 على `c_55` يبقي الحوار، وبلا مسار `/transactions` جديد، والرأس `320 د.ل`، والمخزَّن 320 والإصدار 4. مسبار محلي ثم حُذف: 321 يُمنع بلا POST، و320 يُرسل ويصير الرصيد 0 والإصدار 5، و`320.01` جملة العدد الصحيح بلا رسالة السقف وبلا POST. بعد سداد خارجي 200 والمزوّد ما زال 320، إدخال 150 يُرسل ولا يُمنع بالسقف، والرأس يبقى 320، والمخزَّن 120 والإصدار 5. الحارس يقرأ آخر جلب في `accountCardProvider` ولا يجلب قبل الحفظ.
+
+الخادم التجريبي يرفض الزائد بـ 400 `VALIDATION_ERROR` قبل تغيير الإصدار والرصيد. **مؤقت، وليس عقدًا.** السؤال المفتوح لمالك الخادم: هل هذا الرفض عقد الخادم، وبأي حالة ورمز؟ القسمة بمعامل 2 ومبلغ 400 تُرسل في المسبار، والرأس يبقى 320، لأن المعامل ليس مبلغًا. هل يُرفض ناتج القسمة أو الضرب إذا تجاوز المتبقي؟ غير محسوم، لأن حساب الناتج ممنوع على العميل.
+
+`test/write_safety_test.dart` صار يدخل 100 بعد أن صار 180 فوق المتبقي 140.
+
+#### #54 — DEF-021
+
+الطلب [#54](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/54). الرأس `dc6c5c893f758b834cb23da33ee7e984d8ea58c4`. CI [39711511958](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions/runs/39711511958) أخضر على هذا الالتزام.
+
+**الحكم:** yes with notes. أُعيد تصنيف DEF-021 عيب بديل اختبار بلا أثر إنتاج. يبقى Open على `main` حتى الدمج. فحص staging للخادم الحقيقي باقٍ.
+
+`tool/check.sh` على `/tmp/wt-54`، خروج 0: التحليل 5.4s و2.3s، التطبيق **372/0**، الحزمة **152/0**، السالب **27/0** و**23/0**، dry-run **6/0**، الحارس **4/0**، ورفض Fake.
+
+**`lib/`:** `fake_api_client.dart` فقط. لا ملف تطبيق. `_AssignmentFormState._submit` و`_UnlinkedFormState._submit` كانا يناديان `ref.invalidate(collectionsProvider)` بعد النجاح. `collectionsProvider` ينادي `collections.overview()`. اختبار الودجت يفتح `submit-as_1` و`save-unlinked`، وتظهر البطاقتان `sb_posted_1` و`ur_posted_1` قبل مغادرة الشاشة، ثم بعد العودة. تكرار `requestId` يعيد الصف نفسه عبر `_mutate`. تعيين `as_9` للموظف 404. القرار على الإصدار المخزَّن ينجح. المقاييس الحرفية لا تُجمع من الصف الجديد.
+
+#### #55 — DEF-022
+
+الطلب [#55](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/55). الرأس `fc140f910fd08d6fa215a70892bd44a86b55eb2c`. CI [39710591725](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions/runs/39710591725) أخضر على هذا الالتزام.
+
+**الحكم:** yes with notes. الرأس يتحدث على الشاشة نفسها قبل التنقل. DEF-022 يبقى Open وBlocking على `main`. P7-10 يبقى Partial.
+
+`tool/check.sh` على `/tmp/wt-55`، خروج 0: التحليل 5.5s و2.3s، التطبيق **372/0**، الحزمة **150/0**، السالب **27/0** و**23/0**، dry-run **6/0**، الحارس **4/0**، ورفض Fake.
+
+**`lib/`:** `ledger_screen.dart` فقط. `_submit` يعيد رمي `VERSION_CONFLICT`. غير ذلك يُعاد `failureText` ويبقى الحوار. `onVersionConflict` يُبطل الكارت والدفتر والقائمة والرئيسية مرة واحدة من `_presentFailure`. لا إبطال ثانٍ في `_submit`. 409 لا ينهي الجلسة. الاختبار يتوقع الجملة `تم تعديل البيانات. أُعيد الجلب من الخادم.` وغياب جملة الخادم، والرأس `319 د.ل` قبل `Navigator.pop`، ثم بعد العودة. المخزَّن 319 والإصدار 5. لا `220 د.ل`.
+
+#### merge-tree
+
+خروج 0 في كل طرف. لم يُنشأ دمج. #53 و#54 يشتركان في `fake_api_client.dart` والدمج تلقائي. #53 و#55 يشتركان في `ledger_screen.dart` والدمج تلقائي. #54 و#55 بلا ملف مشترك. #52 يشترك مع #53 في الملفين ومع #54 في الخادم التجريبي ومع #55 في شاشة الدفتر، والدمج تلقائي. #50 يشترك مع #53 و#54 في `fake_api_client.dart`. لا ملف مشترك مع #48 أو #49 أو #51 أو #56.
+
+| الطلب | `main` | #48 | #49 | #50 |
+|---|---|---|---|---|
+| #53 | `6602b858a0f3ba24447e5e3382648d1ba6c5996e` | `d1648bcac8670c902f0b94c9835ef5198d514e0a` | `75f4a6394efd36a69d14f2b0bce9826ee075950b` | `a8469fdc7a21f3868e73fbcfc12e3142dffd8be8` |
+| #54 | `866b980027a04976f6bae42ee0d0e662a5d6c4cd` | `d36d3126549e2ec801d1d9411460fe2377cb880b` | `43b77b6524a17062c8a86ee8538485c4b5894df7` | `c75e8aefedc3641510e29b9c1ac2d9df34cfee50` |
+| #55 | `f3d82e3968c1fd69851ec534f7f511ea890035e4` | `f4b457787941cbde21225a82f8e8b94aab337ec0` | `0005eb0231c93bd336e2c93e9ad7a7d5b2085e13` | `0380aa74391c89fadf28b7c2039f7d243fc1d80b` |
+
+| الطلب | #51 | #52 | #56 | ضد بعض |
+|---|---|---|---|---|
+| #53 | `88588143bf5416f60f6f7820012ca17ddbabf496` | `2961ff47c555aeb9620b74d6c1a79aa413837822` | `77172ec880048278bb8dd4883345991b641f8018` | #54 `1f83a740af0edcd2062c41f3b3a32ec2d593346f`، #55 `025007e7e3072fd1a37608a385e4c585a59eb9e5` |
+| #54 | `f4443edc57933c242c6816ef96b4b1f73dfe22a1` | `6300a464e2030dbe2ba3d0fb8997377054809dcc` | `225835f916ceda227c5882d1d41997bdb27619c5` | #55 `844402f43fb50d2c20a215c6abb2e817ca23e731` |
+| #55 | `afc03aa76e2d8e9a73c75d99a54eb949a435e998` | `1a859242a232e900f4b220d542354fac49a9838f` | `2979e92a6102d4f372528a4d97604f556d63d338` | الشجرتان أعلاه |
 
 ---
 
