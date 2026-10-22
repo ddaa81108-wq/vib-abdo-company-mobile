@@ -7,6 +7,7 @@ import '../../core/network/precise_json.dart';
 import '../../core/network/wire_json.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/network/api_endpoints.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/error_mapper.dart';
 import '../../core/network/reachability.dart';
@@ -128,6 +129,14 @@ class FakeApiClient implements ApiClient {
   /// The next N GET /api/notifications/unread-count calls answer 404 (tests).
   int failUnreadCountRemaining = 0;
 
+  /// Registration POSTs to the existing proposed device route (tests).
+  /// Unregister posts are not counted. The token is not stored here.
+  int mobilePushRegisterPosts = 0;
+
+  /// The next N of those registration POSTs fail. A failure is still counted,
+  /// and it is not treated as a stored success by the app.
+  int failMobilePushDevicesRemaining = 0;
+
   /// The next authenticated request fails with this status, once (tests).
   /// 419 uses `PAGE_EXPIRED`, which ends the session and is not a CSRF error.
   int? failNextAuthenticatedStatus;
@@ -208,6 +217,16 @@ class FakeApiClient implements ApiClient {
   /// Unlinked receipt fields changed by a decision or cash receipt. Keyed by id.
   final Map<String, Map<String, dynamic>> _unlinkedState = {};
 
+  /// Rows stored by assignment submit and unlinked-receipt submit.
+  ///
+  /// Each row keeps the fields the request sent. `status` is `pending` and
+  /// `version` is 1, matching an undecided fixture row. `submittedByUserId`
+  /// is the same owner id the fixture already stores so the caller still sees
+  /// their own row. `cashStatus` is not written: that wire field is proposed.
+  /// Overview metrics stay the stored literals; these rows are not summed.
+  final List<Map<String, dynamic>> _extraSubmissions = [];
+  final List<Map<String, dynamic>> _extraUnlinked = [];
+
   /// Purchase day fields changed by finalize or correction. Keyed by book|day.
   final Map<String, Map<String, dynamic>> _purchaseDays = {};
 
@@ -245,6 +264,14 @@ class FakeApiClient implements ApiClient {
   static const dayFinalizedCode = 'DAY_FINALIZED';
   static const dayFinalizedMessage =
       'اليوم مرحّل. لا يمكن إضافة أو تعديل أو حذف بند.';
+
+  /// Direct partial payment larger than the stored card balance.
+  ///
+  /// Whether the real server rejects this is an open question for the
+  /// backend owner. This fake refuses the write so the stored balance cannot
+  /// change, using the same HTTP 400 `VALIDATION_ERROR` envelope as its other
+  /// rejected inputs. That code is not a confirmed server contract.
+  static const amountAboveRemainingMessage = 'المبلغ أكبر من المتبقي المسجّل.';
 
   /// Routes later public calls through [gateway] (the auth interceptor).
   void bindGateway(ApiClient gateway) => _gateway = gateway;
@@ -911,6 +938,12 @@ class FakeApiClient implements ApiClient {
       return _ok(_me);
     }
 
+    // 🔶 Existing proposed route. Not a new API. Accepted here so a successful
+    // registration can be told apart from a failure. The token is not stored.
+    if (method == 'POST' && path == ApiEndpoints.proposedMobilePushDevices) {
+      return _mobilePushDevices(b);
+    }
+
     if (method != 'GET' &&
         head != 'notifications' &&
         head != 'notification-preferences') {
@@ -926,6 +959,17 @@ class FakeApiClient implements ApiClient {
       );
     }
     return _route(method, b, seg, head, query);
+  }
+
+  /// Proposed `POST /api/mobile-push/devices`. The body is not kept.
+  Future<ApiResponse> _mobilePushDevices(Map<dynamic, dynamic> body) async {
+    if (body['unregister'] == true) return _ok(const <String, Object?>{});
+    mobilePushRegisterPosts++;
+    if (failMobilePushDevicesRemaining > 0) {
+      failMobilePushDevicesRemaining--;
+      _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تسجيل الجهاز.');
+    }
+    return _ok(const <String, Object?>{});
   }
 
   /// Cookie session check. A missing, revoked, or expired cookie is 401
@@ -1348,6 +1392,12 @@ class FakeApiClient implements ApiClient {
     if (seg.length == 3 && seg[1] == 'days' && seg[2] == 'close') {
       return _applyClose(b);
     }
+    if (seg.length == 4 && seg[1] == 'assignments' && seg[3] == 'submissions') {
+      return _applyAssignmentSubmission(seg[2], b);
+    }
+    if (seg.length == 2 && seg[1] == 'unlinked-receipts') {
+      return _applyUnlinkedCreate(b);
+    }
     return _ok({'id': 'ok', 'version': 1});
   }
 
@@ -1481,16 +1531,26 @@ class FakeApiClient implements ApiClient {
   /// Debt or partial payment. The version is the card's stored version.
   ///
   /// A direct partial payment stores the previous card balance with the
-  /// received `inputValue` applied. That result is what later reads return.
-  /// The app does not calculate it. A rate-based movement only bumps the
-  /// version; this fake does not turn a factor into an amount.
+  /// received `inputValue` applied when that integer is not larger than the
+  /// stored balance. A larger integer is refused and the stored balance is
+  /// left as it was. The app does not calculate the new balance. A rate-based
+  /// movement only bumps the version; this fake does not turn a factor into
+  /// an amount, and it does not compare that factor with the balance.
   ApiResponse _applyMovement(String section, String id, Map b) {
     final card = _cardView(section, id);
     _requireVersion(b['expectedVersion'], card['version']);
-    final version = (card['version'] as int) + 1;
-    final state = <String, dynamic>{'version': version};
     final previous = card['balanceUnits'];
     final entered = b['inputValue'];
+    if (b['type'] == 'payment' &&
+        b['paymentMode'] == 'partial' &&
+        b['calculationMode'] == 'direct' &&
+        previous is int &&
+        entered is int &&
+        entered > previous) {
+      _fail(400, 'VALIDATION_ERROR', amountAboveRemainingMessage);
+    }
+    final version = (card['version'] as int) + 1;
+    final state = <String, dynamic>{'version': version};
     if (b['type'] == 'payment' &&
         b['paymentMode'] == 'partial' &&
         b['calculationMode'] == 'direct' &&
@@ -1563,6 +1623,12 @@ class FakeApiClient implements ApiClient {
       if (state != null) item.addAll(state);
       items.add(item);
     }
+    for (final extra in _extraSubmissions) {
+      final item = Map<String, dynamic>.from(extra);
+      final state = _submissionState['${item['id']}'];
+      if (state != null) item.addAll(state);
+      items.add(item);
+    }
     body['submissions'] = items;
     final receipts = <Map<String, dynamic>>[];
     for (final raw in body['unlinkedReceipts'] as List) {
@@ -1571,10 +1637,88 @@ class FakeApiClient implements ApiClient {
       if (state != null) item.addAll(state);
       receipts.add(item);
     }
+    for (final extra in _extraUnlinked) {
+      final item = Map<String, dynamic>.from(extra);
+      final state = _unlinkedState['${item['id']}'];
+      if (state != null) item.addAll(state);
+      receipts.add(item);
+    }
     body['unlinkedReceipts'] = receipts;
     final batch = _batchState;
     if (batch != null) body.addAll(batch);
     return body;
+  }
+
+  /// Stores one submission on an assignment the caller can see.
+  ///
+  /// An assignment outside that set is 404, the same body as a missing id.
+  /// The amount is the integer the request sent. This does not copy the
+  /// assignment balance and does not change overview metrics.
+  ApiResponse _applyAssignmentSubmission(String assignmentId, Map b) {
+    _requireVisibleAssignment(assignmentId);
+    final mode = b['mode'];
+    if (mode != 'full' && mode != 'partial') {
+      _fail(400, 'VALIDATION_ERROR', 'mode غير معروف');
+    }
+    int? amount;
+    if (mode == 'partial') {
+      final raw = b['amountUnits'];
+      if (raw is! int) _fail(400, 'VALIDATION_ERROR', 'amountUnits مطلوب');
+      amount = raw;
+    } else if (b['amountUnits'] is int) {
+      amount = b['amountUnits'] as int;
+    }
+    final id = 'sb_posted_${_extraSubmissions.length + 1}';
+    final name = _displayName();
+    _extraSubmissions.add({
+      'id': id,
+      'mode': mode,
+      if (amount != null) 'amountUnits': amount,
+      'status': 'pending',
+      'version': 1,
+      if (_userId != null) 'submittedByUserId': _userId,
+      if (name != null) 'submittedByName': name,
+    });
+    return _ok({'id': id, 'version': 1});
+  }
+
+  /// Stores one unlinked receipt for the signed-in caller.
+  ApiResponse _applyUnlinkedCreate(Map b) {
+    final name = b['customerName'];
+    if (name is! String || name.trim().isEmpty) {
+      _fail(400, 'VALIDATION_ERROR', 'customerName مطلوب');
+    }
+    final amount = b['amountUnits'];
+    if (amount is! int) _fail(400, 'VALIDATION_ERROR', 'amountUnits مطلوب');
+    final id = 'ur_posted_${_extraUnlinked.length + 1}';
+    _extraUnlinked.add({
+      'id': id,
+      'customerName': name,
+      'amountUnits': amount,
+      'status': 'pending',
+      'version': 1,
+      if (_userId != null) 'submittedByUserId': _userId,
+    });
+    return _ok({'id': id, 'version': 1});
+  }
+
+  void _requireVisibleAssignment(String id) {
+    final assignments = _collectionsForCaller()['assignments'];
+    if (assignments is List) {
+      for (final raw in assignments) {
+        if (raw is Map && raw['id'] == id) return;
+      }
+    }
+    _fail(404, 'NOT_FOUND', _notFound);
+  }
+
+  String? _displayName() {
+    final user = _me['user'];
+    if (user is Map && user['displayName'] is String) {
+      final name = user['displayName'] as String;
+      if (name.isNotEmpty) return name;
+    }
+    return null;
   }
 
   /// Compares the stored batch version. A match stores the next batch id.
