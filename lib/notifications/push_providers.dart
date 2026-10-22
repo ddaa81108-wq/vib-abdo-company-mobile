@@ -160,6 +160,11 @@ final deviceTokenRegistrarProvider = Provider<DeviceTokenRegistrar>((ref) {
     store: ref.watch(deviceTokenStoreProvider),
     client: ref.watch(deviceRegistrationClientProvider),
     dedup: ref.watch(notificationDedupProvider),
+    currentUserId: () {
+      final session = ref.read(sessionStateProvider);
+      if (session is! SessionAuthenticated) return null;
+      return session.profile.id;
+    },
     onCancelBackground: () async {
       try {
         await ref.read(shownNotificationStoreProvider).clear();
@@ -171,6 +176,7 @@ final deviceTokenRegistrarProvider = Provider<DeviceTokenRegistrar>((ref) {
   gate.onForget = registrar.forget;
   ref.onDispose(() {
     if (identical(gate.onForget, registrar.forget)) gate.onForget = null;
+    registrar.dispose();
   });
   return registrar;
 });

@@ -89,6 +89,10 @@ abstract final class AppStrings {
   static const noNotifications = 'لا توجد إشعارات';
   static const refresh = 'تحديث';
   static const integerOnly = 'أدخل عددًا صحيحًا كما هو، بلا كسور.';
+
+  /// Direct partial payment compared with the card balance the server sent.
+  /// The app does not subtract or store a new balance.
+  static const amountAboveRemaining = 'المبلغ أكبر من المتبقي المسجّل.';
   static const dateInvalid = 'أدخل التاريخ بصيغة سنة-شهر-يوم.';
   static const unitsHint =
       'عدد صحيح بالوحدة الصغرى التي يخزّنها الخادم. بلا فواصل وبلا كسور. التطبيق لا يحوّل هذا الرقم ولا يحسبه.';
