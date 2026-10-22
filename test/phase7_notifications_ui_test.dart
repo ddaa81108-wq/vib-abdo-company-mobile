@@ -24,7 +24,7 @@ import 'package:vib_abdo_company_mobile/ui/widgets/logout_confirm.dart';
 import 'support/phase7_ui.dart';
 import 'support/pump_app.dart';
 
-bool get _skipDef019 => true;
+bool get _skipDef019 => false;
 
 void main() {
   testWidgets('the bell shows the server count, 99, and 99+', (tester) async {

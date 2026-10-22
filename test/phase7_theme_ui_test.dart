@@ -9,9 +9,9 @@ import 'support/pump_app.dart';
 /// QA's registry already uses DEF-020, DEF-021, and DEF-022 for other defects.
 /// Login brand is DEF-023, the light sidebar role is DEF-024, and dark primary
 /// text plus cashPositive is DEF-025. The next free number is DEF-026.
-bool get _skipDef023 => true;
-bool get _skipDef024 => true;
-bool get _skipDef025 => true;
+bool get _skipDef023 => false;
+bool get _skipDef024 => false;
+bool get _skipDef025 => false;
 
 /// Pairs DEF-023, DEF-024, and DEF-025 already record. Anything else still fails.
 bool _knownContrast(String failure) {
