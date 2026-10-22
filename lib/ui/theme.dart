@@ -145,7 +145,7 @@ const _lightScheme = ColorScheme(
   onErrorContainer: Color(0xFF8D2C2C),
   surface: Color(0xFFFFFFFF),
   onSurface: Color(0xFF172723),
-  onSurfaceVariant: Color(0xFF6D7C77),
+  onSurfaceVariant: Color(0xFF5F6E69),
   outline: Color(0xFFD5DEE9),
   outlineVariant: Color(0xFFE8EDF3),
   shadow: Color(0x12172723),
