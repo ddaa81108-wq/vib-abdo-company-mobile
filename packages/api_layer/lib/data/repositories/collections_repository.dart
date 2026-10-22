@@ -8,10 +8,6 @@ import '../models/common.dart';
 /// Admin-only per the existing system: assign, decide, cash-received, close day, payroll entries/salary.
 abstract interface class CollectionsRepository {
   Future<CollectionsOverviewDto> overview();
-
-  /// One page of the overview. [cursor] is the previous `nextCursor`.
-  /// The default [overview] stays the first page.
-  Future<CollectionsOverviewDto> overviewPage({String? cursor, int limit = 40});
   Future<List<Json>> assignees();
   Future<MutationAck> assign(
       {required List<String> customerIds,
@@ -84,22 +80,6 @@ class RemoteCollectionsRepository implements CollectionsRepository {
   Future<CollectionsOverviewDto> overview() async =>
       CollectionsOverviewDto.fromData(
           (await _api.get(ApiEndpoints.collections)).data);
-
-  @override
-  Future<CollectionsOverviewDto> overviewPage({
-    String? cursor,
-    int limit = 40,
-  }) async =>
-      CollectionsOverviewDto.fromData(
-        (await _api.get(
-          ApiEndpoints.collections,
-          query: {
-            'limit': limit,
-            if (cursor != null) 'cursor': cursor,
-          },
-        ))
-            .data,
-      );
 
   @override
   Future<List<Json>> assignees() async => Paged.fromData(
