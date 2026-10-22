@@ -375,7 +375,10 @@ void main() {
     expect(find.text(AppStrings.rateMissing), findsOneWidget);
     final card = tester.widget<Card>(find.byKey(const Key('active-cash-card')));
     expect(card.color, isNull);
-    expect(find.text('90 ج.م'), findsNothing);
+    // DEF-032: the missing rate hides the converted LYD row, not this EGP amount.
+    expect(find.text('90 ج.م'), findsOneWidget);
+    expect(find.text('90 د.ل'), findsNothing);
+    expect(find.text(AppStrings.converted), findsNothing);
   });
 
   testWidgets('both screens lay out on phones in light and dark', (

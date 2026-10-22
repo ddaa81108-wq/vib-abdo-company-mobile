@@ -162,6 +162,20 @@ class FakeApiClient implements ApiClient {
   /// Items returned for an account-list read that sends `cursor` (tests).
   List<Map<String, dynamic>> accountNextItems = const [];
 
+  /// Overlay for `GET /api/treasury` totals (tests).
+  ///
+  /// A null value is encoded as JSON `null` and the key stays. Every other
+  /// total stays the stored fixture or the cash-entry running figure. This
+  /// map is not divided, summed, or converted into another currency.
+  Map<String, Object?>? treasuryTotalsPatch;
+
+  /// Keys deleted from those totals so the JSON omits them (tests).
+  /// Distinct from a null [treasuryTotalsPatch] value, which is sent as null.
+  final Set<String> omitTreasuryTotalKeys = {};
+
+  /// `jsonEncode` of the last treasury summary body after the patch (tests).
+  String? lastTreasuryJson;
+
   /// When set, account-list reads wait here (tests).
   Completer<void>? pauseAccountLists;
 
@@ -1966,15 +1980,35 @@ class FakeApiClient implements ApiClient {
   }
 
   /// Fixture treasury, with version and running cash from a stored entry.
+  ///
+  /// [treasuryTotalsPatch] is applied last. A null value stays in the JSON.
+  /// [omitTreasuryTotalKeys] then deletes keys. Neither derives a conversion.
   Map<String, dynamic> _treasuryView() {
     final body = _copy(FakeFixtures.treasury());
     final state = _treasuryState;
-    if (state == null) return body;
-    body['version'] = state['version'];
-    final totals = Map<String, dynamic>.from(body['totals'] as Map);
-    totals['activeCashUnits'] = state['activeCashUnits'];
-    totals['netUnits'] = state['netUnits'];
-    body['totals'] = totals;
+    if (state != null) {
+      body['version'] = state['version'];
+      final totals = Map<String, dynamic>.from(body['totals'] as Map);
+      totals['activeCashUnits'] = state['activeCashUnits'];
+      totals['netUnits'] = state['netUnits'];
+      body['totals'] = totals;
+    }
+    final patch = treasuryTotalsPatch;
+    if (patch != null && patch.isNotEmpty) {
+      final totals = Map<String, dynamic>.from(body['totals'] as Map);
+      for (final entry in patch.entries) {
+        totals[entry.key] = entry.value;
+      }
+      body['totals'] = totals;
+    }
+    if (omitTreasuryTotalKeys.isNotEmpty) {
+      final totals = Map<String, dynamic>.from(body['totals'] as Map);
+      for (final key in omitTreasuryTotalKeys) {
+        totals.remove(key);
+      }
+      body['totals'] = totals;
+    }
+    lastTreasuryJson = jsonEncode(body);
     return body;
   }
 
