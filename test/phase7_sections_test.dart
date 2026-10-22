@@ -30,7 +30,10 @@ void main() {
     expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
     expect(find.byKey(const Key('home-business-date')), findsOneWidget);
     expect(find.text('2026-10-19'), findsWidgets);
-    expect(_inside(HomeShell.summaryKey('customers.netBalance'), '10,635 د.ل'), findsOneWidget);
+    expect(
+      _inside(HomeShell.summaryKey('customers.netBalance'), '10,635 د.ل'),
+      findsOneWidget,
+    );
 
     await go(tester, '/customers');
     expect(find.byKey(const Key('screen-customers')), findsOneWidget);
@@ -59,17 +62,26 @@ void main() {
     expect(find.byKey(const Key('screen-masraweya')), findsOneWidget);
     final money = MoneyFormatter();
     expect(
-      _inside(const Key('masraweya-work-total'), money.format(3050, Currency.egp)),
+      _inside(
+        const Key('masraweya-work-total'),
+        money.format(3050, Currency.egp),
+      ),
       findsOneWidget,
     );
     expect(
-      _inside(const Key('masraweya-remaining'), money.format(8950, Currency.egp)),
+      _inside(
+        const Key('masraweya-remaining'),
+        money.format(8950, Currency.egp),
+      ),
       findsOneWidget,
     );
 
     await go(tester, '/purchases');
     expect(find.byKey(const Key('screen-purchases')), findsOneWidget);
-    expect(_inside(const Key('purchases-lifetime'), '2,553 د.ل'), findsOneWidget);
+    expect(
+      _inside(const Key('purchases-lifetime'), '2,553 د.ل'),
+      findsOneWidget,
+    );
     expect(find.text('553 د.ل'), findsWidgets);
 
     await go(tester, '/treasury');
@@ -82,37 +94,39 @@ void main() {
     expect(find.text('ديون لنا + النشط + المصري − ديون علينا'), findsOneWidget);
   });
 
-  testWidgets('P7-06 customers list shows a loading pane until the server answers', (
-    tester,
-  ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(800, 1400));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    final gate = Completer<void>();
-    (layer.client as FakeApiClient).pauseAccountLists = gate;
+  testWidgets(
+    'P7-06 customers list shows a loading pane until the server answers',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(800, 1400));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      final gate = Completer<void>();
+      (layer.client as FakeApiClient).pauseAccountLists = gate;
 
-    goNow(tester, '/customers');
-    await pumpUntilFound(tester, find.byKey(const Key('accounts-loading')));
-    expect(find.byKey(const Key('screen-customers')), findsNothing);
+      goNow(tester, '/customers');
+      await pumpUntilFound(tester, find.byKey(const Key('accounts-loading')));
+      expect(find.byKey(const Key('screen-customers')), findsNothing);
 
-    gate.complete();
-    (layer.client as FakeApiClient).pauseAccountLists = null;
-    await settle(tester);
-    expect(find.byKey(const Key('screen-customers')), findsOneWidget);
-    expect(find.text('10,635 د.ل'), findsWidgets);
-  });
+      gate.complete();
+      (layer.client as FakeApiClient).pauseAccountLists = null;
+      await settle(tester);
+      expect(find.byKey(const Key('screen-customers')), findsOneWidget);
+      expect(find.text('10,635 د.ل'), findsWidgets);
+    },
+  );
 
-  testWidgets('P7-06 a missing card is an error with retry, not a forbidden pane', (
-    tester,
-  ) async {
-    await pumpFakeApp(tester, size: const Size(800, 1400));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers/missing-card');
+  testWidgets(
+    'P7-06 a missing card is an error with retry, not a forbidden pane',
+    (tester) async {
+      await pumpFakeApp(tester, size: const Size(800, 1400));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/customers/missing-card');
 
-    expect(find.byKey(const Key('screen-ledger-customers')), findsOneWidget);
-    expect(find.text('العنصر غير موجود'), findsWidgets);
-    expect(find.text(AppStrings.retry), findsWidgets);
-    expect(find.byKey(ForbiddenPane.paneKey), findsNothing);
-  });
+      expect(find.byKey(const Key('screen-ledger-customers')), findsOneWidget);
+      expect(find.text('العنصر غير موجود'), findsWidgets);
+      expect(find.text(AppStrings.retry), findsWidgets);
+      expect(find.byKey(ForbiddenPane.paneKey), findsNothing);
+    },
+  );
 
   testWidgets('P7-06 the financial ledger is a real empty server page', (
     tester,
@@ -133,30 +147,32 @@ void main() {
     );
   });
 
-  testWidgets('P7-06 employee totals shows the server row, then an empty window', (
-    tester,
-  ) async {
-    // 🔶 GET /api/admin/employee-totals. The November window is a second
-    // canned payload, not a sum of the October row.
-    await pumpFakeApp(tester, size: const Size(800, 1600));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/settings/employee-totals');
+  testWidgets(
+    'P7-06 employee totals shows the server row, then an empty window',
+    (tester) async {
+      // 🔶 GET /api/admin/employee-totals. The November window is a second
+      // canned payload, not a sum of the October row.
+      await pumpFakeApp(tester, size: const Size(800, 1600));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/settings/employee-totals');
 
-    expect(find.byKey(EmployeeTotalsScreen.screenKey), findsOneWidget);
-    expect(find.text('موظف استلام تجريبي'), findsOneWidget);
-    expect(find.text('100 د.ل'), findsWidgets);
+      expect(find.byKey(EmployeeTotalsScreen.screenKey), findsOneWidget);
+      expect(find.text('موظف استلام تجريبي'), findsOneWidget);
+      expect(find.text('100 د.ل'), findsWidgets);
 
-    final container = ProviderScope.containerOf(
-      tester.element(find.byKey(HomeShell.shellKey)),
-    );
-    container.read(employeeTotalsQueryProvider.notifier).state =
-        const EmployeeTotalsQuery(from: '2026-11-01', to: '2026-11-30');
-    await settle(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byKey(HomeShell.shellKey)),
+      );
+      container.read(employeeTotalsQueryProvider.notifier).state =
+          const EmployeeTotalsQuery(from: '2026-11-01', to: '2026-11-30');
+      await settle(tester);
 
-    expect(find.text('موظف استلام تجريبي'), findsNothing);
-    expect(find.text('100 د.ل'), findsNothing);
-    expect(find.text('0 د.ل'), findsWidgets);
-  }, tags: ['pending-decision']);
+      expect(find.text('موظف استلام تجريبي'), findsNothing);
+      expect(find.text('100 د.ل'), findsNothing);
+      expect(find.text('0 د.ل'), findsWidgets);
+    },
+    tags: ['pending-decision'],
+  );
 
   testWidgets('P7-06 employee totals stays on the loading key while paused', (
     tester,
@@ -195,7 +211,9 @@ void main() {
     expect(find.byKey(EmployeeTotalsScreen.retryKey), findsNothing);
   }, tags: ['pending-decision']);
 
-  testWidgets('P7-06 limited admin notifications list is empty', (tester) async {
+  testWidgets('P7-06 limited admin notifications list is empty', (
+    tester,
+  ) async {
     // 🔶 recipientUserId. u_2 has no row in the catalog, so the list is empty.
     await pumpFakeApp(tester, size: const Size(800, 1400));
     await signIn(tester, username: 'limited.admin.demo', password: 'demo-only');
@@ -206,22 +224,23 @@ void main() {
     expect(find.text('إشعار المدير'), findsNothing);
   }, tags: ['pending-decision']);
 
-  testWidgets('P7-06 a notifications failure offers retry and is not forbidden', (
-    tester,
-  ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(800, 1400));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    (layer.client as FakeApiClient).failNextNotificationListStatus = 503;
+  testWidgets(
+    'P7-06 a notifications failure offers retry and is not forbidden',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(800, 1400));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      (layer.client as FakeApiClient).failNextNotificationListStatus = 503;
 
-    await go(tester, '/notifications');
-    expect(find.byKey(NotificationsScreen.retryKey), findsOneWidget);
-    expect(find.text('تعذر تحميل الإشعارات.'), findsOneWidget);
-    expect(find.byKey(ForbiddenPane.paneKey), findsNothing);
+      await go(tester, '/notifications');
+      expect(find.byKey(NotificationsScreen.retryKey), findsOneWidget);
+      expect(find.text('تعذر تحميل الإشعارات.'), findsOneWidget);
+      expect(find.byKey(ForbiddenPane.paneKey), findsNothing);
 
-    await tester.tap(find.byKey(NotificationsScreen.retryKey));
-    await settle(tester);
-    expect(find.text('إشعار المدير'), findsOneWidget);
-  });
+      await tester.tap(find.byKey(NotificationsScreen.retryKey));
+      await settle(tester);
+      expect(find.text('إشعار المدير'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'P7-07 empty settings tiles show the DEF-012 placeholders and do not close the row',
@@ -233,7 +252,10 @@ void main() {
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
 
       await go(tester, '/settings/employees');
-      expect(find.byKey(const Key('screen-settings-employees')), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen-settings-employees')),
+        findsOneWidget,
+      );
       expect(find.text(AppStrings.employeesEmpty), findsOneWidget);
 
       await go(tester, '/settings/audit');
@@ -241,7 +263,10 @@ void main() {
       expect(find.text(AppStrings.auditEmpty), findsOneWidget);
 
       await go(tester, '/settings/operations');
-      expect(find.byKey(const Key('screen-settings-operations')), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen-settings-operations')),
+        findsOneWidget,
+      );
       expect(find.text(AppStrings.operationsEmpty), findsOneWidget);
     },
     tags: ['known-bug'],

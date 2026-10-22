@@ -37,7 +37,10 @@ void main() {
       await tester.ensureVisible(find.byKey(const Key('unlinked-collection')));
       await tester.tap(find.byKey(const Key('unlinked-collection')));
       await settle(tester);
-      await tester.enterText(find.byKey(const Key('unlinked-name')), 'زبون جديد');
+      await tester.enterText(
+        find.byKey(const Key('unlinked-name')),
+        'زبون جديد',
+      );
       await tester.enterText(
         find.descendant(
           of: find.byKey(const Key('unlinked-amount')),
@@ -53,21 +56,24 @@ void main() {
         fake.mutationPaths,
         contains('/api/collections/assignments/as_1/submissions'),
       );
-      expect(fake.mutationPaths, contains('/api/collections/unlinked-receipts'));
+      expect(
+        fake.mutationPaths,
+        contains('/api/collections/unlinked-receipts'),
+      );
       expect(fake.mutationBodies.join('\n'), contains('"amountUnits":40'));
       expect(fake.mutationBodies.join('\n'), contains('"amountUnits":25'));
 
       final overview = await tester.runAsync(
         () => layer.collections.overview(),
       );
-      expect(
-        overview!.submissions.map((row) => row.id).toList(),
-        ['sb_1', 'sb_2'],
-      );
-      expect(
-        overview.unlinkedReceipts.map((row) => row.id).toList(),
-        ['ur_1', 'ur_2'],
-      );
+      expect(overview!.submissions.map((row) => row.id).toList(), [
+        'sb_1',
+        'sb_2',
+      ]);
+      expect(overview.unlinkedReceipts.map((row) => row.id).toList(), [
+        'ur_1',
+        'ur_2',
+      ]);
     },
     tags: ['known-bug'],
   );
@@ -113,40 +119,46 @@ void main() {
     },
   );
 
-  testWidgets('a system-managed card shows its stored balance and hides writes', (
+  testWidgets(
+    'a system-managed card shows its stored balance and hides writes',
+    (tester) async {
+      // 🔶 systemKind is not on the fixture and is not inferred from
+      // systemLinkKey. The write gate reads systemManaged only.
+      final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/customers');
+
+      expect(find.text('متبقي المصراوية تجريبي'), findsOneWidget);
+      expect(find.text(AppStrings.systemCard), findsWidgets);
+
+      final card = await tester.runAsync(
+        () => layer.accounts.get(
+          AccountSection.customers,
+          'c_masraweya_remainder',
+        ),
+      );
+      expect(card!.systemManaged, isTrue);
+      expect(card.systemLinkKey, 'masraweya_remainder');
+      expect(card.systemKind, isNull);
+      expect(card.balanceUnits, 8950);
+      expect(canSelectAccountForAssignment(card), isFalse);
+
+      await go(tester, '/customers/c_masraweya_remainder');
+      expect(_header('8,950 د.ل'), findsOneWidget);
+      expect(find.byKey(const Key('add-payment')), findsNothing);
+      expect(find.text(AppStrings.systemCard), findsWidgets);
+
+      await go(tester, '/customers/c_55');
+      expect(_header('320 د.ل'), findsOneWidget);
+      final payment = find.byKey(const Key('add-payment'), skipOffstage: false);
+      await tester.ensureVisible(payment);
+      expect(payment, findsOneWidget);
+    },
+  );
+
+  testWidgets('P7-14 cash buttons follow the stored cash status', (
     tester,
   ) async {
-    // 🔶 systemKind is not on the fixture and is not inferred from
-    // systemLinkKey. The write gate reads systemManaged only.
-    final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers');
-
-    expect(find.text('متبقي المصراوية تجريبي'), findsOneWidget);
-    expect(find.text(AppStrings.systemCard), findsWidgets);
-
-    final card = await tester.runAsync(
-      () => layer.accounts.get(
-        AccountSection.customers,
-        'c_masraweya_remainder',
-      ),
-    );
-    expect(card!.systemManaged, isTrue);
-    expect(card.systemLinkKey, 'masraweya_remainder');
-    expect(card.systemKind, isNull);
-    expect(card.balanceUnits, 8950);
-    expect(canSelectAccountForAssignment(card), isFalse);
-
-    await go(tester, '/customers/c_masraweya_remainder');
-    expect(_header('8,950 د.ل'), findsOneWidget);
-    expect(find.byKey(const Key('add-payment')), findsNothing);
-    expect(find.text(AppStrings.systemCard), findsWidgets);
-
-    await go(tester, '/customers/c_55');
-    expect(find.byKey(const Key('add-payment')), findsOneWidget);
-  });
-
-  testWidgets('P7-14 cash buttons follow the stored cash status', (tester) async {
     // 🔶 cashStatus / cashPending. ur_1 is not_applicable, so cash stays
     // hidden. ur_2 is rejected and cash pending, so decide stays hidden and
     // cash is shown.

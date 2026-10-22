@@ -80,11 +80,15 @@ void main() {
 
     final payroll = await layer.collections.payroll();
     expect(
-      payroll.employees.firstWhere((row) => row.userId == 'u_12').remainingUnits,
+      payroll.employees
+          .firstWhere((row) => row.userId == 'u_12')
+          .remainingUnits,
       1250,
     );
     expect(
-      payroll.employees.firstWhere((row) => row.userId == 'u_20').remainingUnits,
+      payroll.employees
+          .firstWhere((row) => row.userId == 'u_20')
+          .remainingUnits,
       2580,
     );
 
@@ -103,47 +107,49 @@ void main() {
     expect(find.text('0 د.ل'), findsWidgets);
   }, tags: ['pending-decision']);
 
-  testWidgets('payroll remaining on the collections screen matches the server', (
-    tester,
-  ) async {
-    await pumpFakeApp(tester, size: const Size(800, 2600));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/collections');
+  testWidgets(
+    'payroll remaining on the collections screen matches the server',
+    (tester) async {
+      await pumpFakeApp(tester, size: const Size(800, 2600));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/collections');
 
-    await tester.ensureVisible(find.byKey(const Key('payroll-u_12')));
-    expect(_inside(const Key('payroll-u_12'), '1,250 د.ل'), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const Key('payroll-u_20')));
-    expect(_inside(const Key('payroll-u_20'), '2,580 د.ل'), findsOneWidget);
-  });
+      await tester.ensureVisible(find.byKey(const Key('payroll-u_12')));
+      expect(_inside(const Key('payroll-u_12'), '1,250 د.ل'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('payroll-u_20')));
+      expect(_inside(const Key('payroll-u_20'), '2,580 د.ل'), findsOneWidget);
+    },
+  );
 
-  testWidgets('DEF-016 a full payment leaves the home debt row at the stored zero', (
-    tester,
-  ) async {
-    // Decided: the row stays, and the balance is the next server value.
-    await pumpFakeApp(tester, size: const Size(800, 2200));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers/c_55');
-    await tester.ensureVisible(find.byKey(const Key('full-payment')));
-    await tester.tap(find.byKey(const Key('full-payment')));
-    await settle(tester);
+  testWidgets(
+    'DEF-016 a full payment leaves the home debt row at the stored zero',
+    (tester) async {
+      // Decided: the row stays, and the balance is the next server value.
+      await pumpFakeApp(tester, size: const Size(800, 2200));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/customers/c_55');
+      await tester.ensureVisible(find.byKey(const Key('full-payment')));
+      await tester.tap(find.byKey(const Key('full-payment')));
+      await settle(tester);
 
-    await go(tester, '/');
-    expect(find.byKey(const Key('old-debt-c_55')), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('old-debt-c_55')),
-        matching: find.textContaining('0 د.ل'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('old-debt-c_55')),
-        matching: find.textContaining('320 د.ل'),
-      ),
-      findsNothing,
-    );
-  });
+      await go(tester, '/');
+      expect(find.byKey(const Key('old-debt-c_55')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('old-debt-c_55')),
+          matching: find.textContaining('0 د.ل'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('old-debt-c_55')),
+          matching: find.textContaining('320 د.ل'),
+        ),
+        findsNothing,
+      );
+    },
+  );
 }
 
 ApiLayer _layer() {

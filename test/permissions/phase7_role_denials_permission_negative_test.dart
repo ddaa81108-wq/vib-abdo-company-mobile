@@ -21,26 +21,27 @@ import '../support/pump_app.dart';
 /// production retry rule. That rule is the container test below, which copies
 /// the callback in lib/main.dart without changing production code.
 void main() {
-  testWidgets('P7-05 employee treasury and masraweya are forbidden with no retry', (
-    tester,
-  ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
-    await signIn(tester, username: 'employee.demo', password: 'demo-only');
+  testWidgets(
+    'P7-05 employee treasury and masraweya are forbidden with no retry',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
+      await signIn(tester, username: 'employee.demo', password: 'demo-only');
 
-    expect(layer.permissions.canRead(SectionKey.treasury), isFalse);
-    expect(layer.permissions.canWrite(SectionKey.reports), isFalse);
+      expect(layer.permissions.canRead(SectionKey.treasury), isFalse);
+      expect(layer.permissions.canWrite(SectionKey.reports), isFalse);
 
-    for (final path in ['/treasury', '/masraweya', '/companies']) {
-      await go(tester, path);
-      expect(find.byKey(TreasuryScreen.screenKey), findsNothing);
-      expect(find.byKey(const Key('screen-masraweya')), findsNothing);
-      expect(find.byKey(const Key('screen-companies')), findsNothing);
-      expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
-      expect(find.text(AppStrings.forbidden), findsWidgets);
-      expect(find.text(AppStrings.retry), findsNothing);
-      expect(find.byKey(HomeShell.shellKey), findsOneWidget);
-    }
-  });
+      for (final path in ['/treasury', '/masraweya', '/companies']) {
+        await go(tester, path);
+        expect(find.byKey(TreasuryScreen.screenKey), findsNothing);
+        expect(find.byKey(const Key('screen-masraweya')), findsNothing);
+        expect(find.byKey(const Key('screen-companies')), findsNothing);
+        expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
+        expect(find.text(AppStrings.forbidden), findsWidgets);
+        expect(find.text(AppStrings.retry), findsNothing);
+        expect(find.byKey(HomeShell.shellKey), findsOneWidget);
+      }
+    },
+  );
 
   testWidgets(
     'P7-12 employee does not see decide buttons and the repository returns 403',
@@ -56,20 +57,20 @@ void main() {
       expect(find.byKey(const Key('unlinked-approve-ur_1')), findsNothing);
       expect(find.byKey(const Key('unlinked-link-ur_1')), findsNothing);
 
-      await expectLater(
-        tester.runAsync(
-          () => layer.collections.decide(
+      await tester.runAsync(() async {
+        await expectLater(
+          layer.collections.decide(
             'sb_1',
             CollectionDecision.approve,
             meta: MutationMeta(expectedVersion: 1),
           ),
-        ),
-        throwsA(
-          isA<ForbiddenException>()
-              .having((error) => error.statusCode, 'status', 403)
-              .having((error) => error.code, 'code', 'FORBIDDEN'),
-        ),
-      );
+          throwsA(
+            isA<ForbiddenException>()
+                .having((error) => error.statusCode, 'status', 403)
+                .having((error) => error.code, 'code', 'FORBIDDEN'),
+          ),
+        );
+      });
     },
   );
 
@@ -110,16 +111,18 @@ void main() {
       final container = ProviderScope.containerOf(
         tester.element(find.byKey(HomeShell.shellKey)),
       );
-      await expectLater(
-        tester.runAsync(() => container.read(employeeTotalsProvider.future)),
-        throwsA(
-          isA<ForbiddenException>().having(
-            (error) => error.statusCode,
-            'status',
-            403,
+      await tester.runAsync(() async {
+        await expectLater(
+          container.read(employeeTotalsProvider.future),
+          throwsA(
+            isA<ForbiddenException>().having(
+              (error) => error.statusCode,
+              'status',
+              403,
+            ),
           ),
-        ),
-      );
+        );
+      });
       await tester.pump();
       final state = container.read(employeeTotalsStateProvider);
       expect(state, isA<EmployeeTotalsForbidden>());
@@ -144,10 +147,7 @@ void main() {
         () => layer.collections.overview(),
       );
       expect(overview!.employeeTotals, hasLength(1));
-      expect(
-        overview.employeeTotals.single.employeeName,
-        'موظف استلام تجريبي',
-      );
+      expect(overview.employeeTotals.single.employeeName, 'موظف استلام تجريبي');
     },
     tags: ['pending-decision'],
   );
@@ -189,10 +189,7 @@ void main() {
     );
     expect(calls, 1);
 
-    expect(
-      appRetry(0, const SessionExpiredException(statusCode: 401)),
-      isNull,
-    );
+    expect(appRetry(0, const SessionExpiredException(statusCode: 401)), isNull);
     expect(
       retryUnlessForbidden(
         0,
