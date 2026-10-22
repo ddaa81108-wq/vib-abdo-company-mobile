@@ -20,6 +20,7 @@ Future<ApiLayer> pumpFakeApp(
   WidgetTester tester, {
   Size size = const Size(800, 1400),
   double textScale = 1,
+  int sdkInt = 33,
   List<Override> overrides = const [],
   ConnectivityPort? connectivity,
   NotificationPermissionService? notificationsPermission,
@@ -59,8 +60,9 @@ Future<ApiLayer> pumpFakeApp(
           notificationsPermission ?? const GrantedNotificationPermission(),
         ),
         notificationPermissionRegistrarOverride(),
-        // Widget tests have no platform channel. Android 13 keeps the dialog.
-        notificationSdkIntProvider.overrideWithValue(() async => 33),
+        // Widget tests have no platform channel, and a second override of this
+        // provider throws. Pass [sdkInt] (default Android 13, which still asks).
+        notificationSdkIntProvider.overrideWithValue(() async => sdkInt),
         backgroundNotificationSchedulerProvider.overrideWithValue(
           const NoopBackgroundNotificationScheduler(),
         ),
