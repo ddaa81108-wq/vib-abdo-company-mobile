@@ -13,12 +13,12 @@
 
 | التصنيف | المعرّفات |
 |---|---|
-| Pending PM decision | DEF-002. على `main` عند `8a52160` السلوك لم يتغير. الإداري المحدود ما زال `collections.decide`، ومسار الإجماليات المخصص يرفضه بـ 403 |
-| Blocking مفتوح على `main` | لا يبقى عيب مانع من DEF-013 أو DEF-014. هما verified on main 451ec58 |
-| Blocking على فرع وليس على `main` | لا يبقى. DEF-018 أُغلق على #47 `da9183c` |
-| Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `8a52160` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل. DEF-019 على #47 `da9183c`: فتح الإشعارات بعد دخول بإذن ممنوح يرسل رمز الجهاز مرة ثانية |
-| أُغلق على فرع وليس على `main` | DEF-017. Verified closed on `cursor/phase6-system-tray-bg-poll` `cc1bc83` and still closed on #46 `f6fa327` and on #47 `da9183c`, not on main. كان مفتوحًا على `82e0e8c`. DEF-018. Verified closed on #47 `da9183c`, not on main. كان مفتوحًا على `3f8e009` |
-| verified on main 8a52160 | DEF-010. «عرض الكل» يتبع قسم النشرة |
+| Pending PM decision | DEF-002. على `main` `a5ca268` السلوك لم يتغير. الإداري المحدود ما زال `collections.decide`، ومسار الإجماليات المخصص يرفضه بـ 403. الاختبار `limited admin provider state is forbidden until DEF-002` |
+| Blocking مفتوح على `main` | لا يبقى عيب مانع من DEF-013 أو DEF-014. هما verified on main 451ec58. لا مانع مفتوح للمرحلة 6 على `a5ca268` |
+| Blocking على فرع وليس على `main` | لا يبقى. DEF-018 صار Verified closed على `main` `a5ca268` |
+| Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `a5ca268` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل، والاختبار `DEF-012 admin settings replace the old unavailable sentence` يتوقع `employeesEmpty` و`auditEmpty` و`operationsEmpty`. خارج المرحلة 6. DEF-019 مفتوح على `main` `a5ca268`: فتح الإشعارات بعد دخول بإذن ممنوح يرسل رمز الجهاز مرة ثانية. غير مانع |
+| Verified closed على `main` `a5ca268` | DEF-017 وDEF-018. كانا مغلقين على الفرع فقط حتى دمج #46 و#47 |
+| verified on main 8a52160 | DEF-010. «عرض الكل» يتبع قسم النشرة. ما زال مغلقًا على `a5ca268` (`DEF-010 view all opens the section it belongs to when readable`) |
 | verified on main 451ec58 | DEF-001، DEF-003، DEF-004، DEF-005، DEF-006، DEF-013، DEF-014، DEF-015، DEF-016 |
 | أُغلق بعد إعادة اختبار | DEF-007 وDEF-008 وDEF-009 وDEF-011 بقيت مغلقة ضمن المجموعة على `451ec58` |
 
@@ -530,7 +530,7 @@
 
 ### DEF-017 — 401 أثناء ابتلاع الدفع يخرج من `presentPush` بلا `sessionEnded`
 
-**الحالة:** Verified closed on `cursor/phase6-system-tray-bg-poll` `cc1bc83b81e4b996cd0a974121e5b057b182726a`, and still closed on #46 `f6fa327bc60e747804356c25ec1dd5b7179be0ae` and on #47 `da9183c35b8f7b642d8f348e15221a239526f5f2`, not on main. كان Open على `82e0e8c`. غير مانع حين كان مفتوحًا. التالي الحر DEF-020 بعد DEF-019.
+**الحالة:** Verified closed on main `a5ca26809578dd013430dcaae78c517043e95491`. كان مغلقًا على `cc1bc83` و#46 `f6fa327` و#47 `da9183c` قبل أن يصل الكود مع دمج #46. كان Open على `82e0e8c`. غير مانع حين كان مفتوحًا. التالي الحر DEF-020.
 
 | الحقل | القيمة |
 |---|---|
@@ -557,11 +557,13 @@
 
 **على #47 `da9183c`:** المسبار نفسه **7/0**. لم يُعد فتح DEF-017. DEF-018 أُغلق في القسم التالي، وDEF-019 فُتح. التالي الحر DEF-020.
 
+**على `main` `a5ca268`:** شجرة الدمج تطابق `da9183c`. المسبار المحلي غير المدفوع `test/qa_def017_retest_probe_test.dart` خرج **7/0** على المزوّد الموصول: 401 على جلب العدد يخرج مرة، و419 `PAGE_EXPIRED` كذلك، و419 CSRF يحدّث الرمز بلا خروج، و500 بلا اسم، و404 بلا صينية، و401 الدخول يبقى `INVALID_CREDENTIALS`، ومسار المضيف يخرج مرة ثم كلمة المرور الخاطئة لا تخرج. الحكم: **Verified closed** على `main`.
+
 ---
 
 ### DEF-018 — موافقة إذن الإشعار لا ترسل تسجيل الجهاز
 
-**الحالة:** Verified closed on #47 `da9183c35b8f7b642d8f348e15221a239526f5f2`, not on main. كان Open وBlocking على `3f8e009`. التالي الحر DEF-020 بعد DEF-019.
+**الحالة:** Verified closed on main `a5ca26809578dd013430dcaae78c517043e95491`. كان Verified closed على #47 `da9183c` قبل الدمج، وOpen وBlocking على `3f8e009`. التالي الحر DEF-020.
 
 | الحقل | القيمة |
 |---|---|
@@ -584,13 +586,15 @@
 
 على المسجّل مباشرة، إذا مُنح الإذن في بنائه: النداء مرتين يرسل الرمز نفسه مرتين بلا مقارنة مع المخزن. 401 بعد ذلك يعطي `session_expired` مرة. 403 يبقي الجلسة ولا يطبع الرمز. فشل الشبكة طلب POST واحد بلا إعادة. هذه المسارات لا تصل من زر الموافقة اليوم.
 
-**إعادة الاختبار على `da9183c`:** `buildAppRoot` في `lib/main.dart` يضع `notificationPermissionRegistrarOverride()` على نطاق الجذر، و`runApp` يستدعي هذه الدالة. المسبار على هذه الدالة، بالمسجّل الحقيقي و`FakePushTransport`، بلا `RecordingDeviceTokenRegistrar`. الموافقة على API 33 ترسل `POST /api/mobile-push/devices` مرة واحدة وفي الجسم الرمز، والرمز لا يُطبع ولا يُرسم. «لاحقًا» والرفض الدائم والرفض بعد الموافقة لا ترسل. الحكم: **Verified closed** على هذا الرأس، وليس على `main`. تكرار الإرسال عند فتح الشاشة بعد دخول بإذن ممنوح هو DEF-019، وليس إعادة فتح لهذا العيب.
+**إعادة الاختبار على `da9183c`:** `buildAppRoot` في `lib/main.dart` يضع `notificationPermissionRegistrarOverride()` على نطاق الجذر، و`runApp` يستدعي هذه الدالة. المسبار على هذه الدالة، بالمسجّل الحقيقي و`FakePushTransport`، بلا `RecordingDeviceTokenRegistrar`. الموافقة على API 33 ترسل `POST /api/mobile-push/devices` مرة واحدة وفي الجسم الرمز، والرمز لا يُطبع ولا يُرسم. «لاحقًا» والرفض الدائم والرفض بعد الموافقة لا ترسل. الحكم حينها: **Verified closed** على هذا الرأس.
+
+**على `main` `a5ca268`:** `git diff da9183c a5ca268` فارغ. `lib/main.dart` يستدعي `runApp(buildAppRoot(...))` والتبديل على نطاق الجذر. المسبار `Agree posts the token once on the real root registrar` و`Later and permanent denial post nothing and the list stays` و`permanent denial posts nothing and the list stays` و`Android 33 denial after Agree posts nothing` ناجحة. الحكم: **Verified closed** على `main`. تكرار الإرسال عند فتح الشاشة بعد دخول بإذن ممنوح هو DEF-019، وليس إعادة فتح لهذا العيب.
 
 ---
 
 ### DEF-019 — فتح الإشعارات بعد دخول بإذن ممنوح يرسل الرمز مرة ثانية
 
-**الحالة:** Open on #47 `da9183c35b8f7b642d8f348e15221a239526f5f2`, not on main. غير مانع لإغلاق DEF-018. التالي الحر DEF-020.
+**الحالة:** Open on main `a5ca26809578dd013430dcaae78c517043e95491`. غير مانع. كان مفتوحًا على #47 `da9183c` قبل أن يصير الكود على `main`. التالي الحر DEF-020.
 
 | الحقل | القيمة |
 |---|---|
@@ -611,6 +615,8 @@
 **المتوقع:** `POST /api/mobile-push/devices` مرة واحدة لذلك الرمز. الاستئناف لا يضيف طلبًا.
 
 **الفعلي:** الدخول يرسل مرة. فتح الشاشة يرسل الرمز نفسه مرة ثانية، لأن ذاكرة المزامنة لم تُملأ من مسار الدخول. الاستئناف بعد ذلك لا يرسل ثالثة. الموافقة ثم الاستئناف أو إعادة بناء الشاشة تبقى على طلب واحد، فهذا المسار ليس استئنافًا بعد الموافقة. تغيّر الرمز ثم الاستئناف لا يرسل الرمز الجديد، لأن المقارنة على الاختيار لا على الرمز. إعادة تشغيل العملية ترسل عند الدخول مرة، وهذا غير مكتوب في التعليق؛ ثم فتح الشاشة يضيف المرة الثانية نفسها.
+
+**على `main` `a5ca268`:** المسبار `already granted login then opening notifications` ما زال يتوقع `[token, token]` بعد فتح الشاشة، والاستئناف يبقى على 2، ونجح. `relaunch with the same token posts again` و`a token change on resume does not post the new token` ناجحان. الحكم يبقى **Open** على `main`، وغير مانع. لم يُفتح DEF-020.
 
 ---
 
@@ -662,3 +668,4 @@
 - إعادة اختبار #46 عند `f6fa327` لم تفتح DEF-018. DEF-017 يبقى مغلقًا على الفرع. تعليم قراءة صف المستخدم الحالي عندما ترجع الفتاحة `forbidden` خيار لمدير المشروع: المسار `/forbidden` والنص «القسم غير مصرح لهذا الحساب» قائمان، والنقرة الثانية لا تنقص العدد. مستلم آخر لا يُعلَّم ولا يفتح المحتوى ولا يسرّب الاسم. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
 - إعادة اختبار #47 عند `3f8e009` فتحت DEF-018 أعلاه. التالي الحر DEF-019. DEF-017 لم يُعد فتحه. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
 - إعادة اختبار #47 عند `da9183c` أغلقت DEF-018 على الفرع وليس على `main`، وفتحت DEF-019 أعلاه. التالي الحر DEF-020. DEF-017 لم يُعد فتحه. إعادة إرسال نفس الرمز عند إعادة تشغيل العملية غير مكتوبة في التعليق، وليست عيبًا ثانيًا. P6-30 قرار لعلي والالتزام `da9183c` يُرجع وحده. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
+- جولة القبول النهائية على `main` `a5ca268` أغلقت DEF-017 وDEF-018 على `main`. DEF-019 بقي Open وغير مانع. لم يُفتح DEF-020. DEF-010 بقي مغلقًا. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail وخارج المرحلة 6. سقف الشارة `99+` فوق 99 سؤال مفتوح كما في الخطة، وليس عيبًا. تعليم القراءة عند `forbidden` لنفس المستخدم يبقى قرار علي.

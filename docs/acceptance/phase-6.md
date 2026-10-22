@@ -35,7 +35,7 @@
 
 طريقة التحقق واحدة من ثلاث: اختبار وحدة أو ودجت على Fake، أو مصفوفة محاكٍ في CI، أو جهاز حقيقي أو staging. ما لا يُغلق إلا بالجهاز أو staging معلَّم في الحالة وفي الجدول أسفل الخطة.
 
-الحكم الآن لكل معيار في جدول «من المعيار إلى الحكم»، ثم في إعادة اختبار فرع الصينية. المرحلة لم تُوقَّع. «غير مبني بعد» ليس عيبًا. DEF-017 مغلق على فرع الصينية حتى #46 `f6fa327` وليس على `main`. DEF-018 مغلق على #47 `da9183c` وليس على `main`. DEF-019 مفتوح على #47 وليس على `main`. تعليم القراءة عند `forbidden` لنفس المستخدم خيار لمدير المشروع وليس عيبًا. التالي الحر DEF-020.
+الحكم الآن لكل معيار في جدول «من المعيار إلى الحكم» وهو لقطة الخطة على `8a52160`. جولة القبول النهائية على `main` `a5ca268` في القسم الذي يسبق التوقيع. المرحلة لم تُوقَّع، والتوقيع عند علي. DEF-017 وDEF-018 **Verified closed** على `main` `a5ca268`. DEF-019 مفتوح على `main` وغير مانع. تعليم القراءة عند `forbidden` لنفس المستخدم خيار لمدير المشروع. لم يُفتح DEF-020. التالي الحر DEF-020. الحكم المكتوب: **مقبول بشروط**.
 
 ---
 
@@ -1281,19 +1281,182 @@ DEF-017: المسبار **7/0** على هذا الرأس. (a) و(c) و(e) في �
 
 ---
 
+## جولة القبول النهائية على `main` `a5ca268`
+
+التاريخ 2026-10-22. الالتزام `a5ca26809578dd013430dcaae78c517043e95491`، ورسالته «Register the device when notification permission changes (#47)». `origin/main` يساوي هذا الالتزام. الشجرة تطابق #47 `da9183c35b8f7b642d8f348e15221a239526f5f2` (`git diff` فارغ). لم يُدمج شيء في هذه الجولة، بما في ذلك #12. لم يُمس كود الإنتاج. المسابير بقيت في `/tmp` ولم تُدفع. التوقيع عند علي.
+
+### ما على `main`
+
+| الطلب | الالتزام على `main` | ملاحظة |
+|---|---|---|
+| #40 | `e97690e` | توثيق أن العميل الحالي بلا دفع جوّال |
+| #42 | `07bf4ec` | القنوات وFirebase الاختياري. مرشح `push` غائب. `on.push.branches` هو `main` فقط |
+| #44 | `9a734df` | نقل المرحلة 6 وفحوص الأمان |
+| #43 | `7018c6c` | عرض الإشعارات في صدفة التطبيق |
+| #46 | `bbf2bf1` | الصينية والاستطلاع |
+| #47 | `a5ca268` | تسجيل الجهاز عند تغيّر الإذن. هذا رأس `main` |
+
+CI على `main`: التشغيل [39699625496](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions/runs/39699625496) نجح. الفحوص الثلاثة نجحت: Analyze, test, and debug APK؛ وNegative permission tests؛ وRelease build rejects fake API. `head_sha` هو `a5ca268`. لا وظيفة محاكٍ في هذا التشغيل.
+
+### البوابة على checkout مطابق
+
+Flutter 3.47.7 / Dart 3.13.5. `bash tool/check.sh` خرج **0**.
+
+| المجموعة | الفعلي |
+|---|---|
+| تحليل التطبيق | `No issues found! (ran in 4.0s)` |
+| التطبيق `flutter test --exclude-tags screenshots` | **371/0** |
+| تحليل الحزمة | `No issues found! (ran in 2.7s)` |
+| الحزمة | **150/0** |
+| `--tags permissions-negative` التطبيق | **27/0** |
+| `--tags permissions-negative` الحزمة | **23/0** |
+| `preflight_test.sh` | `preflight_test ok` |
+| `scan_release_apk.py --self-test` | `scan_release_apk self-test ok` |
+| رفض Fake في الإصدار | `Release compilation rejected USE_FAKE_API=true.` ثم حارس الإصدار **4/0** |
+| `tool/staging_negative_tests/run.sh --dry-run` | **6/0** |
+
+المسبار المحلي، غير الملتزم، على الشجرة نفسها: **24/0**. ملف DEF-017 سبعة اختبارات. ملف التسجيل يغطي DEF-018 وDEF-019 وعينة API 29 والنقر. ملف الفتاحة يغطي `needsLogin` والمنع لنفس المستخدم ومستلمًا آخر. مسبار البيانات هو اختبارات المتحكّم والنقل داخل الـ 371، لا ملفًا قديمًا يتوقع بقاء النقر على `/notifications`.
+
+النقل الافتراضي `PUSH_TRANSPORT` فارغ فيصبح `NoopPushTransport`. `fake` يسجّل. `fcm` يبني `FcmPushTransport` و`currentToken` يبقى `null`. `firebase_messaging` ليس اعتمادًا. استطلاع الخلفية في الإصدار مطفأ إلا بـ `BACKGROUND_NOTIFICATION_POLL=true`.
+
+### جدول الحالات P6-01..P6-40
+
+الحكم واحد لكل حالة. Partial (Fake only) يعني أن شريحة Fake مغلقة وأن نصف الجهاز أو staging ما زال مفتوحًا. لا حالة Fail.
+
+| الحالة | الحكم | الدليل |
+|---|---|---|
+| P6-01 | Pass | `test/notifications_controller_test.dart` `push and poll dedupe, and a push does not increment the count`. `test/push_transport_test.dart` `the connect resync does not refresh, and a later signal does`. المستمع يعيد الجلب ولا يأخذ العدد من نص الإشارة |
+| P6-02 | Partial (Fake only) | الشريط: `a foreground event shows a banner and the tap uses origin banner`. نص الصينية في الوحدة. صينية أندرويد المرسومة Needs device-emulator |
+| P6-03 | Pass | `non-whitelisted keys never reach the notification text`. `push whitelist still excludes employeeName` |
+| P6-04 | Partial (Fake only) | `scheduling uses at least 15 minutes, the network, and keep`. `fake and debug default the poll on, and an explicit false stays off`. `release builds leave the poll off and stay fake-free`. التسليم الحقيقي في الخلفية Needs device-emulator. هذا ليس دفع FCM في الخلفية |
+| P6-05 | Partial (Fake only) | `RealtimeLifecycle` يوقف الاستماع عند `paused` و`hidden` و`detached` ويعيد الجلب عبر `NotificationSignalBridge`. لا ودجت يحقن `unreadCount` أثناء الإيقاف ثم يقيس الشارة بعد `resumed` |
+| P6-06 | Not supported | لا اختبار يقتل العملية. WorkManager يتوقف مع الإيقاف الإجباري. FCM غير مربوط فلا تسليم لتطبيق مقتول |
+| P6-07 | Partial (Fake only) | `a cold tray payload for the signed-in user opens collections` داخل العملية. نقر الصينية بعد قتل العملية Needs device-emulator |
+| P6-08 | Partial (Fake only) | `collections channel id, Arabic name, and badge flag stay stable`: الاسم `تنبيهات VIB`. العنوان من `systemName` في وحدة الصينية. الرسم في الصينية وإعدادات النظام Needs device-emulator. `applicationId` ما زال `com.example.vib_abdo_company_mobile` (`minSdk stays <= 29 and the application id is unchanged`) وهو سؤال إطلاق في الملحق |
+| P6-09 | Partial (Fake only) | معرّف القناة `vib_collections_alerts` داخلي. الاسم الظاهر `تنبيهات VIB`. قفل الشاشة: `the lock-screen public version has no name and no amount` والنص `إشعار جديد`. شاشة إعدادات النظام Needs device-emulator |
+| P6-10 | Partial (Fake only) | `headline keeps the employee only when the server sent one`. الاسم من صف الخادم. رسم الاسم في الصينية Needs device-emulator |
+| P6-11 | Pass | نفس اختبار العنوان: الغياب يُبقي «استلام جديد بانتظار المراجعة» بلا فاصل معلّق. المجهول في `notificationFallback('')` هو «إشعار». صف القائمة يرسم التسمية المعروفة في `rows and the bell use the server notification fields` |
+| P6-12 | Pass | سلبي. صف `88` لمستخدم آخر غائب عن قائمة الموظف. `another user on the banner is not marked read`. `a push with no recipientUserId is dropped` للمال الناقص. تسليم staging لم يُشغَّل |
+| P6-13 | Pass | `notificationFallback` و`rows and the bell use the server notification fields`. المبلغ لا يصل من `details`: اختبار القائمة البيضاء |
+| P6-14 | Pass | التسمية دالة بلا فرع دور. ودجت الموظف يرسم «استلام جديد بانتظار المراجعة». لا ودجت منفصل للأدوار الثلاثة لأن الدالة واحدة |
+| P6-15 | Pass | `employee sees only server-granted sections and the server unread count`. الشارة من العدد لا من طول الصفوف: `unread badge uses the server count and shows 99+ above 99` |
+| P6-16 | Pass | `a failed unread-count route uses the list count, then keeps the previous one`. `a missing unread count draws no badge`: `null` والصفر يخفيان الشارة ولا يرسمان صفرًا |
+| P6-17 | Pass | `badgeLabel`: `null` و0 مخفيان، و1 و98 كما هما، و99 هو `99`، وفوق 99 هو `99+` (`the bell hides 0 and loading and draws 99+ above 99`). الرقم الكامل فوق 99 سؤال لعلي في الخطة، وليس DEF-020 |
+| P6-18 | Pass | `mark-read updates readAt and the server count, without a second decrement`. `a list tap marks the row read once`. المسبار: النقرة الأولى تنقص 2 إلى 1، والثانية ترسل تعليمًا آخر والعدد يبقى 1 |
+| P6-19 | Pass | `each notifications list state has its own pane`: خطأ ثم إعادة محاولة. `mark-read keeps the previous count when the write and the count route omit it` |
+| P6-20 | Pass | `read all calls markAllRead only when the server count is unread`. `a second read-all tap does nothing while the first is in flight`. تجهيز Fake يكتب `readAt` في `_markAllRead` |
+| P6-21 | Pass | `offline disables notification writes and account edits` |
+| P6-22 | Pass | `a duplicate id from push and poll is ingested once` |
+| P6-23 | Partial (Fake only) | سلبي. `the unread count does not increase twice for the same id`. `tray dedup is shared by push, poll, and the worker`. نصف الصينية Needs device-emulator |
+| P6-24 | Partial (Fake only) | `minSdk stays <= 29` والبيان فيه `POST_NOTIFICATIONS`. `below Android 33 registers without asking`. المسبار على SDK 29: دخول واحد، ولا `request`، ولا حوار، و`notice-77`، والاستئناف يبقى 1. تثبيت الصورة واستلام إشعار على محاكي 29 Needs device-emulator. هذا التشغيل بلا وظيفة محاكٍ |
+| P6-25 | Partial (Fake only) | `Android 33 asks before the device post`. `notification permission asks, then grants, denies, or opens settings`. حوار النظام الحقيقي Needs device-emulator |
+| P6-26 | Needs device-emulator | لا اختبار يخص API 34. الكود يعامل `sdk >= 33` معاملة 33. المحاكي 34 لم يُشغَّل |
+| P6-27 | Partial (Fake only) | الحوار العربي ثم الموافقة ترسل مرة: `allow posts the device token once` والمسبار `Agree posts the token once on the real root registrar`. `grant then resume posts the device token once`. حوار النظام واستلام إشعار بعده Needs device-emulator |
+| P6-28 | Partial (Fake only) | سلبي. المسبار «لاحقًا»: لا POST والقائمة تبقى. الرفض بعد الطلب يُظهر `notification-permission-denied`. لا انهيار. حوار النظام Needs device-emulator |
+| P6-29 | Partial (Fake only) | سلبي. الرفض الدائم: لا `request`، وحوار الرفض، وزر الإعدادات يضبط `openedSettings`. المسبار: لا POST والقائمة تبقى. الرجوع من إعدادات النظام ثم الاستلام Needs device-emulator |
+| P6-30 | Partial (Fake only) | تحت 33 على SDK محقون: لا حوار ولا `request` وإرسال واحد والاستئناف لا يضيف (مسبار SDK 29). على 33 الحوار ثم الإرسال بعد الموافقة. قرار لعلي. صورة API 29 الحقيقية Needs device-emulator. الرجوع عن `da9183c` وُجد نظيفًا في الجولة السابقة على الشجرة نفسها ولم يُعد في هذه الجولة |
+| P6-31 | Pass | `logout unregisters and clears the device token`. `a failed unregister still clears the token and finishes logout`. `logout cancels the work and a later run shows nothing`. `deleteToken` على النقل التجريبي يمسح الرمز. نقل FCM ما زال بلا رمز |
+| P6-32 | Partial (Fake only) | `a payload for the previous user is dropped after an account switch`. الخروج يلغي الرمز والدخول التالي يرسل إن وُجد رمز. ارتباط الرمز بحسابين على الخادم Needs staging |
+| P6-33 | Pass | `logout and account switch drop the previous list and count`. `the next user does not see the previous account` |
+| P6-34 | Partial (Fake only) | سلبي. `account change before the GET finishes shows nothing`. حمولة المستخدم السابق لا تفتح المحتوى القديم. نقر الصينية على الجهاز Needs device-emulator |
+| P6-35 | Pass | سلبي. مستخدم آخر غائب عن القائمة. `another user on the banner is not marked read`. تعليم `88` من غير مالكه 404 في التجهيز. تسليم الجهاز على staging لم يُشغَّل |
+| P6-36 | Partial (Fake only) | سلبي. `a banner tap while signed out does not mark read`. `a list tap and a tray tap mark read once, and needsLogin does not`. المسبار `needsLogin does not mark read`: `notificationMutationApplies` = 0. نقر صينية النظام Needs device-emulator |
+| P6-37 | Pass | سلبي. القائمة البيضاء تسقط المفاتيح الزائدة. `a push with no recipientUserId is dropped`. لا انهيار |
+| P6-38 | Pass | سلبي. `a payload for the previous user is dropped after an account switch`. 404 لا ينشئ صفًا. الشارة لا تزيد من الحمولة المرفوضة |
+| P6-39 | Pass | سلبي. `permission forbidden marks the current user read, a different recipient does not`. `a same-user forbidden list tap marks the row read once`. المسار `/forbidden` والنص «القسم غير مصرح لهذا الحساب». «شركة سرية» غائبة في المسبار. تعليم قراءة صف المستخدم نفسه عند المنع يبقى قرار علي |
+| P6-40 | Partial (Fake only) | سلبي. `non-whitelisted keys never reach the notification text` و`the lock-screen public version has no name and no amount`. لا كلمة مرور ولا كوكي ولا مبلغ ولا هاتف في نص الصينية على Fake. الجسم الحي Needs staging |
+
+العد: **Pass 20**، **Partial (Fake only) 18**، **Needs device-emulator 1** (P6-26)، **Not supported 1** (P6-06)، **Fail 0**، ولا حالة حكمها Needs staging وحدها. P6-32 وP6-40 داخل الـ Partial ونصفهما الحي Needs staging.
+
+الحالات السلبية، صراحة:
+
+| الحالة | الحكم |
+|---|---|
+| P6-12 | Pass |
+| P6-23 | Partial (Fake only) |
+| P6-28 | Partial (Fake only) |
+| P6-29 | Partial (Fake only) |
+| P6-34 | Partial (Fake only) |
+| P6-35 | Pass |
+| P6-36 | Partial (Fake only) |
+| P6-37 | Pass |
+| P6-38 | Pass |
+| P6-39 | Pass |
+| P6-40 | Partial (Fake only) |
+
+الجزئي والمفتوح من غير Pass: P6-02 وP6-04 وP6-05 وP6-07 وP6-08 وP6-09 وP6-10 وP6-23 وP6-24 وP6-25 وP6-27 وP6-28 وP6-29 وP6-30 وP6-32 وP6-34 وP6-36 وP6-40، ثم P6-26 Needs device-emulator، ثم P6-06 Not supported.
+
+### العيوب على `main`
+
+| العيب | الحكم على `a5ca268` |
+|---|---|
+| DEF-017 | Verified closed. المسبار 7/0 |
+| DEF-018 | Verified closed. الموافقة ترسل مرة على المسجّل الجذر |
+| DEF-019 | Open، غير مانع. الدخول بإذن ممنوح يرسل مرة، وفتح الشاشة يرسل الرمز نفسه مرة ثانية، والاستئناف لا يضيف ثالثة |
+| DEF-010 | مغلق. `DEF-010 view all opens the section it belongs to when readable` |
+| DEF-002 | Pending PM decision. `limited admin provider state is forbidden until DEF-002`. خارج هذه المرحلة |
+| DEF-012 | Fail. البلاطات الثلاث ما زالت `employeesEmpty` و`auditEmpty` و`operationsEmpty`. خارج هذه المرحلة |
+| DEF-020 | لم يُفتح |
+
+### من المعيار إلى الحكم على `a5ca268`
+
+Pass هنا يعني أن كل حالات المعيار Pass على Fake. غير ذلك فجوة أو غير مدعوم. جدول الخطة أعلاه يبقى لقطة `8a52160`.
+
+| المعيار | الحالات | الحكم | السبب |
+|---|---|---|---|
+| (1) المقدمة | P6-01، P6-02، P6-03 | Gap needs device | P6-01 وP6-03 Pass. P6-02: الشريط والنص على Fake، وصينية النظام لم تُرسم |
+| (2) الخلفية | P6-04، P6-05 | Gap needs device | عقد الاستطلاع والفاصل 15 دقيقة والإيقاف في الإصدار على الوحدة. التسليم الحقيقي Needs device. ليس دفع خلفية عبر FCM |
+| (3) الإغلاق أو القتل | P6-06، P6-07 | Not supported | P6-06 غير مدعوم بلا FCM. P6-07 فتح بارد داخل العملية فقط |
+| (4) اسم النظام | P6-08، P6-09 | Gap needs device | الاسم `تنبيهات VIB` وقفل الشاشة `إشعار جديد` في الوحدة. الرسم وإعدادات النظام Needs device |
+| (5) اسم الموظف | P6-10، P6-11، P6-12 | Gap needs device | P6-11 وP6-12 Pass على القائمة والتصفية. P6-10: الاسم في الصف من الخادم، ورسمه في الصينية Needs device |
+| (6) نوع العملية | P6-13، P6-14، P6-40 | Gap needs staging | P6-13 وP6-14 Pass. شكل P6-40 على Fake نظيف. الجسم الحي Needs staging |
+| (7) الشارة | P6-15، P6-16، P6-17 | Pass | العدد من الخادم، والإخفاء عند الغياب والصفر، و`99` عند 99 و`99+` فوقه |
+| (8) النقص عند القراءة | P6-18، P6-19 | Pass | التعليم يحفظ `readAt` وينقص مرة. الفشل يبقي العدد. النقرة الثانية لا تنقص |
+| (9) قراءة الكل | P6-20، P6-21 | Pass | الزر عند عدد غير مقروء، والنداء المزدوج أثناء الطيران طلب واحد، وبلا شبكة لا كتابة |
+| (10) بلا تكرار | P6-22، P6-23، P6-37 | Gap needs device | P6-22 وP6-37 Pass. P6-23: العدد لا يزيد مرتين على Fake، وصينية مكررة Needs device |
+| (11) أندرويد 10+ | P6-24، P6-25، P6-26 | Gap needs device | بوابة 29 و33 على SDK محقون. API 34 لم يُشغَّل. لا محاكٍ في CI هذا التشغيل |
+| (12) الإذن | P6-27، P6-28، P6-29، P6-30 | Gap needs device | الحوار والتسجيل على SDK محقون Pass، بما فيه P6-30. حوار النظام ومصفوفة الصور Needs device. DEF-019 فجوة غير مانعة داخل التسجيل. P6-30 قرار لعلي |
+| (13) تبديل الحساب | P6-31، P6-32، P6-33، P6-34، P6-35، P6-36، P6-38، P6-39 | Gap needs device or staging | العزل والخروج والمنع و`needsLogin` Pass على Fake. P6-32 الرمز الحي Needs staging. نقر الصينية في P6-34 وP6-36 Needs device |
+
+### قرارات معلقة لعلي
+
+- الاستطلاع في الخلفية مقابل FCM. الإصدار يبقي الاستطلاع مطفأ. `firebase_messaging` غير مربوط، ونقل `fcm` بلا رمز.
+- تعليم القراءة عندما يفتح المستخدم صفًا يملكه ثم ترجع الفتاحة `forbidden`. المسار والنص قائمان. هذا خيار، وليس عيبًا.
+- P6-30: تحت API 33 يُعدّ الإذن ممنوحًا بلا حوار. السلوك على `main` منذ `da9183c`. يُعامل كقرار ممنوح إلى أن ينقضه علي.
+- `requestId` يبقى خارج السلك إلى أن يؤكد مالك الخادم الحقل.
+- عنوان staging وحسابات الأدوار.
+- تشغيل جهاز أو محاكٍ على API 29 و33 و34.
+
+DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail. كلاهما خارج شروط المرحلة 6.
+
+### الحكم
+
+**مقبول بشروط.** هذا حكم مكتوب، وليس توقيعًا. التوقيع عند علي.
+
+الشروط:
+
+1. جهاز أو محاكٍ لـ API 29 و33 و34: صينية النظام، والتسليم في الخلفية، والفتح البارد بعد القتل، واسم التطبيق والقناة كما يرسمهما النظام، وحوار إذن النظام، ونقر الصينية في P6-34 وP6-36.
+2. تسليم التطبيق المقتول ودفع الخلفية الحقيقي غير مدعومين إلى أن يعطي نقل (FCM أو غيره) رمزًا. الإصدار لا يشغّل الاستطلاع إلا بتعريف صريح.
+3. staging: عنوان، وحسابات، وجسم دفع حي لـ P6-32 وP6-40.
+4. DEF-019 يبقى مفتوحًا وغير مانع: دخول بإذن ممنوح ثم أول فتح لشاشة الإشعارات يرسل الرمز مرة ثانية.
+5. قرارات علي المعلقة أعلاه تبقى شروطًا، وليست عيوبًا جديدة.
+6. DEF-002 وDEF-012 لا يمنعان هذا الحكم ولا يُغلقان به.
+
+---
+
 ## توقيع قبول المرحلة 6
 
 | الحقل | القيمة |
 |---|---|
 | رقم المرحلة | 6 |
-| النطاق المُسلَّم | خطة إشعارات، 40 حالة، على `main` `8a52160`. لا تنفيذ جديد |
-| نتيجة كل معيار | لقطة الخطة في جدول «من المعيار إلى الحكم». #46 يحدّث (2) و(3). #47 `da9183c` يغلق إرسال المعيار 12 على مسار الموافقة (DEF-018 مغلق) ويفتح DEF-019 لتكرار الإرسال عند فتح الشاشة. P6-30 Pass على SDK محقون وقابل للرجوع. المرحلة لم تُوقَّع |
+| النطاق المُسلَّم | جولة نهائية على `main` `a5ca26809578dd013430dcaae78c517043e95491` (دمج #47). الشجرة تطابق `da9183c`. أربعون حالة على Fake والوحدة. الجهاز وstaging لم يُشغَّلا |
+| نتيجة كل معيار | جدول «من المعيار إلى الحكم على `a5ca268`»: (7) و(8) و(9) Pass. (3) Not supported. بقية المعايير فجوة جهاز أو staging. لا Fail على Fake |
 | الاسم | وكيل القبول الآلي لهذه الجولة (بلا اسم شخص) |
 | الدور | مهندس قبول |
-| التاريخ | 2026-10-21 |
+| التاريخ | 2026-10-22 |
 | القرار | لم يُوقَّع |
-| العيوب المانعة المفتوحة | لا مانع مفتوح على هذا الرأس. DEF-018 مغلق على #47 `da9183c` وليس على `main`. DEF-019 مفتوح وغير مانع على #47 وليس على `main`. DEF-017 مغلق على فرع الصينية حتى #46 وليس على `main` |
-| ملاحظات | #47 عند `da9183c`: نعم مع ملاحظات. الموافقة ترسل الرمز مرة. فتح الشاشة بعد دخول بإذن ممنوح يرسله مرة ثانية. P6-30 على SDK محقون و`da9183c` يُرجع وحده. (2) و(3) فجوات جهاز. المرحلة لم تُوقَّع. القرار عند التوقيع أحد: مقبول / مقبول بشروط / مرفوض. التوقيع الإداري في الجدول التالي فارغ |
+| العيوب المانعة المفتوحة | لا مانع مفتوح على `main`. DEF-017 وDEF-018 Verified closed على `a5ca268`. DEF-019 مفتوح وغير مانع. DEF-002 Pending PM decision وDEF-012 Fail خارج المرحلة |
+| ملاحظات | الحكم المكتوب: مقبول بشروط. الشروط: مصفوفة الجهاز 29/33/34، وstaging، وDEF-019، وقرارات علي (الاستطلاع مقابل FCM، وتعليم المنع لنفس المستخدم، وP6-30، و`requestId`). التسليم لتطبيق مقتول غير مدعوم بلا FCM. لم يُوقَّع. التوقيع الإداري في الجدول التالي فارغ |
 
 توقيع الإدارة:
 

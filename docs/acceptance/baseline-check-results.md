@@ -228,6 +228,7 @@ DEF-003 وDEF-004 وDEF-005: **Verified**. DEF-002: **Pending PM decision** بع
 | PR #25 (`e53a8b1`) | `tool/check.sh` خروج 0: 86 و56. قائمة الكروت مطابقة. كتابة القسم مع `debts.zero_review`: سؤال مفتوح وليس عيبًا |
 | `main` (`dff1456`) | `tool/check.sh` خروج **0** في 2026-10-21. تحليل التطبيق بلا مشكلات (5.6s) و**247/0**. تحليل `packages/api_layer` بلا مشكلات (0.8s) و**74/0**. الالتزام `dff145630a534c73defd0602096ba97d5c648c14`. اختبار القبول `test/acceptance/phase_1_3_fake_test.dart` على الفرع بعد دمج `main`: **4/4**. المرحلة 4: مرفوض (DEF-013 وDEF-014). DEF-002: Pending PM decision |
 | `main` (`8a52160`) | `tool/check.sh` خروج **0** في 2026-10-21. تحليل التطبيق بلا مشكلات (4.0s) و**291/0/0**. تحليل الحزمة بلا مشكلات (0.6s) و**139/0/0**. الوسم `permissions-negative`: التطبيق **12/0/0** والحزمة **21/0/0**. `run.sh --dry-run` **6/0/0**. مسبار الإصدار رفض `USE_FAKE_API=true` وقبل `false` ثم 4/0. اختبارات القبول على فرع التوثيق بعد الدمج: **18/0**. المرحلة 5: مقبول بشروط. DEF-002: Pending PM decision. DEF-012: Fail. DEF-010: verified |
+| `main` (`a5ca268`) | `tool/check.sh` خروج **0** في 2026-10-22. التطبيق **371/0**، والحزمة **150/0**، والسالب **27/0** و**23/0**، وحارس الإصدار **4/0** مع رفض `USE_FAKE_API=true`. `run.sh --dry-run` **6/0**. CI `39699625496` أخضر. المرحلة 6: مقبول بشروط ولم تُوقَّع. DEF-017 وDEF-018 مغلقان على هذا الالتزام. DEF-019 مفتوح وغير مانع. DEF-002: Pending PM decision. DEF-012: Fail. DEF-010: مغلق |
 
 ## `main` عند `8a52160`
 
@@ -249,3 +250,25 @@ DEF-003 وDEF-004 وDEF-005: **Verified**. DEF-002: **Pending PM decision** بع
 | `USE_FAKE_API=false` ثم اختبارات الحارس | تُرجمت، ثم 4 ناجح و0 فاشل |
 
 وسم `screenshots` مستبعد، فلم يُحسب داخل 291. الوسم السالب خطوة لاحقة في السكربت نفسه، وأرقامه منفصلة عن 291 و139. CI على GitHub للالتزام نفسه أخضر (التشغيل `39635021270`).
+
+## `main` عند `a5ca268`
+
+التاريخ: 2026-10-22. الالتزام: `a5ca26809578dd013430dcaae78c517043e95491` (دمج #47). `origin/main` يساوي هذا الالتزام. Flutter 3.47.7 / Dart 3.13.5. السكربت: تحليل واختبار التطبيق ثم الحزمة، ثم `tool/run_permissions_negative_tests.sh`، ثم `tool/staging_negative_tests/preflight_test.sh`، ثم `python3 tool/scan_release_apk.py --self-test`، ثم `tool/check_release_rejects_fake_api.sh`. `run.sh --dry-run` شُغّل إلى جانب السكربت لأن `check.sh` يشغّل الفحص المسبق لا `--dry-run`.
+
+**رمز الخروج: 0.**
+
+| الخطوة | النتيجة |
+|---|---|
+| `flutter analyze` للتطبيق | `No issues found! (ran in 4.0s)` |
+| `flutter test --exclude-tags screenshots` | 371 ناجح، 0 فاشل |
+| `flutter analyze` في `packages/api_layer` | `No issues found! (ran in 2.7s)` |
+| `flutter test` في `packages/api_layer` | 150 ناجح، 0 فاشل |
+| `--tags permissions-negative` في التطبيق | 27 ناجح، 0 فاشل |
+| `--tags permissions-negative` في الحزمة | 23 ناجح، 0 فاشل |
+| `preflight_test.sh` | `preflight_test ok` |
+| `scan_release_apk.py --self-test` | `scan_release_apk self-test ok` |
+| `USE_FAKE_API=true` في الإصدار | `Release compilation rejected USE_FAKE_API=true.` |
+| `USE_FAKE_API=false` ثم اختبارات الحارس | 4 ناجح، 0 فاشل |
+| `run.sh --dry-run` | 6 ناجح، 0 فاشل |
+
+CI على GitHub للالتزام نفسه أخضر (التشغيل `39699625496`): Analyze, test, and debug APK؛ وNegative permission tests؛ وRelease build rejects fake API. لا وظيفة محاكٍ في هذا التشغيل. المرحلة 6: مقبول بشروط، ولم تُوقَّع. DEF-017 وDEF-018: Verified closed على هذا الالتزام. DEF-019: Open وغير مانع. DEF-002: Pending PM decision. DEF-012: Fail. DEF-010: مغلق.
