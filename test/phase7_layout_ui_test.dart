@@ -40,6 +40,14 @@ void main() {
   ) async {
     await _exercise(tester, const Size(320, 568), 2);
   }, timeout: timeout);
+
+  testWidgets('P7-22 rotation on 320dp does not overflow', (tester) async {
+    await _rotate(tester, const Size(320, 568), const Size(568, 320));
+  }, timeout: timeout);
+
+  testWidgets('P7-22 rotation on 430dp does not overflow', (tester) async {
+    await _rotate(tester, const Size(430, 932), const Size(932, 430));
+  }, timeout: timeout);
 }
 
 Future<void> _exercise(WidgetTester tester, Size size, double textScale) async {
@@ -52,4 +60,39 @@ Future<void> _exercise(WidgetTester tester, Size size, double textScale) async {
   await visitMainScreens(tester, (path) {
     expectQuiet(tester, '$path ${size.width}x${size.height} x$textScale');
   });
+}
+
+const _rotatedScreens = <String, Key>{
+  '/': Key('home-dashboard'),
+  '/collections': Key('screen-collections'),
+  '/customers/c_55': Key('screen-ledger-customers'),
+  '/notifications': Key('screen-notifications'),
+};
+
+Future<void> _rotate(WidgetTester tester, Size portrait, Size landscape) async {
+  await pumpFakeApp(tester, size: portrait);
+  _expectScreen(tester, const Key('login-screen'), 'login portrait');
+  await _flip(tester, landscape);
+  _expectScreen(tester, const Key('login-screen'), 'login landscape');
+  await _flip(tester, portrait);
+
+  await signIn(tester, username: 'admin.demo', password: 'demo-only');
+  for (final entry in _rotatedScreens.entries) {
+    await go(tester, entry.key);
+    _expectScreen(tester, entry.value, '${entry.key} portrait');
+    await _flip(tester, landscape);
+    _expectScreen(tester, entry.value, '${entry.key} landscape');
+    await _flip(tester, portrait);
+    _expectScreen(tester, entry.value, '${entry.key} portrait again');
+  }
+}
+
+Future<void> _flip(WidgetTester tester, Size size) async {
+  tester.view.physicalSize = size;
+  await settle(tester);
+}
+
+void _expectScreen(WidgetTester tester, Key key, String label) {
+  expect(find.byKey(key), findsOneWidget, reason: label);
+  expectQuiet(tester, label);
 }
