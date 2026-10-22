@@ -4,7 +4,7 @@
 
 **الأساس:** `main` عند `a5ca26809578dd013430dcaae78c517043e95491`. الفرع يضيف هذه الوثيقة فقط. لا تغيير لكود الإنتاج. لم يُمس فرع #12.
 
-**معرّفات القبول السابقة** (`P0`–`P6`) موثّقة على [#12](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/12) في `docs/acceptance/phase-0.md` … `phase-6.md`. سجل العيوب هناك أيضًا: [`defects.md`](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/blob/cursor/acceptance-docs-13b0/docs/acceptance/defects.md). التالي الحر **DEF-020**.
+**معرّفات القبول السابقة** (`P0`–`P6`) موثّقة على [#12](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/12) في `docs/acceptance/phase-0.md` … `phase-6.md`. سجل العيوب هناك أيضًا: [`defects.md`](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/blob/cursor/acceptance-docs-13b0/docs/acceptance/defects.md). عند كتابة الخطة كان التالي الحر DEF-020. بعد مراجعة #51 التالي الحر **DEF-023**.
 
 **المالكون:** مهندس API = 1 و2 و3 و11 و12 و13. Senior Flutter = 4 و5 و6 و7 و8 و9. مطور الواجهة = 10 و14 و15 و16. DevOps = 17 و18 و19 (البند 19 تجهيز تشغيل الهاتف الحقيقي).
 
@@ -16,8 +16,8 @@
 
 | الحالة | العدد | البنود |
 |---|---|---|
-| Covered | 2 | 14، 15 |
-| Partial | 16 | 1، 2، 3، 4، 5، 6، 7، 8، 9، 10، 11، 12، 13، 16، 17، 18 |
+| Covered | 3 | 4، 14، 15 |
+| Partial | 15 | 1، 2، 3، 5، 6، 7، 8، 9، 10، 11، 12، 13، 16، 17، 18 |
 | Missing | 0 | — |
 | Device-only | 1 | 19 |
 | Staging-only | 0 | — |
@@ -25,11 +25,11 @@
 | المالك | البنود | Covered | Partial | Device-only |
 |---|---|---|---|---|
 | مهندس API | 6 | 0 | 6 | 0 |
-| Senior Flutter | 6 | 0 | 6 | 0 |
+| Senior Flutter | 6 | 1 | 5 | 0 |
 | مطور الواجهة | 4 | 2 | 2 | 0 |
 | DevOps | 3 | 0 | 2 | 1 |
 
-لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 في القسم ج تنقل البند 17 إلى Partial: القياس موجود على ذلك الطلب ولم يُدمج في `main`. البند 19 يبقى Device-only. لا توقيع.
+لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. البند 19 يبقى Device-only. لا توقيع.
 
 أكبر الفجوات لكل مالك في نهاية القسم أ.
 
@@ -44,12 +44,12 @@
 | 1 اختبارات API | مهندس API | Partial | unit | P7-01 |
 | 2 الدخول | مهندس API | Partial | widget | P7-02، P7-03 |
 | 3 الصلاحيات | مهندس API | Partial | unit + widget | P7-04 |
-| 4 أدوار المدير والموظف | Senior Flutter | Partial | widget | P7-05 |
-| 5 كل قسم | Senior Flutter | Partial | widget | P7-06، P7-07 |
+| 4 أدوار المدير والموظف | Senior Flutter | Covered | widget على #51 | — |
+| 5 كل قسم | Senior Flutter | Partial | widget على #51 | P7-07 |
 | 6 الحسابات | Senior Flutter | Partial | widget | P7-08، P7-09 |
-| 7 سداد جزئي وكامل | Senior Flutter | Partial | unit + widget | P7-10، P7-11 |
-| 8 اعتماد ورفض | Senior Flutter | Partial | unit + widget | P7-12، P7-13 |
-| 9 كروت مربوطة وغير مربوطة | Senior Flutter | Partial | widget | P7-14، P7-15 |
+| 7 سداد جزئي وكامل | Senior Flutter | Partial | widget على #51 | P7-10، P7-11 |
+| 8 اعتماد ورفض | Senior Flutter | Partial | widget على #51 | P7-13 |
+| 9 كروت مربوطة وغير مربوطة | Senior Flutter | Partial | widget على #51 | P7-14، P7-15 |
 | 10 الإشعارات | مطور الواجهة | Partial | unit + widget | P7-16، P7-17، P7-18 |
 | 11 انقطاع الإنترنت | مهندس API | Partial | widget | P7-19 |
 | 12 إعادة المحاولة | مهندس API | Partial | unit + widget | P7-20 |
@@ -92,16 +92,18 @@
 
 - **المالك:** Senior Flutter
 - **الموجود:** `test/login_flow_test.dart` (الاختباران الأولان أعلاه). `test/shell_group_test.dart`: `an employee does not see settings or admin routes`، `guest and flag admin see no sections and no settings`، `limited admin has no settings entry`. `test/collections_presentation_test.dart` `each fake role only sees the collections actions it may use`. `test/forbidden_presentation_test.dart`: `employee hides management totals, decisions, and admin tiles`، `admin still sees totals, approve, reject, and admin tiles`. `test/ledger_presentation_test.dart`: `an employee does not see ledger writes`، `a limited admin does not see ledger writes`. القبول: P5-10، P5-20، P5-30، P5-40، P3-12.
-- **الفجوة:** **P7-05** مسار واحد لكل دور (`admin`، `limited.admin`، `employee`، `guest`، `flag.admin`) يبدأ من نموذج الدخول ويقرأ الأقسام من الجلسة التي بناها الخادم التجريبي. المستوى widget على `FakeApiClient`.
+- **بعد #51:** `test/phase7_roles_test.dart` خمسة أدوار من `login-screen` و`signIn` على الحقول `username-field` و`password-field` وزر `login-button`. السكة من `SectionKey` والجلسة. لا `SessionAuthenticated` مسبق.
+- **الفجوة:** **P7-05** أُغلق على مستوى الودجت والخادم التجريبي. لم يُدمج #51.
 - **منع الاستبدال:** لا `SessionAuthenticated` مسبق. لا إخفاء الأزرار بشرط اختبار بدل `PermissionService` القادم من `me`.
 - **المستوى:** widget
-- **الحالة:** Partial
+- **الحالة:** Covered
 
 ### 5 — كل قسم
 
 - **المالك:** Senior Flutter
 - **الموجود:** `SectionKey` في `packages/api_layer/lib/core/permissions/permission_codes.dart`: `customers`، `collections`، `companies`، `libyan-deposits`، `egyptian-deposits`، `masraweya`، `purchases`، `treasury`، `reports`. `test/section_errors_test.dart`: خطأ ثم إعادة لكل من الديون، والدفتر، والاستلامات، والمشتريات، والخزينة، والتقارير، ودفتر الإعدادات، والبحث. `test/shell_group_test.dart` `DEF-010 view all for ${section.key} opens /${section.key}` و`companies-only debts open the companies section`. `test/home_contract_test.dart` `home, cash status, version, and rates stay server text`. `test/qa_round_test.dart` `home sections lay out for $user`. شاشات: `collections_presentation_test.dart`، `purchases_presentation_test.dart`، `treasury_reports_polish_test.dart`، `masraweya_save_test.dart`، `account_list_ui_test.dart`. القبول: P1-05، P1-18، P4-01 إلى P4-08، P5-03، P5-04، P5-05، P5-06.
-- **الفجوة:** **P7-06** قراءة كل `SectionKey` من الشاشة الحقيقية بعد دخول، وصف من `FakeApiClient` لا من `homeDashboardProvider` مستبدل. **P7-07** شاشات الإعدادات `/settings/employees` و`/settings/audit` و`/settings/operations` على staging أو بعد بيانات حقيقية. اليوم `DEF-012 admin settings replace the old unavailable sentence` يتوقع `employeesEmpty` و`auditEmpty` و`operationsEmpty`. هذا Fail معروف، لا Pass. المستوى widget ثم staging.
+- **بعد #51:** `P7-06 admin reads every section from the signed-in session` يفتح `HomeDashboard` ثم المسارات التسعة لكل `SectionKey`. لا `homeDashboardProvider.override`. **P7-07** ما زال `employeesEmpty` و`auditEmpty` و`operationsEmpty`. الاختبار على #51 يثبت النص ولا يغلق الصف. DEF-012 يبقى Fail.
+- **الفجوة:** **P7-06** أُغلق على الودجت. **P7-07** شاشات الإعدادات على staging أو بعد بيانات حقيقية. هذا Fail معروف، لا Pass.
 - **منع الاستبدال:** تجاوز `homeDashboardProvider` في اختبار DEF-010 يثبت التوجيه فقط. لا يُحتسب زيارة قسم. لا استبدال `collectionsProvider` بقائمة ثابتة في P7-06.
 - **المستوى:** widget. P7-07 staging.
 - **الحالة:** Partial
@@ -110,6 +112,7 @@
 
 - **المالك:** Senior Flutter
 - **الموجود:** `test/account_list_actions_test.dart`: `zero review is per card and only when the server allows it`، `Egyptian deposits send the pinned filter`، `phone show-all loads the remaining pages for the active filter`. `test/account_list_logic_test.dart` `load-more rows clear when that section filter or query changes`. `test/edit_account_card_test.dart`: `edit follows section write, allowedActions, and system cards`، `admin can open edit from each card section`، `a blank name does not send, and a retry reuses the request id`. `packages/api_layer/test/account_list_query_test.dart` `list sends filter for Egyptian deposits the same way as customers`. `packages/api_layer/test/zero_review_read_test.dart`. القبول: P2-01، P2-07، P2-09، P2-10، P2-11، P2-12، P4-004.
+- **بعد #51:** لا اختبار لإنشاء كارت أو رفض التكرار. P7-08 وP7-09 باقيان.
 - **الفجوة:** **P7-08** إنشاء كارت والبحث قبل التكرار عبر متحكّم الحساب و`FakeApiClient`، لا مستودع مستبدل. **P7-09** عينة staging من 10 كروت لكل قسم تطابق الويب (P2-01). المستوى widget ثم staging.
 - **منع الاستبدال:** لا حقن رصيد في الودجت ثم مقارنته بنفسه. الرصيد المعروض هو حقل الرد.
 - **المستوى:** widget. P7-09 staging.
@@ -119,7 +122,8 @@
 
 - **المالك:** Senior Flutter
 - **الموجود:** `packages/api_layer/test/qa_defects_round1_test.dart`: `DEF-003 full payment stores balance 0`، `partial payment stores the new balance and rejects a stale version`، `DEF-016 partial payment and cancel publish the stored home balance`. `test/qa_defects_round1_test.dart`: `DEF-003 full payment refreshes the ledger header and the list`، `DEF-016 a partial payment shows the stored home balance`، `DEF-016 full payment no longer shows the 320 home debt row`. `test/transaction_correction_test.dart` `full payment sends a chosen date and omits an unchosen one`. `packages/api_layer/test/v027_fields_test.dart` `full payment omits a date the user did not choose`. `test/write_safety_test.dart` `a payment dialog ignores a second confirm while the send is in flight`. القبول: P2-03، P2-04، P2-05، P2-06.
-- **الفجوة:** **P7-10** سداد جزئي ثم كامل على الكارت نفسه من حوار السداد والمتحكّم الحقيقي؛ النقرة الثانية أثناء الطيران طلب واحد؛ الرصيد من الجلب التالي. **P7-11** المطابقة نفسها على staging مقابل الويب. المستوى widget ثم staging.
+- **بعد #51:** `P7-10 a partial payment then a full payment on the same card` من `add-payment` ثم `full-payment` على `c_55`، والنقرة الثانية أثناء الإيقاف طلب واحد، والرأس 220 ثم 0. DEF-020 وDEF-022 يمنعان إغلاق الصف. P7-11 staging باقٍ.
+- **الفجوة:** **P7-10** المسار السعيد موجود والصف Partial بسبب DEF-020 وDEF-022. **P7-11** المطابقة على staging مقابل الويب.
 - **منع الاستبدال:** لا متحكّم دفتر يضع الرصيد 0 محليًا. الأمانات لا تُمرَّر فيها سداد كامل إن كان الزر غائبًا (P2-04).
 - **المستوى:** unit + widget. P7-11 staging.
 - **الحالة:** Partial
@@ -128,7 +132,8 @@
 
 - **المالك:** Senior Flutter
 - **الموجود:** `test/unlinked_receipt_actions_test.dart`: `reject and cash stay hidden without the action permission`، `decide without cash receive shows reject and hides cash`، `retrying an unchanged reject reuses the request id and version`، `confirming cash on a rejected receipt sends its version`. `test/forbidden_presentation_test.dart` `admin still sees totals, approve, reject, and admin tiles`. `test/qa_defects_round1_test.dart` `DEF-002 limited admin can approve because the server grants decide`. `packages/api_layer/test/qa_defects_round1_test.dart` `unlinked decision stores status and version and rejects a stale one` و`DEF-002 limited admin has collections.decide and the server accepts it`. `test/permissions/employee_gating_permission_negative_test.dart`. القبول: P3-02، P3-03، P3-04، P3-10، P3-11، P3-12.
-- **الفجوة:** **P7-12** اعتماد استلام ورفض استلام آخر من أزرار `CollectionsScreen` والمتحكّم الحقيقي. الموظف لا يرى الزر، واستدعاؤه على الخادم التجريبي 403. **P7-13** اعتمادان متزامنان بإصدار واحد على staging: واحد ينجح (P3-04). المستوى widget ثم staging.
+- **بعد #51:** `P7-12 admin approves one submission and rejects another` من `approve-sb_1` و`reject-sb_9` ثم قراءة المستودع. الموظف لا يرى الأزرار و`decide` يعيد 403. DEF-002 يبقى مفتوحًا وليس Pass. P7-13 staging باقٍ.
+- **الفجوة:** **P7-12** أُغلق على الودجت والخادم التجريبي. **P7-13** اعتمادان متزامنان بإصدار واحد على staging.
 - **منع الاستبدال:** لا `onDecide` مستبدل. DEF-002 لا يُحسب Pass للمدير المحدود.
 - **المستوى:** widget. P7-13 staging.
 - **الحالة:** Partial
@@ -137,7 +142,8 @@
 
 - **المالك:** Senior Flutter
 - **الموجود:** `test/collections_presentation_test.dart`: `the unlinked and assignment forms stay inside a narrow large-text sheet`، `approved unlinked receipts keep the locked status colour`. `test/unlinked_receipt_actions_test.dart` `a pending receipt is not offered cash until the server says so`. `packages/api_layer/test/qa_defects_round1_test.dart` `unlinked decision stores status and version and rejects a stale one`. القبول: P3-07، P3-08، P3-09، P3-10.
-- **الفجوة:** اختبار النموذج الحالي يثبت التخطيط لا الإرسال. **P7-14** إرسال استلام من إسناد (مربوط) واستلام بلا ربط، ثم اعتماد غير المربوط، عبر المتحكّم و`FakeApiClient`. **P7-15** الزوج نفسه على staging. المستوى widget ثم staging.
+- **بعد #51:** الإرسال من `submit-as_1` و`save-unlinked` حقيقي، والنظرة لا تحتوي الصف الجديد (DEF-021). ربط `ur_1` يخزّن `customerId` ولا يحرّك رصيد `c_55`. P7-15 staging باقٍ.
+- **الفجوة:** **P7-14** Partial بسبب DEF-021. **P7-15** الزوج نفسه على staging.
 - **منع الاستبدال:** لا `onSubmit` فارغ. حالة الربط تُقرأ من الرد (`assignment` / غياب الربط) لا من علم اختبار.
 - **المستوى:** widget. P7-15 staging.
 - **الحالة:** Partial
@@ -240,7 +246,7 @@
 | المالك | ما يُكتب أولًا |
 |---|---|
 | مهندس API | P7-01 الدخان الحي. P7-02 الدخول الحقيقي. P7-04 مصفوفة الصلاحيات من `me`. P7-19 الطيران على الراديو. P7-20 وP7-21 إعادة المحاولة بلا حركة ثانية، و`requestId` ظاهر في الجسم أو سؤال خادم |
-| Senior Flutter | P7-05 الأدوار من نموذج الدخول. P7-06 الأقسام بلا استبدال الرئيسية. P7-07 لا تُمرَّر بلاطات DEF-012 الفارغة. P7-10 السداد من الحوار. P7-12 الاعتماد والرفض من المتحكّم. P7-14 إرسال المربوط وغير المربوط لا تخطيط النموذج فقط |
+| Senior Flutter | بعد #51: P7-05 وP7-06 وP7-12 مغلقة على الودجت ولم تُدمج. يبقى P7-07 مع DEF-012، وP7-08، وP7-10 مع DEF-020 وDEF-022، وP7-14 مع DEF-021، وصفوف staging P7-09 وP7-11 وP7-13 وP7-15 |
 | مطور الواجهة | P7-16 الصينية والإذن والقفل والنقر على المسجّل والفتاحة الحقيقيين. P7-17 الخلفية، والقتل Not supported بلا FCM. P7-18 مصفوفة 29/33/34. P7-22 التدوير |
 | DevOps | بعد #52 يبقى: رقم P7-23 وP7-24 على الجهاز الضعيف في النموذج، وعتبة علي، ونصف الجهاز من P7-25، ونموذج P7-26 على الهواتف A–D. سير المحاكي لا يملأ النموذج |
 
@@ -351,7 +357,7 @@ flutter build apk --release \
 |---|---|---|---|---|---|---|---|---|---|---|
 | | | | | | | | | | | |
 
-قيم `pass/fail`: `Pass`، `Fail`، `Blocked`، `Not supported`. العيب الجديد يبدأ من DEF-020 ويُضاف إلى `defects.md` على #12، لا في هذه الوثيقة وحدها.
+قيم `pass/fail`: `Pass`، `Fail`، `Blocked`، `Not supported`. DEF-020 وDEF-021 وDEF-022 مسجّلة في `defects.md` على #12. التالي الحر DEF-023.
 
 ---
 
@@ -363,7 +369,7 @@ flutter build apk --release \
 2. **وسم `permissions-negative`.** كل حالة 403/401 لدور بلا صلاحية في ملف تحت `test/permissions/` أو `packages/api_layer/test/permissions/` أو الملفات الموسومة الحالية، و`tool/run_permissions_negative_tests.sh` أخضر. صفر اختبارات موسومة يفشل السكربت.
 3. **`tool/check.sh` أخضر** على رأس الطلب: تحليل، اختبارات بلا وسم `screenshots`، حزمة API، السالب، `preflight_test.sh`، `scan_release_apk.py --self-test`، ورفض ترجمة `USE_FAKE_API=true` في release.
 4. **لا Fake في release.** لا `--dart-define=USE_FAKE_API=true` في بناء release ولا في وثيقة التثبيت. debug بـ Fake يبقى حلقة مطور ويُسمّى كذلك.
-5. **العيوب.** عيب جديد من DEF-020 فصاعدًا في [`docs/acceptance/defects.md`](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/blob/cursor/acceptance-docs-13b0/docs/acceptance/defects.md) على [#12](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/12). التالي الحر عند كتابة هذه الخطة: **DEF-020**. لا يُغلق DEF-002 ولا DEF-012 من طلب مرحلة 7 إلا بقرار علي أو ببيانات الإعدادات. DEF-019 يبقى مفتوحًا وغير مانع حتى يُصلح تكرار تسجيل الجهاز.
+5. **العيوب.** عيب جديد من DEF-020 فصاعدًا في [`docs/acceptance/defects.md`](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/blob/cursor/acceptance-docs-13b0/docs/acceptance/defects.md) على [#12](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/12). عند كتابة الخطة كان التالي الحر DEF-020. بعد مراجعة #51 التالي الحر **DEF-023**. لا يُغلق DEF-002 ولا DEF-012 من طلب مرحلة 7 إلا بقرار علي أو ببيانات الإعدادات. DEF-019 يبقى مفتوحًا وغير مانع حتى يُصلح تكرار تسجيل الجهاز.
 6. **لا دمج من هذه الخطة.** المراجعة لا تدمج `main`. لا دفع قسري.
 7. **المستوى مكتوب** على الاختبار أو في وصف الطلب: unit أو widget أو integration أو device أو staging. اختبار Fake لا يُغلق صفًا حالته Device-only أو شرطه staging.
 
@@ -413,6 +419,69 @@ CI التشغيل `39707007033` أخضر: Analyze, test, and debug APK نجاح 
 | P7-24 | Partial | إطارات الشاشة الحقيقية تُطبع `recorded`، وسير المحاكي profile مع Fake يفشلها إن تجاوزت الميزانية. لا مقياس ذاكرة. النموذج فارغ. |
 | P7-25 | Partial | 20 صفحة عبر `load-older` و`FakeApiClient`، والمجموع 800. الشاشة تحتفظ بآخر 80 سطرًا أقدم. نصف الجهاز مفتوح. ساعة الودجت أقل من 8 ثوانٍ مفروضة. |
 | P7-26 | Device-only | سير المحاكي نصف البروتوكول. أعمدة النموذج مطابقة والصفوف فارغة. التشغيل اليدوي ينتظر وصول الملف إلى `main`. |
+
+### مراجعة #51 — البنود 4–9
+
+الطلب [#51](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/51) مسودة. الرأس `8aec37ee29107bb33541499f9e3be595f422919d`. الأساس `main` `a5ca26809578dd013430dcaae78c517043e95491`. ثلاثة التزامات. 11 ملفًا، كلها اختبارات و`dart_test.yaml`. فرق `lib/` و`packages/api_layer/lib` فارغ. لم يُدمج. هذه المراجعة لم تدفع إلى فرعه. لا توقيع.
+
+**الحكم:** yes with notes. DEF-020 وDEF-021 وDEF-022 مفتوحة ومانعة لمساراتها. التالي الحر DEF-023.
+
+CI التشغيل `39708173062` أخضر على هذا الرأس: Analyze, test, and debug APK، وNegative permission tests، وRelease build rejects fake API.
+
+`tool/check.sh` على الرأس، شجرة `/tmp/wt-51`، خروج 0. الأرقام تطابق ادعاء الوصف:
+
+| الخطوة | النتيجة |
+|---|---|
+| `flutter analyze` للتطبيق | `No issues found! (ran in 4.2s)` |
+| `flutter test --exclude-tags screenshots` | **410/0** |
+| `flutter analyze` في `packages/api_layer` | `No issues found! (ran in 2.5s)` |
+| `flutter test` في `packages/api_layer` | **153/0** |
+| `--tags permissions-negative` التطبيق | **32/0** |
+| `--tags permissions-negative` الحزمة | **26/0** |
+| dry-run | **6/0** |
+| `preflight_test.sh` | `preflight_test ok` |
+| `scan_release_apk.py --self-test` | `scan_release_apk self-test ok` |
+| `USE_FAKE_API=true` في release | `Release compilation rejected USE_FAKE_API=true.` |
+| حارس الإصدار | **4/0** |
+
+42 اختبارًا جديدًا. أسماؤها موجودة في الملفات. 41 اسمًا مذكور في وصف الطلب. اسم ودجت DEF-020 `DEF-020 a partial payment above the remaining balance is stored` موصوف في قسم العيوب وليس في جدول الأسماء. وسم المكتبة `@Tags(['permissions-negative'])` على `test/permissions/phase7_role_denials_permission_negative_test.dart` و`packages/api_layer/test/permissions/phase7_status_order_permission_negative_test.dart`. حالات 403/401 داخل هذين الملفين موسومة. `known-bug` و`pending-decision` داخل التشغيل الافتراضي.
+
+**منع الاستبدال.** لا `homeDashboardProvider.override` ولا استبدال متحكّم الاستلامات ولا حوار السداد ولا مزوّد جلسة ولا مزوّد صلاحية قسم في الملفات الجديدة. `pumpFakeApp` يبني `ApiLayer.create(useFakeApi: true)` ويستبدل `apiLayerProvider` بهذه الطبقة، ومعها بوابة الدفع والاتصال ومخازن الإشعار. هذا الحزام القائم. `signIn` يكتب `username-field` و`password-field` ويستدعي `login-button.onPressed`.
+
+- **P7-05.** خمسة أدوار من نموذج الدخول. `_expectSections` يمر على `SectionKey.values`. الموظف الممنوع في ملف السالب يفتح `/treasury` و`/masraweya` و`/companies` ويرى `ForbiddenPane`.
+- **P7-06.** الاختبار الرئيسي يفتح `HomeDashboard.screenKey` ثم customers وcollections وcompanies وlibyan-deposits وegyptian-deposits وmasraweya وpurchases وtreasury وreports. هذه قيم `SectionKey` التسع. اختبارات الإجماليات والإشعارات وصفر الدين موسومة `pending-decision` ولا تغلق سؤالًا زائدًا.
+- **P7-07.** يثبت جمل DEF-012 ولا يغلق الصف. الوسم `known-bug`.
+- **P7-08.** غير موجود في الطلب.
+- **P7-10.** حوار `add-payment` ثم `save-movement` ثم `full-payment` على `c_55`. أثناء `pauseMutations` النقرة الثانية لا تضيف `requestId`. الرأس 220 ثم 0. الأمانات الليبية بلا زر سداد كامل.
+- **P7-12.** `approve-sb_1` و`reject-sb_9` ثم `collections.overview()`. الموظف بلا أزرار و`decide` يرمي 403 `FORBIDDEN`. تعارض الإصدار على الاستلامات يبقي الزر ويعيد الجلب. DEF-002 موسوم `pending-decision` وليس Pass.
+- **P7-14.** الإرسال من الحوارين حقيقي. النظرة لا تضم الصف. ربط `ur_1` يخزّن `customerId` والرصيد يبقى 320.
+
+ملاحظة واحدة على الاستبدال: `a 403 is not retried by the buildAppRoot callback` ينسخ دالة إعادة المحاولة من `lib/main.dart` ويستبدل `apiLayerProvider` فقط. لا يضخ `buildAppRoot`. ليس إغلاقًا لبند شاشة.
+
+**العيوب على `main` `a5ca268`.** مسبار محلي 4/4 ثم حُذف. لم يُلتزم.
+
+| المعرف | الشدة | التصنيف | التأكيد |
+|---|---|---|---|
+| DEF-020 | عالية | Blocking | العميل والخادم التجريبي يقبلان 400 على 320. الرأس `-80 د.ل` والمخزَّن −80. العقد يكلّف الخادم بحساب المبلغ ولا ينص على سقف. الحارس على الحوار مطلوب. |
+| DEF-021 | عالية | Blocking لإغلاق P7-14 | المساران سُجّلا. النظرة تبقى `sb_1` `sb_2` `ur_1` `ur_2`. الإبطال على الشاشة حقيقي والسقوط في `_mutateCollections`. |
+| DEF-022 | عالية | Blocking لحوار السداد | بعد 409 الجملة هي نص الخادم. الرأس يبقى `320 د.ل` بعد المغادرة. المخزَّن 319. |
+
+**merge-tree.** ضد `main` `a5ca268`: خروج 0 وشجرة `2174c58cc41f7facff8e07a5a8fff38d5c265457`. ضد #52 `dc713ffd09442d0499ab2270ef88ce7f5f47a1a1`: خروج 0 وشجرة `d22b7b27cc9d65498b50e4e7168542ea6768e606`. لا ملف مشترك في الفرقين. لم يُنشأ دمج.
+
+| المعرف | الحالة بعد #51 |
+|---|---|
+| P7-05 | Covered |
+| P7-06 | Covered |
+| P7-07 | مفتوح (DEF-012) |
+| P7-08 | لم يُضف |
+| P7-09 | Staging، لم يُغلق |
+| P7-10 | Partial (DEF-020، DEF-022) |
+| P7-11 | Staging، لم يُغلق |
+| P7-12 | Covered |
+| P7-13 | Staging، لم يُغلق |
+| P7-14 | Partial (DEF-021) |
+
+البندان 4 Covered. البنود 5 و6 و7 و8 و9 Partial. DEF-002 وDEF-012 وDEF-019 على حالها.
 
 ---
 
