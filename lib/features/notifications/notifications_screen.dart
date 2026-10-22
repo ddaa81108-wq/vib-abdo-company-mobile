@@ -3,7 +3,9 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../error_handling/error_handler.dart';
+import '../../notifications/push_providers.dart';
 import '../../state/notification_providers.dart';
+import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
@@ -13,6 +15,7 @@ import '../../ui/widgets/soft_tile.dart';
 import 'notification_content.dart';
 import 'notification_open_seam.dart';
 import 'notification_permission.dart';
+import 'notification_permission_registration.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -35,11 +38,17 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   /// First visit to this screen in the provider scope. Already granted skips
-  /// the dialog. A denial explains first and requests only after agreement.
+  /// the dialog. Below Android 13 there is no request and no explanation.
+  /// A denial explains first and requests only after agreement.
   Future<void> _maybeExplain() async {
     if (!mounted) return;
     if (ref.read(notificationPermissionPromptedProvider)) return;
     ref.read(notificationPermissionPromptedProvider.notifier).mark();
+    if (await notificationRuntimePermissionIsImplicit(
+      ref.read(notificationSdkIntProvider),
+    )) {
+      return;
+    }
     final service = ref.read(notificationPermissionServiceProvider);
     final NotificationPermissionChoice status;
     try {
@@ -48,8 +57,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       return;
     }
     if (!mounted) return;
-    if (status == NotificationPermissionChoice.granted) return;
+    if (status == NotificationPermissionChoice.granted) {
+      await _syncRegistration();
+      return;
+    }
     if (status == NotificationPermissionChoice.permanentlyDenied) {
+      await _syncRegistration();
+      if (!mounted) return;
       await _showDenied();
       return;
     }
@@ -74,7 +88,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         ],
       ),
     );
-    if (agreed != true || !mounted) return;
+    if (!mounted) return;
+    if (agreed != true) {
+      await _syncRegistration();
+      return;
+    }
     final NotificationPermissionChoice next;
     try {
       next = await service.request();
@@ -82,7 +100,21 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       return;
     }
     if (!mounted) return;
+    await _syncRegistration();
+    if (!mounted) return;
     if (next != NotificationPermissionChoice.granted) await _showDenied();
+  }
+
+  /// A grant registers. A denial unregisters. The opener still owns mark-read.
+  Future<void> _syncRegistration() {
+    final session = ref.read(sessionStateProvider);
+    return ref
+        .read(notificationPermissionSyncProvider.notifier)
+        .sync(
+          signedIn: session is SessionAuthenticated,
+          permission: ref.read(notificationPermissionServiceProvider),
+          registrar: ref.read(deviceTokenRegistrarProvider),
+        );
   }
 
   Future<void> _showDenied() {

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'features/notifications/foreground_notification_banner.dart';
+import 'features/notifications/notification_permission_registration.dart';
 import 'features/splash/splash_screen.dart';
 import 'notifications/notification_transport_host.dart';
 import 'notifications/realtime_lifecycle.dart';
@@ -76,9 +77,11 @@ class CompanyApp extends ConsumerWidget {
 }
 
 Widget _live(BuildContext context, Widget? page) {
-  return NotificationTransportHost(
-    child: ForegroundNotificationBanner(
-      child: RealtimeLifecycle(child: page ?? const SizedBox.shrink()),
+  return NotificationPermissionRegistration(
+    child: NotificationTransportHost(
+      child: ForegroundNotificationBanner(
+        child: RealtimeLifecycle(child: page ?? const SizedBox.shrink()),
+      ),
     ),
   );
 }

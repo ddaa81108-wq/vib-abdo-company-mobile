@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/app.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notification_permission.dart';
+import 'package:vib_abdo_company_mobile/features/notifications/notification_permission_registration.dart';
 import 'package:vib_abdo_company_mobile/notifications/background_scheduler.dart';
 import 'package:vib_abdo_company_mobile/notifications/device_token_registrar.dart';
 import 'package:vib_abdo_company_mobile/notifications/device_token_store.dart';
@@ -57,6 +58,9 @@ Future<ApiLayer> pumpFakeApp(
         notificationPermissionServiceProvider.overrideWithValue(
           notificationsPermission ?? const GrantedNotificationPermission(),
         ),
+        notificationPermissionRegistrarOverride(),
+        // Widget tests have no platform channel. Android 13 keeps the dialog.
+        notificationSdkIntProvider.overrideWithValue(() async => 33),
         backgroundNotificationSchedulerProvider.overrideWithValue(
           const NoopBackgroundNotificationScheduler(),
         ),
