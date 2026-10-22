@@ -67,7 +67,7 @@ void main() {
       () => layer.accounts.get(AccountSection.customers, 'c_55'),
     );
     expect(card.balanceUnits, isNotNull);
-    final balance = money.format(card.balanceUnits!, card.currency);
+    final balance = _fmt(money, card.balanceUnits, card.currency);
     expect(balance, '320 د.ل');
     expect(_inside(const Key('ledger-header-balance'), balance), findsOneWidget);
 
@@ -80,45 +80,45 @@ void main() {
     expect(
       _inside(
         const Key('purchases-lifetime'),
-        money.format(totals.remainingUnits!, Currency.lyd),
+        _fmt(money, totals.remainingUnits, Currency.lyd),
       ),
       findsOneWidget,
     );
     expect(
       _inside(
         const Key('purchases-lifetime'),
-        money.format(totals.resultUnits!, Currency.lyd),
+        _fmt(money, totals.resultUnits, Currency.lyd),
       ),
       findsOneWidget,
     );
     expect(
       _inside(
         const Key('purchases-lifetime'),
-        money.format(totals.paidUnits!, Currency.lyd),
+        _fmt(money, totals.paidUnits, Currency.lyd),
       ),
       findsOneWidget,
     );
-    expect(money.format(totals.remainingUnits!, Currency.lyd), '2,553 د.ل');
+    expect(_fmt(money, totals.remainingUnits, Currency.lyd), '2,553 د.ل');
 
     await go(tester, '/treasury');
     final treasury = await _flushed(tester, () => layer.treasury.summary());
     expect(
       _inside(
         const Key('screen-treasury'),
-        money.format(treasury.netUnits!, Currency.lyd),
+        _fmt(money, treasury.netUnits, Currency.lyd),
       ),
       findsOneWidget,
     );
     expect(
       _inside(
         const Key('screen-treasury'),
-        money.format(treasury.egyptianSourceUnits!, Currency.egp),
+        _fmt(money, treasury.egyptianSourceUnits, Currency.egp),
       ),
       findsOneWidget,
     );
-    expect(money.format(treasury.netUnits!, Currency.lyd), '51,000 د.ل');
+    expect(_fmt(money, treasury.netUnits, Currency.lyd), '51,000 د.ل');
     expect(
-      money.format(treasury.egyptianSourceUnits!, Currency.egp),
+      _fmt(money, treasury.egyptianSourceUnits, Currency.egp),
       '95,000 ج.م',
     );
 
@@ -135,14 +135,14 @@ void main() {
       expect(
         _inside(
           const Key('screen-collections'),
-          money.format(units!, Currency.lyd),
+          _fmt(money, units, Currency.lyd),
         ),
         findsWidgets,
       );
     }
-    expect(money.format(collections.dayTotalUnits!, Currency.lyd), '100 د.ل');
+    expect(_fmt(money, collections.dayTotalUnits, Currency.lyd), '100 د.ل');
     expect(
-      money.format(collections.cashOutstandingUnits!, Currency.lyd),
+      _fmt(money, collections.cashOutstandingUnits, Currency.lyd),
       '250 د.ل',
     );
     expect(tester.takeException(), isNull);
@@ -173,8 +173,9 @@ void main() {
       () => layer.accounts.get(AccountSection.customers, 'c_55'),
     );
     expect(afterPartial.balanceUnits, isNotNull);
-    final partialText = money.format(
-      afterPartial.balanceUnits!,
+    final partialText = _fmt(
+      money,
+      afterPartial.balanceUnits,
       afterPartial.currency,
     );
     expect(
@@ -190,7 +191,7 @@ void main() {
       () => layer.accounts.get(AccountSection.customers, 'c_55'),
     );
     expect(afterFull.balanceUnits, isNotNull);
-    final fullText = money.format(afterFull.balanceUnits!, afterFull.currency);
+    final fullText = _fmt(money, afterFull.balanceUnits, afterFull.currency);
     expect(fullText, '0 د.ل');
     expect(_inside(const Key('ledger-header-balance'), fullText), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -216,8 +217,8 @@ void main() {
       tester,
       () => layer.accounts.list(AccountSection.customers),
     );
-    final total = money.format(page.summary.totalDebtUnits!, Currency.lyd);
-    final net = money.format(page.summary.netBalanceUnits!, Currency.lyd);
+    final total = _fmt(money, page.summary.totalDebtUnits, Currency.lyd);
+    final net = _fmt(money, page.summary.netBalanceUnits, Currency.lyd);
     expect(total, '12,800,000 د.ل');
     expect(net, total);
     expect(_inside(const Key('screen-customers'), total), findsWidgets);
@@ -232,7 +233,7 @@ void main() {
           FakeLargeCatalog.accountCard('customers', index)['balanceUnits']
               as int;
     }
-    expect(visibleSum, isNot(page.summary.totalDebtUnits));
+    expect(visibleSum, isNot(page.summary.totalDebtUnits?.asInt));
     expect(tester.takeException(), isNull);
   }, tags: [tag]);
 
@@ -254,7 +255,7 @@ void main() {
       tester,
       () => layer.accounts.list(AccountSection.customers),
     );
-    final total = money.format(page.summary.totalDebtUnits!, Currency.lyd);
+    final total = _fmt(money, page.summary.totalDebtUnits, Currency.lyd);
     expect(_inside(const Key('screen-customers'), total), findsWidgets);
     expect(
       _inside(const Key('screen-customers'), money.format(1250000000, Currency.lyd)),
@@ -274,27 +275,37 @@ void main() {
   ) async {
     final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
     final fake = layer.client as FakeApiClient;
+    fake.accountNextCursor = 'frac';
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers');
     final shown = money.format(10635, Currency.lyd);
     expect(_inside(const Key('screen-customers'), shown), findsWidgets);
 
     for (final fraction in [10.005, 0.995, 1.995]) {
+      fake.accountNextCursor = 'frac';
       fake.accountNextItems = [
         {'id': 'frac', 'name': 'كسر', 'balanceUnits': fraction},
       ];
-      Object? thrown;
-      try {
-        await _flushed(
-          tester,
-          () => layer.accounts.list(AccountSection.customers, cursor: 'frac'),
-        );
-      } catch (error) {
-        thrown = error;
-      }
-      expect(thrown, isA<InvalidServerResponseException>());
+      final page = await _flushed(
+        tester,
+        () => layer.accounts.list(AccountSection.customers, cursor: 'frac'),
+      );
+      final bad = page.page.items.single;
+      expect(bad.balanceUnits!.isInvalid, isTrue);
+      expect(bad.balanceUnits!.asInt, isNull);
+      expect(bad.balanceUnits!.asInt, isNot(0));
+      expect(bad.balanceUnits!.asInt, isNot(2));
+      expect(bad.balanceUnits!.asInt, isNot(10));
+      expect(
+        layer.money.formatOrDash(bad.balanceUnits, Currency.lyd),
+        'مبلغ غير صالح',
+      );
     }
 
+    await tester.ensureVisible(find.byKey(const Key('load-more-accounts')));
+    await tester.tap(find.byKey(const Key('load-more-accounts')));
+    await settle(tester);
+    expect(find.text('مبلغ غير صالح'), findsWidgets);
     expect(find.text('10 د.ل'), findsNothing);
     expect(find.text('1 د.ل'), findsNothing);
     expect(find.text('2 د.ل'), findsNothing);
@@ -330,12 +341,25 @@ void main() {
     );
   }, tags: [tag]);
 
-  test('DEF-032 a missing Egyptian rate hides both amounts', () {
-    markTestSkipped(
-      'DEF-032. treasury_screen.dart dashes egyptianSourceUnits and '
-      'egyptianConvertedUnits when egyptianRate is absent. The standard fake '
-      'always sends 9.5, so this path is not on the default screen.',
-    );
+  testWidgets('DEF-032 a missing Egyptian rate keeps the server EGP amount', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
+    final fake = layer.client as FakeApiClient;
+    fake.treasuryTotalsPatch = const <String, Object?>{'egyptianRate': null};
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/treasury');
+    expect(find.text('95,000 ج.م'), findsWidgets);
+    expect(find.text('يلزم سعر تحويل معتمد'), findsOneWidget);
+    expect(find.byKey(const Key('rate-missing')), findsOneWidget);
+    expect(find.text('10,000 د.ل'), findsNothing);
+    expect(find.text('0 ج.م'), findsNothing);
+    expect(find.text('0 د.ل'), findsNothing);
+    final summary = await _flushed(tester, () => layer.treasury.summary());
+    expect(summary.egyptianRate, isNull);
+    expect(summary.rateMissing, isTrue);
+    expect(summary.egyptianSourceUnits?.asInt, 95000);
+    expect(tester.takeException(), isNull);
   }, tags: [tag]);
 
   test('DEF-033 Vodafone currency is an assumption', () {
@@ -359,11 +383,33 @@ void main() {
     );
   }, tags: [tag]);
 
-  test('DEF-036 the website fraction is not a displayed number', () {
-    markTestSkipped(
-      'DEF-036. A fractional JSON amount fails the response. '
-      'There is no website sample of .005 or .995 to place on screen.',
+  testWidgets('DEF-036 one fractional field is invalid and the page stays', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
+    final fake = layer.client as FakeApiClient;
+    fake.accountNextCursor = 'frac';
+    fake.accountNextItems = [
+      {'id': 'frac', 'name': 'كسر', 'balanceUnits': 1.995},
+    ];
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers');
+    final shown = money.format(10635, Currency.lyd);
+    expect(_inside(const Key('screen-customers'), shown), findsWidgets);
+    await tester.ensureVisible(find.byKey(const Key('load-more-accounts')));
+    await tester.tap(find.byKey(const Key('load-more-accounts')));
+    await settle(tester);
+    expect(find.text('مبلغ غير صالح'), findsWidgets);
+    expect(find.text('2 د.ل'), findsNothing);
+    expect(find.text('1 د.ل'), findsNothing);
+    expect(_inside(const Key('screen-customers'), shown), findsWidgets);
+    final page = await _flushed(
+      tester,
+      () => layer.accounts.list(AccountSection.customers, cursor: 'frac'),
     );
+    expect(page.page.items.single.balanceUnits!.isInvalid, isTrue);
+    expect(page.summary.totalDebtUnits?.asInt, 10635);
+    expect(tester.takeException(), isNull);
   }, tags: [tag]);
 }
 
@@ -377,10 +423,16 @@ Future<void> _expectSummary(
 ) async {
   await go(tester, '/${section.path}');
   final page = await _flushed(tester, () => layer.accounts.list(section));
-  final total = money.format(page.summary.totalDebtUnits!, currency);
-  final net = money.format(page.summary.netBalanceUnits!, currency);
+  final total = _fmt(money, page.summary.totalDebtUnits, currency);
+  final net = _fmt(money, page.summary.netBalanceUnits, currency);
   expect(_inside(screen, total), findsWidgets);
   expect(_inside(screen, net), findsWidgets);
+}
+
+String _fmt(MoneyFormatter money, MoneyValue? value, Currency currency) {
+  expect(value, isNotNull);
+  expect(value!.isValid, isTrue);
+  return money.format(value.asInt!, currency);
 }
 
 Finder _inside(Key key, String text) {

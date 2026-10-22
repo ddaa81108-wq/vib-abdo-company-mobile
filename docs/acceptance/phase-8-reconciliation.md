@@ -25,7 +25,7 @@
 
 مؤكَّد في الكود، وغير مؤكد أمام الموقع:
 
-- المال عدد صحيح فقط. `unitsOrNull` يقبل `int`. النص أو الكسر أو `JsonNumberText` يرمي `InvalidServerResponseException` ولا يُقصّ ولا يُقرَّب (`packages/api_layer/lib/data/models/common.dart:27-36`). `null` يبقى `null` والشاشة ترسم `—` (`money_formatter.dart:47-49`، `lib/ui/strings.dart:68`). كسر واحد يُسقط الاستجابة كلها (DEF-036).
+- المال الصحيح يُحفظ `MoneyValue.known`. النص أو الكسر أو `bool` أو الكائن أو `JsonNumberText` يصبح `MoneyValue.invalid` لذلك الحقل فقط، والشاشة ترسم `مبلغ غير صالح`، بلا قص ولا تقريب ولا `0` (`packages/api_layer/lib/data/models/common.dart:47-60`، `money_value.dart:17`). `null` يبقى `null` والشاشة ترسم `—` (`money_formatter.dart:52-59`، `lib/ui/strings.dart:70`). حاوية حاضرة ليست كائن JSON ما زالت تُسقط الاستجابة (`common.dart:68-72`). DEF-036 Closed على `main` `82a6807` (سكواش #62).
 - المفكك لا ينتج `double`. العدد غير الصحيح يبقى نصًا (`packages/api_layer/lib/core/network/precise_json.dart:24-26`).
 - `MoneyFormatter` يقطع سلسلة الأرقام: بلا قسمة ولا تقريب ولا جمع ولا تحويل عملة (`money_formatter.dart:7-13`). الافتراض `moneyUnitScale` = 0 (`api_config.dart:73-75`، `docs/staging.md:33` و`:109`). فاصل الآلاف `,` والعلامة العشرية `.`. لا `intl` `NumberFormat`.
 - دقة عرض الموقع **غير معروفة** لكل الحقول. P0-04 حالته Not run (`docs/acceptance/phase-0.md:49-58`). تعليق `maximumFractionDigits: 0` هو الملاحظة نفسها وليس قاعدة موقع. هذا DEF-029.
@@ -172,11 +172,11 @@
 | مقياس الوحدة 0 غير مؤكد وP0-04 لم يُشغَّل | مؤكد في `api_config.dart:73-75` و`phase-0.md:49-58` | DEF-029 |
 | نطاق `summary` مع `q` و`filter` والصفوف المخفية غير مكتوب | الطلب يرسلها (`accounts_repository.dart:53-56`) والشريط يعرض `summary` لا مجموع الصفحة | DEF-030 |
 | سقف السداد الجزئي من الرصيد المخزَّن | مؤكد `ledger_screen.dart:417-430`. الضرب والقسمة بلا مقارنة | DEF-031 |
-| غياب سعر المصري يخفي المبلغين | مؤكد `treasury_screen.dart:389-396` حتى لو وصل العدد | DEF-032 |
+| غياب سعر المصري يخفي المبلغين | كان مؤكدًا. على `main` `82a6807` مصدر الجنيه يُرسم دائمًا، وصف التحويل فقط يُستبدل بـ `يلزم سعر تحويل معتمد` (`treasury_screen.dart:394-435`) | DEF-032 Closed |
 | عملة فودافون مفترضة `EGP` | مؤكد `purchase_models.dart:14-15` و`purchases_screen.dart:241-245` | DEF-033 |
 | مفاتيح الإجمالي الدائم غير مؤكدة | مؤكد `purchase_models.dart:238-239`. مفتاح غريب يبقى في `all` ولا يُرسم | DEF-034 |
 | عملة الاستلامات مثبّتة `LYD` | مؤكد `collection_models.dart:182`. لا حقل عملة من الخادم | DEF-035 |
-| كسر واحد يُسقط الاستجابة | مؤكد `common.dart:31-36` | DEF-036 |
+| كسر واحد يُسقط الاستجابة | كان مؤكدًا على `common.dart:31-36`. على `main` `82a6807` الحقل غير الصحيح يُرسم `مبلغ غير صالح` وبقية الصفحة تبقى (`common.dart:47-60`). حاوية حاضرة ليست كائن JSON ما زالت تُسقط الاستجابة (`common.dart:68-72`) | DEF-036 Closed |
 | الـ Fake يضيف الفرق إلى الملخصين | مؤكد `fake_api_client.dart:1471-1482`. ليس دليل الموقع | DEF-028 |
 | لا جمع محلي للإجماليات ولا جمع LYD مع EGP | مؤكد في الشاشات والنماذج المذكورة أعلاه | ليس عيبًا |
 
