@@ -4,13 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import 'support/phase7_nav.dart';
 import 'support/pump_app.dart';
 
 /// P7-10. The payment dialog and the ledger controller stay real. The balance
-/// on screen is the next fetch. The app does not cap or recompute it.
+/// on screen is the next fetch.
+///
+/// A direct payment above the stored balance, and a version conflict on save,
+/// are covered by the tests merged with DEF-020 and DEF-022:
+/// `test/def020_overpayment_test.dart`,
+/// `packages/api_layer/test/def020_overpayment_test.dart`, and
+/// `test/def022_payment_conflict_test.dart`. Those are not repeated here.
 void main() {
   testWidgets('P7-10 a partial payment then a full payment on the same card', (
     tester,
@@ -78,34 +83,6 @@ void main() {
     expect(find.byKey(const Key('full-payment')), findsNothing);
   });
 
-  testWidgets(
-    'DEF-020 a partial payment above the remaining balance is stored',
-    (tester) async {
-      // The app sends the integer. The fake stores previous - entered and
-      // does not reject it. 400 on c_55 (320) comes back as -80. This does
-      // not close a cap that the product does not have.
-      await pumpFakeApp(tester, size: const Size(800, 2200));
-      await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      await go(tester, '/customers/c_55');
-      await tester.ensureVisible(find.byKey(const Key('add-payment')));
-      await tester.tap(find.byKey(const Key('add-payment')));
-      await settle(tester);
-      await tester.enterText(
-        find.descendant(
-          of: find.byKey(const Key('movement-amount')),
-          matching: find.byType(TextField),
-        ),
-        '400',
-      );
-      await tester.tap(find.byKey(const Key('save-movement')));
-      await settle(tester);
-
-      expect(_header('-80 د.ل'), findsOneWidget);
-      expect(find.text(AppStrings.versionConflict), findsNothing);
-    },
-    tags: ['known-bug'],
-  );
-
   test(
     'a stale expectedVersion is rejected and the balance stays 320',
     () async {
@@ -140,62 +117,6 @@ void main() {
       final card = await layer.accounts.get(AccountSection.customers, 'c_55');
       expect(card.balanceUnits, 320);
     },
-  );
-
-  testWidgets(
-    'DEF-022 the payment dialog shows the server conflict sentence and does not refetch',
-    (tester) async {
-      // The collections buttons throw, so GuardedMutation shows
-      // AppStrings.versionConflict and refetches. This dialog catches the
-      // error and returns the server sentence. It does not invalidate
-      // accountCardProvider, so the header stays on the card loaded at 320
-      // even after the ledger is left and opened again. The stored card is
-      // 319 because the concurrent partial of 1 was accepted.
-      final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
-      await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      await go(tester, '/customers/c_55');
-      await tester.ensureVisible(find.byKey(const Key('add-payment')));
-      await tester.tap(find.byKey(const Key('add-payment')));
-      await settle(tester);
-      await tester.enterText(
-        find.descendant(
-          of: find.byKey(const Key('movement-amount')),
-          matching: find.byType(TextField),
-        ),
-        '100',
-      );
-
-      await tester.runAsync(
-        () => layer.accounts.addTransaction(
-          AccountSection.customers,
-          'c_55',
-          AccountTransactionRequest.partialPayment(
-            inputValue: 1,
-            date: DateTime.utc(2026, 10, 22),
-          ),
-          MutationMeta(expectedVersion: 4),
-        ),
-      );
-      await tester.tap(find.byKey(const Key('save-movement')));
-      await settle(tester);
-
-      expect(find.text('تم تعديل البيانات من مستخدم آخر'), findsWidgets);
-      expect(find.text(AppStrings.versionConflict), findsNothing);
-      expect(_header('320 د.ل'), findsOneWidget);
-
-      Navigator.of(tester.element(find.byType(Dialog))).pop();
-      await settle(tester);
-      final stored = await tester.runAsync(
-        () => layer.accounts.get(AccountSection.customers, 'c_55'),
-      );
-      expect(stored!.balanceUnits, 319);
-
-      await go(tester, '/customers');
-      await go(tester, '/customers/c_55');
-      expect(_header('320 د.ل'), findsOneWidget);
-      expect(_header('319 د.ل'), findsNothing);
-    },
-    tags: ['known-bug'],
   );
 }
 

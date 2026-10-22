@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
-import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/features/accounts/account_list_logic.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
@@ -8,76 +7,15 @@ import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'support/phase7_nav.dart';
 import 'support/pump_app.dart';
 
-/// P7-14. Submits and the link decision use the real collections controller.
+/// P7-14. The link decision uses the real collections controller.
 /// Link state is read from the next overview. An empty onSubmit is not used.
+///
+/// A real submit for a linked card and an unlinked card, and the refreshed
+/// overview, are covered by the tests merged with DEF-021:
+/// `test/def021_collection_submit_test.dart` and
+/// `packages/api_layer/test/def021_collection_submit_test.dart`.
+/// Those are not repeated here.
 void main() {
-  testWidgets(
-    'DEF-021 a real submit for a linked card and an unlinked card is not on the next overview',
-    (tester) async {
-      // POST /api/collections/assignments/{id}/submissions and
-      // POST /api/collections/unlinked-receipts return {id: ok, version: 1}
-      // and the next GET /api/collections does not contain the new row.
-      final layer = await pumpFakeApp(tester, size: const Size(800, 2400));
-      await signIn(tester, username: 'employee.demo', password: 'demo-only');
-      await go(tester, '/collections');
-
-      await tester.ensureVisible(find.byKey(const Key('submit-as_1')));
-      await tester.tap(find.byKey(const Key('submit-as_1')));
-      await settle(tester);
-      await tester.enterText(
-        find.descendant(
-          of: find.byType(Dialog),
-          matching: find.byType(TextField),
-        ),
-        '40',
-      );
-      await tester.tap(find.byKey(const Key('save-assignment')));
-      await settle(tester);
-
-      await tester.ensureVisible(find.byKey(const Key('unlinked-collection')));
-      await tester.tap(find.byKey(const Key('unlinked-collection')));
-      await settle(tester);
-      await tester.enterText(
-        find.byKey(const Key('unlinked-name')),
-        'زبون جديد',
-      );
-      await tester.enterText(
-        find.descendant(
-          of: find.byKey(const Key('unlinked-amount')),
-          matching: find.byType(TextField),
-        ),
-        '25',
-      );
-      await tester.tap(find.byKey(const Key('save-unlinked')));
-      await settle(tester);
-
-      final fake = layer.client as FakeApiClient;
-      expect(
-        fake.mutationPaths,
-        contains('/api/collections/assignments/as_1/submissions'),
-      );
-      expect(
-        fake.mutationPaths,
-        contains('/api/collections/unlinked-receipts'),
-      );
-      expect(fake.mutationBodies.join('\n'), contains('"amountUnits":40'));
-      expect(fake.mutationBodies.join('\n'), contains('"amountUnits":25'));
-
-      final overview = await tester.runAsync(
-        () => layer.collections.overview(),
-      );
-      expect(overview!.submissions.map((row) => row.id).toList(), [
-        'sb_1',
-        'sb_2',
-      ]);
-      expect(overview.unlinkedReceipts.map((row) => row.id).toList(), [
-        'ur_1',
-        'ur_2',
-      ]);
-    },
-    tags: ['known-bug'],
-  );
-
   testWidgets(
     'P7-14 linking ur_1 approves it, stores customerId, and does not move money',
     (tester) async {
