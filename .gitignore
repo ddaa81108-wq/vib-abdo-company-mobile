@@ -69,3 +69,6 @@ google-services.json.bak
 **/*serviceAccount*.json
 **/*-api-key*.json
 **/*apikey*.json
+
+# Local credential files (e.g. staging.env). Never commit them.
+*.env
