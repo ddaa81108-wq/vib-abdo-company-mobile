@@ -835,6 +835,37 @@ CI التشغيل [39711134480](https://github.com/ddaa81108-wq/vib-abdo-company
 
 الملخص لم يتغير: Covered ‏3، وPartial ‏15، وDevice-only ‏1.
 
+### ملحق #56 — وسيط التأخير في `GetRetryInterceptor`
+
+الادعاء: تغيير إنتاج واحد، والافتراضي بلا وسيط يبقي السلوك السابق. فُحص الفرق سطرًا سطرًا بين `a5ca268` و`9c0fa4f`. الحكم على هذا الملحق: yes. الأعداد والحالات لم تتغير. لم يُدفع إلى فرع #56. المسبار المحلي حُذف.
+
+**الفرق التنفيذي.** الملف الوحيد تحت `lib/` و`packages/api_layer/lib` هو `get_retry_interceptor.dart`. بعد تطبيع سطر الانتظار، جسم `onError` و`_isRetryable` و`_backoff` مطابق. الأسطر الجديدة:
+
+- وسيط اختياري `Future<void> Function(Duration delay)? delay`.
+- الحقل `_delay`، وقيمته `delay ?? _systemDelay`.
+- `_systemDelay` هو `Future<void>.delayed(delay)`.
+- `await Future<void>.delayed(delay)` صار `await _delay(delay)`.
+
+الثوابت كما كانت: `maxRetries` ‏2، و`baseDelay` ‏400 مللي ثانية، و`random ?? Random()`، والحالات `{502, 503, 504}`، والاهتزاز `base * 3^n ± 20%`. فحص الطريقة ما زال `GET` و`HEAD` فقط. `POST` و`PUT` و`PATCH` و`DELETE` لا تُعاد. رجوع 401 و419 ما زال قبل حساب التأخير. سطر الإلغاء ما زال بعد الانتظار: `if (req.cancelToken?.isCancelled ?? false) return handler.next(err);`.
+
+**من يمرّر الوسيط.** البناء الوحيد في الإنتاج هو `GetRetryInterceptor()` في `api_client_factory.dart:91`. بصمة هذا الملف `c418820091bd1aad8dc1c0d7c2db037d809bd6de` على الرأسين. `ApiLayer.create` يمر من `ApiStack.build`. لا وسيط `delay:` في `lib/` ولا في `packages/api_layer/lib` ولا في `tool/`. الموضع الوحيد لـ `delay:` هو `retry_policy_test.dart`. الإصدار يترجم المصنع نفسه، فلا يُمرَّر الوسيط هناك.
+
+**الاختبار الجديد يستخدم الصنف الحقيقي.** `retry_policy_test.dart` يستورد `package:flutter_api_layer/core/network/get_retry_interceptor.dart` ويبني `GetRetryInterceptor`. لا نسخة ثانية من `onError`. الاستبدال ثلاثة أشياء: محوّل `_Script`، و`Random` ثابت (`nextDouble` ‏0.5 فيصفّر الاهتزاز)، و`delay: clock.delay`. الساعة تسجّل 400 ثم 1200 مللي ثانية ولا تنام.
+
+**اختبارات المعترض القائمة، بلا تعديل.** `get_retry_auth_header_test.dart` بصمته `fa2fad3a877bb8664487b94f26aec58d04efc18b` على الرأسين. البناء `GetRetryInterceptor(baseDelay: Duration.zero)` بلا وسيط تأخير، فيسلك `_systemDelay` على الرأس الجديد و`Future.delayed` على القديم. التشغيل على `/tmp/wt-main` و`/tmp/wt-56`: **+5** وخروج 0 في الجهتين. إعادة واحدة بعد 502 و503، والترويسة الحالية تُعاد.
+
+**مسبار المسار الافتراضي، ثم حُذف.** نفس الملف على الرأسين، وبلا وسيط `delay`. `Random` ثابت حتى يكون 400 و1200 بلا اهتزاز. النتيجة **+4** إضافية وخروج 0 على الرأسين:
+
+| الحالة | الرأسان |
+|---|---|
+| خطأ اتصال على GET | 3 نداءات، والزمن من 1500 إلى أقل من 6000 مللي ثانية |
+| HEAD بعد 502 | نداءان |
+| POST وPUT وPATCH وDELETE بعد 502 | نداء واحد، وأقل من 300 مللي ثانية |
+| GET ‏401 و419 | نداء واحد، وأقل من 300 مللي ثانية |
+| إلغاء أثناء انتظار 250 مللي ثانية | المستقبل `DioExceptionType.cancel`، وبعد 400 مللي ثانية إضافية النداء ما زال واحدًا |
+
+**عدّ الاختبارات الجديدة.** 53 اختبارًا مسجّلًا، لا 52. التفصيل: عقد 21، وP7-02 جلسة 7، وP7-01 دخان 1 (المتخطى)، وسياسة إعادة 8، ومفتاح كتابة 4، وP7-04 أدوار 7 (خمسة في الحلقة زائد اثنان)، وودجت دخول 1، وP7-19 اثنان، وP7-20/P7-21 ودجت 2. في `check.sh` نجح 52 وتخطى 1. الـ 52 هي الناجحة فقط.
+
 ---
 
 ## د. خط الأساس `tool/check.sh`
