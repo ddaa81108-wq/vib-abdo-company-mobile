@@ -373,6 +373,18 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
   Future<String?> _submit(MutationMeta meta) async {
     final units = parseUnits(_amount.text);
     if (units == null) return AppStrings.integerOnly;
+    // Direct partial payment only. A rate is not an amount, so it is not
+    // compared. This reads the server balance; it does not compute one.
+    if (widget.type == 'payment' && _mode == CalculationMode.direct) {
+      final remaining = ref
+          .read(accountCardProvider((widget.section, widget.id)))
+          .asData
+          ?.value
+          .balanceUnits;
+      if (remaining != null && units > remaining) {
+        return AppStrings.amountAboveRemaining;
+      }
+    }
     final parsedDate = DateTime.tryParse(_date.text);
     if (parsedDate == null) return AppStrings.dateInvalid;
     DecimalString? factorValue;
