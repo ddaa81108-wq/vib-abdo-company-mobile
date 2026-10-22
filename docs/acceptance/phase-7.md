@@ -4,7 +4,7 @@
 
 **الأساس:** `main` عند `a5ca26809578dd013430dcaae78c517043e95491`. الفرع يضيف هذه الوثيقة فقط. لا تغيير لكود الإنتاج. لم يُمس فرع #12.
 
-**معرّفات القبول السابقة** (`P0`–`P6`) موثّقة على [#12](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/12) في `docs/acceptance/phase-0.md` … `phase-6.md`. سجل العيوب هناك أيضًا: [`defects.md`](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/blob/cursor/acceptance-docs-13b0/docs/acceptance/defects.md). عند كتابة الخطة كان التالي الحر DEF-020. بعد مراجعة #51 كان التالي الحر DEF-023. بعد مراجعة #49 التالي الحر **DEF-026**.
+**معرّفات القبول السابقة** (`P0`–`P6`) موثّقة على [#12](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/12) في `docs/acceptance/phase-0.md` … `phase-6.md`. سجل العيوب هناك أيضًا: [`defects.md`](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/blob/cursor/acceptance-docs-13b0/docs/acceptance/defects.md). عند كتابة الخطة كان التالي الحر DEF-020. بعد مراجعة #51 كان التالي الحر DEF-023. بعد مراجعة #49 التالي الحر DEF-026. بعد تأكيد `main` `2a45cfb` فُتح DEF-026 وصار التالي الحر **DEF-027**.
 
 **المالكون:** مهندس API = 1 و2 و3 و11 و12 و13. Senior Flutter = 4 و5 و6 و7 و8 و9. مطور الواجهة = 10 و14 و15 و16. DevOps = 17 و18 و19 (البند 19 تجهيز تشغيل الهاتف الحقيقي).
 
@@ -29,7 +29,7 @@
 | مطور الواجهة | 4 | 2 | 2 | 0 |
 | DevOps | 3 | 0 | 2 | 1 |
 
-لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. مراجعة #56 على `9c0fa4f` لا تغيّر الأعداد: Covered ‏3 وPartial ‏15 وDevice-only ‏1. مراجعة #53 و#54 و#55 لا تغيّر الأعداد. مراجعة #57 على `714c6ea` لا تغيّر الأعداد. إعادة اختبار #52 على `f347a8a` بعد دمج `main` `c40e03d` لا تغيّر الأعداد. إعادة اختبار #51 على `721edef` لا تغيّر الأعداد. DEF-019 وDEF-020 وDEF-021 وDEF-022 صارت Verified closed على ذلك الـ `main`. البند 7 يبقى Partial لأن P7-11 staging. البند 9 يبقى Partial لأن P7-15 staging. البند 19 يبقى Device-only. لا توقيع.
+لقطة الأساس على `a5ca268` كانت Partial ‏15 وDevice-only ‏2 (البندان 17 و19). مراجعة #52 تنقل البند 17 إلى Partial. مراجعة #51 تنقل البند 4 إلى Covered. إعادة اختبار #52 على `f8f7812` لا تغيّر الأعداد. مراجعة #49 و#50 وملحق #49 لا تغيّر الأعداد. إعادة اختبار #51 على `e34504c` لا تغيّر الأعداد. مراجعة #56 على `9c0fa4f` لا تغيّر الأعداد: Covered ‏3 وPartial ‏15 وDevice-only ‏1. مراجعة #53 و#54 و#55 لا تغيّر الأعداد. مراجعة #57 على `714c6ea` لا تغيّر الأعداد. إعادة اختبار #52 على `f347a8a` بعد دمج `main` `c40e03d` لا تغيّر الأعداد. إعادة اختبار #51 على `721edef` لا تغيّر الأعداد. DEF-019 وDEF-020 وDEF-021 وDEF-022 صارت Verified closed على `main` `c40e03d`. تأكيد `main` `2a45cfb` (squash #52 ثم #57 ثم #51) وإعادة اختبار #49 على `653a07c` لا يغيّران الأعداد. DEF-023 وDEF-024 وDEF-025 صارت Verified closed على `2a45cfb`. فُتح DEF-026 وغير مانع. البند 10 يبقى Partial لنصف الجهاز. البند 14 يبقى Covered. البند 15 يبقى Covered. البند 16 يبقى Partial لنصف الجهاز. البند 7 يبقى Partial لأن P7-11 staging. البند 9 يبقى Partial لأن P7-15 staging. البند 19 يبقى Device-only. التالي الحر DEF-027. لا توقيع.
 
 أكبر الفجوات لكل مالك في نهاية القسم أ.
 
@@ -166,6 +166,7 @@
 - **الفجوة:** **P7-16** جهاز: صينية المقدمة، حوار الإذن على API 33، نص القفل `إشعار جديد`، والنقر يفتح الكيان وينقص العدد مرة. **P7-17** الخلفية، ثم العملية المقتولة. إن لم يصل شيء بعد الإيقاف الإجباري فالنتيجة Not supported (لا FCM) لا Fail وهمي. **P7-18** API 29 بلا حوار تشغيل، وAPI 34 كـ 33. المستوى device.
 - **بعد #49:** ودجت للحوار والقفل والنقرة والاستطلاع و`sdkInt` ‏29/33/34. نصف الجهاز مفتوح. DEF-019 ما زال مفتوحًا على `main` `a5ca268` في تلك المراجعة. التفاصيل في مراجعة #49 و#50. الحالة Partial.
 - **على `main` `c40e03d`:** اختبارات DEF-019 الخمسة **+5** وخروج 0، وعلى `f347a8a` أيضًا **+5**. العيب Verified closed. نصف الجهاز من P7-16 وP7-17 وP7-18 ما زال مفتوحًا. الحالة Partial.
+- **بعد #49 على `653a07c`:** `_skipDef019` صار `false`. اختبار `a granted login does not register again on the first notifications visit` نجح داخل التطبيق **466/0** بلا تخطي. النقل `FakePushTransport` والمسجّل عبر `pumpFakeApp`. نصف الجهاز من P7-16 وP7-17 وP7-18 ما زال مفتوحًا. قتل العملية Not supported بلا FCM. الحالة Partial.
 - **منع الاستبدال:** `granting permission registers with signedIn true` يستبدل المسجّل (`RecordingDeviceTokenRegistrar`) ولا يُغلق الإرسال. درس DEF-018: الموافقة تُقاس على `buildAppRoot` والمسجّل الحقيقي. لا `notificationOpenSeamProvider` مسجّل حين يُحكم على النقر. نقل `FakePushTransport` مسموح في ودجت Fake فقط.
 - **المستوى:** unit + widget. الفجوة device.
 - **الحالة:** Partial
@@ -205,7 +206,8 @@
 - **المالك:** مطور الواجهة
 - **الموجود:** `test/screens_ui_test.dart` `allowed screens render RTL in dark mode`. `test/shell_group_test.dart` `login, home, settings, account, and notifications hold at phone sizes (light|dark)`. `test/collections_presentation_test.dart` `light and dark keep status colours, RTL, and amount direction`. `test/purchases_presentation_test.dart` `purchases renders RTL in light and dark`. `test/ledger_presentation_test.dart` `ledger layout stays whole across widths, scales, and themes`. `test/treasury_reports_polish_test.dart` `both screens lay out on phones in light and dark`. `test/notifications_presentation_test.dart` `the notifications list fits a small and a large phone in both themes`. `test/forbidden_presentation_test.dart` `forbidden pane fits a small phone in light and dark`. لقطات `screenshots` مستبعدة من `flutter test --exclude-tags screenshots`.
 - **الفجوة:** لا اختبار آلي جديد لإغلاق الصف. التأكيد على الجهاز خطوة 23 في البروتوكول. تباين #49 مسجّل DEF-023 وDEF-024 وDEF-025 ولا ينقل الصف عن Covered.
-- **بعد #57:** الرأس `714c6ea` يرفع الأزواج الثلاثة فوق AA على فرعه. الصف يبقى Covered. العيوب تبقى Open على `main` حتى الدمج.
+- **بعد #57:** الرأس `714c6ea` يرفع الأزواج الثلاثة فوق AA على فرعه. الصف يبقى Covered. العيوب كانت Open على `main` حتى الدمج.
+- **على `main` `2a45cfb`:** DEF-023 وDEF-024 وDEF-025 Verified closed. اختبارات `contrast_tokens_test.dart` نجحت داخل **432/0**. `#7C6100` في سمة الوضع الفاتح. الصف يبقى Covered. DEF-026 (`#6D7C77` تحت 4.5:1 للنص العادي وفوق 3:1) مفتوح وغير مانع ولا ينقل الصف.
 - **منع الاستبدال:** لا `ThemeData` مفروض فوق `themeModeProvider` حين يُختبر مبدّل السمة. تثبيت `_DarkTheme` مقبول لمعاينة الشاشة لا لزر التبديل.
 - **المستوى:** widget
 - **الحالة:** Covered
@@ -215,6 +217,7 @@
 - **المالك:** مطور الواجهة
 - **الموجود:** `test/screens_ui_test.dart` `login is RTL and does not offer an external account`. `test/shell_group_test.dart` `disclosure chevrons mirror in RTL`. `test/account_list_ui_test.dart` `amounts sit on the RTL start edge in light and dark`. `test/purchases_opening_correction_test.dart` `opening balance renders RTL in light mode`. `test/edit_account_card_test.dart` `the edit screen stays RTL on a small phone in both themes`. `test/transaction_correction_test.dart` `the correction form is RTL in both themes on small and large phones`. `test/unlinked_receipt_actions_test.dart` `unlinked actions stay RTL in both themes on a small phone`. `test/ledger_presentation_test.dart` `a missing sequence is a dash and dates stay LTR`.
 - **الفجوة:** لا اختبار آلي جديد. اتجاه التاريخ LTR مقصود. التأكيد البصري في الخطوة 23.
+- **بعد #49 على `653a07c`:** `test/phase7_rtl_ui_test.dart` مطابق بايتًا لـ `546a623`. الصف يبقى Covered.
 - **منع الاستبدال:** لا `Directionality(textDirection: TextDirection.rtl)` يلف الشاشة من خارج التطبيق. الاتجاه من `MaterialApp` الحقيقي.
 - **المستوى:** widget
 - **الحالة:** Covered
@@ -225,6 +228,7 @@
 - **الموجود:** عرض 320 و360 و393 و430 في `test/shell_group_test.dart` `login, home, settings, account, and notifications hold at phone sizes` ومع `text scale` 1 و1.3 و2. `admin bottom bar stays on one row at 320 and 360`. `test/collections_presentation_test.dart` `receipt cards do not overflow across phone widths and text scales`. `test/treasury_reports_polish_test.dart` `the cash form stays reachable at 320 and text scale 2`. `test/employee_totals_screen_test.dart` `a 320 phone fits the cards in both themes`. `test/purchases_opening_correction_test.dart` مقاس 320 و430. `test/screens_ui_test.dart` `a wide window uses the side list instead of a bottom bar`.
 - **الفجوة:** **P7-22** تدوير عمودي/أفقي على 320 و430 لدخول والرئيسية والاستلامات والدفتر والإشعارات، بلا فيض. ثم الجهاز الصغير والكبير في البروتوكول. المستوى widget ثم device.
 - **بعد #49:** التدوير على 320 و430 موجود في الودجت. نصف الجهاز مفتوح. الحالة Partial.
+- **بعد #49 على `653a07c`:** `test/phase7_layout_ui_test.dart` مطابق بايتًا لـ `546a623`. نصف الجهاز من P7-22 ما زال مفتوحًا. الحالة Partial.
 - **منع الاستبدال:** `tester.view` يثبت المقاس في الودجت. لا يُغلق جهازًا حقيقيًا. لا `overflow: clip` لإخفاء الخطأ.
 - **المستوى:** widget. الفجوة تدوير + device.
 - **الحالة:** Partial
@@ -268,7 +272,7 @@
 |---|---|
 | مهندس API | بعد #56 على `9c0fa4f` يبقى: دخان P7-01 (not run بلا أسرار staging)، ودخول الأدوار على staging، وP7-03 على الجهاز، ومصفوفة P7-04 الحية، وطيران P7-19، وعودة الراديو، ودفتر staging لـ P7-20 وP7-21. السؤال المفتوح: هل `GET /api/me` هو العقد؟ |
 | Senior Flutter | على `main` `c40e03d` أُغلق DEF-020 وDEF-022، وأُغلق DEF-021 كبديل اختبار. البند 7 يبقى Partial لـ P7-11. البند 9 يبقى Partial لـ P7-15. P7-07 مع DEF-012، وP7-08، وصفوف staging P7-09 وP7-13 باقية. إعادة اختبار #51 على `721edef` و#52 على `f347a8a` لم تنقل عددًا |
-| مطور الواجهة | بعد #57 على `714c6ea` الحكم yes with notes. DEF-023 وDEF-024 وDEF-025 تبقى Open على `main`. الجهاز لـ P7-16 وP7-17 وP7-18 وP7-22 باقٍ. قتل العملية Not supported بلا FCM |
+| مطور الواجهة | بعد #49 على `653a07c` الحكم **YES**. DEF-023 وDEF-024 وDEF-025 Verified closed على `main` `2a45cfb`. DEF-026 مفتوح وغير مانع. الجهاز لـ P7-16 وP7-17 وP7-18 وP7-22 باقٍ. قتل العملية Not supported بلا FCM. البنود 10 و16 Partial، و14 و15 Covered |
 | DevOps | بعد إعادة اختبار #52 على `f347a8a` يبقى: رقم P7-23 وP7-24 على الجهاز الضعيف في النموذج، وعتبة علي، ونصف الجهاز من P7-25، ومجموعة المعرّفات على مشي الحزمة لا على الشاشة، ونموذج P7-26 على الهواتف A–D. سير المحاكي لا يملأ النموذج. `HISTORY_WINDOW_TRIM` مطفأ. الذاكرة تقرير فقط |
 
 ### فهرس `P7`
@@ -378,7 +382,7 @@ flutter build apk --release \
 |---|---|---|---|---|---|---|---|---|---|---|
 | | | | | | | | | | | |
 
-قيم `pass/fail`: `Pass`، `Fail`، `Blocked`، `Not supported`. DEF-020 حتى DEF-025 مسجّلة في `defects.md` على #12. التالي الحر DEF-026.
+قيم `pass/fail`: `Pass`، `Fail`، `Blocked`، `Not supported`. DEF-020 حتى DEF-026 مسجّلة في `defects.md` على #12. التالي الحر DEF-027.
 
 ---
 
@@ -390,7 +394,7 @@ flutter build apk --release \
 2. **وسم `permissions-negative`.** كل حالة 403/401 لدور بلا صلاحية في ملف تحت `test/permissions/` أو `packages/api_layer/test/permissions/` أو الملفات الموسومة الحالية، و`tool/run_permissions_negative_tests.sh` أخضر. صفر اختبارات موسومة يفشل السكربت.
 3. **`tool/check.sh` أخضر** على رأس الطلب: تحليل، اختبارات بلا وسم `screenshots`، حزمة API، السالب، `preflight_test.sh`، `scan_release_apk.py --self-test`، ورفض ترجمة `USE_FAKE_API=true` في release.
 4. **لا Fake في release.** لا `--dart-define=USE_FAKE_API=true` في بناء release ولا في وثيقة التثبيت. debug بـ Fake يبقى حلقة مطور ويُسمّى كذلك.
-5. **العيوب.** عيب جديد من DEF-020 فصاعدًا في [`docs/acceptance/defects.md`](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/blob/cursor/acceptance-docs-13b0/docs/acceptance/defects.md) على [#12](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/12). عند كتابة الخطة كان التالي الحر DEF-020. بعد مراجعة #51 كان التالي الحر DEF-023. بعد مراجعة #49 التالي الحر **DEF-026**. لا يُغلق DEF-002 ولا DEF-012 من طلب مرحلة 7 إلا بقرار علي أو ببيانات الإعدادات. DEF-019 يبقى مفتوحًا على `main` وغير مانع. مسبار #50 لم يغلقه هناك.
+5. **العيوب.** عيب جديد من DEF-020 فصاعدًا في [`docs/acceptance/defects.md`](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/blob/cursor/acceptance-docs-13b0/docs/acceptance/defects.md) على [#12](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/12). عند كتابة الخطة كان التالي الحر DEF-020. بعد مراجعة #51 كان التالي الحر DEF-023. بعد مراجعة #49 التالي الحر DEF-026. بعد تأكيد `main` `2a45cfb` فُتح DEF-026 وصار التالي الحر **DEF-027**. لا يُغلق DEF-002 ولا DEF-012 من طلب مرحلة 7 إلا بقرار علي أو ببيانات الإعدادات. DEF-019 كان مفتوحًا وغير مانع عند كتابة القاعدة، وأُغلق على `main` `c40e03d`. مسبار #50 لم يغلقه قبل ذلك الدمج.
 6. **لا دمج من هذه الخطة.** المراجعة لا تدمج `main`. لا دفع قسري.
 7. **المستوى مكتوب** على الاختبار أو في وصف الطلب: unit أو widget أو integration أو device أو staging. اختبار Fake لا يُغلق صفًا حالته Device-only أو شرطه staging.
 
@@ -1085,7 +1089,36 @@ CI التشغيل [39711134480](https://github.com/ddaa81108-wq/vib-abdo-company
 | #49 `546a623` | `b439d0c39db6710e5180328ea6b2764445f2fb48` |
 | #48 `5307b84` | `12a232feece4a17964db8b07c673218c44d0174b` |
 
-لا تحرير من الجهتين مع هؤلاء. الأعداد لم تتغير: Covered ‏3 وPartial ‏15 وDevice-only ‏1. DEF-012 يبقى Fail. DEF-002 يبقى Pending PM. التالي الحر DEF-026.
+لا تحرير من الجهتين مع هؤلاء. الأعداد لم تتغير: Covered ‏3 وPartial ‏15 وDevice-only ‏1. DEF-012 يبقى Fail. DEF-002 يبقى Pending PM. التالي الحر حينها DEF-026.
+
+## تأكيد `main` `2a45cfb` وإعادة اختبار #49 — الرأس `653a07c`
+
+`origin/main` عند `2a45cfb16962e16170d10c818bc0ce4cbcc46eb7`. بعد `c40e03d` ثلاثة squash بوالد واحد، ليست دمجات بوالدين. رؤوس المراجعة ليست أسلافًا، وأجسام الرقع متساوية بعد تجاهل ترويسة الـ hunk:
+
+| squash | الرسالة | يطابق |
+|---|---|---|
+| `9111a1f7781caebdcbd8669cf2e8d1dcda6534a1` | Add Phase 7 cold start, long-history, and APK size runs (#52) | فرق `f347a8a` فوق `c40e03d` (34 ملفًا، +3129/−84) |
+| `213e04a9de230874d6e23561149c43b572f256ff` | Raise DEF-023–025 text contrast to WCAG AA (#57) | فرق `714c6ea` (4 ملفات، +416/−17). البصمات ما زالت على `2a45cfb` |
+| `2a45cfb16962e16170d10c818bc0ce4cbcc46eb7` | Add phase 7 tests against the fake server (#51) | فرق `721edef` فوق `c40e03d` (11 ملف اختبار، +1310، بلا `lib/`) |
+
+**`tool/check.sh` على `2a45cfb`.** خرج 0. تحليل التطبيق 4.6s والتطبيق **432/0**. تحليل الحزمة 2.5s والحزمة **209** ناجح وتخطي واحد (P7-01 not run، ليست Pass). السالب **32/0** و**33/0**. التجربة الجافة **6/0**. الحارس **4/0**. release يرفض `USE_FAKE_API=true`. أسماء DEF-023 وDEF-024 وDEF-025 في `contrast_tokens_test.dart` ظهرت وأكمل العداد حتى 432. `#7C6100` هو `base` في `buildAppTheme` للوضع الفاتح. إعادة حساب WCAG 2.x من البايتات تطابق المراجعة: `#7C6100`/`#E5EDF6` 4.983618، و`#EAB600`/`#0D1522` 9.751529، و`#FFFDE0`/`#102A26` 14.754121، و`#36B496`/`#172333` 6.134279، و`#0CB677`/`#172333` 6.019105. الحكم: DEF-023 وDEF-024 وDEF-025 **Verified closed** على `main`.
+
+**DEF-026.** حبر `onSurfaceVariant` الفاتح `#6D7C77` مع `bodySmall` حجم 11 ووزن 500 (نص عادي، فيُقاس على 4.5:1): 3.703585 على `#E5EDF6`، و4.375288 على الأبيض، و4.053914 على `#EDF9F4`، و3.810320 على `#E6F2ED`. فوق 3:1 وتحت 4.5:1. شدة منخفضة. غير مانع. المالك مطور الواجهة. ليس تراجعًا من #57. التالي الحر DEF-027.
+
+الطلب [#49](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/49) ما زال مسودة. الرأس `653a07c2fbac3b8aa6cd7fdd8dc4548244c9c4fc`. `546a62342eb78140d550abdfd138de5e0821c77a` سلف. الدمج `f410e546ae9c3d1d0f68d6f6d006fb8b04823b5c` بوالدين: الأول `546a623` والثاني `main` `2a45cfb`. الرسالة «Merge origin/main into the phase 7 UI tests.» `git merge-tree --write-tree` لذلك الزوج خرج 0. الالتزام التالي `653a07c` والد واحد فوق الدمج. لا إعادة قاعدة. لم يُدفع إلى فرع #49. لا توقيع. الحكم: **مقبول للدمج YES**.
+
+**فوق `main`.** `git diff 2a45cfb 653a07c -- lib packages` فارغ. لا تغيير إنتاج جديد. الفرق سبعة ملفات اختبار: `phase7_layout_ui_test.dart` و`phase7_push_matrix_test.dart` و`phase7_rtl_ui_test.dart` و`test/support/phase7_ui.dart` مطابقة بايتًا لـ `546a623`. `phase7_notifications_ui_test.dart` و`phase7_theme_ui_test.dart` تغيّرا بإطفاء `_skipDef019` و`_skipDef023` و`_skipDef024` و`_skipDef025` فقط (`f410e546..653a07c` ملفان، +4/−4). `pump_app.dart` هو معامل `sdkInt` الذي رُوجع على `546a623`، وقد دُمج تلقائيًا مع نسخة `main` (يختلف عن الوالدين، و`merge-tree` خرج 0).
+
+**`tool/check.sh` على `653a07c`.** خرج 0. تحليل التطبيق 4.1s والتطبيق **466/0** بلا تخطي. تحليل الحزمة 2.6s والحزمة **209** ناجح وتخطي واحد (P7-01). السالب **32/0** و**33/0**. التجربة الجافة **6/0**. الحارس **4/0**. release يرفض Fake. الفرق عن `main` 432 هو اختبارات #49 الأربع والثلاثون، ومنها الأربعة التي كانت تُتخطى. `DEF-023 login brand stays readable on the light scaffold` و`DEF-025 dark primary text and cash amounts stay readable` و`a granted login does not register again on the first notifications visit` ظهرت في سجل البوابة. اسم `DEF-024 the sidebar role stays readable in light mode` سقط بين علامات المبلّغ؛ تشغيل الملف بالمبلّغ الموسّع أعطى **+6** وخروج 0 وظهر الاسم عند +3. CI [39786578137](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions/runs/39786578137) ناجح على هذا الرأس، والفحوص الثلاثة SUCCESS.
+
+**`merge-tree --write-tree` من `653a07c`.** خروج 0. لم يُنشأ دمج.
+
+| الطرف | الشجرة |
+|---|---|
+| `main` `2a45cfb` | `cc727c57bacd06491cf33e23ebc64cdb19368982` (شجرة #49 نفسها) |
+| #48 `f295d38` | `792b18a7233354c75ed5695c215a2d63fd46341d` |
+
+لا سطور `CONFLICT`. الأعداد لم تتغير: Covered ‏3 وPartial ‏15 وDevice-only ‏1. البند 10 يبقى Partial. البند 14 يبقى Covered. البند 15 يبقى Covered. البند 16 يبقى Partial. DEF-012 يبقى Fail. DEF-002 يبقى Pending PM. التالي الحر DEF-027.
 
 ## د. خط الأساس `tool/check.sh`
 
