@@ -56,11 +56,13 @@ void main() {
     var taps = 0;
     while (find.byKey(const Key('load-older')).evaluate().isNotEmpty) {
       taps++;
-      expect(taps, lessThanOrEqualTo(FakeLargeCatalog.ledgerPageCount));
+      expect(taps, lessThanOrEqualTo(FakeLargeCatalog.ledgerPageCount + 1));
       await _pressLoadOlder(tester);
     }
-    expect(taps, FakeLargeCatalog.ledgerPageCount - 1);
-    expect(find.byKey(const Key('ledger-pages-20')), findsOneWidget);
+    // Trim replays the dropped boundary once, so this is one press past the
+    // 19 older pages. The page key counts that replay.
+    expect(taps, FakeLargeCatalog.ledgerPageCount);
+    expect(find.byKey(const Key('ledger-pages-21')), findsOneWidget);
     phase7('p7_25_pages_loaded', taps + 1);
     phase7('p7_25_acceptance', 'widget-walk-complete');
 

@@ -78,7 +78,8 @@ marker_seen() {
 
 set +e
 adb -s "$DEVICE" logcat -c >/dev/null 2>&1
-# HISTORY_WINDOW_TRIM stays off. The profile drive prints scroll markers and
+# HISTORY_WINDOW_TRIM is not passed, so the compile-time default (on) applies.
+# The profile drive prints scroll markers and
 # pauses so dumpsys can sample the live process. Memory never changes status.
 flutter drive \
   --profile \

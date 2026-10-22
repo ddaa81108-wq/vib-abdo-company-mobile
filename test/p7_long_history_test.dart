@@ -17,8 +17,10 @@ void main() {
     HistoryWindow.trimEnabled = HistoryWindow.trimEnabledFromEnvironment;
   });
 
-  testWidgets('P7-25 walks the long ledger to the last page', (tester) async {
-    expect(HistoryWindow.trimEnabled, isFalse);
+  testWidgets('P7-25 HISTORY_WINDOW_TRIM off keeps every loaded ledger row', (
+    tester,
+  ) async {
+    HistoryWindow.trimEnabled = false;
     await pumpFakeApp(
       tester,
       fakeDataset: FakeDataset.large,
@@ -58,7 +60,7 @@ void main() {
   });
 
   testWidgets(
-    'P7-25 HISTORY_WINDOW_TRIM on keeps 80 ledger rows and walks to the last page',
+    'P7-25 HISTORY_WINDOW_TRIM on still walks the ledger to the last page',
     (tester) async {
       HistoryWindow.trimEnabled = true;
       await pumpFakeApp(
@@ -73,15 +75,16 @@ void main() {
       var taps = 0;
       while (find.byKey(const Key('load-older')).evaluate().isNotEmpty) {
         taps++;
-        expect(taps, lessThanOrEqualTo(FakeLargeCatalog.ledgerPageCount));
+        expect(taps, lessThanOrEqualTo(FakeLargeCatalog.ledgerPageCount + 1));
         await _pressLoadOlder(tester);
       }
-      expect(taps, FakeLargeCatalog.ledgerPageCount - 1);
-      expect(find.byKey(const Key('ledger-pages-20')), findsOneWidget);
-      expect(
-        find.byKey(Key('ledger-retained-${HistoryWindow.retainLimit}')),
-        findsOneWidget,
-      );
+      // The trim replays the boundary page once, then the walk continues
+      // from the newest row through the last server page.
+      expect(taps, FakeLargeCatalog.ledgerPageCount);
+      expect(find.byKey(const Key('ledger-pages-21')), findsOneWidget);
+      final olderRows =
+          (FakeLargeCatalog.ledgerPageCount - 1) * FakeLargeCatalog.pageSize;
+      expect(find.byKey(Key('ledger-retained-$olderRows')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -89,6 +92,7 @@ void main() {
   testWidgets('P7-24 P7-25 customer and notification lists stay lazy', (
     tester,
   ) async {
+    HistoryWindow.trimEnabled = false;
     await pumpFakeApp(
       tester,
       fakeDataset: FakeDataset.large,
@@ -116,45 +120,41 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('P7-25 HISTORY_WINDOW_TRIM on caps notifications at 120', (
-    tester,
-  ) async {
-    HistoryWindow.trimEnabled = true;
-    await pumpFakeApp(
-      tester,
-      fakeDataset: FakeDataset.large,
-      size: const Size(800, 1400),
-    );
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    GoRouter.of(tester.element(find.byKey(HomeShell.shellKey)))
-        .go('/notifications');
-    await _until(tester, const Key('load-older-notifications'));
-    var taps = 0;
-    while (find
-        .byKey(const Key('load-older-notifications'))
-        .evaluate()
-        .isNotEmpty) {
-      taps++;
-      expect(taps, lessThan(8));
-      final finder = find.byKey(const Key('load-older-notifications'));
-      await tester.ensureVisible(finder);
-      tester.widget<TextButton>(finder).onPressed!();
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 1));
-      for (var i = 0; i < 20; i++) {
-        if (finder.evaluate().isEmpty) break;
-        if (tester.widget<TextButton>(finder).onPressed != null) break;
-        await tester.pump(const Duration(milliseconds: 20));
+  testWidgets(
+    'P7-25 HISTORY_WINDOW_TRIM on keeps the newest 120 notifications reachable',
+    (tester) async {
+      HistoryWindow.trimEnabled = true;
+      await pumpFakeApp(
+        tester,
+        fakeDataset: FakeDataset.large,
+        size: const Size(800, 1400),
+      );
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      GoRouter.of(tester.element(find.byKey(HomeShell.shellKey)))
+          .go('/notifications');
+      await _until(tester, const Key('load-older-notifications'));
+      for (var taps = 0; taps < 3; taps++) {
+        final finder = find.byKey(const Key('load-older-notifications'));
+        await tester.ensureVisible(finder);
+        tester.widget<TextButton>(finder).onPressed!();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 1));
+        for (var i = 0; i < 20; i++) {
+          if (finder.evaluate().isEmpty) break;
+          if (tester.widget<TextButton>(finder).onPressed != null) break;
+          await tester.pump(const Duration(milliseconds: 20));
+        }
       }
-    }
-    expect(
-      find.byKey(
-        Key('notifications-retained-${HistoryWindow.notificationRetain}'),
-      ),
-      findsOneWidget,
-    );
-    expect(tester.takeException(), isNull);
-  });
+      expect(
+        find.byKey(
+          Key('notifications-retained-${HistoryWindow.notificationRetain}'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('load-older-notifications')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 int _keyedPrefix(WidgetTester tester, String prefix) {

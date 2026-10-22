@@ -4,14 +4,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/performance/history_window.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 
-/// Pending Ali. [HistoryWindow.trimEnabled] stays off unless a test turns it on.
+/// Approved by Ali on 2026-10-22, enabled by default.
+/// A test can still set [HistoryWindow.trimEnabled] false.
 void main() {
   tearDown(() {
     HistoryWindow.trimEnabled = HistoryWindow.trimEnabledFromEnvironment;
   });
 
-  test('HISTORY_WINDOW_TRIM is off unless Ali enables it', () {
-    expect(HistoryWindow.trimEnabledFromEnvironment, isFalse);
+  test('HISTORY_WINDOW_TRIM is on by default and can be turned off', () {
+    expect(HistoryWindow.trimEnabledFromEnvironment, isTrue);
+    expect(HistoryWindow.trimEnabled, isTrue);
+    HistoryWindow.trimEnabled = false;
     expect(HistoryWindow.trimEnabled, isFalse);
   });
 
@@ -31,7 +34,7 @@ void main() {
     expect(notifier.cursorAfter(null), 'o:100');
   });
 
-  test('account extras keep the last 80 rows when trim is on', () {
+  test('account extras keep the newest 80 rows when trim is on', () {
     HistoryWindow.trimEnabled = true;
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -48,8 +51,8 @@ void main() {
     );
     final kept = container.read(accountExtraCardsProvider(section));
     expect(kept, hasLength(HistoryWindow.retainLimit));
-    expect(kept.first.id, 'c_20');
-    expect(kept.last.id, 'c_99');
+    expect(kept.first.id, 'c_0');
+    expect(kept.last.id, 'c_79');
   });
 }
 
