@@ -1,0 +1,51 @@
+# Install the side-by-side NDK named by Flutter's flutter.ndkVersion.
+#
+# ubuntu-latest preinstalls other NDK majors (27, 29, and 30 as of the
+# 20261012 images) and does not ship 28.2.13676358. Pinning the app module to
+# one of those would not satisfy plugins that read flutter.ndkVersion, which
+# is a fixed property of the Flutter SDK. This action installs that exact
+# package before Gradle does, retries a truncated sdkmanager zip, and caches
+# the extracted tree.
+
+name: Install Android NDK
+description: >-
+  Install Flutter's flutter.ndkVersion with sdkmanager retries and cache the
+  extracted NDK.
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve Flutter ndkVersion
+      id: ndk
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ -z "${FLUTTER_ROOT:-}" || ! -d "${ANDROID_HOME:-}/ndk" ]]; then
+          echo "FLUTTER_ROOT and ANDROID_HOME/ndk are required." >&2
+          echo "FLUTTER_ROOT=${FLUTTER_ROOT:-unset} ANDROID_HOME=${ANDROID_HOME:-unset}" >&2
+          exit 1
+        fi
+        ext="${FLUTTER_ROOT}/packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt"
+        version="$(sed -n 's/.*val ndkVersion: String = "\([0-9][0-9.]*\)".*/\1/p' "${ext}")"
+        if [[ ! "${version}" =~ ^[0-9]+(\.[0-9]+){2}$ ]]; then
+          echo "Could not read flutter.ndkVersion from ${ext}." >&2
+          echo "Got: ${version:-empty}" >&2
+          exit 1
+        fi
+        echo "flutter.ndkVersion=${version}"
+        echo "Preinstalled NDKs in ${ANDROID_HOME}/ndk:"
+        ls -1 "${ANDROID_HOME}/ndk"
+        {
+          echo "version=${version}"
+          echo "dir=${ANDROID_HOME}/ndk/${version}"
+        } >> "${GITHUB_OUTPUT}"
+
+    - name: Cache Android NDK
+      uses: actions/cache@v4.2.3
+      with:
+        path: ${{ steps.ndk.outputs.dir }}
+        key: android-ndk-${{ steps.ndk.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+
+    - name: Install Android NDK
+      shell: bash
+      run: bash "${{ github.action_path }}/install.sh" "${{ steps.ndk.outputs.version }}"

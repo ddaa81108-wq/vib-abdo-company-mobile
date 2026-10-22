@@ -61,7 +61,11 @@ Workflow name: `CI` (`.github/workflows/ci.yml`).
 | --- | --- | --- |
 | `analyze-test-apk` | `Analyze, test, and debug APK` | Analyze, full tests, debug APK with `USE_FAKE_API=true`, then `tool/staging_negative_tests/run.sh --dry-run`. |
 | `permissions-negative` | `Negative permission tests` | Convention check, tagged tests for the app and the package, fail on zero tests, then the same dry-run. |
-| `release-no-fake-api` | `Release build rejects fake API` | Compile probe plus a release APK that must exist and scan clean. Described below. |
+| `release-no-fake-api` | `Release build rejects fake API` | Compile probe plus a release APK that must exist and scan clean. Described below. When `GOOGLE_SERVICES_JSON_BASE64` is set, that job decodes it before the successful release APK. See [NOTIFICATIONS.md](NOTIFICATIONS.md). |
+
+Android notification permission on emulators is a separate workflow, `Android notification emulator` (`.github/workflows/android-notifications-emulator.yml`). It is not part of this required check. See [NOTIFICATIONS.md](NOTIFICATIONS.md).
+
+Phase 7 startup, scroll, APK size, and the API 29/33/34 runs are another separate workflow, `Android performance` (`.github/workflows/android-performance.yml`). It is `workflow_dispatch` plus a nightly schedule. It does not run on pull requests and it does not add steps to the three required checks. Budgets, the device protocol, and what Ali provides are in [testing/PHASE7_PERFORMANCE.md](testing/PHASE7_PERFORMANCE.md). The acceptance matrix itself is `docs/acceptance/phase-7.md` on [PR #48](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/48), not in this branch.
 
 `tool/staging_negative_tests/run.sh --dry-run` is an offline self-check. It does not read secrets and does not open a socket. The script is in this repo, so both CI jobs above run it and fail if it fails. The manual staging workflow is the only job that calls it without `--dry-run`. This repository does not add a second staging runner.
 
@@ -175,6 +179,8 @@ flutter build apk --release \
 ```
 
 `https://staging.example.com` is an origin `ApiConfig.requireRealBaseUrl` accepts (https, host only, no userinfo, path, query, or fragment). It is not a live host and not a secret. The staging preflight still refuses `*.example` as a `STAGING_API_BASE` value; that check is separate from this compile-time define. The job fails if `build/app/outputs/flutter-apk/app-release.apk` is missing or empty.
+
+There is no `docs/RELEASE.md`. Optional Firebase config for the release APK, including the secret name `GOOGLE_SERVICES_JSON_BASE64`, is in [NOTIFICATIONS.md](NOTIFICATIONS.md). The decode runs only after the fake-API rejection check, and only when that secret is set.
 
 `tool/scan_release_apk.py` reads the APK and fails if any of these appear as UTF-8 or UTF-16LE: the fixture emails and display names in `fake_fixtures.dart`, `demo-only`, and the `*.demo` usernames. The fixture needles must still occur in `fake_fixtures.dart`, so a rename cannot empty the scan. The APK is not uploaded. It is not a Play artifact.
 

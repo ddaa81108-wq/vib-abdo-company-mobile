@@ -612,7 +612,7 @@ class _CashRow extends StatelessWidget {
         ? AppStrings.cashOut
         : AppStrings.dash;
     final color = incoming
-        ? colors.cashPositive
+        ? colors.cashPositiveText
         : outgoing
         ? colors.cashNegative
         : scheme.onSurfaceVariant;

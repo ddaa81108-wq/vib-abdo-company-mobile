@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../../core/config/api_config.dart';
+import '../../core/config/release_fake_api_guard.dart';
 import '../../core/network/precise_json.dart';
 import '../../core/network/wire_json.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/network/api_endpoints.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/network/error_mapper.dart';
 import '../../core/network/reachability.dart';
@@ -13,6 +15,7 @@ import '../../core/permissions/permission_codes.dart';
 import '../../core/permissions/permission_service.dart';
 import '../models/purchase_models.dart';
 import 'fake_fixtures.dart';
+import 'fake_large_catalog.dart';
 
 /// In-memory fake of the REAL API shapes so the UI can be built with zero contact
 /// with the production system. Same ApiClient interface => Remote*Repository run unchanged.
@@ -52,10 +55,23 @@ class FakeApiClient implements ApiClient {
   FakeApiClient({
     this.latency = const Duration(milliseconds: 250),
     this.rateWireFormat = RateWireFormat.number,
-  });
+    String? dataset,
+  }) : dataset = FakeDataset.resolve(dataset) {
+    // Release AOT never reaches this constructor: the release builder does
+    // not import this library. The check is for a test that forces
+    // dart.vm.product and still tries to build a fake client.
+    if (const bool.fromEnvironment('dart.vm.product')) {
+      throw StateError(releaseFakeApiRejectedMessage);
+    }
+  }
 
   final Duration latency;
   final RateWireFormat rateWireFormat;
+
+  /// [FakeDataset.standard] or [FakeDataset.large]. Large is debug/profile/test.
+  final String dataset;
+
+  bool get _large => dataset == FakeDataset.large;
 
   /// Last request body exactly as it would go on the wire (for tests).
   String? lastWireBody;
@@ -94,6 +110,9 @@ class FakeApiClient implements ApiClient {
   /// The next N notification writes fail (tests).
   int failNotificationWritesRemaining = 0;
 
+  /// Notification writes that changed state. A requestId replay is not counted.
+  int notificationMutationApplies = 0;
+
   /// The next N versioned collection mutations fail with VERSION_CONFLICT (tests).
   int versionConflictRemaining = 0;
 
@@ -106,6 +125,29 @@ class FakeApiClient implements ApiClient {
 
   /// Omit `unreadCount` from the notifications page (tests).
   bool omitUnreadCount = false;
+
+  /// The next N GET /api/notifications/unread-count calls answer 404 (tests).
+  int failUnreadCountRemaining = 0;
+
+  /// Registration POSTs to the existing proposed device route (tests).
+  /// Unregister posts are not counted. The token is not stored here.
+  int mobilePushRegisterPosts = 0;
+
+  /// The next N of those registration POSTs fail. A failure is still counted,
+  /// and it is not treated as a stored success by the app.
+  int failMobilePushDevicesRemaining = 0;
+
+  /// The next authenticated request fails with this status, once (tests).
+  /// 419 uses `PAGE_EXPIRED`, which ends the session and is not a CSRF error.
+  int? failNextAuthenticatedStatus;
+
+  /// The next GET /api/notifications list (not unread-count) fails with this
+  /// status, once (tests). 404 is not found. 401 ends the session. Any other
+  /// status is a failed GET.
+  int? failNextNotificationListStatus;
+
+  /// Omit `unreadCount` from mark-read and mark-all responses (tests).
+  bool omitNotificationWriteUnreadCount = false;
 
   /// When set, account-suggestion reads wait here (tests).
   Completer<void>? pauseSuggestions;
@@ -147,7 +189,20 @@ class FakeApiClient implements ApiClient {
   final Map<String, Completer<Object?>> _pendingMutations = {};
   String? _userId;
   Map<String, dynamic> _me = FakeFixtures.me(admin: false);
-  int _unread = 1; // canned server-side state, set (not computed) per action
+
+  /// Per-user notification rows and the server unread counter.
+  /// The counter is a stored literal that mark-read decrements. It is not
+  /// derived by counting rows on the client.
+  bool _noticesReady = false;
+  final Map<String, List<Map<String, dynamic>>> _notices = {};
+  final Map<String, int> _unreadByUser = {};
+  final Map<String, Map<String, dynamic>> _notificationReplays = {};
+
+  /// Large-history reads are generated, not stored. These record mark-read
+  /// without keeping every notice map.
+  final Set<String> _largeReadIds = {};
+  bool _largeAllRead = false;
+  static const _noticeReadStamp = '2026-10-21T18:00:00Z';
 
   /// Card fields changed by a full payment or a cancel. Keyed by section|id.
   final Map<String, Map<String, dynamic>> _cardState = {};
@@ -161,6 +216,16 @@ class FakeApiClient implements ApiClient {
 
   /// Unlinked receipt fields changed by a decision or cash receipt. Keyed by id.
   final Map<String, Map<String, dynamic>> _unlinkedState = {};
+
+  /// Rows stored by assignment submit and unlinked-receipt submit.
+  ///
+  /// Each row keeps the fields the request sent. `status` is `pending` and
+  /// `version` is 1, matching an undecided fixture row. `submittedByUserId`
+  /// is the same owner id the fixture already stores so the caller still sees
+  /// their own row. `cashStatus` is not written: that wire field is proposed.
+  /// Overview metrics stay the stored literals; these rows are not summed.
+  final List<Map<String, dynamic>> _extraSubmissions = [];
+  final List<Map<String, dynamic>> _extraUnlinked = [];
 
   /// Purchase day fields changed by finalize or correction. Keyed by book|day.
   final Map<String, Map<String, dynamic>> _purchaseDays = {};
@@ -199,6 +264,14 @@ class FakeApiClient implements ApiClient {
   static const dayFinalizedCode = 'DAY_FINALIZED';
   static const dayFinalizedMessage =
       'اليوم مرحّل. لا يمكن إضافة أو تعديل أو حذف بند.';
+
+  /// Direct partial payment larger than the stored card balance.
+  ///
+  /// Whether the real server rejects this is an open question for the
+  /// backend owner. This fake refuses the write so the stored balance cannot
+  /// change, using the same HTTP 400 `VALIDATION_ERROR` envelope as its other
+  /// rejected inputs. That code is not a confirmed server contract.
+  static const amountAboveRemainingMessage = 'المبلغ أكبر من المتبقي المسجّل.';
 
   /// Routes later public calls through [gateway] (the auth interceptor).
   void bindGateway(ApiClient gateway) => _gateway = gateway;
@@ -584,19 +657,25 @@ class FakeApiClient implements ApiClient {
     if (seg.length < 2) return;
     final id = seg[1];
     if (id == 'read-all' || id == 'unread-count') return;
+    // 🔶 404 for an id the caller does not own, including an id that does not
+    // exist. Same body either way. Full access does not see another user's row.
     final owner = _notificationOwner(id);
-    if (owner != null && owner != _userId && !_access.fullAccess) {
+    if (owner == null || owner != _userId) {
       _fail(404, 'NOT_FOUND', _notFound);
     }
   }
 
   String? _notificationOwner(String id) {
-    for (final raw in FakeFixtures.notifications(0)['items'] as List) {
-      final item = raw as Map;
-      if ('${item['id']}' != id) continue;
-      final owner = item['recipientUserId'];
-      if (owner == null) return null;
-      return '$owner';
+    _ensureNotices();
+    if (_large) {
+      for (final userId in FakeLargeCatalog.noticeUsers) {
+        if (FakeLargeCatalog.noticeOrNull(userId, id) != null) return userId;
+      }
+    }
+    for (final entry in _notices.entries) {
+      for (final item in entry.value) {
+        if ('${item['id']}' == id) return entry.key;
+      }
     }
     return null;
   }
@@ -764,6 +843,10 @@ class FakeApiClient implements ApiClient {
   }
 
   Map<String, dynamic>? _cardOrNull(String head, String id) {
+    if (_large) {
+      final generated = FakeLargeCatalog.cardOrNull(head, id);
+      if (generated != null) return Map<String, dynamic>.from(generated);
+    }
     final card = FakeFixtures.cardById(head, id);
     return card.isEmpty ? null : card;
   }
@@ -799,7 +882,8 @@ class FakeApiClient implements ApiClient {
     if (body is String) {
       lastWireBody = body;
     } else {
-      lastWireBody = body == null ? null : WireJson.encode(body, rateWireFormat);
+      lastWireBody =
+          body == null ? null : WireJson.encode(body, rateWireFormat);
     }
     final decoded = lastWireBody == null ? null : jsonDecode(lastWireBody!);
     final b = decoded is Map ? decoded : const {};
@@ -854,6 +938,12 @@ class FakeApiClient implements ApiClient {
       return _ok(_me);
     }
 
+    // 🔶 Existing proposed route. Not a new API. Accepted here so a successful
+    // registration can be told apart from a failure. The token is not stored.
+    if (method == 'POST' && path == ApiEndpoints.proposedMobilePushDevices) {
+      return _mobilePushDevices(b);
+    }
+
     if (method != 'GET' &&
         head != 'notifications' &&
         head != 'notification-preferences') {
@@ -871,9 +961,28 @@ class FakeApiClient implements ApiClient {
     return _route(method, b, seg, head, query);
   }
 
+  /// Proposed `POST /api/mobile-push/devices`. The body is not kept.
+  Future<ApiResponse> _mobilePushDevices(Map<dynamic, dynamic> body) async {
+    if (body['unregister'] == true) return _ok(const <String, Object?>{});
+    mobilePushRegisterPosts++;
+    if (failMobilePushDevicesRemaining > 0) {
+      failMobilePushDevicesRemaining--;
+      _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تسجيل الجهاز.');
+    }
+    return _ok(const <String, Object?>{});
+  }
+
   /// Cookie session check. A missing, revoked, or expired cookie is 401
   /// before any permission decision.
   void _ensureSession(ApiRequestOptions options) {
+    final forced = failNextAuthenticatedStatus;
+    if (forced != null) {
+      failNextAuthenticatedStatus = null;
+      if (forced == 419) {
+        _fail(419, 'PAGE_EXPIRED', 'يجب تسجيل الدخول أولًا.');
+      }
+      _fail(forced, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
+    }
     final id = _presentedSessionId(options);
     final session = id == null ? null : _sessions[id];
     if (session == null || session.expired) {
@@ -995,7 +1104,7 @@ class FakeApiClient implements ApiClient {
       case 'egyptian-deposits':
         return _accounts(method, head, seg, b, query);
       case 'collections':
-        return _collections(method, seg, b);
+        return _collections(method, seg, b, query);
       case 'masraweya':
         if (method == 'GET') {
           _requireRead(SectionKey.masraweya);
@@ -1073,17 +1182,7 @@ class FakeApiClient implements ApiClient {
           'scopeTotals': {'LYD': 0, 'EGP': 0},
         });
       case 'notifications':
-        if (method == 'GET') {
-          final data = _notificationsForCaller();
-          if (omitUnreadCount) data.remove('unreadCount');
-          return _ok(data);
-        }
-        if (failNotificationWritesRemaining > 0) {
-          failNotificationWritesRemaining--;
-          _fail(500, 'SERVER_ERROR', 'تعذر تحديث الإشعار.');
-        }
-        _unread = 0; // fake server state reset (single notification fixture)
-        return _ok({});
+        return _notifications(method, seg, b, query);
       case 'notification-preferences':
         return _ok({'soundEnabled': true, 'speechEnabled': false});
       case 'event-changes':
@@ -1132,6 +1231,16 @@ class FakeApiClient implements ApiClient {
         accountListQueries.add(
           AccountListQuery(section: head, filter: filter, q: q, cursor: cursor),
         );
+        if (_large && FakeLargeCatalog.pagesAccounts(head)) {
+          final generated = FakeLargeCatalog.accountPage(
+            section: head,
+            cursor: cursor,
+            limit: _pageLimit(query),
+            q: q,
+            filter: filter,
+          );
+          return _ok(_overlayCards(head, generated));
+        }
         final page = _sectionPage(head);
         if (cursor != null) {
           return _ok({...page, 'items': accountNextItems, 'nextCursor': null});
@@ -1163,7 +1272,7 @@ class FakeApiClient implements ApiClient {
           failOlderRemaining--;
           _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
         }
-        return _ok(_ledgerView(head, before));
+        return _ok(_ledgerView(head, before, accountId: seg[1]));
       }
       if (seg.length == 2) return _ok(_cardView(head, seg[1]));
       _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
@@ -1204,11 +1313,12 @@ class FakeApiClient implements ApiClient {
     String method,
     List<String> seg,
     Map b,
+    Map<String, dynamic>? query,
   ) async {
     if (method == 'GET' && seg.length == 1) {
       _requireRead(SectionKey.collections);
       collectionOverviewReads++;
-      return _ok(_collectionsForCaller());
+      return _ok(_collectionsForCaller(query));
     }
     if (method == 'GET' && _isSalaryPath(seg)) {
       return _ok(_salaryRecord(seg[3]));
@@ -1281,6 +1391,12 @@ class FakeApiClient implements ApiClient {
     // CollectionsRepository.closeDay posts /api/collections/days/close.
     if (seg.length == 3 && seg[1] == 'days' && seg[2] == 'close') {
       return _applyClose(b);
+    }
+    if (seg.length == 4 && seg[1] == 'assignments' && seg[3] == 'submissions') {
+      return _applyAssignmentSubmission(seg[2], b);
+    }
+    if (seg.length == 2 && seg[1] == 'unlinked-receipts') {
+      return _applyUnlinkedCreate(b);
     }
     return _ok({'id': 'ok', 'version': 1});
   }
@@ -1370,7 +1486,16 @@ class FakeApiClient implements ApiClient {
     return body;
   }
 
-  Map<String, dynamic> _ledgerView(String section, String? before) {
+  Map<String, dynamic> _ledgerView(
+    String section,
+    String? before, {
+    String? accountId,
+  }) {
+    if (_large &&
+        accountId != null &&
+        FakeLargeCatalog.isLongLedger(section, accountId)) {
+      return FakeLargeCatalog.ledgerPage(before: before);
+    }
     if (before != null && before.isNotEmpty) {
       return FakeFixtures.ledger(before: before);
     }
@@ -1406,16 +1531,26 @@ class FakeApiClient implements ApiClient {
   /// Debt or partial payment. The version is the card's stored version.
   ///
   /// A direct partial payment stores the previous card balance with the
-  /// received `inputValue` applied. That result is what later reads return.
-  /// The app does not calculate it. A rate-based movement only bumps the
-  /// version; this fake does not turn a factor into an amount.
+  /// received `inputValue` applied when that integer is not larger than the
+  /// stored balance. A larger integer is refused and the stored balance is
+  /// left as it was. The app does not calculate the new balance. A rate-based
+  /// movement only bumps the version; this fake does not turn a factor into
+  /// an amount, and it does not compare that factor with the balance.
   ApiResponse _applyMovement(String section, String id, Map b) {
     final card = _cardView(section, id);
     _requireVersion(b['expectedVersion'], card['version']);
-    final version = (card['version'] as int) + 1;
-    final state = <String, dynamic>{'version': version};
     final previous = card['balanceUnits'];
     final entered = b['inputValue'];
+    if (b['type'] == 'payment' &&
+        b['paymentMode'] == 'partial' &&
+        b['calculationMode'] == 'direct' &&
+        previous is int &&
+        entered is int &&
+        entered > previous) {
+      _fail(400, 'VALIDATION_ERROR', amountAboveRemainingMessage);
+    }
+    final version = (card['version'] as int) + 1;
+    final state = <String, dynamic>{'version': version};
     if (b['type'] == 'payment' &&
         b['paymentMode'] == 'partial' &&
         b['calculationMode'] == 'direct' &&
@@ -1488,6 +1623,12 @@ class FakeApiClient implements ApiClient {
       if (state != null) item.addAll(state);
       items.add(item);
     }
+    for (final extra in _extraSubmissions) {
+      final item = Map<String, dynamic>.from(extra);
+      final state = _submissionState['${item['id']}'];
+      if (state != null) item.addAll(state);
+      items.add(item);
+    }
     body['submissions'] = items;
     final receipts = <Map<String, dynamic>>[];
     for (final raw in body['unlinkedReceipts'] as List) {
@@ -1496,10 +1637,88 @@ class FakeApiClient implements ApiClient {
       if (state != null) item.addAll(state);
       receipts.add(item);
     }
+    for (final extra in _extraUnlinked) {
+      final item = Map<String, dynamic>.from(extra);
+      final state = _unlinkedState['${item['id']}'];
+      if (state != null) item.addAll(state);
+      receipts.add(item);
+    }
     body['unlinkedReceipts'] = receipts;
     final batch = _batchState;
     if (batch != null) body.addAll(batch);
     return body;
+  }
+
+  /// Stores one submission on an assignment the caller can see.
+  ///
+  /// An assignment outside that set is 404, the same body as a missing id.
+  /// The amount is the integer the request sent. This does not copy the
+  /// assignment balance and does not change overview metrics.
+  ApiResponse _applyAssignmentSubmission(String assignmentId, Map b) {
+    _requireVisibleAssignment(assignmentId);
+    final mode = b['mode'];
+    if (mode != 'full' && mode != 'partial') {
+      _fail(400, 'VALIDATION_ERROR', 'mode غير معروف');
+    }
+    int? amount;
+    if (mode == 'partial') {
+      final raw = b['amountUnits'];
+      if (raw is! int) _fail(400, 'VALIDATION_ERROR', 'amountUnits مطلوب');
+      amount = raw;
+    } else if (b['amountUnits'] is int) {
+      amount = b['amountUnits'] as int;
+    }
+    final id = 'sb_posted_${_extraSubmissions.length + 1}';
+    final name = _displayName();
+    _extraSubmissions.add({
+      'id': id,
+      'mode': mode,
+      if (amount != null) 'amountUnits': amount,
+      'status': 'pending',
+      'version': 1,
+      if (_userId != null) 'submittedByUserId': _userId,
+      if (name != null) 'submittedByName': name,
+    });
+    return _ok({'id': id, 'version': 1});
+  }
+
+  /// Stores one unlinked receipt for the signed-in caller.
+  ApiResponse _applyUnlinkedCreate(Map b) {
+    final name = b['customerName'];
+    if (name is! String || name.trim().isEmpty) {
+      _fail(400, 'VALIDATION_ERROR', 'customerName مطلوب');
+    }
+    final amount = b['amountUnits'];
+    if (amount is! int) _fail(400, 'VALIDATION_ERROR', 'amountUnits مطلوب');
+    final id = 'ur_posted_${_extraUnlinked.length + 1}';
+    _extraUnlinked.add({
+      'id': id,
+      'customerName': name,
+      'amountUnits': amount,
+      'status': 'pending',
+      'version': 1,
+      if (_userId != null) 'submittedByUserId': _userId,
+    });
+    return _ok({'id': id, 'version': 1});
+  }
+
+  void _requireVisibleAssignment(String id) {
+    final assignments = _collectionsForCaller()['assignments'];
+    if (assignments is List) {
+      for (final raw in assignments) {
+        if (raw is Map && raw['id'] == id) return;
+      }
+    }
+    _fail(404, 'NOT_FOUND', _notFound);
+  }
+
+  String? _displayName() {
+    final user = _me['user'];
+    if (user is Map && user['displayName'] is String) {
+      final name = user['displayName'] as String;
+      if (name.isNotEmpty) return name;
+    }
+    return null;
   }
 
   /// Compares the stored batch version. A match stores the next batch id.
@@ -1828,7 +2047,65 @@ class FakeApiClient implements ApiClient {
     return _ok({'id': entry['id'], 'version': version});
   }
 
-  Map<String, dynamic> _collectionsForCaller() {
+  Map<String, dynamic> _overlayCards(
+    String section,
+    Map<String, dynamic> page,
+  ) {
+    final items = <Map<String, dynamic>>[];
+    for (final raw in page['items'] as List) {
+      final card = Map<String, dynamic>.from(raw as Map);
+      final state = _cardState['$section|${card['id']}'];
+      if (state != null) card.addAll(state);
+      items.add(card);
+    }
+    return {...page, 'items': items};
+  }
+
+  int _pageLimit(Map<String, dynamic>? query) {
+    final raw = query?['limit'];
+    final parsed = raw is int ? raw : int.tryParse('${raw ?? ''}');
+    final limit = parsed ?? FakeLargeCatalog.pageSize;
+    if (limit < 1) return 1;
+    if (limit > FakeLargeCatalog.pageSize) return FakeLargeCatalog.pageSize;
+    return limit;
+  }
+
+  /// First page of the large catalog, with fixture metrics left as stored
+  /// literals. Assignments and submissions come from the page, not a sum.
+  Map<String, dynamic> _largeCollections(Map<String, dynamic>? query) {
+    final page = FakeLargeCatalog.collectionsPage(
+      cursor: _queryText(query, 'cursor'),
+      limit: _pageLimit(query),
+      seesAll: _seesEveryCollection,
+      userId: _userId,
+    );
+    final body = _copy(FakeFixtures.collections());
+    body['assignments'] = page['assignments'];
+    body['submissions'] = page['submissions'];
+    body['nextCursor'] = page['nextCursor'];
+    body['assignedCount'] = page['visibleCount'];
+    body['historyPageCount'] = page['historyPageCount'];
+    if (_seesEveryCollection) return body;
+    final id = _userId;
+    body['unlinkedReceipts'] = const [];
+    body['employeeTotals'] = _owned(body['employeeTotals'], 'userId', id);
+    if (id == FakeFixtures.demoEmployeeId) {
+      body['metrics'] =
+          Map<String, dynamic>.from(FakeFixtures.ownCollectionMetrics);
+    } else {
+      body['metrics'] = {
+        'collectedUnits': 0,
+        'dayTotalUnits': 0,
+        'pendingCount': 0,
+        'unlinkedPendingCount': 0,
+        'cashOutstandingUnits': 0,
+      };
+    }
+    return body;
+  }
+
+  Map<String, dynamic> _collectionsForCaller([Map<String, dynamic>? query]) {
+    if (_large) return _largeCollections(query);
     final body = _collectionsView();
     if (_seesEveryCollection) return body;
     final id = _userId;
@@ -1879,18 +2156,218 @@ class FakeApiClient implements ApiClient {
     _fail(404, 'NOT_FOUND', _notFound);
   }
 
-  Map<String, dynamic> _notificationsForCaller() {
-    final data = FakeFixtures.notifications(_unread);
-    final items = <Map<String, dynamic>>[];
-    for (final raw in data['items'] as List) {
-      final item = Map<String, dynamic>.from(raw as Map);
-      final owner = item['recipientUserId'];
-      if (owner == null || _access.fullAccess || '$owner' == _userId) {
+  ApiResponse _notifications(
+    String method,
+    List<String> seg,
+    Map b,
+    Map<String, dynamic>? query,
+  ) {
+    _ensureNotices();
+    if (seg.length > 1 && seg[1] == 'unread-count') {
+      if (method != 'GET') _fail(404, 'NOT_FOUND', _notFound);
+      if (failUnreadCountRemaining > 0) {
+        failUnreadCountRemaining--;
+        _fail(404, 'NOT_FOUND', _notFound);
+      }
+      // 🔶 Response shape is proposed.
+      return _ok({'unreadCount': _unreadByUser[_userId] ?? 0});
+    }
+    if (method == 'GET') {
+      final forced = failNextNotificationListStatus;
+      if (forced != null) {
+        failNextNotificationListStatus = null;
+        if (forced == 404) _fail(404, 'NOT_FOUND', _notFound);
+        if (forced == 401) {
+          _fail(401, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
+        }
+        _fail(forced, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الإشعارات.');
+      }
+      final data = _notificationsPage(query);
+      if (omitUnreadCount) data.remove('unreadCount');
+      return _ok(data);
+    }
+    if (method == 'POST' && seg.length > 1 && seg[1] == 'read-all') {
+      return _ok(_markAllRead(b));
+    }
+    if (method == 'PATCH' && seg.length > 2 && seg[2] == 'read') {
+      return _ok(_markOneRead(seg[1], b));
+    }
+    _fail(404, 'NOT_FOUND', _notFound);
+  }
+
+  void _ensureNotices() {
+    if (_noticesReady) return;
+    _noticesReady = true;
+    if (_large) {
+      _unreadByUser.addAll(FakeLargeCatalog.unreadLiterals);
+      return;
+    }
+    for (final raw in FakeFixtures.notificationCatalog()) {
+      final item = Map<String, dynamic>.from(raw);
+      final owner = '${item['recipientUserId']}';
+      (_notices[owner] ??= []).add(item);
+    }
+    _unreadByUser.addAll(FakeFixtures.notificationUnreadCounts);
+  }
+
+  Map<String, dynamic> _notificationsPage(Map<String, dynamic>? query) {
+    if (_large && FakeLargeCatalog.hasNotices(_userId)) {
+      final generated = FakeLargeCatalog.notificationPage(
+        userId: _userId!,
+        before: query?['before']?.toString(),
+      );
+      final items = <Map<String, dynamic>>[];
+      for (final raw in generated['items'] as List) {
+        final item = Map<String, dynamic>.from(raw as Map);
+        if (_largeAllRead || _largeReadIds.contains('${item['id']}')) {
+          item['readAt'] = _noticeReadStamp;
+        }
         items.add(item);
       }
+      return {
+        'items': items,
+        'unreadCount': _unreadByUser[_userId] ?? 0,
+        'nextBefore': generated['nextBefore'],
+        'historyPageCount': generated['historyPageCount'],
+      };
     }
-    data['items'] = items;
-    return data;
+    final own = _notices[_userId] ?? const <Map<String, dynamic>>[];
+    final sorted = [...own]..sort(_noticeOrder);
+    final before = query?['before']?.toString();
+    var page = sorted;
+    if (before != null && before.isNotEmpty) {
+      final index = sorted.indexWhere((item) => '${item['id']}' == before);
+      page = index < 0
+          ? const <Map<String, dynamic>>[]
+          : sorted.skip(index + 1).toList(growable: false);
+    }
+    return {
+      'items': [
+        for (final item in page) Map<String, dynamic>.from(item),
+      ],
+      'unreadCount': _unreadByUser[_userId] ?? 0,
+      // 🔶 No extra page in the fixture, so the cursor is absent.
+      'nextBefore': null,
+    };
+  }
+
+  int _noticeOrder(Map<String, dynamic> a, Map<String, dynamic> b) {
+    final at = DateTime.tryParse('${a['createdAt']}') ?? DateTime.utc(1970);
+    final bt = DateTime.tryParse('${b['createdAt']}') ?? DateTime.utc(1970);
+    final byTime = bt.compareTo(at);
+    if (byTime != 0) return byTime;
+    return '${a['id']}'.compareTo('${b['id']}');
+  }
+
+  Map<String, dynamic> _markOneRead(String id, Map b) {
+    final stored = _storedNotificationReplay(b);
+    if (stored != null) return stored;
+    _failNextNotificationWrite();
+    final found = _ownNotice(id);
+    if (found == null) _fail(404, 'NOT_FOUND', _notFound);
+    final item = found;
+    if (item['readAt'] == null) {
+      item['readAt'] = _noticeReadStamp;
+      if (_large) _largeReadIds.add(id);
+      _decrementUnread(_userId!);
+    }
+    notificationMutationApplies++;
+    final result = <String, dynamic>{
+      'unreadCount': _unreadByUser[_userId] ?? 0,
+      'readAt': item['readAt'],
+      'notification': Map<String, dynamic>.from(item),
+    };
+    if (omitNotificationWriteUnreadCount) result.remove('unreadCount');
+    _storeNotificationReplay(b, result);
+    return result;
+  }
+
+  Map<String, dynamic> _markAllRead(Map b) {
+    final stored = _storedNotificationReplay(b);
+    if (stored != null) return stored;
+    _failNextNotificationWrite();
+    if (_large) {
+      _largeAllRead = true;
+      _unreadByUser[_userId!] = 0;
+      notificationMutationApplies++;
+      final result = <String, dynamic>{
+        'unreadCount': 0,
+        'readAt': _noticeReadStamp,
+      };
+      if (omitNotificationWriteUnreadCount) result.remove('unreadCount');
+      _storeNotificationReplay(b, result);
+      return result;
+    }
+    final own = _notices[_userId] ?? const <Map<String, dynamic>>[];
+    for (final item in own) {
+      if (item['readAt'] == null) item['readAt'] = _noticeReadStamp;
+    }
+    _unreadByUser[_userId!] = 0;
+    notificationMutationApplies++;
+    final result = <String, dynamic>{
+      'unreadCount': 0,
+      'readAt': _noticeReadStamp,
+    };
+    if (omitNotificationWriteUnreadCount) result.remove('unreadCount');
+    _storeNotificationReplay(b, result);
+    return result;
+  }
+
+  /// Test hook. Adds one row without counting it into the stored unread total.
+  /// [unreadCount] replaces that owner's stored total when passed.
+  void stageNotification(Map<String, dynamic> item, {int? unreadCount}) {
+    _ensureNotices();
+    final copy = Map<String, dynamic>.from(item);
+    final owner = '${copy['recipientUserId'] ?? _userId}';
+    copy['recipientUserId'] = owner;
+    (_notices[owner] ??= []).add(copy);
+    if (unreadCount != null) _unreadByUser[owner] = unreadCount;
+  }
+
+  void _failNextNotificationWrite() {
+    if (failNotificationWritesRemaining <= 0) return;
+    failNotificationWritesRemaining--;
+    _fail(500, 'SERVER_ERROR', 'تعذر تحديث الإشعار.');
+  }
+
+  void _decrementUnread(String userId) {
+    final current = _unreadByUser[userId] ?? 0;
+    _unreadByUser[userId] = current > 0 ? current - 1 : 0;
+  }
+
+  Map<String, dynamic>? _ownNotice(String id) {
+    if (_large) {
+      final generated = FakeLargeCatalog.noticeOrNull(_userId, id);
+      if (generated != null) {
+        final item = Map<String, dynamic>.from(generated);
+        if (_largeAllRead || _largeReadIds.contains(id)) {
+          item['readAt'] = _noticeReadStamp;
+        }
+        return item;
+      }
+    }
+    final own = _notices[_userId];
+    if (own == null) return null;
+    for (final item in own) {
+      if ('${item['id']}' == id) return item;
+    }
+    return null;
+  }
+
+  /// 🔶 Honored only when the caller includes requestId. The repository does not.
+  Map<String, dynamic>? _storedNotificationReplay(Map b) {
+    final requestId = b['requestId'];
+    if (requestId == null || '$requestId'.isEmpty) return null;
+    final stored = _notificationReplays['${_userId ?? ''}|$requestId'];
+    if (stored == null) return null;
+    return jsonDecode(jsonEncode(stored)) as Map<String, dynamic>;
+  }
+
+  void _storeNotificationReplay(Map b, Map<String, dynamic> result) {
+    final requestId = b['requestId'];
+    if (requestId == null || '$requestId'.isEmpty) return;
+    _notificationReplays['${_userId ?? ''}|$requestId'] =
+        jsonDecode(jsonEncode(result)) as Map<String, dynamic>;
   }
 
   ApiResponse _accountRequests(List<String> seg, Map b) {

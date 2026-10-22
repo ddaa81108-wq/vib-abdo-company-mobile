@@ -25,12 +25,22 @@ class AccountExtraCards extends Notifier<List<AccountCardDto>> {
   String? _cursor;
   var _started = false;
 
+  /// The last append crossed the retain cap and the next append should
+  /// bring those dropped rows back instead of skipping them.
+  var _replay = false;
+
+  /// The user already asked for a page past the cap, so later appends stay
+  /// contiguous from the newest card.
+  var _extend = false;
+
   @override
   List<AccountCardDto> build() {
     ref.watch(accountQueryProvider(section));
     ref.watch(accountFilterProvider(section));
     _cursor = null;
     _started = false;
+    _replay = false;
+    _extend = false;
     return const [];
   }
 
@@ -39,16 +49,66 @@ class AccountExtraCards extends Notifier<List<AccountCardDto>> {
   String? cursorAfter(String? firstPageCursor) =>
       _started ? _cursor : firstPageCursor;
 
-  void append(List<AccountCardDto> items, {String? nextCursor}) {
+  void append(
+    List<AccountCardDto> items, {
+    String? nextCursor,
+    int? retainLimit,
+  }) {
     _started = true;
+    if (items.isEmpty) {
+      _cursor = nextCursor;
+      _replay = false;
+      return;
+    }
+    final known = {for (final card in state) card.id};
+    final fresh = <AccountCardDto>[
+      for (final card in items)
+        if (known.add(card.id)) card,
+    ];
+    if (fresh.isEmpty) {
+      _cursor = nextCursor;
+      if (_replay) {
+        _replay = false;
+        _extend = true;
+      }
+      return;
+    }
+    if (retainLimit == null || _extend) {
+      state = [...state, ...fresh];
+      _cursor = nextCursor;
+      return;
+    }
+    if (_replay) {
+      state = [...state, ...fresh];
+      _cursor = nextCursor;
+      _replay = false;
+      _extend = true;
+      return;
+    }
+    final merged = [...state, ...fresh];
+    if (merged.length <= retainLimit) {
+      state = merged;
+      _cursor = nextCursor;
+      return;
+    }
+    // Keep the prefix next to the first page. Dropping the tail used to
+    // leave the first page and the oldest cards on screen with a hole
+    // between them (DEF-027).
+    state = merged.sublist(0, retainLimit);
+    final dropped = merged.length - retainLimit;
+    final entirePageDropped = dropped >= fresh.length;
+    if (entirePageDropped || _cursor != null) {
+      _replay = true;
+      return;
+    }
     _cursor = nextCursor;
-    if (items.isEmpty) return;
-    state = [...state, ...items];
   }
 
   void clear() {
     _cursor = null;
     _started = false;
+    _replay = false;
+    _extend = false;
     state = const [];
   }
 
@@ -60,16 +120,21 @@ class AccountExtraCards extends Notifier<List<AccountCardDto>> {
     required String? firstPageCursor,
     required Future<AccountsPage> Function(String cursor) fetch,
     required bool Function() stillCurrent,
+    int? retainLimit,
   }) async {
     var cursor = cursorAfter(firstPageCursor);
     while (cursor != null && cursor.isNotEmpty) {
       final requested = cursor;
       final page = await fetch(requested);
       if (!ref.mounted || !stillCurrent()) return;
-      final next = page.page.nextCursor;
-      append(page.page.items, nextCursor: next);
-      if (next == null || next.isEmpty || next == requested) return;
-      cursor = next;
+      append(
+        page.page.items,
+        nextCursor: page.page.nextCursor,
+        retainLimit: retainLimit,
+      );
+      final stored = _cursor;
+      if (stored == null || stored.isEmpty || stored == requested) return;
+      cursor = stored;
     }
   }
 }
@@ -188,11 +253,6 @@ final financialLedgerProvider = FutureProvider<FinancialLedgerPage>((
     throw const ForbiddenException(code: 'FORBIDDEN', message: 'غير مصرح');
   }
   return layer.reports.financialLedger();
-});
-
-final notificationsProvider = FutureProvider<NotificationsPage>((ref) async {
-  watchSignedIn(ref);
-  return ref.read(apiLayerProvider).notifications.list();
 });
 
 final notificationPrefsProvider = FutureProvider<Map<String, dynamic>>((

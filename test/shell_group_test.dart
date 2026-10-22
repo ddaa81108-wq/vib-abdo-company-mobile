@@ -12,7 +12,7 @@ import 'package:vib_abdo_company_mobile/features/notifications/notifications_scr
 import 'package:vib_abdo_company_mobile/features/settings/employee_totals_screen.dart';
 import 'package:vib_abdo_company_mobile/features/splash/splash_screen.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
-import 'package:vib_abdo_company_mobile/state/section_providers.dart';
+import 'package:vib_abdo_company_mobile/state/notification_providers.dart';
 import 'package:vib_abdo_company_mobile/state/session_providers.dart';
 import 'package:vib_abdo_company_mobile/state/theme_controller.dart';
 import 'package:vib_abdo_company_mobile/ui/presentation.dart';
@@ -697,14 +697,14 @@ void main() {
       tester,
       size: const Size(360, 900),
       overrides: [
-        notificationsProvider.overrideWith((ref) async {
+        notificationsProvider.overrideWithBuild((ref, _) async {
           gate.calls++;
           if (gate.failing) throw const NetworkException();
           return ref.read(apiLayerProvider).notifications.list();
         }),
       ],
     );
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await signIn(tester, username: 'employee.demo', password: 'demo-only');
     await go(tester, '/notifications');
     expect(find.byKey(NotificationsScreen.retryKey), findsOneWidget);
     gate.failing = false;

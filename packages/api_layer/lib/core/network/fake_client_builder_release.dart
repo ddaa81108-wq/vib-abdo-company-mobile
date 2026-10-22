@@ -16,6 +16,12 @@ FakeStackParts buildFakeStack({
   Future<void> Function(String reason) onForcedLogout = _ignoreLogout,
   CookieStore? cookieStore,
   TokenStorage? tokenStorage,
+  String? fakeDataset,
 }) {
+  // Same signature as the debug builder. This file does not import the
+  // catalog and does not read a dataset define.
+  if (fakeDataset != null) {
+    throw StateError(releaseFakeApiRejectedMessage);
+  }
   throw StateError(releaseFakeApiRejectedMessage);
 }

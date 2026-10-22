@@ -1,221 +1,412 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../notifications/push_providers.dart';
+import '../../performance/history_window.dart';
 import '../../state/notification_providers.dart';
-import '../../state/section_providers.dart';
+import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
-import '../../ui/presentation.dart';
-import '../../ui/section_labels.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
 import '../../ui/widgets/soft_tile.dart';
+import 'notification_content.dart';
+import 'notification_open_seam.dart';
+import 'notification_permission.dart';
+import 'notification_permission_registration.dart';
 
-class NotificationsScreen extends ConsumerWidget {
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   static const screenKey = Key('screen-notifications');
   static const retryKey = Key('notifications-retry');
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final page = ref.watch(notificationsProvider);
-    final unread = ref.watch(unreadCountProvider);
-    final online = ref.watch(onlineProvider);
-    final count = unread.asData?.value ?? page.asData?.value.unreadCount;
-    final theme = Theme.of(context);
-    return ListView(
-      key: screenKey,
-      padding: pagePadding(MediaQuery.sizeOf(context).width),
-      children: [
-        const ScreenTitle(AppStrings.notifications),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          '${AppStrings.unreadFull} ${count ?? AppStrings.dash}',
-          key: const Key('unread-full'),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: BusyAction(
-            buttonKey: const Key('mark-all-read'),
-            enabled: online && (count ?? 0) > 0,
-            label: AppStrings.markAllRead,
-            onSubmit: () => _all(ref, context),
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  var _scrollArmed = true;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeExplain();
+    });
+  }
+
+  /// First visit to this screen in the provider scope. Already granted skips
+  /// the dialog. Below Android 13 there is no request and no explanation.
+  /// A denial explains first and requests only after agreement.
+  Future<void> _maybeExplain() async {
+    if (!mounted) return;
+    if (ref.read(notificationPermissionPromptedProvider)) return;
+    ref.read(notificationPermissionPromptedProvider.notifier).mark();
+    if (await notificationRuntimePermissionIsImplicit(
+      ref.read(notificationSdkIntProvider),
+    )) {
+      return;
+    }
+    final service = ref.read(notificationPermissionServiceProvider);
+    final NotificationPermissionChoice status;
+    try {
+      status = await service.status();
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    if (status == NotificationPermissionChoice.granted) {
+      await _syncRegistration();
+      return;
+    }
+    if (status == NotificationPermissionChoice.permanentlyDenied) {
+      await _syncRegistration();
+      if (!mounted) return;
+      await _showDenied();
+      return;
+    }
+    final agreed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => _permissionDialog(
+        dialogContext,
+        key: const Key('notification-permission-explain'),
+        title: AppStrings.notificationPermissionTitle,
+        message: AppStrings.notificationPermissionBody,
+        actions: [
+          TextButton(
+            key: const Key('notification-permission-later'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text(AppStrings.notificationPermissionLater),
           ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        KeptData<NotificationsPage>(
-          value: page,
-          resetKey: 'notifications',
-          retryKey: retryKey,
-          onRetry: online ? () => ref.invalidate(notificationsProvider) : null,
-          messageOf: (error) =>
-              failureText(ref.read(errorHandlerProvider).toFailure(error)),
-          failureOf: (error) => ref.read(errorHandlerProvider).toFailure(error),
-          loading: const SkeletonBox(
-            key: Key('notifications-loading'),
-            height: 72,
+          FilledButton(
+            key: const Key('notification-permission-agree'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(AppStrings.notificationPermissionAgree),
           ),
-          builder: (data) {
-            if (data.items.isEmpty) {
-              return const EmptyPane(
-                title: AppStrings.notifications,
-                message: AppStrings.noNotifications,
-                icon: Icons.notifications_none,
-              );
-            }
-            return Column(
-              children: [
-                for (final item in data.items)
-                  _NoticeTile(
-                    item: item,
-                    online: online,
-                    onRead: () => _read(ref, item),
-                  ),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(AppStrings.noLanguage, style: theme.textTheme.bodySmall),
-      ],
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (agreed != true) {
+      await _syncRegistration();
+      return;
+    }
+    final NotificationPermissionChoice next;
+    try {
+      next = await service.request();
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    await _syncRegistration();
+    if (!mounted) return;
+    if (next != NotificationPermissionChoice.granted) await _showDenied();
+  }
+
+  /// A grant registers. A denial unregisters. The opener still owns mark-read.
+  Future<void> _syncRegistration() {
+    final session = ref.read(sessionStateProvider);
+    return ref
+        .read(notificationPermissionSyncProvider.notifier)
+        .sync(
+          signedIn: session is SessionAuthenticated,
+          permission: ref.read(notificationPermissionServiceProvider),
+          registrar: ref.read(deviceTokenRegistrarProvider),
+        );
+  }
+
+  Future<void> _showDenied() {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => _permissionDialog(
+        dialogContext,
+        key: const Key('notification-permission-denied'),
+        title: AppStrings.notificationPermissionTitle,
+        message: AppStrings.notificationPermissionDenied,
+        actions: [
+          TextButton(
+            key: const Key('notification-permission-later'),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text(AppStrings.notificationPermissionLater),
+          ),
+          FilledButton(
+            key: const Key('notification-permission-settings'),
+            onPressed: () async {
+              await ref
+                  .read(notificationPermissionServiceProvider)
+                  .openSettings();
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+            },
+            child: const Text(AppStrings.notificationPermissionSettings),
+          ),
+        ],
+      ),
     );
   }
 
-  Future<({String? error, String? path})> _read(
-    WidgetRef ref,
-    NotificationDto item,
-  ) async {
-    try {
-      await ref.read(apiLayerProvider).notifications.markRead(item.id);
-    } catch (error) {
-      return (
-        error: failureText(ref.read(errorHandlerProvider).toFailure(error)),
-        path: null,
-      );
-    }
-    ref.invalidate(notificationsProvider);
-    ref.invalidate(unreadCountProvider);
-    return (error: null, path: notificationPath(item.section, item.entityId));
-  }
-
-  Future<void> _all(WidgetRef ref, BuildContext context) async {
-    try {
-      await ref.read(apiLayerProvider).notifications.markAllRead();
-    } catch (error) {
-      final failure = ref.read(errorHandlerProvider).toFailure(error);
-      if (context.mounted) showFailureSnackBar(context, failure);
-      return;
-    }
-    ref.invalidate(notificationsProvider);
-    ref.invalidate(unreadCountProvider);
-  }
-}
-
-class _NoticeTile extends StatefulWidget {
-  const _NoticeTile({
-    required this.item,
-    required this.online,
-    required this.onRead,
-  });
-
-  final NotificationDto item;
-  final bool online;
-  final Future<({String? error, String? path})> Function() onRead;
-
-  @override
-  State<_NoticeTile> createState() => _NoticeTileState();
-}
-
-class _NoticeTileState extends State<_NoticeTile> {
-  var _busy = false;
-
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(notificationsStateProvider);
+    final unread = ref.watch(unreadNotificationsCountProvider);
+    final online = ref.watch(onlineProvider);
+    final count = unread.asData?.value;
+    if (state is NotificationsForbidden) {
+      return const KeyedSubtree(
+        key: NotificationsScreen.screenKey,
+        child: ForbiddenPane(),
+      );
+    }
+    return RefreshIndicator(
+      key: const Key('notifications-refresh'),
+      onRefresh: () => ref.read(notificationsProvider.notifier).refresh(),
+      child: ListView(
+        key: NotificationsScreen.screenKey,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: pagePadding(MediaQuery.sizeOf(context).width),
+        children: [
+          const ScreenTitle(AppStrings.notifications),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '${AppStrings.unreadFull} ${count ?? AppStrings.dash}',
+            key: const Key('unread-full'),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: BusyAction(
+              buttonKey: const Key('mark-all-read'),
+              enabled: online && (count ?? 0) > 0,
+              label: AppStrings.markAllRead,
+              onSubmit: () => _markAll(context),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _body(state, online),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            AppStrings.noLanguage,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _body(NotificationsState state, bool online) {
+    return switch (state) {
+      NotificationsLoading() => const SkeletonBox(
+        key: Key('notifications-loading'),
+        height: 72,
+      ),
+      NotificationsEmpty() => const EmptyPane(
+        title: AppStrings.notifications,
+        message: AppStrings.noNotifications,
+        icon: Icons.notifications_none,
+      ),
+      NotificationsFailure(:final failure) => ErrorPane(
+        message: failure.message,
+        retryKey: NotificationsScreen.retryKey,
+        onRetry: online ? () => ref.invalidate(notificationsProvider) : null,
+      ),
+      NotificationsReady(:final items) => () {
+        HistoryWindowTrace.notificationWindow = [
+          for (final item in items) item.notificationId,
+        ];
+        return items.length <= HistoryWindow.eagerLimit
+            ? Column(
+                children: [for (final item in items) _NoticeTile(item: item)],
+              )
+            : Column(
+                children: [
+                  SizedBox(
+                    height: 560,
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: _onNoticesScroll,
+                      child: ListView.builder(
+                        key: const Key('notifications-list'),
+                        itemCount: items.length,
+                        itemBuilder: (context, index) =>
+                            _NoticeTile(item: items[index]),
+                      ),
+                    ),
+                  ),
+                  KeyedSubtree(
+                    key: Key('notifications-retained-${items.length}'),
+                    child: const SizedBox.shrink(),
+                  ),
+                  // Approved by Ali on 2026-10-22, enabled by default.
+                  // The control stays while an older page can still be loaded.
+                  // Off, the control stays hidden and the first page remains.
+                  if (HistoryWindow.trimEnabled && _olderCursor() != null)
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton(
+                        key: const Key('load-older-notifications'),
+                        onPressed: online ? _loadOlderNotifications : null,
+                        child: const Text(AppStrings.loadOlder),
+                      ),
+                    ),
+                ],
+              );
+      }(),
+      NotificationsForbidden() => const SizedBox.shrink(),
+    };
+  }
+
+  bool _onNoticesScroll(ScrollNotification notification) {
+    if (notification is! ScrollUpdateNotification) return false;
+    final metrics = notification.metrics;
+    if (metrics.maxScrollExtent > 0 &&
+        metrics.pixels < metrics.maxScrollExtent - 24) {
+      _scrollArmed = true;
+      return false;
+    }
+    if (!historyDraggedToEnd(notification)) return false;
+    if (!_scrollArmed || _olderCursor() == null) return false;
+    _scrollArmed = false;
+    _loadOlderNotifications();
+    return false;
+  }
+
+  String? _olderCursor() {
+    final page = ref.read(notificationsProvider).asData?.value;
+    return page?.nextBefore;
+  }
+
+  Future<void> _loadOlderNotifications() async {
+    try {
+      await ref.read(notificationsProvider.notifier).loadOlder();
+    } catch (error) {
+      if (!mounted) return;
+      showFailureSnackBar(
+        context,
+        ref.read(errorHandlerProvider).toFailure(error),
+      );
+    }
+  }
+
+  Future<void> _markAll(BuildContext context) async {
+    try {
+      await ref.read(notificationsProvider.notifier).markAllRead();
+    } catch (error) {
+      if (!context.mounted) return;
+      showFailureSnackBar(
+        context,
+        ref.read(errorHandlerProvider).toFailure(error),
+      );
+    }
+  }
+}
+
+class _NoticeTile extends ConsumerWidget {
+  const _NoticeTile({required this.item});
+
+  final AppNotification item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final title = (widget.item.title != null && widget.item.title!.isNotEmpty)
-        ? widget.item.title!
-        : notificationFallback(widget.item.action);
-    final body = widget.item.body;
+    final unread = !item.isRead;
+    final headline = notificationHeadline(item);
+    final secondary = notificationSecondaryLines(item);
+    final label =
+        '${unread ? AppStrings.unreadLabel : AppStrings.readLabel} $headline';
     return Card(
+      key: Key('notice-card-${item.notificationId}'),
       margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-      color: widget.item.isRead ? null : theme.colorScheme.primaryContainer,
-      child: InkWell(
-        key: Key('notice-${widget.item.id}'),
-        onTap: _busy ? null : _run,
-        child: Padding(
-          padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.item.isRead
-                          ? AppStrings.readLabel
-                          : AppStrings.unreadLabel,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+      color: unread ? theme.colorScheme.primaryContainer : null,
+      child: Semantics(
+        label: label,
+        button: true,
+        container: true,
+        child: InkWell(
+          key: Key('notice-${item.notificationId}'),
+          onTap: () => _open(context, ref),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (unread)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                      top: 6,
+                      end: AppSpacing.sm,
+                    ),
+                    child: Container(
+                      key: Key('notice-unread-dot-${item.notificationId}'),
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(title, style: theme.textTheme.titleSmall),
-                    if (body != null && body.isNotEmpty) ...[
+                  ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        headline,
+                        key: Key('notice-headline-${item.notificationId}'),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: unread
+                              ? FontWeight.w800
+                              : FontWeight.w500,
+                        ),
+                      ),
+                      for (final line in secondary) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(line),
+                      ],
                       const SizedBox(height: AppSpacing.xs),
-                      Text(body),
-                    ],
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      formatIsoDate(widget.item.createdAt),
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    if (_busy) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                      Text(
+                        notificationWhen(item),
+                        style: theme.textTheme.bodySmall,
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              forwardChevron(context),
-            ],
+                forwardChevron(context),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Future<void> _run() async {
-    if (_busy) return;
-    final path = notificationPath(widget.item.section, widget.item.entityId);
-    if (!widget.online) {
-      if (path != null && mounted) context.go(path);
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      final result = await widget.onRead();
-      if (!mounted) return;
-      if (result.error != null) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(result.error!)));
-        return;
-      }
-      final next = result.path;
-      if (next != null) context.go(next);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+  Future<void> _open(BuildContext context, WidgetRef ref) async {
+    final result = await ref
+        .read(notificationOpenSeamProvider)
+        .open(item, origin: NotificationOpenOrigin.list);
+    if (!context.mounted) return;
+    showNotificationOpenResult(context, result);
   }
+}
+
+Widget _permissionDialog(
+  BuildContext context, {
+  required Key key,
+  required String title,
+  required String message,
+  required List<Widget> actions,
+}) {
+  final tight = MediaQuery.sizeOf(context).width <= 360;
+  return AlertDialog(
+    key: key,
+    scrollable: true,
+    insetPadding: EdgeInsets.symmetric(
+      horizontal: tight ? 12 : 40,
+      vertical: tight ? 16 : 24,
+    ),
+    title: Text(title),
+    content: Text(message),
+    actions: actions,
+  );
 }

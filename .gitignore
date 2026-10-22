@@ -54,3 +54,18 @@ staging-permissions-junit.xml
 .env.*
 *.jks
 *.keystore
+
+# Push credentials and API keys. Never commit these.
+# Firebase Android config is per environment and is not committed.
+# CI decodes GOOGLE_SERVICES_JSON_BASE64 when that secret is set.
+google-services.json
+android/app/google-services.json
+**/google-services.json
+GoogleService-Info.plist
+**/GoogleService-Info.plist
+google-services.json.bak
+**/firebase_options.dart
+**/*service-account*.json
+**/*serviceAccount*.json
+**/*-api-key*.json
+**/*apikey*.json

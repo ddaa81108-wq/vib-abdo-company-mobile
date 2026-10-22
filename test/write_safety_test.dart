@@ -57,7 +57,9 @@ void main() {
 
     await tester.tap(find.byKey(const Key('add-payment')));
     await settle(tester);
-    await enterAmount(tester, '180');
+    // The accepted 180 left the stored balance at 140. This amount is still
+    // within that remaining, so the new form is sent and gets its own id.
+    await enterAmount(tester, '100');
     await hold(tester, fake, const Key('save-movement'));
 
     expect(fake.mutationRequestIds, hasLength(4));
