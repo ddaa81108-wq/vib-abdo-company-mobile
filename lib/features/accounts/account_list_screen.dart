@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_providers.dart';
+import '../../performance/history_window.dart';
 import '../../error_handling/app_failure.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/section_providers.dart';
@@ -96,7 +97,17 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             ScreenTitle(sectionLabel(section.sectionKey)),
             const SizedBox(height: AppSpacing.md),
             if (_showTicker)
-              _ticker(home, money, width, cards, data.page.nextCursor),
+              _ticker(
+                home,
+                money,
+                width,
+                cards,
+                data.page.nextCursor,
+                HistoryWindow.trimEnabled &&
+                        data.page.items.length > HistoryWindow.eagerLimit
+                    ? HistoryWindow.retainLimit
+                    : null,
+              ),
             _SummaryStrip(
               summary: data.summary,
               currency: section.currency,
@@ -178,58 +189,125 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             const SizedBox(height: AppSpacing.md),
             if (cards.isEmpty)
               EmptyPane(message: AppStrings.emptyAccounts)
+            else if (cards.length <= HistoryWindow.eagerLimit)
+              _cardWrap(
+                cards: cards,
+                columns: columns,
+                canWrite: canWrite,
+                permissions: permissions,
+              )
             else
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final cardWidth = _cardWidth(constraints.maxWidth, columns);
-                  return Wrap(
-                    spacing: AppSpacing.md,
-                    runSpacing: AppSpacing.md,
-                    children: [
-                      for (final card in cards)
-                        SizedBox(
-                          width: cardWidth,
-                          child: _AccountCard(
-                            section: section,
-                            card: card,
-                            money: money,
-                            canWrite: canWrite && !card.systemManaged,
-                            assigning: _assigning,
-                            selected: _selected.contains(card.id),
-                            onOpen: () =>
-                                context.go('/${section.path}/${card.id}'),
-                            onToggle: () => setState(() {
-                              if (!canSelectAccountForAssignment(card)) return;
-                              _selected.contains(card.id)
-                                  ? _selected.remove(card.id)
-                                  : _selected.add(card.id);
-                            }),
-                            onPin: (meta) => _pin(card, meta),
-                            onZero:
-                                showCustomerZeroReview(
-                                  permissions: permissions,
-                                  section: section,
-                                  card: card,
-                                )
-                                ? (meta) => _zero(card, meta)
-                                : null,
-                          ),
-                        ),
-                    ],
-                  );
-                },
+              SizedBox(
+                height: 560,
+                child: ListView.builder(
+                  key: const Key('account-cards-list'),
+                  itemCount: cards.length,
+                  itemBuilder: (context, index) {
+                    final card = cards[index];
+                    return Padding(
+                      padding: const EdgeInsetsDirectional.only(
+                        bottom: AppSpacing.md,
+                      ),
+                      child: _accountCard(
+                        card: card,
+                        canWrite: canWrite,
+                        permissions: permissions,
+                      ),
+                    );
+                  },
+                ),
               ),
-            if (data.page.nextCursor != null)
+            if (_loadMoreCursor(data.page.nextCursor) != null)
               Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: TextButton(
-                  onPressed: online ? () => _more(data.page.nextCursor!) : null,
+                  key: const Key('load-more-accounts'),
+                  onPressed: online
+                      ? () => _more(
+                          _loadMoreCursor(data.page.nextCursor)!,
+                          retainLimit: _accountRetainLimit(data.page.items),
+                        )
+                      : null,
                   child: const Text(AppStrings.loadMore),
                 ),
               ),
           ],
         );
       },
+    );
+  }
+
+  /// Pending Ali. Off, the button keeps the previous cursor behaviour.
+  /// On, it follows the last page and keeps [HistoryWindow.retainLimit] rows.
+  String? _loadMoreCursor(String? firstPageCursor) {
+    if (!HistoryWindow.trimEnabled) return firstPageCursor;
+    return ref
+        .read(accountExtraCardsProvider(section).notifier)
+        .cursorAfter(firstPageCursor);
+  }
+
+  int? _accountRetainLimit(List<AccountCardDto> firstPage) {
+    if (!HistoryWindow.trimEnabled) return null;
+    if (firstPage.length <= HistoryWindow.eagerLimit) return null;
+    return HistoryWindow.retainLimit;
+  }
+
+  Widget _cardWrap({
+    required List<AccountCardDto> cards,
+    required int columns,
+    required bool canWrite,
+    required PermissionService permissions,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = _cardWidth(constraints.maxWidth, columns);
+        return Wrap(
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.md,
+          children: [
+            for (final card in cards)
+              SizedBox(
+                width: cardWidth,
+                child: _accountCard(
+                  card: card,
+                  canWrite: canWrite,
+                  permissions: permissions,
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _accountCard({
+    required AccountCardDto card,
+    required bool canWrite,
+    required PermissionService permissions,
+  }) {
+    return _AccountCard(
+      section: section,
+      card: card,
+      money: ref.watch(apiLayerProvider).money,
+      canWrite: canWrite && !card.systemManaged,
+      assigning: _assigning,
+      selected: _selected.contains(card.id),
+      onOpen: () => context.go('/${section.path}/${card.id}'),
+      onToggle: () => setState(() {
+        if (!canSelectAccountForAssignment(card)) return;
+        _selected.contains(card.id)
+            ? _selected.remove(card.id)
+            : _selected.add(card.id);
+      }),
+      onPin: (meta) => _pin(card, meta),
+      onZero:
+          showCustomerZeroReview(
+            permissions: permissions,
+            section: section,
+            card: card,
+          )
+          ? (meta) => _zero(card, meta)
+          : null,
     );
   }
 
@@ -261,6 +339,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     double width,
     List<AccountCardDto> cards,
     String? nextCursor,
+    int? retainLimit,
   ) {
     final debts = home.asData?.value?.oldDebts;
     if (debts == null) return const SizedBox.shrink();
@@ -299,7 +378,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             alignment: AlignmentDirectional.centerStart,
             child: TextButton(
               key: const Key('show-all-debts'),
-              onPressed: () => _showAll(nextCursor),
+              onPressed: () => _showAll(nextCursor, retainLimit: retainLimit),
               child: const Text(AppStrings.showAll),
             ),
           ),
@@ -332,7 +411,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
 
   String _message(Object error) => failureText(_failure(error));
 
-  Future<void> _more(String cursor) async {
+  Future<void> _more(String cursor, {int? retainLimit}) async {
     final query = ref.read(accountQueryProvider(section)).trim();
     final filter = ref.read(accountFilterProvider(section));
     final next = await ref
@@ -349,12 +428,16 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     if (ref.read(accountFilterProvider(section)) != filter) return;
     ref
         .read(accountExtraCardsProvider(section).notifier)
-        .append(next.page.items, nextCursor: next.page.nextCursor);
+        .append(
+          next.page.items,
+          nextCursor: next.page.nextCursor,
+          retainLimit: retainLimit,
+        );
   }
 
   /// Phone «عرض الكل»: keep the bulletin's existing flag, and load every
   /// remaining account page for the filter and search that are active now.
-  void _showAll(String? firstPageCursor) {
+  void _showAll(String? firstPageCursor, {int? retainLimit}) {
     setState(() => _showAllDebts = true);
     if (!ref.read(onlineProvider)) return;
     final query = ref.read(accountQueryProvider(section)).trim();
@@ -363,6 +446,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
         .read(accountExtraCardsProvider(section).notifier)
         .loadRemaining(
           firstPageCursor: firstPageCursor,
+          retainLimit: retainLimit,
           fetch: (cursor) => ref
               .read(apiLayerProvider)
               .accounts

@@ -107,6 +107,7 @@ class ApiLayer {
     TokenStorage? tokenStorage,
     Duration? fakeLatency,
     HttpClientAdapter? httpClientAdapter,
+    String? fakeDataset,
   }) {
     final cfg = config ?? ApiConfig.fromEnvironment();
     rejectFakeApiInRelease(cfg.useFakeApi);
@@ -123,6 +124,7 @@ class ApiLayer {
       tokenStorage: tokenStorage,
       fakeLatency: fakeLatency,
       httpClientAdapter: httpClientAdapter,
+      fakeDataset: fakeDataset,
     );
     final api = stack.client;
 

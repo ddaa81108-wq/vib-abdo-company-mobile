@@ -27,10 +27,21 @@ FakeStackParts buildFakeStack({
   Future<void> Function(String reason) onForcedLogout = _ignoreLogout,
   CookieStore? cookieStore,
   TokenStorage? tokenStorage,
+  String? fakeDataset,
 }) {
+  const datasetFromDefine = String.fromEnvironment(
+    'FAKE_DATASET',
+    defaultValue: 'standard',
+  );
+  const latencyFromDefine = int.fromEnvironment(
+    'FAKE_LATENCY_MS',
+    defaultValue: 250,
+  );
+  const latencyMs = latencyFromDefine < 0 ? 0 : latencyFromDefine;
   final fake = FakeApiClient(
     rateWireFormat: config.rateWireFormat,
-    latency: fakeLatency ?? const Duration(milliseconds: 250),
+    latency: fakeLatency ?? const Duration(milliseconds: latencyMs),
+    dataset: fakeDataset ?? datasetFromDefine,
   );
   // In-memory stand-ins when the app did not inject stores. Real mode
   // still defaults to secure storage. No bearer token is written.

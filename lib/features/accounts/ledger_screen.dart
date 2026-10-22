@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../performance/history_window.dart';
 import '../../state/section_providers.dart';
 import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
@@ -143,7 +144,8 @@ class LedgerScreen extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.xs),
                   if (page.page.items.isEmpty)
                     const EmptyPane(message: AppStrings.emptyLedger)
-                  else ...[
+                  else if (page.page.items.length <=
+                      HistoryWindow.eagerLimit) ...[
                     if (!tight) _LedgerColumnHeader(showBalance: showBalance),
                     for (final entry in page.page.items)
                       _EntryTile(
@@ -155,6 +157,28 @@ class LedgerScreen extends ConsumerWidget {
                         canWrite: canWrite,
                         onCancel: (meta) => _cancel(context, ref, entry, meta),
                       ),
+                  ] else ...[
+                    if (!tight) _LedgerColumnHeader(showBalance: showBalance),
+                    SizedBox(
+                      height: 560,
+                      child: ListView.builder(
+                        key: const Key('ledger-entries-list'),
+                        itemCount: page.page.items.length,
+                        itemBuilder: (context, index) {
+                          final entry = page.page.items[index];
+                          return _EntryTile(
+                            section: section,
+                            accountId: id,
+                            entry: entry,
+                            money: money,
+                            showBalance: showBalance,
+                            canWrite: canWrite,
+                            onCancel: (meta) =>
+                                _cancel(context, ref, entry, meta),
+                          );
+                        },
+                      ),
+                    ),
                   ],
                   if (page.page.nextCursor != null)
                     _LoadOlderLedger(
@@ -364,6 +388,12 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
               ?.value
               .version,
           label: AppStrings.save,
+          onVersionConflict: () {
+            ref.invalidate(ledgerProvider((widget.section, widget.id)));
+            ref.invalidate(accountCardProvider((widget.section, widget.id)));
+            ref.invalidate(accountsProvider(widget.section));
+            ref.invalidate(homeDashboardProvider);
+          },
           onSubmit: _submit,
         ),
       ],
@@ -373,6 +403,18 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
   Future<String?> _submit(MutationMeta meta) async {
     final units = parseUnits(_amount.text);
     if (units == null) return AppStrings.integerOnly;
+    // Direct partial payment only. A rate is not an amount, so it is not
+    // compared. This reads the server balance; it does not compute one.
+    if (widget.type == 'payment' && _mode == CalculationMode.direct) {
+      final remaining = ref
+          .read(accountCardProvider((widget.section, widget.id)))
+          .asData
+          ?.value
+          .balanceUnits;
+      if (remaining != null && units > remaining) {
+        return AppStrings.amountAboveRemaining;
+      }
+    }
     final parsedDate = DateTime.tryParse(_date.text);
     if (parsedDate == null) return AppStrings.dateInvalid;
     DecimalString? factorValue;
@@ -407,7 +449,11 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       Navigator.of(context).pop(true);
       return null;
     } catch (error) {
-      return failureText(ref.read(errorHandlerProvider).toFailure(error));
+      // A returned string never reaches GuardedMutation's conflict path.
+      // Rethrow so it refetches and shows the shared conflict sentence.
+      final failure = ref.read(errorHandlerProvider).toFailure(error);
+      if (failure.code == 'VERSION_CONFLICT') rethrow;
+      return failureText(failure);
     }
   }
 }
@@ -536,6 +582,9 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
   String? _error;
   var _busy = false;
 
+  /// First page is already on screen. Each successful load-more adds one.
+  var _pagesLoaded = 1;
+
   @override
   void initState() {
     super.initState();
@@ -557,7 +606,13 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
       if (!mounted) return;
       setState(() {
         _extra.addAll(page.page.items);
+        // Pending Ali. Off by default, so a long book keeps every loaded row.
+        if (HistoryWindow.trimEnabled &&
+            _extra.length > HistoryWindow.retainLimit) {
+          _extra.removeRange(0, _extra.length - HistoryWindow.retainLimit);
+        }
         _cursor = page.page.nextCursor;
+        _pagesLoaded++;
         _busy = false;
       });
     } catch (error) {
@@ -572,19 +627,52 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final older = _extra.length <= HistoryWindow.eagerLimit
+        ? <Widget>[
+            for (final entry in _extra)
+              _EntryTile(
+                section: widget.section,
+                accountId: widget.id,
+                entry: entry,
+                money: widget.money,
+                showBalance: widget.showBalance,
+                canWrite: widget.canWrite,
+                onCancel: (meta) => widget.onCancel(entry, meta),
+              ),
+          ]
+        : <Widget>[
+            SizedBox(
+              height: 560,
+              child: ListView.builder(
+                key: const Key('ledger-older-list'),
+                itemCount: _extra.length,
+                itemBuilder: (context, index) {
+                  final entry = _extra[index];
+                  return _EntryTile(
+                    section: widget.section,
+                    accountId: widget.id,
+                    entry: entry,
+                    money: widget.money,
+                    showBalance: widget.showBalance,
+                    canWrite: widget.canWrite,
+                    onCancel: (meta) => widget.onCancel(entry, meta),
+                  );
+                },
+              ),
+            ),
+          ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final entry in _extra)
-          _EntryTile(
-            section: widget.section,
-            accountId: widget.id,
-            entry: entry,
-            money: widget.money,
-            showBalance: widget.showBalance,
-            canWrite: widget.canWrite,
-            onCancel: (meta) => widget.onCancel(entry, meta),
-          ),
+        KeyedSubtree(
+          key: Key('ledger-pages-$_pagesLoaded'),
+          child: const SizedBox.shrink(),
+        ),
+        KeyedSubtree(
+          key: Key('ledger-retained-${_extra.length}'),
+          child: const SizedBox.shrink(),
+        ),
+        ...older,
         if (_error != null)
           Padding(
             padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),

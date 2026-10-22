@@ -284,9 +284,12 @@ bool _matches(String path, String location) {
 }
 
 class IdentityBlock extends StatelessWidget {
-  const IdentityBlock({required this.summary, super.key});
+  const IdentityBlock({required this.summary, this.roleColor, super.key});
 
   final HomeSummary summary;
+
+  /// Sidebar on-color. The phone header leaves this null and uses onSurface.
+  final Color? roleColor;
 
   @override
   Widget build(BuildContext context) {
@@ -304,7 +307,13 @@ class IdentityBlock extends StatelessWidget {
           Text(AppStrings.signedInAs, style: theme.textTheme.labelLarge),
           const SizedBox(height: AppSpacing.xs),
           Text(summary.displayName, style: theme.textTheme.titleMedium),
-          Text(roleLabel(summary.role), key: HomeShell.roleKey),
+          Text(
+            roleLabel(summary.role),
+            key: HomeShell.roleKey,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: roleColor ?? theme.colorScheme.onSurface,
+            ),
+          ),
         ],
       ),
     );
@@ -368,7 +377,10 @@ class _Rail extends ConsumerWidget {
                       displayColor: palette.shine,
                     ),
                   ),
-                  child: IdentityBlock(summary: summary),
+                  child: IdentityBlock(
+                    summary: summary,
+                    roleColor: palette.shine,
+                  ),
                 ),
                 for (var i = 0; i < items.length; i++)
                   SoftTile(
@@ -448,7 +460,7 @@ class _NavList extends ConsumerWidget {
                     ),
                     child: Text(
                       AppStrings.brandWord,
-                      style: cairo(20, 800, color: palette.base),
+                      style: cairo(20, 800, color: palette.bright),
                     ),
                   ),
                   Padding(
@@ -468,7 +480,10 @@ class _NavList extends ConsumerWidget {
                           displayColor: palette.shine,
                         ),
                       ),
-                      child: IdentityBlock(summary: summary),
+                      child: IdentityBlock(
+                        summary: summary,
+                        roleColor: palette.shine,
+                      ),
                     ),
                   const SizedBox(height: AppSpacing.md),
                   for (var i = 0; i < items.length; i++)

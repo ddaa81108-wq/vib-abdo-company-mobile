@@ -24,6 +24,7 @@ Future<ApiLayer> pumpFakeApp(
   List<Override> overrides = const [],
   ConnectivityPort? connectivity,
   NotificationPermissionService? notificationsPermission,
+  String? fakeDataset,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -41,6 +42,7 @@ Future<ApiLayer> pumpFakeApp(
   final layer = ApiLayer.create(
     config: const ApiConfig(baseUrl: 'https://fake.invalid', useFakeApi: true),
     fakeLatency: Duration.zero,
+    fakeDataset: fakeDataset,
     cleanups: [pushGate.forget],
   );
   addTearDown(layer.dispose);
