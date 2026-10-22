@@ -57,10 +57,10 @@ void main() {
     final layer = _layer();
     await layer.session.login(username: 'admin.demo', password: 'x');
     final day = await layer.masraweya.getDay();
-    expect(day.previousValueUnits, 10000);
-    expect(day.purchasesUnits, 2000);
-    expect(day.workTotalUnits, 3050);
-    expect(day.remainingUnits, 8950);
+    expect(day.previousValueUnits?.units, 10000);
+    expect(day.purchasesUnits?.units, 2000);
+    expect(day.workTotalUnits?.units, 3050);
+    expect(day.remainingUnits?.units, 8950);
   });
 
   test('account summaries and payroll remaining are stored literals', () async {
@@ -68,32 +68,32 @@ void main() {
     final layer = _layer();
     await layer.session.login(username: 'admin.demo', password: 'x');
     final customers = await layer.accounts.list(AccountSection.customers);
-    expect(customers.summary.netBalanceUnits, 10635);
-    expect(customers.summary.totalDebtUnits, 10635);
+    expect(customers.summary.netBalanceUnits?.units, 10635);
+    expect(customers.summary.totalDebtUnits?.units, 10635);
     final companies = await layer.accounts.list(AccountSection.companies);
-    expect(companies.summary.netBalanceUnits, 1035);
+    expect(companies.summary.netBalanceUnits?.units, 1035);
     final libyan = await layer.accounts.list(AccountSection.libyanDeposits);
-    expect(libyan.summary.netBalanceUnits, 695);
+    expect(libyan.summary.netBalanceUnits?.units, 695);
     final egyptian = await layer.accounts.list(AccountSection.egyptianDeposits);
-    expect(egyptian.summary.netBalanceUnits, 23750);
+    expect(egyptian.summary.netBalanceUnits?.units, 23750);
 
     final payroll = await layer.collections.payroll();
     expect(
       payroll.employees
           .firstWhere((row) => row.userId == 'u_12')
-          .remainingUnits,
+          .remainingUnits?.units,
       1250,
     );
     expect(
       payroll.employees
           .firstWhere((row) => row.userId == 'u_20')
-          .remainingUnits,
+          .remainingUnits?.units,
       2580,
     );
 
     final purchases = await layer.purchases.list(PurchaseBook.alBayan);
-    expect(purchases.lifetimeTotals?.remainingUnits, 2553);
-    expect(purchases.page.items.single.entries.single.remainingUnits, 553);
+    expect(purchases.lifetimeTotals?.remainingUnits?.units, 2553);
+    expect(purchases.page.items.single.entries.single.remainingUnits?.units, 553);
   });
 
   testWidgets('P7-06 the zero card shows the server age label', (tester) async {

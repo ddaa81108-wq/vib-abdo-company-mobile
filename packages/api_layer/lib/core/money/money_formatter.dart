@@ -1,6 +1,8 @@
 import 'decimal_string.dart';
+import 'money_value.dart';
 
 export 'decimal_string.dart';
+export 'money_value.dart';
 
 /// THE ONLY place in the app that turns a server money value into text.
 ///
@@ -44,9 +46,20 @@ class MoneyFormatter {
   String format(int units, Currency currency) =>
       '${formatNumber(units, scale: unitScale)} ${currency.symbol}';
 
-  /// Server-provided `null` -> dash (never substitute 0).
-  String formatOrDash(int? units, Currency currency) =>
-      units == null ? '—' : format(units, currency);
+  /// Null -> dash. A valid integer is grouped. [MoneyValue.invalid], a `double`,
+  /// or any other non-integer becomes [MoneyValue.invalidLabel] and is not
+  /// formatted, rounded, or read as a number.
+  String formatOrDash(Object? value, Currency currency) {
+    if (value == null) return '—';
+    if (value is int) return format(value, currency);
+    if (value is MoneyValue) {
+      if (value.isInvalid) return MoneyValue.invalidLabel;
+      final units = value.units;
+      if (units == null) return '—';
+      return format(units, currency);
+    }
+    return MoneyValue.invalidLabel;
+  }
 
   /// Scaled integer (e.g. factorMicros with scale 6) to text — still string-only.
   String formatScaled(int scaledValue, int scale) =>

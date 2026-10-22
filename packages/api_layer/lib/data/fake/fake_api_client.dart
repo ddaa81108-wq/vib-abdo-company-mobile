@@ -162,6 +162,12 @@ class FakeApiClient implements ApiClient {
   /// Items returned for an account-list read that sends `cursor` (tests).
   List<Map<String, dynamic>> accountNextItems = const [];
 
+  /// One-shot raw `data` JSON for a GET, decoded with [PreciseJson].
+  ///
+  /// Fractions and oversized integers stay non-integers. The body is not logged.
+  /// Authenticated calls still require a session. Tests only.
+  final Map<String, String> scriptedGetJson = {};
+
   /// Overlay for `GET /api/treasury` totals (tests).
   ///
   /// A null value is encoded as JSON `null` and the key stays. Every other
@@ -931,6 +937,16 @@ class FakeApiClient implements ApiClient {
     }
     if (path == '/api/auth/csrf') return _ok({'csrfToken': 'fake-csrf'});
     if (options.authenticated) _ensureSession(options);
+    if (method == 'GET') {
+      final scripted = scriptedGetJson.remove(path);
+      if (scripted != null) {
+        return ApiResponse(
+          statusCode: 200,
+          data: PreciseJson.decode(scripted),
+          correlationId: 'fake',
+        );
+      }
+    }
     if (path == '/api/auth/logout') {
       final id = _presentedSessionId(options);
       if (id != null) _sessions.remove(id);

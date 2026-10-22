@@ -753,13 +753,9 @@ class _AccountCard extends StatelessWidget {
                       style: cairo(12, 500, color: accent),
                     ),
                   const SizedBox(height: AppSpacing.sm),
-                  _StartAlignedText(
+                  MoneyText(
                     money.formatOrDash(card.balanceUnits, card.currency),
-                    style: context.textExtras.amountLarge.copyWith(
-                      color: fg,
-                      fontFamily: 'JetBrainsMono',
-                    ),
-                    mono: true,
+                    style: context.textExtras.amountLarge.copyWith(color: fg),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
@@ -1233,7 +1229,7 @@ class _Metric extends StatelessWidget {
         children: [
           Text(label, style: valueStyle),
           const SizedBox(height: AppSpacing.xs),
-          _StartAlignedText(value, style: amountStyle, mono: true),
+          MoneyText(value, style: amountStyle),
         ],
       ),
     );
@@ -1263,7 +1259,9 @@ class _TickerLine extends StatelessWidget {
     final currency = card?.currency ?? debt.currency;
     final units = card?.balanceUnits ?? debt.balanceUnits;
     final amount = currency == null
-        ? AppStrings.dash
+        ? (units != null && units.isInvalid
+              ? MoneyValue.invalidLabel
+              : AppStrings.dash)
         : money.formatOrDash(units, currency);
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -1287,11 +1285,7 @@ class _TickerLine extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
-            _StartAlignedText(
-              amount,
-              style: context.textExtras.amount,
-              mono: true,
-            ),
+            MoneyText(amount, style: context.textExtras.amount),
             if (age != null) ...[
               const SizedBox(height: AppSpacing.xs),
               Text(age, key: Key('ticker-age-${debt.id}')),

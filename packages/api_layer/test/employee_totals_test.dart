@@ -36,15 +36,15 @@ void main() {
     final row = report.items.single;
     expect(row.employeeId, 'u_12');
     expect(row.employeeName, 'موظف استلام تجريبي');
-    expect(row.collectedUnits, 0);
-    expect(row.pendingUnits, 100);
+    expect(row.collectedUnits?.units, 0);
+    expect(row.pendingUnits?.units, 100);
     expect(row.approvedCount, 0);
     expect(row.rejectedCount, 0);
     expect(row.pendingCount, 1);
-    expect(row.cashOutstandingUnits, 250);
+    expect(row.cashOutstandingUnits?.units, 250);
     expect(row.currency, Currency.lyd);
-    expect(report.totals.collectedUnits, 0);
-    expect(report.totals.pendingUnits, 100);
+    expect(report.totals.collectedUnits?.units, 0);
+    expect(report.totals.pendingUnits?.units, 100);
   });
 
   test(
@@ -60,7 +60,7 @@ void main() {
       expect(inside.from, '2026-10-01');
       expect(inside.to, '2026-10-18');
       expect(inside.items.single.employeeId, 'u_12');
-      expect(inside.totals.pendingUnits, 100);
+      expect(inside.totals.pendingUnits?.units, 100);
 
       final outside = await api.employeeTotals.fetch(
         from: '2026-10-19',
@@ -69,8 +69,8 @@ void main() {
       expect(outside.from, '2026-10-19');
       expect(outside.to, '2026-10-20');
       expect(outside.items, isEmpty);
-      expect(outside.totals.collectedUnits, 0);
-      expect(outside.totals.pendingUnits, 0);
+      expect(outside.totals.collectedUnits?.units, 0);
+      expect(outside.totals.pendingUnits?.units, 0);
     },
   );
 
@@ -109,7 +109,7 @@ void main() {
       final other = _rowForUser(report, byId, FakeFixtures.otherEmployeeId);
       expect(own.employeeName, 'موظف استلام تجريبي');
       expect(own.employeeId, isNull);
-      expect(own.collectedUnits, 0);
+      expect(own.collectedUnits?.units, 0);
       expect(own.pendingUnits, isNull);
       expect(own.approvedCount, 0);
       expect(own.pendingCount, 1);
@@ -117,7 +117,7 @@ void main() {
       expect(own.currency, Currency.lyd);
       expect(other.employeeName, 'موظف آخر تجريبي');
       expect(other.employeeId, isNull);
-      expect(other.collectedUnits, 900);
+      expect(other.collectedUnits?.units, 900);
       expect(other.approvedCount, 4);
       expect(other.pendingCount, 2);
       expect(other.pendingUnits, isNull);
@@ -156,7 +156,7 @@ void main() {
         expect(row.employeeId, isNull);
         expect(row.employeeId, isNot(0));
         expect(row.pendingUnits, isNull);
-        expect(row.pendingUnits, isNot(0));
+        expect(row.pendingUnits?.units, isNot(0));
         expect(row.cashOutstandingUnits, isNull);
         expect(money.formatOrDash(row.pendingUnits, row.currency), '—');
       }
@@ -168,8 +168,8 @@ void main() {
 
       // A zero the collections row actually sends stays zero. The other
       // employee's stored collected amount stays that amount.
-      expect(own.collectedUnits, 0);
-      expect(other.collectedUnits, 900);
+      expect(own.collectedUnits?.units, 0);
+      expect(other.collectedUnits?.units, 900);
       expect(money.formatOrDash(own.collectedUnits, own.currency), isNot('—'));
       expect(
         money.formatOrDash(other.collectedUnits, other.currency),
@@ -209,12 +209,12 @@ void main() {
       expect(again.version, 4);
       expect(again.currency, Currency.lyd);
       expect(again.items.single.employeeName, 'موظف استلام تجريبي');
-      expect(again.items.single.collectedUnits, 5);
-      expect(again.items.single.pendingUnits, 7);
-      expect(again.items.single.cashOutstandingUnits, 9);
+      expect(again.items.single.collectedUnits?.units, 5);
+      expect(again.items.single.pendingUnits?.units, 7);
+      expect(again.items.single.cashOutstandingUnits?.units, 9);
       expect(again.items.single.currency, Currency.lyd);
-      expect(again.totals.collectedUnits, 40);
-      expect(again.totals.pendingUnits, 2);
+      expect(again.totals.collectedUnits?.units, 40);
+      expect(again.totals.pendingUnits?.units, 2);
     },
   );
 
@@ -249,35 +249,32 @@ void main() {
       },
     });
     expect(overview.items.single.employeeName, 'موظف استلام تجريبي');
-    expect(overview.items.single.cashOutstandingUnits, 250);
+    expect(overview.items.single.cashOutstandingUnits?.units, 250);
     expect(overview.totals.collectedUnits, isNull);
     expect(overview.totals.pendingUnits, isNull);
   });
 
-  test('non-integer money is INVALID_SERVER_RESPONSE', () {
-    final fractional = (PreciseJson.decode('{"collectedUnits":1.5}') as Map)
-        .cast<String, dynamic>();
-    expect(
-      () => EmployeeTotalsItemDto.fromJson(fractional),
-      throwsA(
-        isA<InvalidServerResponseException>().having(
-          (error) => error.code,
-          'code',
-          'INVALID_SERVER_RESPONSE',
-        ),
-      ),
-    );
+  test('non-integer money marks the field and keeps the row', () {
+    final fractional = (PreciseJson.decode(
+      '{"employeeId":"u_12","employeeName":"موظف","collectedUnits":1.5,"pendingUnits":4}',
+    ) as Map).cast<String, dynamic>();
+    final row = EmployeeTotalsItemDto.fromJson(fractional);
+    expect(row.employeeName, 'موظف');
+    expect(row.collectedUnits!.isInvalid, isTrue);
+    expect(row.collectedUnits?.units, isNot(1));
+    expect(row.collectedUnits?.units, isNot(2));
+    expect(row.pendingUnits?.units, 4);
     for (final bad in <Object?>['250', 10.0, true]) {
-      expect(
-        () => EmployeeTotalsItemDto.fromJson({'cashOutstandingUnits': bad}),
-        throwsA(isA<InvalidServerResponseException>()),
-        reason: '$bad',
-      );
-      expect(
-        () => EmployeeTotalsSummaryDto.fromJson({'pendingUnits': bad}),
-        throwsA(isA<InvalidServerResponseException>()),
-        reason: 'totals $bad',
-      );
+      final item = EmployeeTotalsItemDto.fromJson({
+        'employeeId': 'u_12',
+        'cashOutstandingUnits': bad,
+        'collectedUnits': 3,
+      });
+      expect(item.cashOutstandingUnits!.isInvalid, isTrue, reason: '$bad');
+      expect(item.collectedUnits?.units, 3, reason: '$bad');
+      final totals = EmployeeTotalsSummaryDto.fromJson({'pendingUnits': bad});
+      expect(totals.pendingUnits!.isInvalid, isTrue, reason: 'totals $bad');
+      expect(totals.pendingUnits?.units, isNot(0), reason: 'totals $bad');
     }
   });
 }

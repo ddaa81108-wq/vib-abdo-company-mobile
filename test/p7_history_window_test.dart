@@ -60,7 +60,7 @@ AccountCardDto _card(String id) {
   return AccountCardDto(
     id: id,
     name: id,
-    balanceUnits: 1,
+    balanceUnits: MoneyValue.known(1),
     currency: Currency.lyd,
   );
 }

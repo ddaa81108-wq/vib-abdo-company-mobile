@@ -142,8 +142,8 @@ void main() {
     final card = await tester.runAsync(
       () => layer.accounts.get(AccountSection.customers, 'c_55'),
     );
-    final shown = layer.money.format(card!.balanceUnits!, Currency.lyd);
-    expect(card.balanceUnits, 0);
+    final shown = layer.money.format(card!.balanceUnits!.units!, Currency.lyd);
+    expect(card.balanceUnits?.units, 0);
     expect(_debtAmount('320 د.ل'), findsNothing);
     expect(_debtAmount(shown), findsOneWidget);
   });
@@ -171,8 +171,8 @@ void main() {
     final card = await tester.runAsync(
       () => layer.accounts.get(AccountSection.customers, 'c_55'),
     );
-    final shown = layer.money.format(card!.balanceUnits!, Currency.lyd);
-    expect(card.balanceUnits, isNot(320));
+    final shown = layer.money.format(card!.balanceUnits!.units!, Currency.lyd);
+    expect(card.balanceUnits?.units, isNot(320));
     expect(_debtAmount(shown), findsOneWidget);
     expect(_debtAmount('320 د.ل'), findsNothing);
   });
@@ -195,8 +195,8 @@ void main() {
     final card = await tester.runAsync(
       () => layer.accounts.get(AccountSection.customers, 'c_55'),
     );
-    final shown = layer.money.format(card!.balanceUnits!, Currency.lyd);
-    expect(card.balanceUnits, isNot(320));
+    final shown = layer.money.format(card!.balanceUnits!.units!, Currency.lyd);
+    expect(card.balanceUnits?.units, isNot(320));
     expect(_debtAmount(shown), findsOneWidget);
     expect(_debtAmount('320 د.ل'), findsNothing);
   });

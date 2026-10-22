@@ -78,8 +78,8 @@ void main() {
         final money = layer.money;
         expect(summary.egyptianRate?.value, '9.5');
         expect(summary.rateMissing, isFalse);
-        expect(summary.egyptianSourceUnits, 95000);
-        expect(summary.egyptianConvertedUnits, 11111);
+        expect(summary.egyptianSourceUnits?.asInt, 95000);
+        expect(summary.egyptianConvertedUnits?.asInt, 11111);
 
         final wire = fake.lastTreasuryJson;
         expect(wire, isNotNull);
@@ -87,9 +87,12 @@ void main() {
         expect(wire, contains('"egyptianConvertedUnits":11111'));
         expect(wire, isNot(contains('"egyptianConvertedUnits":10000')));
 
-        final source = money.format(summary.egyptianSourceUnits!, Currency.egp);
+        final source = money.format(
+          summary.egyptianSourceUnits!.asInt!,
+          Currency.egp,
+        );
         final converted = money.format(
-          summary.egyptianConvertedUnits!,
+          summary.egyptianConvertedUnits!.asInt!,
           Currency.lyd,
         );
         final rate = money.formatDecimal(summary.egyptianRate!);
@@ -145,19 +148,19 @@ Future<void> _runMissingRate(
     final summary = _loadedSummary(tester);
     expect(summary.egyptianRate, isNull);
     expect(summary.rateMissing, isTrue);
-    expect(summary.egyptianSourceUnits, 95000);
-    expect(summary.egyptianConvertedUnits, 10000);
+    expect(summary.egyptianSourceUnits?.asInt, 95000);
+    expect(summary.egyptianConvertedUnits?.asInt, 10000);
 
     final wire = fake.lastTreasuryJson;
     expect(wire, isNotNull);
     expectWire(wire!);
 
     final source = layer.money.format(
-      summary.egyptianSourceUnits!,
+      summary.egyptianSourceUnits!.asInt!,
       Currency.egp,
     );
     final converted = layer.money.format(
-      summary.egyptianConvertedUnits!,
+      summary.egyptianConvertedUnits!.asInt!,
       Currency.lyd,
     );
     expect(source, '95,000 ج.م');

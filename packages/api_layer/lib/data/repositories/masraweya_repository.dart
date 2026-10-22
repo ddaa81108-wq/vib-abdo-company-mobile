@@ -1,6 +1,7 @@
 import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../core/network/idempotency.dart';
+import '../../core/network/logging_interceptor.dart';
 import '../models/masraweya_models.dart';
 
 abstract interface class MasraweyaRepository {
@@ -15,15 +16,18 @@ class RemoteMasraweyaRepository implements MasraweyaRepository {
   final ApiClient _api;
 
   @override
-  Future<MasraweyaDayDto> getDay({String? date}) async =>
-      MasraweyaDayDto.fromData((await _api
-              .get(ApiEndpoints.masraweyaDay, query: {'date': date}))
-          .data);
+  Future<MasraweyaDayDto> getDay({String? date}) async {
+    const path = ApiEndpoints.masraweyaDay;
+    final data = (await _api.get(path, query: {'date': date})).data;
+    return runWithMoneyEndpoint(path, () => MasraweyaDayDto.fromData(data));
+  }
 
   @override
   Future<MasraweyaDayDto> saveDay(
-          SaveMasraweyaDayRequest r, MutationMeta meta) async =>
-      MasraweyaDayDto.fromData((await _api.put(ApiEndpoints.masraweyaDay,
-              body: {...meta.toBody(), ...r.toJson()}))
-          .data);
+      SaveMasraweyaDayRequest r, MutationMeta meta) async {
+    const path = ApiEndpoints.masraweyaDay;
+    final data = (await _api.put(path, body: {...meta.toBody(), ...r.toJson()}))
+        .data;
+    return runWithMoneyEndpoint(path, () => MasraweyaDayDto.fromData(data));
+  }
 }

@@ -16,13 +16,13 @@ class TreasurySummaryDto {
     this.rateMissing = false,
     this.activeCashTone,
   });
-  final int? receivablesUnits; // LYD — ديون لنا
-  final int? liabilitiesUnits; // LYD — ديون علينا
-  final int? activeCashUnits; // LYD — الفلوس النشطة
-  final int? egyptianSourceUnits; // EGP — source amount
+  final MoneyValue? receivablesUnits; // LYD — ديون لنا
+  final MoneyValue? liabilitiesUnits; // LYD — ديون علينا
+  final MoneyValue? activeCashUnits; // LYD — الفلوس النشطة
+  final MoneyValue? egyptianSourceUnits; // EGP — source amount
   final DecimalString? egyptianRate; // decimal TEXT, display only
-  final int? egyptianConvertedUnits; // LYD — converted BY THE SERVER
-  final int? netUnits; // LYD — صافي الخزينة (server)
+  final MoneyValue? egyptianConvertedUnits; // LYD — converted BY THE SERVER
+  final MoneyValue? netUnits; // LYD — صافي الخزينة (server)
   final int? version; // -> expectedVersion for cash entries
   final bool rateMissing; // "يلزم سعر تحويل معتمد"
 
@@ -34,16 +34,21 @@ class TreasurySummaryDto {
   static const Currency egyptianSourceCurrency = Currency.egp;
 
   factory TreasurySummaryDto.fromData(Object? data) {
+    requireJsonObject(data, 'treasury');
     final d = asJson(data);
-    final t = d['totals'] is Map ? asJson(d['totals']) : d;
+    final totalsRaw = d['totals'];
+    requireJsonObject(totalsRaw, 'totals');
+    final t = totalsRaw is Map ? asJson(totalsRaw) : d;
+    MoneyValue? money(String key) =>
+        unitsOrNull(t[key], fieldPath: 'totals.$key');
     return TreasurySummaryDto(
-      receivablesUnits: unitsOrNull(t['receivablesUnits']),
-      liabilitiesUnits: unitsOrNull(t['liabilitiesUnits']),
-      activeCashUnits: unitsOrNull(t['activeCashUnits']),
-      egyptianSourceUnits: unitsOrNull(t['egyptianSourceUnits']),
+      receivablesUnits: money('receivablesUnits'),
+      liabilitiesUnits: money('liabilitiesUnits'),
+      activeCashUnits: money('activeCashUnits'),
+      egyptianSourceUnits: money('egyptianSourceUnits'),
       egyptianRate: decimalOrNull(t['egyptianRate']),
-      egyptianConvertedUnits: unitsOrNull(t['egyptianConvertedUnits']),
-      netUnits: unitsOrNull(t['netUnits']),
+      egyptianConvertedUnits: money('egyptianConvertedUnits'),
+      netUnits: money('netUnits'),
       version: intOrNull(d['version'] ?? t['version']),
       rateMissing: t['egyptianRate'] == null,
       activeCashTone: SummaryTone.fromServer(
@@ -63,17 +68,25 @@ class CashEntryDto {
       this.createdByName});
   final String id;
   final String direction; // in | out
-  final int? amountUnits; // LYD
+  final MoneyValue? amountUnits; // LYD
   final String? description;
-  final int? balanceAfterUnits; // from server
+  final MoneyValue? balanceAfterUnits; // from server
   final DateTime? createdAt;
   final String? createdByName;
   factory CashEntryDto.fromJson(Json j) => CashEntryDto(
         id: str(j['id']),
         direction: str(j['direction']),
-        amountUnits: unitsOrNull(j['amountUnits']),
+        amountUnits: unitsOrNull(
+          j['amountUnits'],
+          fieldPath: 'amountUnits',
+          rowId: strOrNull(j['id']),
+        ),
         description: strOrNull(j['description']),
-        balanceAfterUnits: unitsOrNull(j['balanceAfterUnits']),
+        balanceAfterUnits: unitsOrNull(
+          j['balanceAfterUnits'],
+          fieldPath: 'balanceAfterUnits',
+          rowId: strOrNull(j['id']),
+        ),
         createdAt: dateOrNull(j['createdAt']),
         createdByName: strOrNull(j['createdByName'] ?? j['actorName']),
       );

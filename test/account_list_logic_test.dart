@@ -349,7 +349,7 @@ AccountCardDto _card({
   return AccountCardDto(
     id: id,
     name: id,
-    balanceUnits: balanceUnits,
+    balanceUnits: balanceUnits == null ? null : MoneyValue.known(balanceUnits),
     currency: Currency.lyd,
     version: 4,
     systemManaged: systemManaged,

@@ -63,7 +63,7 @@ void main() {
     expect(page.page.items.single.status, 'finalized');
     expect(page.page.items.single.version, 4);
     expect(page.page.items.single.entries.single.id, 'pe_1');
-    expect(page.page.items.single.entries.single.paidUnits, 500);
+    expect(page.page.items.single.entries.single.paidUnits?.units, 500);
     expect(tester.takeException(), isNull);
   });
 

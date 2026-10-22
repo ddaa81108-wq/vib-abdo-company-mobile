@@ -34,11 +34,12 @@ class RemotePurchasesRepository implements PurchasesRepository {
 
   @override
   Future<PurchasesBookPage> list(PurchaseBook book,
-          {String? before, int limit = 100}) async =>
-      PurchasesBookPage.fromData((await _api.get(
-              ApiEndpoints.purchases(book.path),
-              query: {'limit': limit, 'before': before}))
-          .data);
+      {String? before, int limit = 100}) async {
+    final path = ApiEndpoints.purchases(book.path);
+    final data =
+        (await _api.get(path, query: {'limit': limit, 'before': before})).data;
+    return runWithMoneyEndpoint(path, () => PurchasesBookPage.fromData(data));
+  }
 
   @override
   Future<MutationAck> create(

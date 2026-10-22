@@ -138,11 +138,11 @@ void main() {
     expect(find.byKey(const Key('financial-ledger')), findsOneWidget);
     expect(find.text(AppStrings.emptyLedger), findsWidgets);
     expect(
-      tester.widget<Text>(find.byKey(const Key('ledger-total-LYD'))).data,
+      tester.widget<MoneyText>(find.byKey(const Key('ledger-total-LYD'))).text,
       '0 د.ل',
     );
     expect(
-      tester.widget<Text>(find.byKey(const Key('ledger-total-EGP'))).data,
+      tester.widget<MoneyText>(find.byKey(const Key('ledger-total-EGP'))).text,
       '0 ج.م',
     );
   });

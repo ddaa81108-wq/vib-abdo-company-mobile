@@ -154,7 +154,7 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
         filter: 'pinned',
       );
       expect(page.page.items.single.name, 'زبون تجريبي');
-      expect(page.page.items.single.balanceUnits, 1500);
+      expect(page.page.items.single.balanceUnits?.units, 1500);
       final call = expectCall(h, 'GET', ApiEndpoints.accounts('customers'));
       expect('${call.query['q']}', 'زبون');
       expect('${call.query['filter']}', 'pinned');
@@ -185,13 +185,13 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
       expect(suggestions.single.name, 'اقتراح تجريبي');
       expectCall(h, 'GET', ApiEndpoints.accountSuggestions('customers'));
       final card = await h.layer.accounts.get(AccountSection.customers, 'c1');
-      expect(card.balanceUnits, 1500);
+      expect(card.balanceUnits?.units, 1500);
       expectCall(h, 'GET', ApiEndpoints.account('customers', 'c1'));
       final ledger = await h.layer.accounts.ledger(
         AccountSection.customers,
         'c1',
       );
-      expect(ledger.page.items.single.amountUnits, 10);
+      expect(ledger.page.items.single.amountUnits?.units, 10);
       expectCall(h, 'GET', ApiEndpoints.accountLedger('customers', 'c1'));
     },
   ),
@@ -313,7 +313,7 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
     (h) async {
       final meta = MutationMeta(requestId: 'req-col', expectedVersion: 3);
       final overview = await h.layer.collections.overview();
-      expect(overview.collectedUnits, 5);
+      expect(overview.collectedUnits?.units, 5);
       expectCall(h, 'GET', ApiEndpoints.collections);
       final people = await h.layer.collections.assignees();
       expect(people.single['id'], 'u_12');
@@ -377,7 +377,7 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
     (h) async {
       final meta = MutationMeta(requestId: 'req-pay', expectedVersion: 1);
       final payroll = await h.layer.collections.payroll();
-      expect(payroll.employees.single.baseSalaryUnits, 10);
+      expect(payroll.employees.single.baseSalaryUnits?.units, 10);
       expectCall(h, 'GET', ApiEndpoints.payroll);
       await h.layer.collections.addPayrollEntry(
         employeeUserId: 'u_12',
@@ -398,13 +398,13 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
     (h) async {
       final day = await h.layer.masraweya.getDay(date: '2026-10-21');
       expect(day.businessDate, '2026-10-21');
-      expect(day.workTotalUnits, 3);
+      expect(day.workTotalUnits?.units, 3);
       expectCall(h, 'GET', ApiEndpoints.masraweyaDay);
       final saved = await h.layer.masraweya.saveDay(
         const SaveMasraweyaDayRequest(businessDate: '2026-10-21'),
         MutationMeta(requestId: 'req-day', expectedVersion: 1),
       );
-      expect(saved.remainingUnits, 1);
+      expect(saved.remainingUnits?.units, 1);
       final call = expectCall(h, 'PUT', ApiEndpoints.masraweyaDay);
       expect(call.jsonBody?['requestId'], 'req-day');
       expect(call.jsonBody?['expectedVersion'], 1);
@@ -457,10 +457,10 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
     'P7 contract treasury, reports, and statement PDF',
     (h) async {
       final summary = await h.layer.treasury.summary();
-      expect(summary.receivablesUnits, 1);
+      expect(summary.receivablesUnits?.units, 1);
       expectCall(h, 'GET', ApiEndpoints.treasury);
       final cash = await h.layer.treasury.cashLedger();
-      expect(cash.items.single.amountUnits, 2);
+      expect(cash.items.single.amountUnits?.units, 2);
       expectCall(h, 'GET', ApiEndpoints.treasuryCashLedger);
       await h.layer.treasury.addCashEntry(
         const CashEntryRequest(
@@ -477,7 +477,7 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
       expect(reports.formula, 'server-formula');
       expectCall(h, 'GET', ApiEndpoints.reports);
       final ledger = await h.layer.reports.financialLedger();
-      expect(ledger.pageTotals['LYD'], 1);
+      expect(ledger.pageTotals['LYD']?.units, 1);
       expectCall(h, 'GET', ApiEndpoints.financialLedger);
       final pdf = await h.layer.reports.statementPdf(section: 'customers');
       expect(pdf.filename, 'statement.pdf');

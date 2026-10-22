@@ -81,14 +81,14 @@ class PurchaseEntryDto {
   final String kind; // entry | standalone_adjustment
   final String? itemCode;
   final String? itemLabel;
-  final int? egpValueUnits; // EGP
+  final MoneyValue? egpValueUnits; // EGP
   final CalculationMode? calculationMode;
   final DecimalString?
       exchangeRate; // decimal TEXT; display via formatDecimal only
-  final int? resultUnits; // LYD, server-computed
-  final int? paidUnits; // LYD
-  final int? remainingUnits; // LYD, server-computed
-  final int? vodafoneConsumedUnits;
+  final MoneyValue? resultUnits; // LYD, server-computed
+  final MoneyValue? paidUnits; // LYD
+  final MoneyValue? remainingUnits; // LYD, server-computed
+  final MoneyValue? vodafoneConsumedUnits;
   final int? version;
 
   factory PurchaseEntryDto.fromJson(Json j) => PurchaseEntryDto(
@@ -96,13 +96,33 @@ class PurchaseEntryDto {
         kind: str(j['kind'] ?? j['entryType'], 'entry'),
         itemCode: strOrNull(j['itemCode']),
         itemLabel: strOrNull(j['itemLabel']),
-        egpValueUnits: unitsOrNull(j['egpValueUnits']),
+        egpValueUnits: unitsOrNull(
+          j['egpValueUnits'],
+          fieldPath: 'egpValueUnits',
+          rowId: strOrNull(j['id']),
+        ),
         calculationMode: CalculationMode.fromName(j['calculationMode']),
         exchangeRate: decimalOrNull(j['exchangeRate']),
-        resultUnits: unitsOrNull(j['resultUnits']),
-        paidUnits: unitsOrNull(j['paidUnits']),
-        remainingUnits: unitsOrNull(j['remainingUnits']),
-        vodafoneConsumedUnits: unitsOrNull(j['vodafoneConsumedUnits']),
+        resultUnits: unitsOrNull(
+          j['resultUnits'],
+          fieldPath: 'resultUnits',
+          rowId: strOrNull(j['id']),
+        ),
+        paidUnits: unitsOrNull(
+          j['paidUnits'],
+          fieldPath: 'paidUnits',
+          rowId: strOrNull(j['id']),
+        ),
+        remainingUnits: unitsOrNull(
+          j['remainingUnits'],
+          fieldPath: 'remainingUnits',
+          rowId: strOrNull(j['id']),
+        ),
+        vodafoneConsumedUnits: unitsOrNull(
+          j['vodafoneConsumedUnits'],
+          fieldPath: 'vodafoneConsumedUnits',
+          rowId: strOrNull(j['id']),
+        ),
         version: intOrNull(j['version']),
       );
 }
@@ -125,16 +145,24 @@ class PurchaseDayDto {
   final int? version; // -> expectedDayVersion
   final String? status; // draft | finalized | correction (🔶)
   final List<PurchaseEntryDto> entries;
-  final int? previousDebtUnits;
-  final int? previousVodafoneUnits;
-  final int? todayResultUnits;
-  final int? todayPaidUnits;
-  final int? totalDebtUnits;
-  final int? vodafoneRemainingUnits;
-  final int? dayClosingDebtUnits;
+  final MoneyValue? previousDebtUnits;
+  final MoneyValue? previousVodafoneUnits;
+  final MoneyValue? todayResultUnits;
+  final MoneyValue? todayPaidUnits;
+  final MoneyValue? totalDebtUnits;
+  final MoneyValue? vodafoneRemainingUnits;
+  final MoneyValue? dayClosingDebtUnits;
 
   factory PurchaseDayDto.fromJson(Json j) {
-    final t = j['totals'] is Map ? asJson(j['totals']) : j;
+    final totalsRaw = j['totals'];
+    requireJsonObject(totalsRaw, 'day.totals');
+    final t = totalsRaw is Map ? asJson(totalsRaw) : j;
+    final rowId = strOrNull(j['day'] ?? j['dayNumber'] ?? j['id']);
+    MoneyValue? money(String key) => unitsOrNull(
+          t[key],
+          fieldPath: 'totals.$key',
+          rowId: rowId,
+        );
     return PurchaseDayDto(
       day: str(j['day'] ?? j['dayNumber'] ?? j['id']),
       version: intOrNull(j['version'] ?? j['dayVersion']),
@@ -142,13 +170,13 @@ class PurchaseDayDto {
       entries: asJsonList(j['entries'])
           .map(PurchaseEntryDto.fromJson)
           .toList(growable: false),
-      previousDebtUnits: unitsOrNull(t['previousDebtUnits']),
-      previousVodafoneUnits: unitsOrNull(t['previousVodafoneUnits']),
-      todayResultUnits: unitsOrNull(t['todayResultUnits']),
-      todayPaidUnits: unitsOrNull(t['todayPaidUnits']),
-      totalDebtUnits: unitsOrNull(t['totalDebtUnits']),
-      vodafoneRemainingUnits: unitsOrNull(t['vodafoneRemainingUnits']),
-      dayClosingDebtUnits: unitsOrNull(t['dayClosingDebtUnits']),
+      previousDebtUnits: money('previousDebtUnits'),
+      previousVodafoneUnits: money('previousVodafoneUnits'),
+      todayResultUnits: money('todayResultUnits'),
+      todayPaidUnits: money('todayPaidUnits'),
+      totalDebtUnits: money('totalDebtUnits'),
+      vodafoneRemainingUnits: money('vodafoneRemainingUnits'),
+      dayClosingDebtUnits: money('dayClosingDebtUnits'),
     );
   }
 }
@@ -170,6 +198,7 @@ class PurchasesBookPage {
   final PurchaseOpeningDto? opening;
 
   factory PurchasesBookPage.fromData(Object? data) {
+    requireJsonObject(data is List ? null : data, 'purchases');
     final p = Paged.fromData(data, PurchaseDayDto.fromJson, itemsKey: 'days');
     return PurchasesBookPage(
       page: p,
@@ -190,8 +219,8 @@ class PurchaseOpeningDto {
     this.version,
   });
 
-  final int? previousDebtUnits;
-  final int? previousVodafoneUnits;
+  final MoneyValue? previousDebtUnits;
+  final MoneyValue? previousVodafoneUnits;
   final int? version;
 
   static PurchaseOpeningDto? fromJsonOrNull(Object? v) {
@@ -203,8 +232,14 @@ class PurchaseOpeningDto {
     }
     final j = asJson(v);
     return PurchaseOpeningDto(
-      previousDebtUnits: unitsOrNull(j['previousDebtUnits']),
-      previousVodafoneUnits: unitsOrNull(j['previousVodafoneUnits']),
+      previousDebtUnits: unitsOrNull(
+        j['previousDebtUnits'],
+        fieldPath: 'opening.previousDebtUnits',
+      ),
+      previousVodafoneUnits: unitsOrNull(
+        j['previousVodafoneUnits'],
+        fieldPath: 'opening.previousVodafoneUnits',
+      ),
       version: intOrNull(j['version'] ?? j['dayVersion']),
     );
   }
@@ -219,8 +254,8 @@ class ResolvedPurchaseOpening {
     this.version,
   });
 
-  final int? previousDebtUnits;
-  final int? previousVodafoneUnits;
+  final MoneyValue? previousDebtUnits;
+  final MoneyValue? previousVodafoneUnits;
   final int? version;
 
   factory ResolvedPurchaseOpening.fromPage(PurchasesBookPage page) {
@@ -235,8 +270,11 @@ class ResolvedPurchaseOpening {
   }
 }
 
-/// Register totals since the beginning (per API contract). Every value parsed with strict unitsOrNull:
-/// a malformed value fails the WHOLE response (INVALID_SERVER_RESPONSE). Key names pending server confirmation.
+/// Register totals since the beginning. Key names pending server confirmation.
+///
+/// A non-integer money field is [MoneyValue.invalid] for that field. A
+/// `lifetimeTotals` value that is present but is not a JSON object still
+/// fails the whole response: there is no field left to mark.
 class PurchasesLifetimeTotalsDto {
   const PurchasesLifetimeTotalsDto({
     this.resultUnits,
@@ -245,10 +283,10 @@ class PurchasesLifetimeTotalsDto {
     this.all = const {},
   });
 
-  final int? resultUnits;
-  final int? paidUnits;
-  final int? remainingUnits; // LYD
-  final Map<String, int> all;
+  final MoneyValue? resultUnits;
+  final MoneyValue? paidUnits;
+  final MoneyValue? remainingUnits; // LYD
+  final Map<String, MoneyValue> all;
 
   static PurchasesLifetimeTotalsDto? fromJsonOrNull(Object? v) {
     if (v == null) return null;
@@ -257,9 +295,9 @@ class PurchasesLifetimeTotalsDto {
         message: 'استجابة الخادم غير صالحة (إجماليات السجل)',
       );
     }
-    final all = <String, int>{};
+    final all = <String, MoneyValue>{};
     v.forEach((k, value) {
-      final u = unitsOrNull(value);
+      final u = unitsOrNull(value, fieldPath: 'lifetimeTotals.$k');
       if (u != null) all['$k'] = u;
     });
     return PurchasesLifetimeTotalsDto(

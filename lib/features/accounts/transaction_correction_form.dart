@@ -110,7 +110,7 @@ class TransactionCorrectionForm extends ConsumerStatefulWidget {
 class _TransactionCorrectionFormState
     extends ConsumerState<TransactionCorrectionForm> {
   late final TextEditingController _amount = TextEditingController(
-    text: widget.entry.inputValue?.toString() ?? '',
+    text: _amountText(widget.entry.inputValue),
   );
   final _factor = TextEditingController();
   final _note = TextEditingController();
@@ -143,15 +143,22 @@ class _TransactionCorrectionFormState
 
   void _changed() => setState(() {});
 
+  /// Digits for the amount field. Invalid and absent stay empty, never `0`.
+  static String _amountText(MoneyValue? value) {
+    final units = value?.asInt;
+    if (units == null) return '';
+    return '$units';
+  }
+
   /// Ungrouped rate text for multiply/divide. Empty when the line has no rate.
   static String _factorText(LedgerEntryDto entry) {
     final mode = entry.calculationMode;
     final scaled = entry.factorMicros;
-    if (scaled == null) return '';
+    if (scaled == null || !scaled.isValid || scaled.units == null) return '';
     if (mode != CalculationMode.multiply && mode != CalculationMode.divide) {
       return '';
     }
-    return const MoneyFormatter().plainScaled(scaled, 6);
+    return const MoneyFormatter().plainScaled(scaled.units!, 6);
   }
 
   @override
@@ -184,9 +191,11 @@ class _TransactionCorrectionFormState
         ),
         LtrText(widget.entry.id),
         if (widget.entry.factorMicros != null)
-          Text(
-            '${AppStrings.factor} ${money.formatScaled(widget.entry.factorMicros!, 6)}',
-          ),
+          widget.entry.factorMicros!.isValid
+              ? Text(
+                  '${AppStrings.factor} ${money.formatScaled(widget.entry.factorMicros!.units!, 6)}',
+                )
+              : const MoneyText(MoneyValue.invalidLabel),
         const SizedBox(height: AppSpacing.md),
         DropdownButton<String>(
           key: const Key('correction-type'),

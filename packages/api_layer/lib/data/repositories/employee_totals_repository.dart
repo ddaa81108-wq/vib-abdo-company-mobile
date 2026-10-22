@@ -1,6 +1,7 @@
 import '../../core/config/api_config.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
+import '../../core/network/logging_interceptor.dart';
 import '../../core/permissions/permission_service.dart';
 import '../models/employee_totals_models.dart';
 
@@ -45,13 +46,19 @@ class RemoteEmployeeTotalsRepository implements EmployeeTotalsRepository {
     if (_permissions.canViewEmployeeTotals &&
         _source == EmployeeTotalsSource.collections) {
       final data = (await _api.get(ApiEndpoints.collections)).data;
-      return EmployeeTotalsDto.fromCollectionsOverview(data);
+      return runWithMoneyEndpoint(
+        ApiEndpoints.collections,
+        () => EmployeeTotalsDto.fromCollectionsOverview(data),
+      );
     }
     final data = (await _api.get(
       ApiEndpoints.employeeTotals,
       query: _range(from, to),
     )).data;
-    return EmployeeTotalsDto.fromStandalone(data);
+    return runWithMoneyEndpoint(
+      ApiEndpoints.employeeTotals,
+      () => EmployeeTotalsDto.fromStandalone(data),
+    );
   }
 
   /// Standalone query only. `employeeId` is intentionally absent.

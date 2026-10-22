@@ -33,7 +33,7 @@ void main() {
       addTearDown(container.dispose);
 
       final before = await container.read(masraweyaProvider.future);
-      expect(before.previousValueUnits, 10000);
+      expect(before.previousValueUnits?.units, 10000);
       expect(before.version, 2);
 
       final saved = await container
@@ -42,7 +42,7 @@ void main() {
             SaveMasraweyaDayRequest(
               businessDate: before.businessDate,
               previousValueUnits: 1,
-              purchasesUnits: before.purchasesUnits,
+              purchasesUnits: before.purchasesUnits?.asInt,
               entries: before.entries,
             ),
             MutationMeta(
@@ -50,7 +50,7 @@ void main() {
               requestId: 'provider-1',
             ),
           );
-      expect(saved.previousValueUnits, 1);
+      expect(saved.previousValueUnits?.units, 1);
       expect(saved.version, 3);
       expect(saved.purchasesUnits, before.purchasesUnits);
       expect(saved.workTotalUnits, before.workTotalUnits);
@@ -58,7 +58,7 @@ void main() {
 
       container.invalidate(masraweyaProvider);
       final after = await container.read(masraweyaProvider.future);
-      expect(after.previousValueUnits, 1);
+      expect(after.previousValueUnits?.units, 1);
       expect(after.purchasesUnits, before.purchasesUnits);
       expect(after.entries.single.valueUnits, before.entries.single.valueUnits);
       expect(after.version, 3);
@@ -228,7 +228,12 @@ void main() {
             businessDate: '2026-10-19',
             previousValueUnits: 7,
             purchasesUnits: 2000,
-            entries: [MasraweyaEntryDto(valueUnits: 3000, commissionUnits: 50)],
+            entries: [
+              MasraweyaEntryDto(
+                valueUnits: MoneyValue.known(3000),
+                commissionUnits: MoneyValue.known(50),
+              ),
+            ],
           ),
           MutationMeta(expectedVersion: 2, requestId: 'other-writer'),
         ),

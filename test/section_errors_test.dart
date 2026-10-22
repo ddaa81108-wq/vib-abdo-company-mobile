@@ -209,7 +209,7 @@ void main() {
     expect(find.byKey(const Key('search-retry')), findsNothing);
   });
 
-  testWidgets('a string amount is an invalid server response with retry', (
+  testWidgets('a string amount marks that card and leaves the list up', (
     tester,
   ) async {
     final gate = _FailGate();
@@ -232,14 +232,11 @@ void main() {
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers');
-    expect(find.text(AppStrings.retry), findsOneWidget);
-    expect(find.textContaining('غير صالحة'), findsOneWidget);
-    gate.failing = false;
-    await tester.tap(find.text(AppStrings.retry));
-    await settle(tester);
     expect(find.byKey(const Key('screen-customers')), findsOneWidget);
     expect(find.text(AppStrings.retry), findsNothing);
-    expect(gate.calls, greaterThanOrEqualTo(2));
+    expect(find.text('عميل'), findsWidgets);
+    expect(find.text(MoneyValue.invalidLabel), findsWidgets);
+    expect(find.text('125,000 د.ل'), findsNothing);
   });
 
   testWidgets('full access can export PDF; settings.manage alone cannot', (

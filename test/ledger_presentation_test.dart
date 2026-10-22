@@ -322,7 +322,9 @@ void main() {
     _expectWritesHidden(tester);
   });
 
-  testWidgets('a failed card load hides writes', (tester) async {
+  testWidgets('a string balance stays on the ledger and is not a number', (
+    tester,
+  ) async {
     await pumpFakeApp(
       tester,
       size: const Size(360, 1400),
@@ -338,8 +340,11 @@ void main() {
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
-    expect(find.text(AppStrings.retry), findsOneWidget);
-    _expectWritesHidden(tester);
+    expect(find.text(AppStrings.retry), findsNothing);
+    expect(find.text(MoneyValue.invalidLabel), findsWidgets);
+    expect(find.text('عميل'), findsWidgets);
+    expect(find.text('125,000 د.ل'), findsNothing);
+    expect(find.byKey(const Key('add-debt')), findsOneWidget);
   });
 
   testWidgets('an empty ledger keeps the header actions', (tester) async {

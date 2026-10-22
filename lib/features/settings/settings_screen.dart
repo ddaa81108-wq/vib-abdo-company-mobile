@@ -92,9 +92,10 @@ class SettingsScreen extends ConsumerWidget {
 
 /// Page total as an Arabic currency label. The server key (`LYD`, `EGP`) is
 /// not shown beside the symbol.
-String _ledgerTotal(MoneyFormatter money, String code, int units) {
+String _ledgerTotal(MoneyFormatter money, String code, MoneyValue units) {
   final currency = Currency.fromCode(code);
-  if (currency == null) return money.formatNumber(units);
+  if (units.isInvalid || units.units == null) return MoneyValue.invalidLabel;
+  if (currency == null) return money.formatNumber(units.units!);
   return money.formatOrDash(units, currency);
 }
 
@@ -137,7 +138,7 @@ class _LedgerTile extends ConsumerWidget {
                       padding: const EdgeInsetsDirectional.only(
                         top: AppSpacing.xs,
                       ),
-                      child: Text(
+                      child: MoneyText(
                         _ledgerTotal(money, entry.key, entry.value),
                         key: Key('ledger-total-${entry.key}'),
                       ),

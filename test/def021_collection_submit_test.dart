@@ -67,8 +67,8 @@ void main() {
         'ur_2',
         'ur_posted_1',
       ]);
-      expect(overview.submissions.last.amountUnits, 40);
-      expect(overview.unlinkedReceipts.last.amountUnits, 25);
+      expect(overview.submissions.last.amountUnits?.units, 40);
+      expect(overview.unlinkedReceipts.last.amountUnits?.units, 25);
       expect(overview.unlinkedReceipts.last.customerName, 'زبون جديد');
 
       await go(tester, '/');

@@ -18,7 +18,7 @@ import 'package:vib_abdo_company_mobile/ui/widgets/export_pdf_button.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  testWidgets('a failed account card is a full-screen error and hides writes', (
+  testWidgets('a string balance stays on the ledger and is not a number', (
     tester,
   ) async {
     final gate = _FailGate();
@@ -42,22 +42,17 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
 
-    expect(find.text(AppStrings.retry), findsOneWidget);
-    expect(find.textContaining('غير صالحة'), findsOneWidget);
-    expect(find.byKey(const Key('add-debt')), findsNothing);
-    expect(find.byKey(const Key('add-payment')), findsNothing);
-    expect(find.byKey(const Key('full-payment')), findsNothing);
-
-    gate.failing = false;
-    await tester.tap(find.text(AppStrings.retry));
-    await settle(tester);
+    expect(find.text(AppStrings.retry), findsNothing);
+    expect(find.text(MoneyValue.invalidLabel), findsWidgets);
+    expect(find.text('125,000 د.ل'), findsNothing);
+    expect(find.text('عميل'), findsWidgets);
+    expect(find.text('سداد جزئي'), findsWidgets);
     expect(find.byKey(const Key('add-debt')), findsOneWidget);
     expect(find.byKey(const Key('add-payment')), findsOneWidget);
-    expect(find.text(AppStrings.retry), findsNothing);
-    expect(gate.calls, greaterThanOrEqualTo(2));
+    await settle(tester);
   });
 
-  testWidgets('a corrupt lifetime total fails the purchases screen', (
+  testWidgets('a bad lifetime field stays invalid and the other total remains', (
     tester,
   ) async {
     final gate = _FailGate();
@@ -83,28 +78,12 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
 
-    expect(find.text(AppStrings.retry), findsOneWidget);
-    expect(find.textContaining('50,000'), findsNothing);
-    expect(find.textContaining('47,447'), findsNothing);
-
-    gate.failing = false;
-    await tester.tap(find.text(AppStrings.retry));
-    await settle(tester);
-    final lifetime = find.byKey(const Key('purchases-lifetime'));
-    expect(lifetime, findsOneWidget);
-    expect(
-      find.descendant(of: lifetime, matching: find.textContaining('50,000')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: lifetime, matching: find.textContaining('47,447')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: lifetime, matching: find.textContaining('2,553')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('screen-purchases')), findsOneWidget);
     expect(find.text(AppStrings.retry), findsNothing);
+    expect(find.textContaining('50,000'), findsWidgets);
+    expect(find.text(MoneyValue.invalidLabel), findsWidgets);
+    expect(find.text('1 د.ل'), findsNothing);
+    expect(find.textContaining('47,447'), findsNothing);
   });
 
   testWidgets('custom purchase item requires a free-text label', (

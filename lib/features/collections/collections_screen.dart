@@ -943,7 +943,7 @@ class _PayrollEmployee extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String lyd(int? units) => money.formatOrDash(units, Currency.lyd);
+    String lyd(MoneyValue? units) => money.formatOrDash(units, Currency.lyd);
     return Card(
       key: Key('payroll-${employee.userId}'),
       margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),

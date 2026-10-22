@@ -37,15 +37,15 @@ void main() {
     expect(report.to, '2026-10-31');
     expect(report.items.single.employeeId, 'u_12');
     expect(report.items.single.employeeName, 'موظف استلام تجريبي');
-    expect(report.totals.collectedUnits, 0);
-    expect(report.totals.pendingUnits, 100);
-    expect(report.items.single.cashOutstandingUnits, 250);
+    expect(report.totals.collectedUnits?.units, 0);
+    expect(report.totals.pendingUnits?.units, 100);
+    expect(report.items.single.cashOutstandingUnits?.units, 250);
 
     final state = harness.container.read(employeeTotalsStateProvider);
     expect(state, isA<EmployeeTotalsReady>());
     final ready = state as EmployeeTotalsReady;
     expect(ready.report.totals.pendingUnits, report.totals.pendingUnits);
-    expect(ready.report.items.single.collectedUnits, 0);
+    expect(ready.report.items.single.collectedUnits?.units, 0);
   });
 
   test('loading then a server error are distinct from forbidden', () async {

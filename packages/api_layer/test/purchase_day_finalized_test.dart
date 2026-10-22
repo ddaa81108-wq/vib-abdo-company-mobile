@@ -28,30 +28,31 @@ void main() {
   String fingerprint(PurchasesBookPage page) {
     final day = page.page.items.single;
     final row = day.entries.single;
+    Object? units(MoneyValue? value) => value?.units;
     return [
       day.day,
       day.status,
       day.version,
-      day.previousDebtUnits,
-      day.todayResultUnits,
-      day.todayPaidUnits,
-      day.totalDebtUnits,
-      day.vodafoneRemainingUnits,
-      day.dayClosingDebtUnits,
+      units(day.previousDebtUnits),
+      units(day.todayResultUnits),
+      units(day.todayPaidUnits),
+      units(day.totalDebtUnits),
+      units(day.vodafoneRemainingUnits),
+      units(day.dayClosingDebtUnits),
       row.id,
       row.itemCode,
       row.itemLabel,
-      row.egpValueUnits,
-      row.resultUnits,
-      row.paidUnits,
-      row.remainingUnits,
-      row.vodafoneConsumedUnits,
+      units(row.egpValueUnits),
+      units(row.resultUnits),
+      units(row.paidUnits),
+      units(row.remainingUnits),
+      units(row.vodafoneConsumedUnits),
       row.version,
-      page.lifetimeTotals?.resultUnits,
-      page.lifetimeTotals?.paidUnits,
-      page.lifetimeTotals?.remainingUnits,
-      page.opening?.previousDebtUnits,
-      page.opening?.previousVodafoneUnits,
+      units(page.lifetimeTotals?.resultUnits),
+      units(page.lifetimeTotals?.paidUnits),
+      units(page.lifetimeTotals?.remainingUnits),
+      units(page.opening?.previousDebtUnits),
+      units(page.opening?.previousVodafoneUnits),
     ].join('|');
   }
 
@@ -285,8 +286,8 @@ void main() {
     final after = await api.purchases.list(book);
     expect(after.page.items.single.status, 'finalized');
     expect(after.page.items.single.version, 4);
-    expect(after.opening?.previousDebtUnits, 10);
-    expect(after.opening?.previousVodafoneUnits, 20);
+    expect(after.opening?.previousDebtUnits?.units, 10);
+    expect(after.opening?.previousVodafoneUnits?.units, 20);
     expect(after.page.items.single.entries.single.id, 'pe_1');
   });
 

@@ -1,14 +1,29 @@
 /// Shared DTO helpers.
-/// MONEY RULE: the real server sends money as integers named `*Units`. DTOs keep them
-/// as raw `int` and they are NEVER used in arithmetic (no +, -, *, /, sum, diff).
-/// Display goes exclusively through MoneyFormatter (core/money/money_formatter.dart),
-/// one value + its own currency at a time. Currencies are never converted or combined.
+/// MONEY RULE: the real server sends money as integers named `*Units`. DTOs keep a
+/// valid value as [MoneyValue.known] and NEVER use it in arithmetic (no +, -, *, /,
+/// sum, diff). Display goes exclusively through MoneyFormatter, one value + its own
+/// currency at a time. Currencies are never converted or combined.
+///
+/// A money *field* that is not a JSON integer (string, fraction, exponent, `double`,
+/// oversized integer, bool, array, or object) becomes [MoneyValue.invalid] for that
+/// field only. The rest of the object and the other rows still parse. Null stays
+/// null (the UI dash). Nothing is rounded or truncated, and a `double` is never stored.
+///
+/// A *container* that is present but is not a JSON object still fails the whole
+/// response via [requireJsonObject]. There is no field left to mark, and turning
+/// that payload into a page of dashes would hide a broken body. A missing container
+/// stays null or empty. A list element that is not an object is still dropped by
+/// [asJsonList]; that is not a money field.
 library;
 
 import '../../core/money/money_formatter.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/network/logging_interceptor.dart';
 
 export '../../core/money/money_formatter.dart' show Currency, DecimalString;
+export '../../core/money/money_value.dart';
+export '../../core/network/logging_interceptor.dart'
+    show SafeLog, currentMoneyEndpoint, runWithMoneyEndpoint;
 
 typedef Json = Map<String, dynamic>;
 
@@ -24,15 +39,37 @@ List<String> strList(Object? v) =>
     v is List ? v.map((e) => '$e').toList(growable: false) : const [];
 bool boolOf(Object? v) => v == true;
 
-/// Money in minor units: an INTEGER JSON number only, per API contract.
-/// null/missing -> null (UI shows '—'). A string, a fractional/exponent number
-/// ([JsonNumberText]), or anything else -> [InvalidServerResponseException];
-/// never a silent null, never truncation.
-int? unitsOrNull(Object? v) {
+/// Money field. Null/missing -> null (UI shows '—'). A JSON integer -> [MoneyValue.known].
+/// Anything else -> [MoneyValue.invalid] for this field only. No rounding, no `double`.
+///
+/// [fieldPath] and the current endpoint ([runWithMoneyEndpoint]) are logged with
+/// [rowId]. The value itself is not read into the log.
+MoneyValue? unitsOrNull(
+  Object? v, {
+  String fieldPath = '-',
+  String? rowId,
+}) {
   if (v == null) return null;
-  if (v is int) return v;
-  throw const InvalidServerResponseException(
-      message: 'استجابة الخادم غير صالحة (مبلغ ليس عدداً صحيحاً)');
+  if (v is int) return MoneyValue.known(v);
+  if (v is MoneyValue) return v;
+  SafeLog.invalidMoney(
+    endpoint: currentMoneyEndpoint,
+    fieldPath: fieldPath,
+    rowId: rowId,
+  );
+  return const MoneyValue.invalid();
+}
+
+/// Present container must be a JSON object. Missing is allowed.
+///
+/// Used for a whole object (`summary`, `totals`, `opening`, `lifetimeTotals`,
+/// or the response `data`). A string, list, or number here fails the response.
+/// A bad money field inside a real object does not: that is [unitsOrNull].
+void requireJsonObject(Object? value, String label) {
+  if (value == null || value is Map) return;
+  throw InvalidServerResponseException(
+    message: 'استجابة الخادم غير صالحة ($label)',
+  );
 }
 
 /// Rate / factor as decimal TEXT (no double anywhere).
