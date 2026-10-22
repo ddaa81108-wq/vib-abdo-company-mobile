@@ -34,7 +34,7 @@ void main() {
     expect(notifier.cursorAfter(null), 'o:100');
   });
 
-  test('account extras keep the last 80 rows when trim is on', () {
+  test('account extras keep the newest 80 rows when trim is on', () {
     HistoryWindow.trimEnabled = true;
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -51,8 +51,8 @@ void main() {
     );
     final kept = container.read(accountExtraCardsProvider(section));
     expect(kept, hasLength(HistoryWindow.retainLimit));
-    expect(kept.first.id, 'c_20');
-    expect(kept.last.id, 'c_99');
+    expect(kept.first.id, 'c_0');
+    expect(kept.last.id, 'c_79');
   });
 }
 

@@ -615,3 +615,15 @@ class _KeptDataState<T> extends State<KeptData<T>> {
     );
   }
 }
+
+/// The user dragged this list to its end.
+///
+/// A [ScrollPosition.jumpTo] has no drag, so walking the rows in a test does
+/// not load another page.
+bool historyDraggedToEnd(ScrollNotification notification) {
+  if (notification is! ScrollUpdateNotification) return false;
+  if (notification.dragDetails == null) return false;
+  final metrics = notification.metrics;
+  if (metrics.maxScrollExtent <= 0) return false;
+  return metrics.pixels >= metrics.maxScrollExtent - 24;
+}
