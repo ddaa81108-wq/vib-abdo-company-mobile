@@ -222,7 +222,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                           _NoticeTile(item: items[index]),
                     ),
                   ),
-                  if (_olderCursor() != null)
+                  KeyedSubtree(
+                    key: Key('notifications-retained-${items.length}'),
+                    child: const SizedBox.shrink(),
+                  ),
+                  // The older-page control drops rows when the flag is on.
+                  // Pending Ali, so it stays hidden and the first page remains.
+                  if (HistoryWindow.trimEnabled && _olderCursor() != null)
                     Align(
                       alignment: AlignmentDirectional.centerStart,
                       child: TextButton(

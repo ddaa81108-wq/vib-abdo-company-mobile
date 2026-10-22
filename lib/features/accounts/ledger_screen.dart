@@ -584,7 +584,9 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
       if (!mounted) return;
       setState(() {
         _extra.addAll(page.page.items);
-        if (_extra.length > HistoryWindow.retainLimit) {
+        // Pending Ali. Off by default, so a long book keeps every loaded row.
+        if (HistoryWindow.trimEnabled &&
+            _extra.length > HistoryWindow.retainLimit) {
           _extra.removeRange(0, _extra.length - HistoryWindow.retainLimit);
         }
         _cursor = page.page.nextCursor;
@@ -642,6 +644,10 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
       children: [
         KeyedSubtree(
           key: Key('ledger-pages-$_pagesLoaded'),
+          child: const SizedBox.shrink(),
+        ),
+        KeyedSubtree(
+          key: Key('ledger-retained-${_extra.length}'),
           child: const SizedBox.shrink(),
         ),
         ...older,

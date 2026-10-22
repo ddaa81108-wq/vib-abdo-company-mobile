@@ -19,6 +19,18 @@ Other P7 ids in the matrix are out of scope for this change.
 
 Release cold start is real mode. Large-history frames are profile or debug with the fake client. Do not mix them.
 
+## Pending Ali decision: dropping loaded rows
+
+`HISTORY_WINDOW_TRIM` is **off** by default. A long ledger keeps every row the load-older control has fetched. Notifications stay on the first page the server returned. Account load-more does not discard cards.
+
+Turning it on (`--dart-define=HISTORY_WINDOW_TRIM=true`, or `HistoryWindow.trimEnabled` in a test) is a user-visible change:
+
+- The ledger drops loaded lines until 80 remain, while it still walks the server to the last page.
+- Notifications gain a load-older control and keep the newest 120 rows.
+- Account load-more and show-all keep the latest 80 cards.
+
+That behaviour is in its own commit and is not the acceptance result. Ali decides whether it ships. The lazy builders used above 24 rows do not drop data. They only avoid building every tile at once, which the P7-25 widget test checks.
+
 ## Engineering budgets
 
 These can fail the separate workflow. They are not the acceptance column.

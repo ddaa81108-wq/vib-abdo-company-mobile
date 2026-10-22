@@ -1,14 +1,27 @@
 /// Bounds for long histories (P7-24, P7-25).
 ///
 /// Lists at or under [eagerLimit] keep the existing eager tree so the short
-/// fixture screens still build every row. Longer pages use a lazy builder and
-/// keep at most [retainLimit] older rows while the server walk continues.
+/// fixture screens still build every row. Longer pages use a lazy builder.
+/// The builder does not drop rows.
+///
+/// [trimEnabled] drops older ledger rows past [retainLimit] and notification
+/// rows past [notificationRetain]. It is off unless Ali turns it on. Pending
+/// Ali's decision. See docs/testing/PHASE7_PERFORMANCE.md.
 abstract final class HistoryWindow {
   static const eagerLimit = 24;
 
-  /// Older ledger and account rows retained after a load-more.
+  /// Older ledger and account rows kept when [trimEnabled] is on.
   static const retainLimit = 80;
 
-  /// Notification rows retained after walking older pages.
+  /// Notification rows kept when [trimEnabled] is on.
   static const notificationRetain = 120;
+
+  /// Compile-time default. Tests assign [trimEnabled] and restore this.
+  static const trimEnabledFromEnvironment = bool.fromEnvironment(
+    'HISTORY_WINDOW_TRIM',
+    defaultValue: false,
+  );
+
+  /// Off by default. Current screens keep every row they have loaded.
+  static bool trimEnabled = trimEnabledFromEnvironment;
 }

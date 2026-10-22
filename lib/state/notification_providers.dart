@@ -95,16 +95,19 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     return _page(visible, unreadCount: page.unreadCount, base: page);
   }
 
-  /// Follows `nextBefore` one page. Keeps at most
-  /// [HistoryWindow.notificationRetain] rows (the newest stay, the walk stops
-  /// once the cap is full so memory does not grow with the catalog).
+  /// Follows `nextBefore` one page.
+  ///
+  /// The cap is pending Ali. With [HistoryWindow.trimEnabled] off, every
+  /// fetched row stays. With it on, the newest
+  /// [HistoryWindow.notificationRetain] rows stay and the walk stops.
   Future<void> loadOlder() async {
     final current = state.asData?.value;
     final before = current?.nextBefore;
     if (current == null || before == null || before.isEmpty) return;
-    if (current.appNotifications.length >= HistoryWindow.notificationRetain) {
-      return;
-    }
+    final cap = HistoryWindow.trimEnabled
+        ? HistoryWindow.notificationRetain
+        : null;
+    if (cap != null && current.appNotifications.length >= cap) return;
     final page = await ref
         .read(apiLayerProvider)
         .notifications
@@ -117,10 +120,10 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
       currentUserId: session.profile.id,
       source: NotificationSource.fetch,
     );
-    final capped = merged.length > HistoryWindow.notificationRetain
-        ? merged.sublist(0, HistoryWindow.notificationRetain)
+    final capped = cap != null && merged.length > cap
+        ? merged.sublist(0, cap)
         : merged;
-    final nextBefore = capped.length >= HistoryWindow.notificationRetain
+    final nextBefore = cap != null && capped.length >= cap
         ? null
         : page.nextBefore;
     state = AsyncData(

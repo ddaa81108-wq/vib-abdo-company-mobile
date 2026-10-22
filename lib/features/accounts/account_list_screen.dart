@@ -103,7 +103,8 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                 width,
                 cards,
                 data.page.nextCursor,
-                data.page.items.length > HistoryWindow.eagerLimit
+                HistoryWindow.trimEnabled &&
+                        data.page.items.length > HistoryWindow.eagerLimit
                     ? HistoryWindow.retainLimit
                     : null,
               ),
@@ -216,18 +217,15 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                   },
                 ),
               ),
-            if (_moreCursor(data.page.nextCursor) != null)
+            if (_loadMoreCursor(data.page.nextCursor) != null)
               Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: TextButton(
                   key: const Key('load-more-accounts'),
                   onPressed: online
                       ? () => _more(
-                          _moreCursor(data.page.nextCursor)!,
-                          retainLimit:
-                              data.page.items.length > HistoryWindow.eagerLimit
-                              ? HistoryWindow.retainLimit
-                              : null,
+                          _loadMoreCursor(data.page.nextCursor)!,
+                          retainLimit: _accountRetainLimit(data.page.items),
                         )
                       : null,
                   child: const Text(AppStrings.loadMore),
@@ -239,9 +237,20 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     );
   }
 
-  String? _moreCursor(String? firstPageCursor) => ref
-      .read(accountExtraCardsProvider(section).notifier)
-      .cursorAfter(firstPageCursor);
+  /// Pending Ali. Off, the button keeps the previous cursor behaviour.
+  /// On, it follows the last page and keeps [HistoryWindow.retainLimit] rows.
+  String? _loadMoreCursor(String? firstPageCursor) {
+    if (!HistoryWindow.trimEnabled) return firstPageCursor;
+    return ref
+        .read(accountExtraCardsProvider(section).notifier)
+        .cursorAfter(firstPageCursor);
+  }
+
+  int? _accountRetainLimit(List<AccountCardDto> firstPage) {
+    if (!HistoryWindow.trimEnabled) return null;
+    if (firstPage.length <= HistoryWindow.eagerLimit) return null;
+    return HistoryWindow.retainLimit;
+  }
 
   Widget _cardWrap({
     required List<AccountCardDto> cards,
