@@ -4,3 +4,8 @@
 # Included in the default run. Select with --tags permissions-negative.
 tags:
   permissions-negative:
+  # Behaviour that is tested as it works today and can be flipped when the
+  # owner decides. Included in the default run.
+  pending-decision:
+  # Current production or fake behaviour that is asserted, not treated as a pass.
+  known-bug:
