@@ -14,7 +14,7 @@
 | التصنيف | المعرّفات |
 |---|---|
 | Pending PM decision | DEF-002. على `main` `a5ca268` السلوك لم يتغير. الإداري المحدود ما زال `collections.decide`، ومسار الإجماليات المخصص يرفضه بـ 403. الاختبار `limited admin provider state is forbidden until DEF-002` |
-| Blocking مفتوح على `main` | لا يبقى عيب مانع من DEF-013 أو DEF-014. هما verified on main 451ec58. لا مانع مفتوح للمرحلة 6 على `a5ca268` |
+| Blocking مفتوح على `main` | DEF-020 وDEF-021 وDEF-022 على `a5ca268`. سداد 400 من رصيد 320 يُخزَّن −80، وإرسال الاستلام لا يظهر في النظرة، ورأس الدفتر يبقى 320 بعد 409 بينما المخزَّن 319. لا يبقى عيب مانع من DEF-013 أو DEF-014. هما verified on main 451ec58. لا مانع مفتوح للمرحلة 6 |
 | Blocking على فرع وليس على `main` | لا يبقى. DEF-018 صار Verified closed على `main` `a5ca268` |
 | Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `a5ca268` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل، والاختبار `DEF-012 admin settings replace the old unavailable sentence` يتوقع `employeesEmpty` و`auditEmpty` و`operationsEmpty`. خارج المرحلة 6. DEF-019 مفتوح على `main` `a5ca268`: فتح الإشعارات بعد دخول بإذن ممنوح يرسل رمز الجهاز مرة ثانية. غير مانع |
 | Verified closed على `main` `a5ca268` | DEF-017 وDEF-018. كانا مغلقين على الفرع فقط حتى دمج #46 و#47 |
@@ -620,6 +620,80 @@
 
 ---
 
+### DEF-020 — سداد جزئي أكبر من الرصيد يُقبل ويُخزَّن سالبًا
+
+**الحالة:** Open on main `a5ca26809578dd013430dcaae78c517043e95491`. مانع. رصده [#51](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/51) عند `8aec37ee29107bb33541499f9e3be595f422919d` وأعاده مسبار محلي على `main`. التالي الحر DEF-023.
+
+| الحقل | القيمة |
+|---|---|
+| المرحلة | 7 |
+| الشدة | عالية |
+| التصنيف | Blocking |
+| الملفات | `lib/features/accounts/ledger_screen.dart` (`_MovementFormState._submit` يرسل العدد بعد `parseUnits` بلا مقارنة بالرصيد)؛ `lib/ui/widgets/common.dart` (`parseUnits` يقبل أي عدد صحيح)؛ `packages/api_layer/lib/data/fake/fake_api_client.dart` (`_applyMovement` يخزّن `previous - entered`) |
+
+**خطوات الإعادة** على `main` `a5ca268`
+
+1. ادخل `admin.demo` من نموذج الدخول.
+2. افتح `/customers/c_55`. الرصيد 320 والإصدار 4.
+3. افتح حوار السداد، أدخل 400، واحفظ.
+4. اقرأ الكارت من المستودع.
+
+**المتوقع:** رفض قبل الإرسال، والرصيد يبقى 320. حارس على العميل مطلوب ولو أعاد الخادم خطأً. العقد في المستودع يقول إن الخادم يحسب المبلغ النهائي (`AccountTransactionRequest`: «The server computes the final amount. The app shows no preview») وإن التطبيق لا يجمع ولا يطرح (قاعدة README 1). `docs/permission-enforcement-matrix.md` يذكر `requestId` و`expectedVersion` على `POST /api/{section}/{id}/transactions` ولا يذكر سقفًا. لا جملة في الوثائق ترفض `inputValue` الأكبر من الرصيد. الحارس ما زال مطلوبًا: المقارنة مع الرصيد المعروض ليست حساب رصيد جديد.
+
+**الفعلي:** الحوار يرسل 400. الخادم التجريبي يقبل ويعيد `tx_new` ويخزّن الرصيد **−80** والإصدار 5. الرأس يعرض `-80 د.ل`. الطبقتان تسمحان. المسبار على `main`: الوحدة `DEF-020 fake stores 400 on a 320 balance as -80` والودجت `DEF-020 the payment dialog sends 400 and the header shows -80` ناجحان (4/4 مع DEF-021 وDEF-022).
+
+---
+
+### DEF-021 — إرسال إسناد واستلام غير مربوط لا يظهران في النظرة التالية
+
+**الحالة:** Open on main `a5ca26809578dd013430dcaae78c517043e95491`. مانع لإغلاق P7-14. رصده #51 وأعاده المسبار على `main`.
+
+| الحقل | القيمة |
+|---|---|
+| المرحلة | 7 |
+| الشدة | عالية |
+| التصنيف | Blocking |
+| الملفات | `packages/api_layer/lib/data/fake/fake_api_client.dart` (`_mutateCollections` يعيد `{id: ok, version: 1}` لمسار الإرسال وللاستلام غير المربوط ولا يضيف صفًا)؛ `lib/features/collections/collections_screen.dart` (`_AssignmentFormState._submit` وزر `save-unlinked` يبطلان `collectionsProvider` بعد النجاح) |
+
+**خطوات الإعادة**
+
+1. ادخل `employee.demo` من نموذج الدخول.
+2. افتح `/collections`.
+3. أرسل 40 على `as_1` من زر `submit-as_1` وحوار `save-assignment`.
+4. أرسل استلامًا غير مربوط باسم `زبون جديد` ومبلغ 25 من `unlinked-collection` و`save-unlinked`.
+5. اقرأ `collections.overview()`.
+
+**المتوقع:** الصفان الجديدان في النظرة التالية، لأن الشاشة تعيد الجلب بعد النجاح.
+
+**الفعلي:** المساران سُجّلا: `/api/collections/assignments/as_1/submissions` و`/api/collections/unlinked-receipts`. النظرة تبقى `sb_1` و`sb_2` و`ur_1` و`ur_2`. الإبطال على العميل حقيقي، والرد الثابت هو الذي يسقط الصف. ربط `ur_1` الموجود مسبقًا يخزّن `customerId` ويبقى خارج هذا العيب.
+
+---
+
+### DEF-022 — بعد 409 يبقى رأس الدفتر على 320 والمخزَّن 319
+
+**الحالة:** Open on main `a5ca26809578dd013430dcaae78c517043e95491`. مانع لمسار حوار السداد. رصده #51 وأعاده المسبار على `main`.
+
+| الحقل | القيمة |
+|---|---|
+| المرحلة | 7 |
+| الشدة | عالية |
+| التصنيف | Blocking |
+| الملفات | `lib/features/accounts/ledger_screen.dart` (`_MovementFormState._submit` يلتقط الخطأ ويعيد `failureText`، و`GuardedMutation` الحوار بلا `onVersionConflict`)؛ `lib/ui/widgets/mutation_form.dart` (`_presentFailure` لا يعمل إلا إذا رُمي `VERSION_CONFLICT`)؛ `packages/api_layer/lib/data/fake/fake_api_client.dart` (`_requireVersion`) |
+
+**خطوات الإعادة**
+
+1. ادخل `admin.demo` وافتح `/customers/c_55` (320، الإصدار 4).
+2. افتح حوار السداد وأدخل 100.
+3. قبل الحفظ أرسل سدادًا جزئيًا بقيمة 1 وإصدار 4 عبر المستودع.
+4. احفظ الحوار.
+5. أغلق الحوار، اخرج إلى `/customers`، ثم أعد فتح `/customers/c_55`.
+
+**المتوقع:** جملة التعارض الموحّدة `AppStrings.versionConflict`، وإبطال `accountCardProvider`، والرأس يتبع المخزَّن 319.
+
+**الفعلي:** الحوار يعرض جملة الخادم `تم تعديل البيانات من مستخدم آخر` ولا يعرض `AppStrings.versionConflict`. الرأس يبقى `320 د.ل` بعد إغلاق الحوار وبعد مغادرة الشاشة والعودة. قراءة المستودع 319. أزرار اعتماد الاستلامات ترمي الاستثناء، فـ `GuardedMutation` هناك يعرض الجملة الموحّدة ويعيد الجلب. هذا المسار ليس عيب الحوار.
+
+---
+
 ## أسئلة مفتوحة لمدير المشروع على `main` `451ec58`
 
 هذه ليست عيوبًا جديدة، ولا تُغلق من هذه الجولة:
@@ -668,4 +742,5 @@
 - إعادة اختبار #46 عند `f6fa327` لم تفتح DEF-018. DEF-017 يبقى مغلقًا على الفرع. تعليم قراءة صف المستخدم الحالي عندما ترجع الفتاحة `forbidden` خيار لمدير المشروع: المسار `/forbidden` والنص «القسم غير مصرح لهذا الحساب» قائمان، والنقرة الثانية لا تنقص العدد. مستلم آخر لا يُعلَّم ولا يفتح المحتوى ولا يسرّب الاسم. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
 - إعادة اختبار #47 عند `3f8e009` فتحت DEF-018 أعلاه. التالي الحر DEF-019. DEF-017 لم يُعد فتحه. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
 - إعادة اختبار #47 عند `da9183c` أغلقت DEF-018 على الفرع وليس على `main`، وفتحت DEF-019 أعلاه. التالي الحر DEF-020. DEF-017 لم يُعد فتحه. إعادة إرسال نفس الرمز عند إعادة تشغيل العملية غير مكتوبة في التعليق، وليست عيبًا ثانيًا. P6-30 قرار لعلي والالتزام `da9183c` يُرجع وحده. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail.
-- جولة القبول النهائية على `main` `a5ca268` أغلقت DEF-017 وDEF-018 على `main`. DEF-019 بقي Open وغير مانع. لم يُفتح DEF-020. DEF-010 بقي مغلقًا. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail وخارج المرحلة 6. سقف الشارة `99+` فوق 99 سؤال مفتوح كما في الخطة، وليس عيبًا. تعليم القراءة عند `forbidden` لنفس المستخدم يبقى قرار علي.
+- جولة القبول النهائية على `main` `a5ca268` أغلقت DEF-017 وDEF-018 على `main`. DEF-019 بقي Open وغير مانع. لم يُفتح DEF-020 في تلك الجولة. DEF-010 بقي مغلقًا. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail وخارج المرحلة 6. سقف الشارة `99+` فوق 99 سؤال مفتوح كما في الخطة، وليس عيبًا. تعليم القراءة عند `forbidden` لنفس المستخدم يبقى قرار علي.
+- مراجعة #51 على `main` `a5ca268` فتحت DEF-020 وDEF-021 وDEF-022 أعلاه. التالي الحر DEF-023. DEF-002 يبقى Pending PM decision. DEF-012 يبقى Fail. DEF-019 يبقى مفتوحًا وغير مانع.
