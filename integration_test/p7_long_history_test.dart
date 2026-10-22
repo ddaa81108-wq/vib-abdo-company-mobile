@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_api_layer/data/fake/fake_large_catalog.dart';
@@ -9,6 +11,7 @@ import 'package:vib_abdo_company_mobile/performance/perf_budget.dart';
 import 'package:vib_abdo_company_mobile/performance/perf_surface.dart';
 
 import '../test/support/pump_app.dart';
+import 'dart_heap.dart';
 
 /// P7-24 frame timings and the P7-25 page walk on a device or emulator.
 ///
@@ -66,6 +69,14 @@ void main() {
     final timings = <FrameTiming>[];
     void collect(List<FrameTiming> batch) => timings.addAll(batch);
     WidgetsBinding.instance.addTimingsCallback(collect);
+    // RSS/PSS are sampled outside this process. The pause keeps the app
+    // alive so the workflow can run dumpsys. Memory is report-only.
+    const sampleMeminfo = bool.fromEnvironment('PHASE7_SAMPLE_MEMINFO');
+    await phase7Now('p7_24_dart_heap_before_bytes', await dartHeapBytes());
+    await phase7Now('p7_24_scroll_begin', 1);
+    if (sampleMeminfo) {
+      await tester.pump(const Duration(seconds: 3));
+    }
     final scrollWatch = Stopwatch()..start();
     await tester.fling(list, const Offset(0, -600), 2000);
     await tester.pump(const Duration(milliseconds: 16));
@@ -74,6 +85,12 @@ void main() {
     }
     scrollWatch.stop();
     WidgetsBinding.instance.removeTimingsCallback(collect);
+    await phase7Now('p7_24_dart_heap_after_bytes', await dartHeapBytes());
+    await phase7Now('p7_24_memory', 'report-only');
+    await phase7Now('p7_24_scroll_end', 1);
+    if (sampleMeminfo) {
+      await tester.pump(const Duration(seconds: 3));
+    }
 
     final builds = [
       for (final timing in timings) timing.buildDuration.inMicroseconds / 1000,
@@ -122,6 +139,17 @@ void main() {
 void phase7(String key, Object value) {
   // ignore: avoid_print
   print('PHASE7 $key=$value');
+}
+
+/// Flushed so the workflow can see the marker while the process is alive.
+Future<void> phase7Now(String key, Object value) async {
+  final line = 'PHASE7 $key=$value';
+  // ignore: avoid_print
+  print(line);
+  try {
+    stdout.writeln(line);
+    await stdout.flush();
+  } catch (_) {}
 }
 
 Future<void> _until(WidgetTester tester, Key key) async {

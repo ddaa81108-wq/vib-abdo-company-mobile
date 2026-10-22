@@ -31,6 +31,9 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # Same package the Flutter SDK already resolves. Used by the profile
+  # integration test to read Dart heap. Report-only. Not a release dependency.
+  vm_service: 15.4.0
 
 flutter:
   uses-material-design: true
