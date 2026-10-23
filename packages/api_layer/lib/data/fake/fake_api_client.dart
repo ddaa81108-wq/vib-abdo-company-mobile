@@ -157,6 +157,11 @@ class FakeApiClient implements ApiClient {
   /// 419 uses `PAGE_EXPIRED`, which ends the session and is not a CSRF error.
   int? failNextAuthenticatedStatus;
 
+  /// The next authenticated request, other than login and `GET /api/auth/csrf`,
+  /// fails once with this envelope (tests). Login and a CSRF refresh are left
+  /// alone so a scripted write can still be followed by a real refresh.
+  ({int status, String code, String message})? failNextResponse;
+
   /// The next GET /api/notifications list (not unread-count) fails with this
   /// status, once (tests). 404 is not found. 401 ends the session. Any other
   /// status is a failed GET.
@@ -975,6 +980,18 @@ class FakeApiClient implements ApiClient {
     }
     if (enforceTransportContract && unsafe && options.authenticated) {
       _requireCurrentCsrf(options);
+    }
+    final scriptedFailure = failNextResponse;
+    if (scriptedFailure != null &&
+        path != '/api/auth/login' &&
+        path != '/api/auth/csrf') {
+      failNextResponse = null;
+      _fail(
+        scriptedFailure.status,
+        scriptedFailure.code,
+        scriptedFailure.message,
+        authenticated: options.authenticated,
+      );
     }
     if (method == 'GET') {
       final scripted = scriptedGetJson.remove(path);
