@@ -13,6 +13,7 @@ import '../../core/network/error_mapper.dart';
 import '../../core/network/reachability.dart';
 import '../../core/permissions/permission_codes.dart';
 import '../../core/permissions/permission_service.dart';
+import '../models/profile_models.dart';
 import '../models/purchase_models.dart';
 import 'fake_fixtures.dart';
 import 'fake_large_catalog.dart';
@@ -767,9 +768,7 @@ class FakeApiClient implements ApiClient {
     _access.applyFromServer(
       (user['permissions'] as List).map((code) => '$code'),
       role: user['role'] as String?,
-      sectionAccess: section is Map
-          ? section.map((key, value) => MapEntry('$key', '$value'))
-          : null,
+      sectionAccess: sectionAccessFromJson(section),
       fullAccess:
           user['fullAccess'] is bool ? user['fullAccess'] as bool : null,
     );

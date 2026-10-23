@@ -50,6 +50,58 @@ void main() {
     );
   });
 
+  testWidgets('limited reader screens show no write buttons', (tester) async {
+    await pumpFakeApp(tester, size: const Size(900, 2800));
+    await signIn(tester, username: 'limited.reader', password: 'demo-only');
+
+    const screens = <String, Key>{
+      '/customers': Key('screen-customers'),
+      '/customers/c_55': Key('screen-ledger-customers'),
+      '/companies': Key('screen-companies'),
+      '/companies/c_co_02': Key('screen-ledger-companies'),
+      '/libyan-deposits': Key('screen-libyan-deposits'),
+      '/libyan-deposits/c_55': Key('screen-ledger-libyan-deposits'),
+      '/egyptian-deposits': Key('screen-egyptian-deposits'),
+      '/egyptian-deposits/c_55': Key('screen-ledger-egyptian-deposits'),
+      '/purchases': Key('screen-purchases'),
+      '/treasury': Key('screen-treasury'),
+      '/reports': Key('screen-reports'),
+      '/collections': Key('screen-collections'),
+    };
+    const writeKeys = <Key>[
+      Key('add-account'),
+      Key('assign-mode'),
+      Key('add-debt'),
+      Key('add-payment'),
+      Key('full-payment'),
+      Key('cancel-tx_1'),
+      Key('correct-tx_1'),
+      Key('edit-account-card'),
+      Key('save-account-card'),
+      Key('save-rate'),
+      Key('cash-in'),
+      Key('cash-out'),
+      Key('add-purchase-12'),
+      Key('finalize-day-12'),
+      Key('submit-as_1'),
+      Key('unlinked-collection'),
+      Key('approve-sb_1'),
+      Key('reject-sb_1'),
+      Key('cash-sb_2'),
+      Key('close-batch'),
+      Key('export-pdf'),
+      Key('save-masraweya'),
+    ];
+
+    for (final entry in screens.entries) {
+      await _go(tester, entry.key);
+      expect(find.byKey(entry.value), findsOneWidget, reason: entry.key);
+      for (final key in writeKeys) {
+        expect(find.byKey(key), findsNothing, reason: '${entry.key} $key');
+      }
+    }
+  });
+
   testWidgets('PERMISSION_DENIED is the forbidden pane and is not retried', (
     tester,
   ) async {

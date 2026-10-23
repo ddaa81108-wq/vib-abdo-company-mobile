@@ -152,6 +152,59 @@ void main() {
     expect(find.byKey(const Key('financial-ledger')), findsOneWidget);
   });
 
+  testWidgets('a reader without write permission does not see write controls', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(800, 2400));
+    await signIn(tester, username: 'other.employee', password: 'demo-only');
+
+    await go(tester, '/customers');
+    expect(find.byKey(const Key('screen-customers')), findsOneWidget);
+    expect(find.byKey(const Key('add-account')), findsNothing);
+    expect(find.byKey(const Key('assign-mode')), findsNothing);
+
+    await go(tester, '/customers/c_55');
+    expect(find.byKey(const Key('screen-ledger-customers')), findsOneWidget);
+    expect(find.byKey(const Key('add-debt')), findsNothing);
+    expect(find.byKey(const Key('add-payment')), findsNothing);
+    expect(find.byKey(const Key('cancel-tx_1')), findsNothing);
+
+    await go(tester, '/collections');
+    expect(find.byKey(const Key('screen-collections')), findsOneWidget);
+    expect(find.byKey(const Key('submit-as_9')), findsOneWidget);
+    expect(find.byKey(const Key('approve-sb_1')), findsNothing);
+    expect(find.byKey(const Key('cash-sb_2')), findsNothing);
+    expect(find.byKey(const Key('close-batch')), findsNothing);
+
+    for (final path in [
+      '/companies',
+      '/companies/c_55',
+      '/libyan-deposits',
+      '/egyptian-deposits',
+      '/purchases',
+      '/treasury',
+      '/reports',
+      '/settings',
+    ]) {
+      await go(tester, path);
+      expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+      expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
+      expect(find.byKey(HomeDashboard.screenKey), findsNothing);
+    }
+
+    expect(find.byKey(const Key('cash-in')), findsNothing);
+    expect(find.byKey(const Key('add-purchase-12')), findsNothing);
+    expect(find.byKey(const Key('finalize-day-12')), findsNothing);
+    expect(find.byKey(const Key('save-rate')), findsNothing);
+
+    await go(tester, '/account');
+    expect(find.byKey(const Key('screen-account')), findsOneWidget);
+    expectRtl(tester);
+    await go(tester, '/notifications');
+    expect(find.byKey(const Key('screen-notifications')), findsOneWidget);
+    expect(find.text('إشعار موظف آخر'), findsOneWidget);
+  });
+
   testWidgets('a collector sees collection writes and no other sections', (
     tester,
   ) async {

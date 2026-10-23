@@ -3,9 +3,10 @@ import 'common.dart';
 /// GET /api/me -> { ok:true, data: { user: { id, username, displayName, role,
 ///   isOwner, permissions[], mustChangePassword } } }
 ///
-/// Observed `/api/me` omits `sectionAccess`. Null means the key was absent, so
-/// permission codes alone grant a section. A present map, including `{}`,
-/// keeps the current rule: a missing entry is none.
+/// Observed `/api/me` omits `sectionAccess`. Null (missing key or JSON null)
+/// means absent, so permission codes alone grant a section. A present map,
+/// including `{}`, keeps the current rule: a missing entry is none. A
+/// non-object value is stored as `{}` and does not widen access.
 class UserProfile {
   const UserProfile({
     required this.id,
@@ -40,7 +41,7 @@ class UserProfile {
         displayName: str(j['displayName'] ?? j['username']),
         role: j['role'] is String ? j['role'] as String : null,
         permissions: strList(j['permissions']),
-        sectionAccess: _sectionAccess(j['sectionAccess']),
+        sectionAccess: sectionAccessFromJson(j['sectionAccess']),
         fullAccess: _boolOrNull(j['fullAccess'] ?? j['isSuperuser']),
         mustChangePassword: boolOf(j['mustChangePassword']),
       );
@@ -58,8 +59,13 @@ class MeResponse {
 
 bool? _boolOrNull(Object? v) => v is bool ? v : null;
 
-/// A missing or non-object value is absent. An object, including `{}`, is present.
-Map<String, String>? _sectionAccess(Object? raw) {
-  if (raw is! Map) return null;
+/// `sectionAccess` from `/api/me`.
+///
+/// A missing key or JSON null is absent: permission codes alone grant a section.
+/// A JSON object, including `{}`, is present. Any other value (string, list,
+/// number) is an empty map, so a missing section key stays `none`.
+Map<String, String>? sectionAccessFromJson(Object? raw) {
+  if (raw == null) return null;
+  if (raw is! Map) return const {};
   return {for (final e in raw.entries) '${e.key}': '${e.value}'};
 }
