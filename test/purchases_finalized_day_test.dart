@@ -44,7 +44,7 @@ void main() {
     await tester.tap(find.byKey(const Key('purchase-kind-vodafone_cash')));
     await tester.pump();
     await fillLabeled(tester, AppStrings.egpValue, '10000');
-    await fillLabeled(tester, AppStrings.purchasePrice, '9.5');
+    await fillLabeled(tester, AppStrings.exchangeRate, '9.5');
     await fillLabeled(tester, AppStrings.paid, '500');
 
     await tester.runAsync(

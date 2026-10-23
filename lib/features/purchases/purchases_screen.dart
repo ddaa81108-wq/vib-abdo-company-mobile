@@ -143,26 +143,31 @@ class _RegisterTotals extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _AmountLine(
-          AppStrings.resultFromServer,
+          AppStrings.registerResult,
           totals?.resultUnits,
           Currency.lyd,
           money,
         ),
-        _AmountLine(AppStrings.paid, totals?.paidUnits, Currency.lyd, money),
         _AmountLine(
-          AppStrings.purchaseRemaining,
+          AppStrings.todayPaid,
+          totals?.paidUnits,
+          Currency.lyd,
+          money,
+        ),
+        _AmountLine(
+          AppStrings.registerRemaining,
           totals?.remainingUnits,
           Currency.lyd,
           money,
         ),
         _AmountLine(
-          AppStrings.vodafoneConsumed,
+          AppStrings.registerVodafoneConsumed,
           totals?.vodafoneConsumedUnits,
           vodafoneCurrency,
           money,
         ),
         _AmountLine(
-          AppStrings.vodafoneRemaining,
+          AppStrings.registerVodafoneRemaining,
           totals?.vodafoneRemainingUnits,
           vodafoneCurrency,
           money,
@@ -195,6 +200,26 @@ class _AmountLine extends StatelessWidget {
         runSpacing: AppSpacing.xxs,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [Text(label), MoneyText(money.formatOrDash(units, currency))],
+      ),
+    );
+  }
+}
+
+class _TextLine extends StatelessWidget {
+  const _TextLine(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.xs),
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.xxs,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [Text(label), Text(value)],
       ),
     );
   }
@@ -249,7 +274,7 @@ class _DayCard extends ConsumerWidget {
     final band = tone == null ? null : context.statusColors.dayTones[tone];
     final correctionOpen = day.correctionOpen;
     final editable = day.status == 'draft' || correctionOpen;
-    final caption = vodafoneCaption(day.vodafoneRemainingUnits);
+    final vodafone = day.vodafoneRemainingUnits;
     return Card(
       key: Key('purchase-day-$label'),
       color: band,
@@ -271,7 +296,11 @@ class _DayCard extends ConsumerWidget {
                 _CorrectionStatus(day: label, open: correctionOpen),
               ],
             ),
-            _line(AppStrings.previousDebt, day.previousDebtUnits, Currency.lyd),
+            _line(
+              AppStrings.previousValue,
+              day.previousDebtUnits,
+              Currency.lyd,
+            ),
             _line(AppStrings.todayResult, day.todayResultUnits, Currency.lyd),
             _line(AppStrings.todayPaid, day.todayPaidUnits, Currency.lyd),
             _line(
@@ -280,11 +309,10 @@ class _DayCard extends ConsumerWidget {
               Currency.lyd,
             ),
             _line(
-              AppStrings.vodafoneRemaining,
-              day.vodafoneRemainingUnits,
+              vodafoneRemainingLabel(vodafone),
+              vodafoneRemainingFigure(vodafone),
               vodafoneCurrency,
             ),
-            if (caption != null) Text(caption),
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -511,9 +539,7 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
         TextField(
           controller: _rate,
           textDirection: TextDirection.ltr,
-          decoration: const InputDecoration(
-            labelText: AppStrings.purchasePrice,
-          ),
+          decoration: const InputDecoration(labelText: AppStrings.exchangeRate),
         ),
         UnitsField(controller: _paid, label: AppStrings.paid),
         UnitsField(controller: _vodafone, label: AppStrings.vodafoneConsumed),
@@ -610,13 +636,13 @@ class _OpeningCard extends StatelessWidget {
               style: Theme.of(context).textTheme.titleSmall,
             ),
             _MoneyLine(
-              AppStrings.previousDebt,
+              AppStrings.previousValue,
               day?.previousDebtUnits,
               Currency.lyd,
               money,
             ),
             _MoneyLine(
-              AppStrings.previousVodafone,
+              AppStrings.carriedVodafone,
               day?.previousVodafoneUnits,
               vodafoneCurrency,
               money,
@@ -717,13 +743,13 @@ class _OpeningFormState extends ConsumerState<_OpeningForm> {
         UnitsField(
           key: const Key('opening-debt'),
           controller: _debt,
-          label: AppStrings.previousDebt,
+          label: AppStrings.previousValue,
         ),
         const SizedBox(height: AppSpacing.md),
         UnitsField(
           key: const Key('opening-vodafone'),
           controller: _vodafone,
-          label: AppStrings.previousVodafone,
+          label: AppStrings.carriedVodafone,
         ),
         const SizedBox(height: AppSpacing.md),
         GuardedMutation(
@@ -829,10 +855,11 @@ class _Entry extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                entry.itemLabel ?? AppStrings.dash,
-                style: Theme.of(context).textTheme.titleSmall,
+              _TextLine(
+                AppStrings.sequence,
+                '${entry.sequence ?? AppStrings.dash}',
               ),
+              _TextLine(AppStrings.kind, entry.itemLabel ?? AppStrings.dash),
               _AmountLine(
                 AppStrings.egpValue,
                 entry.egpValueUnits,
@@ -867,7 +894,14 @@ class _Entry extends ConsumerWidget {
                 Currency.lyd,
                 money,
               ),
-              if (canWrite)
+              _AmountLine(
+                AppStrings.vodafoneConsumed,
+                entry.vodafoneConsumedUnits,
+                vodafoneCurrency,
+                money,
+              ),
+              if (canWrite) ...[
+                Text(AppStrings.actions),
                 Wrap(
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.xs,
@@ -899,6 +933,7 @@ class _Entry extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ],
             ],
           ),
         ),

@@ -116,7 +116,7 @@ void main() {
       'صنف خاص',
     );
     await fillLabeled(tester, AppStrings.egpValue, '10000');
-    await fillLabeled(tester, AppStrings.purchasePrice, '9.5');
+    await fillLabeled(tester, AppStrings.exchangeRate, '9.5');
     await fillLabeled(tester, AppStrings.paid, '500');
     final gate = Completer<void>();
     fake.pauseMutations = gate;

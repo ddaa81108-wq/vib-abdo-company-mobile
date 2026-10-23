@@ -1,9 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
+import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/features/purchases/purchases_screen.dart';
-import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import 'shell_screenshots_test.dart' show loadScreenshotFonts, saveShot;
@@ -73,41 +75,38 @@ void main() {
             findsWidgets,
           );
           expect(find.byKey(const Key('register-totals-note')), findsOneWidget);
-          expect(find.text(AppStrings.remainingRunningBalance), findsOneWidget);
+          expect(
+            find.text(
+              'الباقي الحالي وباقي فودافون كاش الحالي رصيد متراكم لليوم المفتوح، وليس مجموع البطاقات.',
+            ),
+            findsOneWidget,
+          );
           for (final label in [
-            AppStrings.registerTotals,
-            AppStrings.resultFromServer,
-            AppStrings.paid,
-            AppStrings.purchaseRemaining,
-            AppStrings.vodafoneConsumed,
-            AppStrings.vodafoneRemaining,
-            AppStrings.previousDebt,
-            AppStrings.todayResult,
-            AppStrings.todayPaid,
-            AppStrings.purchaseTotalDebt,
-            AppStrings.finalizeDay,
-            AppStrings.addPurchaseEntry,
-            AppStrings.purchasePrice,
-            AppStrings.operation,
-            AppStrings.egpValue,
+            'التسلسل',
+            'النوع',
+            'القيمة ج.م',
+            'العملية',
+            'السعر',
+            'الناتج',
+            'المسدد',
+            'الباقي',
+            'مستهلك فودافون',
+            'الإجراءات',
+            'القيمة السابقة',
+            'إجمالي شغل اليوم',
+            'إجمالي المسدد',
+            'إجمالي الديون',
+            'باقي فودافون كاش',
+            'ترحيل اليوم',
+            'إضافة معاملة',
+            'إجماليات السجل من البداية',
+            'إجمالي الناتج',
+            'الباقي الحالي',
+            'إجمالي مستهلك فودافون',
+            'باقي فودافون كاش الحالي',
+            'فودافون المرحّل',
           ]) {
             expect(find.text(label), findsWidgets, reason: label);
-          }
-          for (final gone in [
-            'الناتج من الخادم',
-            'المسدد',
-            'مستهلك فودافون',
-            'باقي فودافون',
-            'الدين السابق',
-            'ناتج اليوم',
-            'المسدد اليوم',
-            'إجمالي الديون',
-            'ترحيل اليوم',
-            'إجماليات السجل',
-            'سعر الصرف',
-            'المتبقي',
-          ]) {
-            expect(find.text(gone), findsNothing, reason: gone);
           }
           // The entry's own remaining is not the register figure.
           expect(
@@ -158,54 +157,47 @@ void main() {
   testWidgets(
     'DEF-034 remaining is the server register total, not a sum of rows',
     (tester) async {
-      await pumpFakeApp(
-        tester,
-        size: const Size(430, 1600),
-        overrides: [
-          purchasesProvider.overrideWith((ref) async {
-            return PurchasesPage.fromData({
-              'day': {
-                'id': 'day-1',
-                'dayNumber': 1,
-                'status': 'draft',
-                'previousDebtUnits': 0,
-                'previousVodafoneUnits': 5000,
-                'todayResultUnits': 100,
-                'todayPaidUnits': 20,
-                'totalDebtUnits': 80,
-                'vodafoneRemainingUnits': 4900,
-                'version': 2,
-                'correctionOpen': false,
-              },
-              'entries': [
-                {
-                  'id': 'pe_open',
-                  'dayNumber': 1,
-                  'itemLabel': 'صف اليوم',
-                  'remainingUnits': 40,
-                  'resultUnits': 1,
-                  'paidUnits': 1,
-                },
-                {
-                  'id': 'pe_older',
-                  'dayNumber': 4,
-                  'itemLabel': 'صف يوم آخر',
-                  'remainingUnits': 30,
-                  'resultUnits': 2,
-                  'paidUnits': 2,
-                },
-              ],
-              'registerTotals': {
-                'resultUnits': 100,
-                'paidUnits': 20,
-                'remainingUnits': 80,
-                'vodafoneConsumedUnits': 100,
-                'vodafoneRemainingUnits': 4900,
-              },
-            });
-          }),
+      final layer = await pumpFakeApp(tester, size: const Size(430, 1600));
+      _scriptPurchases(layer.client as FakeApiClient, {
+        'day': {
+          'id': 'day-1',
+          'dayNumber': 1,
+          'status': 'draft',
+          'previousDebtUnits': 0,
+          'previousVodafoneUnits': 5000,
+          'todayResultUnits': 100,
+          'todayPaidUnits': 20,
+          'totalDebtUnits': 80,
+          'vodafoneRemainingUnits': 4900,
+          'version': 2,
+          'correctionOpen': false,
+        },
+        'entries': [
+          {
+            'id': 'pe_open',
+            'dayNumber': 1,
+            'itemLabel': 'صف اليوم',
+            'remainingUnits': 40,
+            'resultUnits': 1,
+            'paidUnits': 1,
+          },
+          {
+            'id': 'pe_older',
+            'dayNumber': 4,
+            'itemLabel': 'صف يوم آخر',
+            'remainingUnits': 30,
+            'resultUnits': 2,
+            'paidUnits': 2,
+          },
         ],
-      );
+        'registerTotals': {
+          'resultUnits': 100,
+          'paidUnits': 20,
+          'remainingUnits': 80,
+          'vodafoneConsumedUnits': 100,
+          'vodafoneRemainingUnits': 4900,
+        },
+      });
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/purchases');
 
@@ -227,7 +219,14 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text(AppStrings.remainingRunningBalance), findsOneWidget);
+      expect(
+        find.text(
+          'الباقي الحالي وباقي فودافون كاش الحالي رصيد متراكم لليوم المفتوح، وليس مجموع البطاقات.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('باقي فودافون لصالحنا'), findsOneWidget);
+      expect(find.text('4,900 ج.م'), findsWidgets);
       expect(tester.takeException(), isNull);
     },
   );
@@ -235,33 +234,27 @@ void main() {
   testWidgets('DEF-034 correctionOpen is the boolean, not a status value', (
     tester,
   ) async {
-    await pumpFakeApp(
-      tester,
-      size: const Size(430, 1200),
-      overrides: [
-        purchasesProvider.overrideWith((ref) async {
-          return PurchasesPage.fromData({
-            'day': {
-              'id': 'day-9',
-              'dayNumber': 9,
-              'status': 'correction',
-              'version': 1,
-              'correctionOpen': false,
-              'previousDebtUnits': 0,
-              'previousVodafoneUnits': 0,
-            },
-            'entries': <Map<String, dynamic>>[],
-            'registerTotals': {
-              'resultUnits': 0,
-              'paidUnits': 0,
-              'remainingUnits': 0,
-              'vodafoneConsumedUnits': 0,
-              'vodafoneRemainingUnits': 0,
-            },
-          });
-        }),
-      ],
-    );
+    final closed = await pumpFakeApp(tester, size: const Size(430, 1200));
+    _scriptPurchases(closed.client as FakeApiClient, {
+      'day': {
+        'id': 'day-9',
+        'dayNumber': 9,
+        'status': 'correction',
+        'version': 1,
+        'correctionOpen': false,
+        'previousDebtUnits': 0,
+        'previousVodafoneUnits': 0,
+        'vodafoneRemainingUnits': 0,
+      },
+      'entries': <Map<String, dynamic>>[],
+      'registerTotals': {
+        'resultUnits': 0,
+        'paidUnits': 0,
+        'remainingUnits': 0,
+        'vodafoneConsumedUnits': 0,
+        'vodafoneRemainingUnits': 0,
+      },
+    });
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
 
@@ -271,39 +264,36 @@ void main() {
     expect(find.byKey(const Key('close-correction-9')), findsNothing);
     expect(find.byKey(const Key('finalize-day-9')), findsNothing);
 
-    await pumpFakeApp(
-      tester,
-      size: const Size(430, 1200),
-      overrides: [
-        purchasesProvider.overrideWith((ref) async {
-          return PurchasesPage.fromData({
-            'day': {
-              'id': 'day-9',
-              'dayNumber': 9,
-              'status': 'finalized',
-              'version': 4,
-              'correctionOpen': true,
-              'previousDebtUnits': 1,
-              'previousVodafoneUnits': 2,
-            },
-            'entries': <Map<String, dynamic>>[],
-            'registerTotals': {
-              'resultUnits': 1,
-              'paidUnits': 1,
-              'remainingUnits': 1,
-              'vodafoneConsumedUnits': 1,
-              'vodafoneRemainingUnits': 1,
-            },
-          });
-        }),
-      ],
-    );
+    final open = await pumpFakeApp(tester, size: const Size(430, 1200));
+    _scriptPurchases(open.client as FakeApiClient, {
+      'day': {
+        'id': 'day-9',
+        'dayNumber': 9,
+        'status': 'finalized',
+        'version': 4,
+        'correctionOpen': true,
+        'previousDebtUnits': 1,
+        'previousVodafoneUnits': 2,
+        'vodafoneRemainingUnits': -40,
+      },
+      'entries': <Map<String, dynamic>>[],
+      'registerTotals': {
+        'resultUnits': 1,
+        'paidUnits': 1,
+        'remainingUnits': 1,
+        'vodafoneConsumedUnits': 1,
+        'vodafoneRemainingUnits': 1,
+      },
+    });
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
 
     expect(find.text(AppStrings.correctionOpen), findsOneWidget);
     expect(find.byKey(const Key('close-correction-9')), findsOneWidget);
     expect(find.byKey(const Key('open-correction-9')), findsNothing);
+    expect(find.text('استهلاك فودافون علينا'), findsOneWidget);
+    expect(find.text('40 ج.م'), findsWidgets);
+    expect(find.text('-40 ج.م'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -328,7 +318,12 @@ void main() {
             find.byKey(const Key('register-totals-note')),
           );
           await tester.pump();
-          expect(find.text(AppStrings.remainingRunningBalance), findsOneWidget);
+          expect(
+            find.text(
+              'الباقي الحالي وباقي فودافون كاش الحالي رصيد متراكم لليوم المفتوح، وليس مجموع البطاقات.',
+            ),
+            findsOneWidget,
+          );
           final theme = dark ? 'dark' : 'light';
           await saveShot(tester, 'purchases-register-$theme-${width.toInt()}');
         }
@@ -341,6 +336,12 @@ void main() {
 
 Finder _inside(Key key, String text) {
   return find.descendant(of: find.byKey(key), matching: find.text(text));
+}
+
+const _purchasesPath = '/api/purchases/al_bayan';
+
+void _scriptPurchases(FakeApiClient fake, Map<String, Object?> page) {
+  fake.scriptedGetJson[_purchasesPath] = jsonEncode(page);
 }
 
 Finder _dayCards() {

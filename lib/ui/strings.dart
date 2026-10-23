@@ -106,10 +106,10 @@ abstract final class AppStrings {
   static const awaitingCash = 'ينتظر النقد';
   static const closeBatch = 'إغلاق ومسح الدفعة';
   static const closeBatchConfirm = 'تأكيد إغلاق الدفعة ومسحها؟';
-  static const finalizeDay = 'اعتماد اليوم';
-  static const finalizeConfirm = 'تأكيد اعتماد اليوم؟';
+  static const finalizeDay = 'ترحيل اليوم';
+  static const finalizeConfirm =
+      'ترحيل اليوم سيحوّل معاملاته إلى قراءة فقط. هل تريد المتابعة؟';
   static const purchaseOpening = 'الرصيد الافتتاحي';
-  static const previousVodafone = 'فودافون سابق';
   static const saveOpening = 'حفظ الرصيد الافتتاحي';
   static const saveDayConfirm =
       'تأكيد حفظ اليوم؟ تُرسل القيم كما أدخلتها، وما يظهر بعد الحفظ هو رد الخادم.';
@@ -143,6 +143,7 @@ abstract final class AppStrings {
   static const correctionOpen = 'تصحيح مفتوح';
   static const vodafoneOurs = 'باقي فودافون لصالحنا';
   static const vodafoneOwed = 'استهلاك فودافون علينا';
+  static const vodafoneCashRemaining = 'باقي فودافون كاش';
   static const balanceAfter = 'الرصيد بعد الحركة';
   static const fullPayment = 'سداد كلي';
   static const partialPayment = 'سداد جزئي';
@@ -211,34 +212,45 @@ abstract final class AppStrings {
   static const byActor = 'بواسطة';
   static const sequence = 'التسلسل';
   static const status = 'الحالة';
-  static const previousDebt = 'مديونية سابقة';
-  static const todayResult = 'نتيجة اليوم';
-  static const todayPaid = 'مدفوع اليوم';
-  static const vodafoneRemaining = 'فودافون المتبقي';
+  static const todayResult = 'إجمالي شغل اليوم';
+  static const todayPaid = 'إجمالي المسدد';
   static const exchangeRate = 'سعر الصرف';
-  static const paid = 'المدفوع';
+  static const paid = 'المسدد';
   static const egpValue = 'القيمة ج.م';
   static const operation = 'العملية';
-  static const vodafoneConsumed = 'فودافون المستهلك';
+  static const vodafoneConsumed = 'مستهلك فودافون';
   static const registerTotals = 'إجماليات السجل من البداية';
 
   /// Day total on the purchases card. The customers headline stays
   /// [totalDebt].
-  static const purchaseTotalDebt = 'إجمالي الدين';
+  static const purchaseTotalDebt = 'إجمالي الديون';
 
   /// Purchases column. Other sections keep [remaining].
   static const purchaseRemaining = 'الباقي';
 
-  /// Purchases rate column. Other sections keep [exchangeRate].
+  /// Purchases rate column. The entry form keeps [exchangeRate].
   static const purchasePrice = 'السعر';
 
   /// Purchases add button. Other sections keep [add].
   static const addPurchaseEntry = 'إضافة معاملة';
 
+  /// Register-total cells. The column headers stay [resultFromServer],
+  /// [paid], [purchaseRemaining], and [vodafoneConsumed].
+  static const registerResult = 'إجمالي الناتج';
+  static const registerRemaining = 'الباقي الحالي';
+  static const registerVodafoneConsumed = 'إجمالي مستهلك فودافون';
+
+  /// Second register row in PurchasesSection. Not the signed day metric.
+  static const registerVodafoneRemaining = 'باقي فودافون كاش الحالي';
+
+  /// Opening editor. The day bar uses [previousValue] for the same amount.
+  static const carriedVodafone = 'فودافون المرحّل';
+  static const actions = 'الإجراءات';
+
   /// `registerTotals.remainingUnits` and `vodafoneRemainingUnits`.
   /// Both are the open day's carried balance. The screen does not add them.
   static const remainingRunningBalance =
-      'الباقي وفودافون المتبقي رصيد متراكم لليوم المفتوح، ويشمل مديونية سابقة، وليس مجموع البطاقات.';
+      'الباقي الحالي وباقي فودافون كاش الحالي رصيد متراكم لليوم المفتوح، وليس مجموع البطاقات.';
   static const kind = 'النوع';
   static const customerName = 'اسم العميل';
   static const modeFull = 'كلي';
@@ -318,7 +330,7 @@ abstract final class AppStrings {
   static const reference = 'المرجع';
   static const actor = 'المنفّذ';
   static const inputValue = 'المدخل';
-  static const resultFromServer = 'نتيجة المشتريات';
+  static const resultFromServer = 'الناتج';
   static const lock = 'مقفل';
   static const expand = 'توسيع';
   static const collapse = 'طي';
