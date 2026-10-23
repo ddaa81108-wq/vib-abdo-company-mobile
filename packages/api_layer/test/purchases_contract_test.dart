@@ -1,6 +1,6 @@
-/// P-04 / DEF-034. The purchases page is the contract shape in
-/// docs/api/evidence/api-samples.json. `days`, `lifetimeTotals`, and `totals`
-/// are not read.
+// P-04 / DEF-034. The purchases page is the contract shape in
+// docs/api/evidence/api-samples.json. `days`, `lifetimeTotals`, and `totals`
+// are not read.
 import 'dart:convert';
 import 'dart:io';
 
