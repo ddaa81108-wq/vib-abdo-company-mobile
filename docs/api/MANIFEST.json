@@ -1,0 +1,33 @@
+{
+  "sourceCommit": "537f073e8fc76ec2ee9120a198272413d5ea68d9",
+  "preparedAt": "2026-10-22T23:01:22.960Z",
+  "synthetic": true,
+  "productionSourceUnchanged": true,
+  "openapiValidation": "SwaggerParser passed, 80 paths, 95 operations including SSE",
+  "checks": "3 isolated financial-policy tests; synthetic UI reconciliation; public HTTPS login/logout and financial comparison; typecheck/lint",
+  "credentialsIncluded": false,
+  "hashes": {
+    "evidence/staging-build-proof.json": "d85324fae5ba5f62adb168c8a8443ad07488a64cc979c72e8d4f37938544220b",
+    "documentation/endpoints.ar.md": "590a3e066155984e5ebd95d18d501a9059004c9bc72dd06892553129a1240b06",
+    "documentation/error-catalog.json": "dddbbf4c8d23958fc32621f7ee4d5af06ec882241182ab10d16d0f9d11bb2e59",
+    "documentation/openapi.json": "2f85b1d95536f15cfd62df9b2400fe7edfc770af4f9ffe5853b2b6a1bbd3b3dc",
+    "documentation/README.ar.md": "06d72f750f39f9fd357ddc3e175dd7e599b96f7247d42fffe6208e228133e357",
+    "documentation/response-types.ts.txt": "aebb9dfe23c0ad1aecb845d90422fc3d55c527debceec3b3195b9787e4946791",
+    "evidence/MATCHING.ar.md": "0d7d7578d2208db18d0695a64420f2a5dc6345f2eef96e9e9a2c3ca049af1fcb",
+    "evidence/api-samples.json": "21b2d5da782124c33f16be6b49adb549beed5858582c8f7bc6a57ae0bb007666",
+    "evidence/reconciliation.json": "ee95cf7dd7981a6b5af127aac96643e4de239235b0fe27773f3389952ffe8923",
+    "evidence/public-verification.json": "42d26e1367f275fcfee602a5ac7df8eed2ff1e1b597fb741caa907d016cca31e",
+    "evidence/01-customer-total.png": "10078847afc67e95acf0cfd716693a2f2b815b0c2edf7cc0ed744b0cfa1398cb",
+    "evidence/02-company-total.png": "66a25817e1acd7068040c21fd3b9869e5d82402ea8b350ff69ba14f33b9cd9e2",
+    "evidence/03-customer-initial.png": "0227b0f8773921be5ad47bdce228f4a23e0d929a342c2990039afd6e2edad166",
+    "evidence/04-customer-after-partial.png": "9d7255c7197264d69c1ebfac382f6bef6031d7c587f80e2fbd550f53706787be",
+    "evidence/05-customer-after-full.png": "3ea029afa32960b89bfb449dbb17e73e06ae38d23fca1433ac58595756392afb",
+    "evidence/06-libyan-deposits.png": "31fae211cc5c2ddbe110661deb5f8cd6f940ed265e531f2360f5a5b648ee5790",
+    "evidence/07-egyptian-deposits.png": "c4f43ab46fa168515567c8ecc8b1a3288a86f07e459aab6e4d9a33192ed681fc",
+    "evidence/08-purchases.png": "c906ffdba7607bc4f61eb5499d66f05556614781738a39892660d0feca5f496e",
+    "evidence/09-treasury.png": "574ef9cba03c542e22f55534f2db2ba88858d344c3c42dec06256d14abd1c888",
+    "evidence/10-collections.png": "c58c24e367d15e781b1022f25ee19d77d7086aef76a5cfffd93da66cac2ff8b8",
+    "evidence/11-public-staging.png": "109c0dd1fe0f64538828ad7a7642897f4fb59ccfbbace3acdddc8cac9a4c4595",
+    "evidence/12-cloudflare-staging-route.png": "d88db6ace1b9f1ce5834c596971436871c6dc41bd400e575b68a011ebec772e0"
+  }
+}

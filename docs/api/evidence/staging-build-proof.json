@@ -1,0 +1,10 @@
+{
+  "version": "0.15.0",
+  "commit": "537f073e8fc76ec2ee9120a198272413d5ea68d9",
+  "builtAt": "2026-10-22T22:46:41.256Z",
+  "dirty": true,
+  "sourceCommit": "537f073e8fc76ec2ee9120a198272413d5ea68d9",
+  "synthetic": true,
+  "note": "dirty=true: staging launcher is uncommitted integration tooling; financial src matches commit. Frozen bundled runtime, independent of later workspace updates.",
+  "serverSha256": "b20fbf649ef9786667c37fb647ca0c21c3a79103ed51e5c3a0b9e13876389b80"
+}

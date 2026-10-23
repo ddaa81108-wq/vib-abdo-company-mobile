@@ -1,0 +1,201 @@
+# خطة التكامل مع عقد الموقع (المرحلة 8)
+
+**المرجع:** العقد `537f073` / apiVersion `1` / schema `50`.
+**المدخلات:** `gap-analysis.ar.md` و`defect-decisions.ar.md` و`staging-readonly-check.ar.md`.
+
+## قواعد الخطة
+
+- **إصلاحات التطبيق تطابق المسارات الموجودة في `openapi.json`.** طلب تغيير الخادم لـ DEF-037 مكتوب في `server-requests.ar.md` ولا يُنفَّذ داخل PRs التطبيق. **الاعتماد المالي النهائي موقوف** حتى يُشحن ذلك الإصلاح ويجتاز اختبار انقطاع الاتصال وإعادة المحاولة.
+- **PR صغير لكل بند**، يُفتح من `main` الحالي ويمر بالوظائف الثلاث في `ci.yml`. لا دمج قبل مراجعة الـ senior وQA للبند.
+- **الـ Fake وfixtures تتبع العقد.** كل PR يغيّر شكل رد يحدّث `FakeApiClient` واختبار عقد من `docs/api/evidence/api-samples.json`.
+- **لا بيانات دخول في المستودع.** staging يُشغَّل فقط من GitHub Environment `staging` بأسرار مُقنَّعة.
+
+## المالكون
+
+| الرمز | الدور | النطاق |
+|---|---|---|
+| **API** | مهندس تكامل API وأمان تطبيقات | `packages/api_layer`، والجلسة، والصلاحيات، والإشعارات، والتخزين الآمن |
+| **UI** | مطور Flutter واجهات وتجربة مستخدم | `lib/features/*`، والعرض والنصوص |
+| **QA** | مهندس اختبار وضمان جودة | الاختبارات، وسجل العيوب، والقبول على staging |
+| **SR** | مهندس Flutter أول | المعمارية، ومراجعة كل PR، وطابور الكتابة |
+| **OPS** | مهندس DevOps وإصدار Android | CI، وأسرار staging، والبناء والتوقيع |
+
+## الترتيب
+
+| # | PR | المالك (مراجع) | يعتمد على | الشدة المغلقة |
+|---|---|---|---|---|
+| P-00 | هذا الـ PR: العقد والتحليل | API (SR, QA) | — | — |
+| P-01 | أسرار staging وتشغيل smoke يدويًا | OPS (API) | P-00 | تمكين |
+| P-02 | fixtures العقد واختبار عقد للنماذج | QA + API (SR) | P-00 | تمكين |
+| P-03 | الاستلامات: قرار المدير بلا `version` | API (SR, QA) | P-02 | G-01 حرج |
+| P-04 | المشتريات: شكل الرد و`registerTotals` | API → UI (SR, QA) | P-02 | G-02 / DEF-034 حرج |
+| P-05 | المشتريات: نسختا الصف واليوم | API (QA) | P-04 | G-06 عالٍ |
+| P-06 | الخزينة: `cashVersion` والشكل المسطّح | API (QA) | P-02 | G-04 عالٍ |
+| P-07 | التثبيت: `isPinned` + `expectedVersion` | API (QA) | P-02 | G-05 عالٍ |
+| P-08 | الصلاحيات بلا `sectionAccess` | API (SR, QA) | — | G-15 عالٍ |
+| P-09 | تحويل الأخطاء | API (SR, QA) | — | G-07 عالٍ |
+| P-10 | تسلسل الكتابات مع CSRF | SR + API (QA) | P-09 | G-08 عالٍ |
+| P-11 | تخفيف DEF-037 **مؤقت**: منع الإرسال التلقائي | API + UI (SR, QA) | P-03, P-10 | G-03 حرج (مؤقت، لا يرفع الإيقاف) |
+| P-12 | المسارات غير الموجودة | API (UI, QA) | — | G-09 متوسط |
+| P-13 | `checkDuplicate`/`allowDuplicate` | API + UI (QA) | P-09 | G-10 متوسط |
+| P-14 | العرض: عنوان الملخص، ودفتر المالية، والتقارير | UI (API, QA) | P-02 | G-11, G-12 / DEF-030 |
+| P-15 | تحذير السداد الأكبر من الرصيد ثم رصيد الخادم | UI + API (QA) | قرار Ali (DEF-031) | G-13 / DEF-031 |
+| P-16 | الـ Fake: ملخص يعبر الصفر | API (QA) | P-02 | DEF-028 |
+| P-17 | الترقيم و`nextBefore` | API (QA) | P-04, P-06 | G-14 منخفض |
+| P-18 | توثيق الإغلاقات (DEF-029/033/035) | QA (API) | P-00 | توثيق |
+| P-19 | قبول staging الكامل وجدول MATCHING | QA (كل الفريق) | P-01…P-17 وبوابة DEF-037 | قبول |
+| P-20 | إيقاف ربط الاستلام المستقل بحساب مصري مؤقتًا | UI + API (QA) | P-00 | DEF-035 |
+
+P-08 وP-09 وP-12 مستقلة، ويمكن أن تسير بالتوازي مع P-03…P-07.
+
+---
+
+### P-01: أسرار staging وتشغيل smoke (OPS)
+
+- **النطاق:**
+  - إنشاء أسرار Environment `staging` (`STAGING_API_BASE` و`STAGING_ADMIN_USERNAME` و`STAGING_ADMIN_PASSWORD`، وأسرار الأدوار المحدودة الموجودة في `.github/workflows/staging-negative-permissions.yml:51-59`) من القناة الآمنة. لا تُلصق في issue أو PR.
+  - **`STAGING_API_BASE` هو الأصل `https://staging.vip2100.com` بلا `/erp`** (`staging-readonly-check.ar.md` §4).
+  - إضافة workflow `workflow_dispatch` بـ `environment: staging` يشغّل `flutter test packages/api_layer/test/phase7/staging_smoke_test.dart` بالأسرار من `env:`، بنمط الإقناع (`::add-mask::`) ورفض الأصل الإنتاجي نفسه في `staging-negative-permissions.yml`. لا يُشغَّل على `pull_request`.
+  - أي سكربت CI يستدعي staging يستخدم UA غير `Python-urllib`، لأن Cloudflare يحجبه بـ 403.
+- **القبول:**
+  - تشغيل يدوي يمر بـ P7-01 للقراءة (login و`/api/me` والقائمة).
+  - السجل لا يحتوي أي قيمة سر.
+  - يبقى المسار الاختياري `STAGING_SMOKE_ACCOUNT_ID` (كتابة pin) **غير مضبوط** حتى يُدمج P-07، لأن جسمه الحالي `pinned` بلا `expectedVersion` (G-05).
+
+### P-02: fixtures العقد (QA + API)
+
+- **النطاق:** اختبار في `packages/api_layer/test/contract/` يقرأ أمثلة `api-samples.json` والأمثلة المضمّنة في `openapi.json`، ويحللها بالنماذج الحالية: `AccountsPage` و`LedgerPage` و`TreasuryOverview` و`PurchasesBookPage` و`CollectionsOverviewDto` و`NotificationsPage` و`ProfileDto`. الاختبارات التي تفشل اليوم تُوسم `skip` مع رقم G، وتُفك في PR الإصلاح.
+- **القبول:** الاختبار يعمل في CI. كل G في §0 من `gap-analysis.ar.md` يقابله اختبار.
+
+### P-03: الاستلامات بلا `version` (API)
+
+- **النطاق:**
+  - `collections_repository.dart:71-77`: لا يُشترط `expectedVersion` في `decide` و`markCashReceived` وقبول الاستلام غير المربوط، لأن العقد لا يأخذه في هذه الأجسام.
+  - إزالة `version` الإلزامي من نماذج `submissions[]` و`unlinkedReceipts[]`.
+  - الحماية من التضارب تأتي من حالة الصف (`status`) ورد 409 الخاص بالحالة.
+  - تحديث الـ Fake ليكف عن إرجاع `version` هنا.
+- **القبول:**
+  - موافقة المدير ورفضه و«استلام النقدية» تعمل على Fake مطابق للعقد.
+  - fixture `collections` يُحلَّل.
+  - اختبار: قرار على صف حالته تغيّرت يعيد 409 ويُعرض كتعارض.
+
+### P-04: المشتريات، الشكل (API ثم UI)
+
+- **النطاق:**
+  - نموذج جديد يحوي `merchant` و`day{...,version}` و`entries[]{version,dayVersion}` و`nextBefore` و`registerTotals{resultUnits,paidUnits,remainingUnits,vodafoneConsumedUnits,vodafoneRemainingUnits}`.
+  - حذف القراءة من `days` و`lifetimeTotals`/`totals`.
+  - إزالة وسم 🔶 عن فودافون (DEF-033).
+  - في الواجهة: عرض `registerTotals` مع نص يوضح أن «المتبقي» رصيد متراكم.
+- **القبول:** لقطة الواجهة على Fake تطابق `evidence/08-purchases.png` في الحقول والعملات. fixture المشتريات يمر. QA يغلق DEF-034 بعد التحقق على staging.
+
+### P-05: كتابات المشتريات (API)
+
+- **النطاق:** PATCH وDELETE للإدخال يرسلان `expectedVersion` (نسخة الإدخال) و`expectedDayVersion`. التصحيح يرسل `expectedVersion` اليوم. يطابق `openapi.json` لمسارات `/api/purchases/{merchant}/entries/{id}` و`/api/purchases/{merchant}/days/{id}/correction`.
+- **القبول:** اختبار جسم الطلب لكل مسار. 409 `VERSION_CONFLICT` يحدّث الصفحة ويحتفظ بالمدخل.
+
+### P-06: الخزينة (API)
+
+- **النطاق:** قراءة `cashVersion` كنسخة لكتابات النقدية (`treasury_models.dart:52`). نموذج الإجماليات مسطّح بلا `totals`. `egyptianConvertedUnits` و`netUnits` قابلان لـ null (DEF-032 محفوظ).
+- **القبول:** قيد نقدية يرسل `expectedVersion = cashVersion`. fixture الخزينة يمر.
+
+### P-07: التثبيت (API)
+
+- **النطاق:** جسم `isPinned` + `expectedVersion` (نسخة الكارت) بدل `pinned` (`accounts_repository.dart:133`).
+- **القبول:** اختبار الجسم. بعده يجوز لـ OPS ضبط `STAGING_SMOKE_ACCOUNT_ID` على كارت اختباري فقط.
+
+### P-08: الصلاحيات (API + SR)
+
+- **النطاق:** `PermissionService`: عند غياب `sectionAccess` من `/api/me`، وهو الحال على staging، يكفي رمز `<section>.read` و`.write` للموظف. يبقى المدير بلا قيد. لا يُبنى أي قرار أمني على الواجهة: الخادم يحكم و403 `PERMISSION_DENIED` يُعرض.
+- **القبول:**
+  - على Fake بحمولة `/api/me` المطابقة لما رصدناه: المحدود يرى الأقسام الثمانية ولا يرى دفتر المالية، والمحصّل يرى الاستلامات فقط.
+  - اختبارات الصلاحيات السالبة الحالية (وظيفة «Negative permission tests») تبقى خضراء.
+
+### P-09: تحويل الأخطاء (API)
+
+- **النطاق:** `error_mapper.dart:124-135`.
+  - `409 CLIENT_VERSION_MISMATCH` يتحول إلى «حدّث التطبيق»، لا تعارض.
+  - `403 CSRF_REJECTED` يمر بمسار جلب CSRF مرة واحدة.
+  - `401 INVALID_CURRENT_PASSWORD` في تغيير كلمة المرور لا يمسح الجلسة.
+  - `409 PENDING_SUBMISSION_EXISTS` و`FULL_AMOUNT_CHANGED` و`NO_POSITIVE_DEBT` و`DUPLICATE_SAME_WORKDAY` تُعرض برسائل محددة.
+  - `details.field` يُقرأ صحيحًا.
+  - MFA: عند `MFA_REQUIRED` تظهر رسالة «غير مدعوم في التطبيق»، دون تنفيذ تدفق جديد.
+- **القبول:** اختبار لكل كود في `error-catalog.json` يحدد الاستثناء الناتج.
+
+### P-10: تسلسل الكتابات مع CSRF (SR + API)
+
+- **النطاق:** `GET /api/auth/csrf` يلغي الرمز السابق. لذلك تمر كل الكتابات بطابور واحد (mutex) داخل `CookieCsrfAuthStrategy`، ويبقى تجديد الرمز single-flight ويُعاد الطلب مرة واحدة. لا تغيير في GET.
+- **القبول:** اختبار: كتابتان متزامنتان مع رمز منتهي، فيحدث جلب CSRF واحد، وتنجح الكتابتان، ولا حلقة.
+
+### P-11: تخفيف DEF-037 مؤقت (API + UI)
+
+هذا البند **مؤقت فقط**. منع الإرسال التلقائي لا يغلق DEF-037 ولا يرفع إيقاف الاعتماد المالي.
+
+- **النطاق:** كما في `defect-decisions.ar.md` (DEF-037، البنود 1–6):
+  - لا إعادة آلية إلى أن يصبح إصلاح الخادم هو الحماية.
+  - بعد فشل غير حاسم: GET `/api/collections` وفحص التكليف قبل السماح بالإعادة.
+  - `checkDuplicate:true`.
+  - تنبيه المدير للتقديمات المتقاربة.
+- **القبول:** اختبار «ضياع الرد، ثم اعتماد، ثم إعادة»: التطبيق لا يرسل تقديمًا ثانيًا دون عرض الحالة وتأكيد صريح. النجاح هنا لا يُعد اعتمادًا ماليًا.
+
+### P-12: المسارات غير الموجودة (API)
+
+- **النطاق:**
+  - عدّاد الإشعارات من `unreadCount` في `GET /api/notifications` بدل `/api/notifications/unread-count` (`lib/state/notification_providers.dart:34,281`).
+  - إيقاف تسجيل `/api/mobile-push/devices` خلف علم معطّل.
+  - مجاميع الموظفين من `employeeTotals` في `GET /api/collections` للمدير، مع إخفاء البطاقة لغيره.
+  - إخفاء `/api/home` و`/api/statements/pdf`.
+- **القبول:** لا طلب في التطبيق إلى مسار غير موجود في `openapi.json`. فحص آلي يقارن `ApiEndpoints` بالعقد.
+
+### P-13: التكرار (API + UI)
+
+- **النطاق:** إرسال `checkDuplicate:true` في المسارات الداعمة. عند `DUPLICATE_SAME_WORKDAY` يُسأل المستخدم، ثم يُعاد الطلب بـ `allowDuplicate:true` و**`requestId` جديد**.
+- **القبول:** اختبار المسار مع Fake يحاكي 409.
+
+### P-14: العرض (UI)
+
+- **النطاق:**
+  - عنوان الملخص: `totalDebt` للعملاء والشركات و`netBalance` للأمانات (`account_list_screen.dart:605-612`).
+  - دفتر المالية يقرأ `sectionKey`/`sourceStatus`/`occurredAt`.
+  - التقارير تقرأ `current` و`daily` و`summary`، وتحذف `netChangeUnits`.
+- **القبول:** مطابقة لقطات `evidence/01..10` في الحقول.
+
+### P-15: تحذير السداد الأكبر من الرصيد (UI، بدعم api_layer)
+
+- **النطاق:** قرار Ali في DEF-031. لا رفض. قبل تأكيد الدفع، وبعد جلب حديث للكارت، يظهر تحذير فيه الرصيد المتوقع. نص المثال: «الدفع يتجاوز الرصيد بـ100 د.ل وسيصبح الرصيد −100 د.ل. هل تريد المتابعة؟». بعد النجاح تعرض الواجهة الرصيد الفعلي الذي يعيده الخادم، لا فرقًا حسبه التطبيق. api_layer يوفّر جلب الكارت وقراءة رصيد الرد.
+- **القبول:**
+  - مبلغ أكبر من الرصيد لا يُحجب. الحوار يظهر قبل الإرسال ويعرض الرصيد المتوقع.
+  - بعد 200، الرقم على الشاشة هو `balanceUnits` في رد الخادم.
+  - إلغاء الحوار لا يرسل الطلب.
+
+### P-16 إلى P-18
+
+- **P-16:** `_accountsView` يحسب `totalDebt = Σ max(b,0)` (DEF-028).
+- **P-17:** `Paged.hasMore` يعتمد `nextBefore` أو `nextCursor` (`common.dart:108`).
+- **P-18:** QA يسجل إغلاق DEF-029 وDEF-033 والجزء المرتبط من DEF-035 (LYD) مع الإحالة، ويزيل الوسوم 🔶. ربط الاستلام المستقل بالمصري يبقى مفتوحًا حتى قرار الشركة (P-20).
+
+### P-19: قبول staging (QA)
+
+- **النطاق:**
+  - تشغيل P-01 smoke بالأدوار الثلاثة.
+  - ملء عمود Flutter في `evidence/MATCHING.ar.md` لكل شاشة.
+  - إعادة سيناريوهات القبول في `README.ar.md:105`: سداد جزئي، وأكبر من الرصيد، وإعادة الفتح، وsingle-flight.
+  - الكتابات على staging فقط ببيانات اختبارية وبموافقة Ali المسبقة.
+- **بوابة الاعتماد المالي (DEF-037):** لا اعتماد مالي نهائي قبل أن يُشحن إصلاح الخادم في القسم أ من `server-requests.ar.md` ويجتاز اختبار انقطاع الاتصال وإعادة المحاولة (نتيجة مطابقة، تحصيل واحد، وترحيل الدين مرة واحدة) واختبار التوازي. P-11 لا يفتح هذه البوابة. التصميم والاختبارات على staging يستمران أثناء الانتظار.
+- **القبول:** تطابق صحيح دون فرق مالي، بالشروط نفسها التي يفرضها الموقع، وبعد فتح بوابة DEF-037.
+
+### P-20: إيقاف ربط الاستلام المستقل بحساب مصري (UI + API)
+
+إيقاف مؤقت في التطبيق حتى تحدد الشركة عملة الإيصال، وهل يُسمح بالتحويل، والسعر والتقريب. لا قيم تُخترع هنا.
+
+- **النطاق:** مرشح الربط لا يعرض قسم `egyptian_deposits`، ورفض الربط إليه إن وصل `sectionKey` من الخادم. الاستلام المرتبط بـ LYD لا يتغير. لا تحويل ولا سعر في التطبيق.
+- **القبول:**
+  - لا يمكن ربط إيصال مستقل بحساب مصري من الواجهة.
+  - ربط الأقسام ذات عملة LYD يبقى متاحًا كما هو.
+  - اختبار واجهة يثبت أن بطاقة المصري غير قابلة للاختيار.
+- **المالك:** UI، وapi_layer إن لزم تصفية `sectionKey` قبل العرض. QA يراجع القبول.
+
+## خارج النطاق
+
+- تنفيذ إصلاح الخادم نفسه. طلب DEF-037 وبنود DEF-035 التي تفرضها الشركة لاحقًا مسودة في `server-requests.ar.md` يرسلها Ali. إضافة `sectionAccess` إلى `/api/me` تبقى خارج التطبيق.
+- تدفق MFA كامل.
+- إشعارات الدفع، لأن مسار التسجيل غير موجود في العقد.

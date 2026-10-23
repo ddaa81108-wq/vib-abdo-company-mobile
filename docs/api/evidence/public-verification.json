@@ -1,0 +1,465 @@
+{
+  "baseUrl": "https://staging.vip2100.com",
+  "checkedAt": "2026-10-22T22:58:11.108Z",
+  "synthetic": true,
+  "health": {
+    "ok": true,
+    "data": {
+      "status": "ready",
+      "apiVersion": "1",
+      "schemaVersion": "50",
+      "uiVersion": "0.15.0",
+      "build": {
+        "version": "0.15.0",
+        "commit": "537f073e8fc76ec2ee9120a198272413d5ea68d9",
+        "builtAt": "2026-10-22T22:46:41.256Z",
+        "dirty": true
+      },
+      "time": "2026-10-22T22:57:53.374Z"
+    }
+  },
+  "https": true,
+  "secureCookie": true,
+  "httpOnlyCookie": true,
+  "sameSite": "Strict",
+  "publicLogin": true,
+  "publicLogout": true,
+  "financialComparison": "matches local phase after full payment",
+  "data": {
+    "/api/me": {
+      "user": {
+        "id": "a9e84beb-8b4e-4cd6-8788-7be5cce76d64",
+        "username": "android-admin",
+        "displayName": "مدير الاختبار",
+        "role": "admin",
+        "isOwner": true,
+        "mustChangePassword": false,
+        "permissions": []
+      },
+      "apiVersion": "1",
+      "schemaVersion": "50"
+    },
+    "/api/customers": {
+      "items": [
+        {
+          "id": "0850d816-6dc0-4d85-b46f-fb0a6ef1cb11",
+          "name": "عميل المطابقة ألف",
+          "phone": null,
+          "version": 3,
+          "activeCycleId": "951e9460-9aee-4cd3-ad5d-c3c6ada272d2",
+          "openingBalanceUnits": 0,
+          "balanceUnits": 0,
+          "currency": "LYD",
+          "isPinned": false,
+          "inactiveSince": "2026-10-22T22:33:51.536Z",
+          "zeroReview": {
+            "pending": true,
+            "financialVersion": 2,
+            "reviewedAt": null,
+            "reviewedByName": null
+          },
+          "hiddenFromDefault": false,
+          "debtStartedAt": null,
+          "debtAgeDays": null,
+          "activeAssigneeName": null,
+          "systemManaged": false,
+          "systemLinkKey": null,
+          "nextSequence": 4,
+          "createdAt": "2026-10-22T22:33:24.984Z",
+          "updatedAt": "2026-10-22T22:33:51.536Z"
+        },
+        {
+          "id": "0342102a-b304-4e81-a4b7-a08081516bfa",
+          "name": "عميل تحصيل الاختبار",
+          "phone": null,
+          "version": 2,
+          "activeCycleId": "0a36934d-f387-42c2-8a45-460d5e5df8ed",
+          "openingBalanceUnits": 0,
+          "balanceUnits": 300,
+          "currency": "LYD",
+          "isPinned": false,
+          "inactiveSince": null,
+          "zeroReview": {
+            "pending": false,
+            "financialVersion": 1,
+            "reviewedAt": null,
+            "reviewedByName": null
+          },
+          "hiddenFromDefault": false,
+          "debtStartedAt": "2026-10-22T22:33:25.074Z",
+          "debtAgeDays": 0,
+          "activeAssigneeName": "محصل الاختبار",
+          "systemManaged": false,
+          "systemLinkKey": null,
+          "nextSequence": 3,
+          "createdAt": "2026-10-22T22:33:25.074Z",
+          "updatedAt": "2026-10-22T22:33:25.561Z"
+        },
+        {
+          "id": "f10ba11d-03b3-411b-a7c9-83fd74347002",
+          "name": "عميل المطابقة باء",
+          "phone": null,
+          "version": 1,
+          "activeCycleId": "27e100cd-624c-4d7f-bbc3-f143a64d180a",
+          "openingBalanceUnits": 0,
+          "balanceUnits": 250,
+          "currency": "LYD",
+          "isPinned": false,
+          "inactiveSince": null,
+          "zeroReview": {
+            "pending": false,
+            "financialVersion": 0,
+            "reviewedAt": null,
+            "reviewedByName": null
+          },
+          "hiddenFromDefault": false,
+          "debtStartedAt": "2026-10-22T22:33:25.025Z",
+          "debtAgeDays": 0,
+          "activeAssigneeName": null,
+          "systemManaged": false,
+          "systemLinkKey": null,
+          "nextSequence": 2,
+          "createdAt": "2026-10-22T22:33:25.025Z",
+          "updatedAt": "2026-10-22T22:33:25.025Z"
+        }
+      ],
+      "nextCursor": null,
+      "totalItems": 3,
+      "summary": {
+        "netBalance": 550,
+        "totalDebt": 550,
+        "activeCards": 2,
+        "pendingReviewCount": 1
+      }
+    },
+    "/api/companies": {
+      "items": [
+        {
+          "id": "6a5e98aa-4b58-4f80-9ca2-c4f83fec77ea",
+          "name": "شركة المطابقة",
+          "phone": null,
+          "version": 1,
+          "activeCycleId": "9c85602e-f3d9-42e1-babe-968b729c4c92",
+          "openingBalanceUnits": 0,
+          "balanceUnits": 2000,
+          "currency": "LYD",
+          "isPinned": false,
+          "inactiveSince": null,
+          "hiddenFromDefault": false,
+          "debtStartedAt": "2026-10-22T22:33:25.125Z",
+          "debtAgeDays": 0,
+          "activeAssigneeName": null,
+          "systemManaged": false,
+          "systemLinkKey": null,
+          "nextSequence": 2,
+          "createdAt": "2026-10-22T22:33:25.125Z",
+          "updatedAt": "2026-10-22T22:33:25.125Z"
+        }
+      ],
+      "nextCursor": null,
+      "totalItems": 1,
+      "summary": {
+        "netBalance": 2000,
+        "totalDebt": 2000,
+        "activeCards": 1,
+        "pendingReviewCount": 0
+      }
+    },
+    "/api/libyan-deposits": {
+      "items": [
+        {
+          "id": "f9190077-ed2b-4cdb-a937-deba81f17085",
+          "name": "أمانة ليبية اختبار",
+          "phone": null,
+          "version": 1,
+          "activeCycleId": "dbcc8541-42eb-4cb1-b865-863e608a8da5",
+          "openingBalanceUnits": 0,
+          "balanceUnits": 300,
+          "currency": "LYD",
+          "isPinned": false,
+          "inactiveSince": null,
+          "hiddenFromDefault": false,
+          "debtStartedAt": "2026-10-22T22:33:25.181Z",
+          "debtAgeDays": 0,
+          "activeAssigneeName": null,
+          "systemManaged": false,
+          "systemLinkKey": null,
+          "nextSequence": 2,
+          "createdAt": "2026-10-22T22:33:25.181Z",
+          "updatedAt": "2026-10-22T22:33:25.181Z"
+        }
+      ],
+      "nextCursor": null,
+      "totalItems": 1,
+      "summary": {
+        "netBalance": 300,
+        "totalDebt": 300,
+        "activeCards": 1,
+        "pendingReviewCount": 0
+      }
+    },
+    "/api/egyptian-deposits": {
+      "items": [
+        {
+          "id": "system-egp-vodafone:org-default",
+          "name": "فودافون قسم المشتريات",
+          "phone": null,
+          "version": 3,
+          "activeCycleId": "system-egp-vodafone-cycle:org-default",
+          "openingBalanceUnits": 0,
+          "balanceUnits": 4900,
+          "currency": "EGP",
+          "isPinned": true,
+          "inactiveSince": null,
+          "hiddenFromDefault": false,
+          "debtStartedAt": null,
+          "debtAgeDays": null,
+          "activeAssigneeName": null,
+          "systemManaged": true,
+          "systemLinkKey": "purchases_vodafone_remainder",
+          "nextSequence": 1,
+          "createdAt": "2026-10-22 22:33:23",
+          "updatedAt": "2026-10-22T22:33:25.399Z"
+        },
+        {
+          "id": "3f1487e2-9be7-4fce-944a-7889513b3fa4",
+          "name": "أمانة مصرية اختبار",
+          "phone": null,
+          "version": 1,
+          "activeCycleId": "eebcb0ac-06a8-43db-96b1-435d166100f6",
+          "openingBalanceUnits": 0,
+          "balanceUnits": 10000,
+          "currency": "EGP",
+          "isPinned": false,
+          "inactiveSince": null,
+          "hiddenFromDefault": false,
+          "debtStartedAt": "2026-10-22T22:33:25.214Z",
+          "debtAgeDays": 0,
+          "activeAssigneeName": null,
+          "systemManaged": false,
+          "systemLinkKey": null,
+          "nextSequence": 2,
+          "createdAt": "2026-10-22T22:33:25.214Z",
+          "updatedAt": "2026-10-22T22:33:25.214Z"
+        },
+        {
+          "id": "system-egp-masraweya:org-default",
+          "name": "قسم المصراوية",
+          "phone": null,
+          "version": 1,
+          "activeCycleId": "system-egp-masraweya-cycle:org-default",
+          "openingBalanceUnits": 0,
+          "balanceUnits": 0,
+          "currency": "EGP",
+          "isPinned": true,
+          "inactiveSince": "2026-10-22 22:33:23",
+          "hiddenFromDefault": false,
+          "debtStartedAt": null,
+          "debtAgeDays": null,
+          "activeAssigneeName": null,
+          "systemManaged": true,
+          "systemLinkKey": "masraweya_remainder",
+          "nextSequence": 1,
+          "createdAt": "2026-10-22 22:33:23",
+          "updatedAt": "2026-10-22 22:33:23"
+        }
+      ],
+      "nextCursor": null,
+      "totalItems": 3,
+      "summary": {
+        "netBalance": 14900,
+        "totalDebt": 14900,
+        "activeCards": 2,
+        "pendingReviewCount": 0
+      }
+    },
+    "/api/purchases/al_bayan": {
+      "merchant": {
+        "key": "al_bayan",
+        "name": "البيان"
+      },
+      "day": {
+        "id": "9b294ca8-fc62-459e-ba56-5312e94681a9",
+        "dayNumber": 1,
+        "businessDate": "2026-10-23",
+        "status": "draft",
+        "previousDebtUnits": 0,
+        "previousVodafoneUnits": 5000,
+        "todayResultUnits": 100,
+        "todayPaidUnits": 20,
+        "totalDebtUnits": 80,
+        "vodafoneRemainingUnits": 4900,
+        "version": 2,
+        "correctionOpen": false
+      },
+      "entries": [
+        {
+          "id": "d0f6a687-1267-471b-831e-a4568602d82c",
+          "dayId": "9b294ca8-fc62-459e-ba56-5312e94681a9",
+          "sequence": 1,
+          "dayNumber": 1,
+          "businessDate": "2026-10-23",
+          "dayStatus": "draft",
+          "dayClosingDebtUnits": 80,
+          "itemCode": "custom",
+          "itemLabel": "مشتريات اختبار",
+          "egpValueUnits": 1000,
+          "calculationMode": "divide",
+          "exchangeRate": 10,
+          "resultUnits": 100,
+          "paidUnits": 20,
+          "remainingUnits": 80,
+          "vodafoneConsumedUnits": 100,
+          "actorName": "مدير الاختبار",
+          "actorIsOwner": true,
+          "version": 1,
+          "dayVersion": 2,
+          "correctionOpen": false,
+          "createdAt": "2026-10-22T22:33:25.399Z",
+          "updatedAt": "2026-10-22T22:33:25.399Z"
+        }
+      ],
+      "nextBefore": null,
+      "registerTotals": {
+        "resultUnits": 100,
+        "paidUnits": 20,
+        "remainingUnits": 80,
+        "vodafoneConsumedUnits": 100,
+        "vodafoneRemainingUnits": 4900
+      }
+    },
+    "/api/treasury": {
+      "currency": "LYD",
+      "receivablesUnits": 2550,
+      "liabilitiesUnits": 380,
+      "activeCashUnits": 500,
+      "egyptianSourceUnits": 14900,
+      "egyptianConvertedUnits": 1490,
+      "egyptianRate": 10,
+      "egyptianRateUpdatedAt": "2026-10-22T22:33:25.306Z",
+      "netUnits": 4160,
+      "cashVersion": 1,
+      "sources": {
+        "customers": 550,
+        "companies": 2000,
+        "purchases": 80,
+        "libyanDeposits": 300,
+        "egyptianDeposits": 14900
+      }
+    },
+    "/api/collections": {
+      "assignments": [
+        {
+          "id": "25b85f67-5977-40b6-b891-e278e59817b8",
+          "customerId": "0342102a-b304-4e81-a4b7-a08081516bfa",
+          "assigneeUserId": "023445ca-7951-4ccf-82b3-f5698f08148c",
+          "status": "active",
+          "businessDate": "2026-10-23",
+          "batchId": "75a8a1c0-0c23-4d5a-8598-4c9d8c6dd869",
+          "assignedAt": "2026-10-22T22:33:25.497Z",
+          "customerName": "عميل تحصيل الاختبار",
+          "phone": null,
+          "customerVersion": 2,
+          "assigneeName": "محصل الاختبار",
+          "balanceUnits": 300,
+          "hasPending": 1,
+          "latestMode": "partial",
+          "latestStatus": "pending",
+          "latestCashReceivedAt": null,
+          "latestDecisionAt": null,
+          "externalFinancialUpdatedAt": "2026-10-22T22:33:25.497Z",
+          "latestSubmissionAt": "2026-10-22T22:33:25.715Z",
+          "cashOutstandingCount": 1
+        }
+      ],
+      "submissions": [
+        {
+          "id": "d37f68dd-814d-4a9b-908b-278e1a259b2f",
+          "assignmentId": "25b85f67-5977-40b6-b891-e278e59817b8",
+          "customerId": "0342102a-b304-4e81-a4b7-a08081516bfa",
+          "collectorUserId": "023445ca-7951-4ccf-82b3-f5698f08148c",
+          "mode": "partial",
+          "amountUnits": 50,
+          "status": "pending",
+          "businessDate": "2026-10-23",
+          "batchId": "75a8a1c0-0c23-4d5a-8598-4c9d8c6dd869",
+          "submittedAt": "2026-10-22T22:33:25.715Z",
+          "decidedAt": null,
+          "decisionNote": "",
+          "cashReceivedAt": null,
+          "customerName": "عميل تحصيل الاختبار",
+          "phone": null,
+          "collectorName": "محصل الاختبار"
+        },
+        {
+          "id": "ec6a801b-377e-4fb5-9aca-aa8efdb252ea",
+          "assignmentId": "25b85f67-5977-40b6-b891-e278e59817b8",
+          "customerId": "0342102a-b304-4e81-a4b7-a08081516bfa",
+          "collectorUserId": "023445ca-7951-4ccf-82b3-f5698f08148c",
+          "mode": "partial",
+          "amountUnits": 100,
+          "status": "approved",
+          "businessDate": "2026-10-23",
+          "batchId": "75a8a1c0-0c23-4d5a-8598-4c9d8c6dd869",
+          "submittedAt": "2026-10-22T22:33:25.523Z",
+          "decidedAt": "2026-10-22T22:33:25.560Z",
+          "decisionNote": "",
+          "cashReceivedAt": null,
+          "customerName": "عميل تحصيل الاختبار",
+          "phone": null,
+          "collectorName": "محصل الاختبار"
+        }
+      ],
+      "unlinkedReceipts": [
+        {
+          "id": "ef293fb5-7a04-4e24-8624-3e02fd9c8115",
+          "customerName": "استلام مستقل للاختبار",
+          "amountUnits": 75,
+          "status": "pending",
+          "submittedAt": "2026-10-22T22:33:25.792Z",
+          "businessDate": "2026-10-23",
+          "batchId": "75a8a1c0-0c23-4d5a-8598-4c9d8c6dd869",
+          "linkedCustomerId": null,
+          "entryType": null,
+          "decidedAt": null,
+          "decisionNote": "",
+          "cashReceivedAt": null,
+          "collectorName": "محصل الاختبار"
+        }
+      ],
+      "outstandingCancelledSubmissions": [],
+      "metrics": {
+        "collectedUnits": 100,
+        "pendingCount": 1,
+        "executedCount": 1,
+        "cashOutstandingUnits": 100,
+        "unlinkedPendingCount": 1
+      },
+      "employeeTotals": [
+        {
+          "employeeId": "023445ca-7951-4ccf-82b3-f5698f08148c",
+          "employeeName": "محصل الاختبار",
+          "collectedUnits": 100,
+          "approvedCount": 1,
+          "pendingCount": 2
+        },
+        {
+          "employeeId": "b6885015-cb21-4636-a115-d511074485c8",
+          "employeeName": "مشرف اختبار محدود",
+          "collectedUnits": 0,
+          "approvedCount": 0,
+          "pendingCount": 0
+        }
+      ],
+      "assignedCount": 1,
+      "openBatches": [
+        {
+          "id": "75a8a1c0-0c23-4d5a-8598-4c9d8c6dd869",
+          "businessDate": "2026-10-23",
+          "batchNumber": 1,
+          "openedAt": "2026-10-22T22:33:25.497Z"
+        }
+      ]
+    }
+  }
+}
