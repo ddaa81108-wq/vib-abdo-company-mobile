@@ -18,6 +18,8 @@
 | عيب بديل اختبار، بلا أثر إنتاج | DEF-021. Verified closed على `main` `c40e03d` بعد squash #54. الشاشة كانت تُبطل `collectionsProvider` وتعيد قراءة النظرة. الصف كان يغيب لأن `FakeApiClient` لا يخزّن الإرسال. فحص الخادم الحقيقي يبقى سؤال staging وليس عيبًا مفتوحًا |
 | Blocking على فرع وليس على `main` | لا يبقى. DEF-018 صار Verified closed على `main` `a5ca268` |
 | Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `86324a4` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل، والاختبار `DEF-012 admin settings replace the old unavailable sentence` يتوقع `employeesEmpty` و`auditEmpty` و`operationsEmpty`. خارج المرحلة 6 |
+| Non-blocking مفتوح — المرحلة 8 | DEF-028 وDEF-029 وDEF-030 وDEF-031 وDEF-033 وDEF-034 وDEF-035 ما زالت مفتوحة. DEF-028 سلوك Fake وليس دليل الموقع. DEF-029 مقياس الوحدة غير مؤكد. DEF-030 نطاق الملخص. DEF-031 سقف السداد من رصيد مخزَّن. DEF-033 عملة فودافون. DEF-034 مفاتيح المشتريات. DEF-035 عملة الاستلامات. التالي الحر DEF-037 |
+| Closed على `main` `82a6807` | DEF-032 وDEF-036. DEF-032 أُغلق بسكواش #61 `e326ac0`. DEF-036 أُغلق بسكواش #62 `82a6807`. أُعيد التحقق على `main` |
 | Verified closed على `main` `86324a4` | DEF-026 وDEF-027. DEF-026 أُغلق بإصلاح #59 (`6957df3`، الحبر `#5F6E69`). DEF-027 أُغلق بإصلاح #58 (`6b3e8e6`، squash على `main` هو `86324a4`). كانا غير مانعين |
 | Verified closed على `main` `2a45cfb` | DEF-023 وDEF-024 وDEF-025. squash #57 `213e04a`. اختبارات التباين الثلاثة نجحت داخل `tool/check.sh` **432/0**. `#7C6100` في سمة الوضع الفاتح |
 | Verified closed على `main` `c40e03d` | DEF-019 وDEF-020 وDEF-021 وDEF-022. DEF-019 كان غير مانع. DEF-020 وDEF-022 كانا مانعين. DEF-021 عيب بديل اختبار |
@@ -956,3 +958,83 @@ CI [39815316603](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions
 - سؤال `requestId` على السلك، وسقف السداد على الخادم الحقيقي، وبطاقة «الاستلامات المعتمدة اليوم»، ومراجعة التصفير بلا كتابة القسم.
 
 تفاصيل البنود التسعة عشر و`P7-01`…`P7-26` في `docs/acceptance/phase-7.md` على #48، القسم هـ.
+
+## جرد المرحلة 8 على `main` `54884d7`
+
+التاريخ 2026-10-22. الالتزام `54884d7e103102b1b9c3bb5bbedff1a2006666ff`. جرد مصادر فقط. لا اختبارات. لا توقيع. لم يُمس كود الإنتاج. جدول المطابقة وقيم Fake في `docs/acceptance/phase-8-reconciliation.md`. عمود الموقع فارغ. لا قيمة موقع مُخترعة.
+
+### DEF-028 — Fake يحسب رصيد السداد الجزئي ويزيح ملخص القسم
+
+**الحالة:** Open على جرد `main` `54884d7`. غير مانع لمسار القراءة من الخادم الحقيقي. التالي الحر بعد هذه الجولة DEF-037.
+
+| الحقل | القيمة |
+|---|---|
+| المرحلة | 8 |
+| الشدة | منخفضة |
+| التصنيف | Non-blocking |
+| المالك المقترح | مهندس API (Fake). شاشة Flutter تعرض الحقل بعد إعادة الجلب |
+| الحالة | Open |
+
+**الدليل:** حوار السداد يرسل `inputValue` ثم يعيد جلب الكارت. لا طرح في `lib/` (`lib/features/accounts/ledger_screen.dart:417`). `FakeApiClient._applyMovement` يخزّن `previous - entered` في `balanceUnits` و`balanceAfterUnits` (`packages/api_layer/lib/data/fake/fake_api_client.dart:1559`). `_accountsView` يجمع الفرق (`fake_api_client.dart:1471`) ثم يضيفه إلى `summary.netBalance` و`summary.totalDebt` (`fake_api_client.dart:1478`). تعليق `AccountsSummaryDto` يقول إن `totalDebt` مجموع الأرصدة الموجبة و`netBalance` الصافي (`packages/api_layer/lib/data/models/account_models.dart:148`). السداد الكلي يخزّن 0 بلا طرح (`fake_api_client.dart:1525`). إلغاء حركة ينسخ آخر `balanceAfterUnits` مرحَّل (`fake_api_client.dart:1581`). سيناريو `test/phase7_payments_test.dart` على `c_55` بإدخال `100` يرسم `220 د.ل`. 220 ليست قيمة موقع.
+
+الحالات العشر في جدول المرحلة 8 لها شاشة ومسار. `MoneyFormatter` عند المقياس 0 لا يقرّب العدد الصحيح. سلوك Fake ليس دليل الموقع.
+
+### DEF-029 — مقياس وحدة المال غير مؤكد
+
+**الحالة:** Open (candidate) على `54884d7`. غير مانع لاختبارات الـ Fake. مانع لمطابقة الموقع حتى يُحسم. التالي الحر DEF-037.
+
+| الحقل | القيمة |
+|---|---|
+| المرحلة | 8 |
+| الشدة | عالية للمطابقة |
+| التصنيف | Non-blocking لاختبار Fake |
+| المالك المقترح | علي مع مالك الخادم |
+| الحالة | Open |
+
+**الدليل:** `ApiConfig.moneyUnitScale` افتراضه 0 وموسوم غير مؤكد (`packages/api_layer/lib/core/config/api_config.dart:73-75`، `docs/staging.md:33` و`:109`). P0-04 حالته Not run (`docs/acceptance/phase-0.md:49-58`). دقة الموقع غير معروفة. إن كانت `*Units` وحدات كسرية فكل شاشة تختلف عن الموقع.
+
+### DEF-030 — نطاق ملخص القسم مع البحث والفلتر غير مكتوب
+
+**الحالة:** Open (candidate). المالك المقترح: مهندس API.
+
+**الدليل:** `AccountsRepository.list` يرسل `q` و`filter` وحدًا افتراضيًا 100 (`accounts_repository.dart:53-56`). الشريط يعرض `summary` لا مجموع الصفوف (`account_list_screen.dart:126-129`). هل الملخص يتجاهل البحث أو الفلتر أو الصفوف المحذوفة أو المخفية بالصلاحية غير مكتوب في المستودع.
+
+### DEF-031 — سقف السداد الجزئي يقرأ الرصيد المخزَّن
+
+**الحالة:** Open (candidate). المالك المقترح: مطور الواجهة. سؤال رفض الخادم الحقيقي ما زال مفتوحًا من DEF-020 ولا يُعاد فتح ذلك العيب.
+
+**الدليل:** الحوار يقارن العدد المكتوب بـ `balanceUnits` المخزَّن للوضع المباشر فقط، بلا جلب قبل الحفظ (`ledger_screen.dart:417-430`). الضرب والقسمة بلا مقارنة. الرسالة `المبلغ أكبر من المتبقي المسجّل.` (`strings.dart:95`).
+
+### DEF-032 — غياب سعر التحويل يخفي مبالغ المصري
+
+**الحالة:** Closed. أُغلق بإصلاح #61 (سكواش `e326ac0`) وتحقق على `main` `82a6807`. المالك المقترح: مطور الواجهة.
+
+**الدليل السابق:** `egyptianSourceUnits` و`egyptianConvertedUnits` كانا يُرسمان `—` عندما يغيب `egyptianRate`.
+
+**بعد الإصلاح:** مصدر الجنيه يُرسم دائمًا من `formatOrDash`. صف التحويل فقط يُستبدل بالنص `يلزم سعر تحويل معتمد` (`treasury_screen.dart:394-435`، `strings.dart:80`). حقل مال غير صحيح على المصدر يُرسم `مبلغ غير صالح` لا `0`.
+
+### DEF-033 — عملة فودافون مفترضة بالجنيه
+
+**الحالة:** Open (candidate). المالك المقترح: علي مع مالك الخادم.
+
+**الدليل:** `vodafoneCurrencyAssumption` موسوم 🔶 ومفترض `EGP` (`purchase_models.dart:14-15`). سطر اليوم يطبع `ج.م` (`purchases_screen.dart:241-245`). لا حقل عملة مؤكد.
+
+### DEF-034 — أسماء مفاتيح الإجمالي الدائم للمشتريات غير مؤكدة
+
+**الحالة:** Open (candidate). المالك المقترح: مهندس API.
+
+**الدليل:** التعليق يقول إن الأسماء بانتظار تأكيد الخادم (`purchase_models.dart:238-239`). الشاشة تقرأ `resultUnits` و`paidUnits` و`remainingUnits` فقط. مفتاح آخر يبقى في `all` ويُرسم `—` إن غابت الأسماء الثلاثة (`purchase_models.dart:265-269`).
+
+### DEF-035 — عملة استلامات الديون مثبّتة في العميل
+
+**الحالة:** Open (candidate). المالك المقترح: مهندس API.
+
+**الدليل:** `CollectionsOverviewDto.currency` يرجع `Currency.lyd` دائمًا (`collection_models.dart:182`). المقاييس والصفوف لا تقرأ عملة من الجسم (`collections_screen.dart:209` و`:374`).
+
+### DEF-036 — قيمة مال كسرية تُسقط الاستجابة كلها
+
+**الحالة:** Closed. أُغلق بإصلاح #62 (سكواش `82a6807`) وتحقق على `main` `82a6807`. المالك المقترح: مهندس API.
+
+**الدليل السابق:** `unitsOrNull` كان يرمي `InvalidServerResponseException` لغير `int`، فكسر واحد يمنع تحليل الصفحة.
+
+**بعد الإصلاح:** الحقل غير الصحيح يصبح `MoneyValue.invalid` وبقية الاستجابة تبقى. الشاشة ترسم `مبلغ غير صالح` بلا تقريب وبلا `0`. `null` يبقى `—` (`common.dart:47-60`، `money_value.dart:17`، `money_formatter.dart:52-59`). حاوية حاضرة ليست كائن JSON ما زالت تُسقط الاستجابة (`common.dart:68-72`). الكتابة ترفض المبلغ غير الصحيح ولا ترسل `0`.
