@@ -58,14 +58,7 @@ void main() {
       expect(find.byKey(const Key('unlinked-reject-ur_1')), findsOneWidget);
       expect(find.byKey(const Key('unlinked-cash-ur_1')), findsNothing);
       expect(find.byKey(const Key('unlinked-reject-ur_2')), findsNothing);
-      expect(find.byKey(const Key('unlinked-cash-ur_2')), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('unlinked-cash-ur_2')),
-          matching: find.text(AppStrings.cashReceived),
-        ),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
     },
   );
 
@@ -84,15 +77,32 @@ void main() {
     expect(find.byKey(const Key('unlinked-reject-ur_1')), findsOneWidget);
     expect(first, {'decision': 'reject'});
 
-    final second = await hold(
-      tester,
-      fake,
-      const Key('unlinked-reject-ur_1'),
-    );
+    final second = await hold(tester, fake, const Key('unlinked-reject-ur_1'));
 
     expect(second, {'decision': 'reject'});
     expect(find.byKey(const Key('unlinked-reject-ur_1')), findsNothing);
   });
+
+  testWidgets(
+    'a rejected receipt with pending cash shows no cash button and sends nothing',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(800, 2400));
+      final fake = layer.client as FakeApiClient;
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/collections');
+      final postsBefore = fake.mutationPaths.length;
+
+      expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('unlinked-card-ur_2')),
+          matching: find.text(AppStrings.cashReceived),
+        ),
+        findsNothing,
+      );
+      expect(fake.mutationPaths, hasLength(postsBefore));
+    },
+  );
 
   testWidgets('cash on a rejected receipt is a status conflict', (
     tester,
@@ -102,20 +112,50 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
 
-    final body = await hold(tester, fake, const Key('unlinked-cash-ur_2'));
-
-    expect(body, isNull);
+    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
     expect(
-      find.text(FakeApiClient.submissionNotApprovedMessage),
-      findsWidgets,
+      find.descendant(
+        of: find.byKey(const Key('unlinked-card-ur_2')),
+        matching: find.text(AppStrings.cashReceived),
+      ),
+      findsNothing,
     );
-    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsOneWidget);
-    final overview = await tester.runAsync(() => layer.client.get('/api/collections'));
+
+    // The button is hidden, so the screen cannot post. A direct cash call
+    // on this rejected row is still a status conflict, with no body and no
+    // change to the receipt.
+    String? wire;
+    await tester.runAsync(() async {
+      await expectLater(
+        layer.collections.markUnlinkedCashReceived('ur_2', MutationMeta()),
+        throwsA(
+          isA<ConflictException>()
+              .having((error) => error.statusCode, 'status', 409)
+              .having((error) => error.code, 'code', 'SUBMISSION_NOT_APPROVED')
+              .having(
+                (error) => error.message,
+                'message',
+                FakeApiClient.submissionNotApprovedMessage,
+              ),
+        ),
+      );
+      wire = fake.lastWireBody;
+    });
+    expect(wire, isNull);
+    expect(
+      fake.mutationPaths,
+      contains('/api/collections/unlinked-receipts/ur_2/cash-received'),
+    );
+
+    final overview = await tester.runAsync(
+      () => layer.client.get('/api/collections'),
+    );
     final receipts = (overview!.data as Map)['unlinkedReceipts'] as List;
     final row = receipts.cast<Map>().firstWhere((item) => item['id'] == 'ur_2');
     expect(row['status'], 'rejected');
     expect(row['cashStatus'], 'pending');
     expect(row.containsKey('version'), isFalse);
+    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
   });
 
   testWidgets(
@@ -155,7 +195,7 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
     await reveal(tester, const Key('unlinked-reject-ur_1'));
-    await reveal(tester, const Key('unlinked-cash-ur_2'));
+    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
 
     expect(tester.takeException(), isNull);
     final reject = tester.element(
@@ -177,18 +217,14 @@ void main() {
       Brightness.dark,
     );
     await go(tester, '/collections');
-    await reveal(tester, const Key('unlinked-cash-ur_2'));
+    await reveal(tester, const Key('unlinked-reject-ur_1'));
 
-    final cash = tester.element(find.byKey(const Key('unlinked-cash-ur_2')));
-    expect(Theme.of(cash).brightness, Brightness.dark);
-    expect(Directionality.of(cash), TextDirection.rtl);
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('unlinked-cash-ur_2')),
-        matching: find.text(AppStrings.cashReceived),
-      ),
-      findsOneWidget,
+    final rejectDark = tester.element(
+      find.byKey(const Key('unlinked-reject-ur_1')),
     );
+    expect(Theme.of(rejectDark).brightness, Brightness.dark);
+    expect(Directionality.of(rejectDark), TextDirection.rtl);
+    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -199,13 +235,12 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
     await reveal(tester, const Key('unlinked-reject-ur_1'));
-    await reveal(tester, const Key('unlinked-cash-ur_2'));
     final list = find.byKey(CollectionsScreen.screenKey);
     await tester.fling(list, const Offset(0, -600), 1200);
     await settle(tester);
 
     expect(find.byKey(const Key('unlinked-reject-ur_1')), findsOneWidget);
-    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsOneWidget);
+    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
@@ -245,9 +280,7 @@ Future<Map<String, dynamic>?> hold(
   await tester.pump();
   await tester.pump(Duration.zero);
   final raw = fake.lastWireBody;
-  final body = raw == null
-      ? null
-      : jsonDecode(raw) as Map<String, dynamic>;
+  final body = raw == null ? null : jsonDecode(raw) as Map<String, dynamic>;
   gate.complete();
   fake.pauseMutations = null;
   await tester.pump();
