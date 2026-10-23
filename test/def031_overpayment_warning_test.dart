@@ -103,6 +103,18 @@ void main() {
       await go(tester, '/customers/c_55');
       final fake = layer.client as FakeApiClient;
       final postsBefore = fake.mutationPaths.length;
+      final balance = find.byKey(
+        const Key('ledger-header-balance'),
+        skipOffstage: false,
+      );
+      final positiveInk = tester.widget<MoneyText>(balance).style?.color;
+      expect(_header('320 د.ل'), findsOneWidget);
+      expect(positiveInk, isNotNull);
+      expect(
+        positiveInk,
+        isNot(tester.element(balance).statusColors.debtText),
+      );
+
       await _openPayment(tester, '400');
       expect(fake.mutationPaths, hasLength(postsBefore));
 
@@ -117,11 +129,8 @@ void main() {
       expect(body['inputValue'], 400);
       expect(_header('-80 د.ل'), findsOneWidget);
       expect(_header('320 د.ل'), findsNothing);
-      final balance = find.byKey(
-        const Key('ledger-header-balance'),
-        skipOffstage: false,
-      );
       final shown = tester.widget<MoneyText>(balance);
+      expect(shown.style?.color, positiveInk);
       expect(
         shown.style?.color,
         isNot(tester.element(balance).statusColors.debtText),
