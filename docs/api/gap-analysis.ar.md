@@ -273,7 +273,7 @@
 
 | السلوك | Fake اليوم | العقد | الإجراء |
 |---|---|---|---|
-| ملخص القسم بعد حركة | يضيف الفرق إلى `netBalance` **و** `totalDebt` معًا (`fake_api_client.dart:1490-1513`) | `totalDebt` مجموع الأرصدة الموجبة فقط | تصحيح الـ Fake (DEF-028) |
+| ملخص القسم بعد حركة | يضيف الفرق إلى `netBalance` **و** `totalDebt` معًا (`fake_api_client.dart:1624-1646`) | `totalDebt` مجموع الأرصدة الموجبة فقط | تصحيح الـ Fake (DEF-028) |
 | السداد الأكبر من الرصيد | `400 VALIDATION_ERROR` مؤقت (`docs/acceptance/defects.md`) | مقبول، والرصيد يصبح سالبًا | تصحيح الـ Fake |
 | شكل المشتريات | `days[]` و`lifetimeTotals` | `day` و`entries` و`registerTotals` و`nextBefore` | تحويل الـ Fake إلى شكل العقد مع المحلّل (G-02) |
 | الخزينة | `totals{...}` و`version` | مسطّح و`cashVersion` | كذلك (G-04) |

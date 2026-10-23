@@ -29,14 +29,14 @@
 
 ## DEF-028: Fake يحسب رصيد السداد الجزئي ويزيح ملخص القسم
 
-- **التعريف:** `FakeApiClient._applyMovement` يخزّن `previous - entered`، و`_accountsView` يضيف الفرق نفسه إلى `summary.netBalance` **و** `summary.totalDebt` (`packages/api_layer/lib/data/fake/fake_api_client.dart:1495-1515` (`_accountsView`)، و`:1569` (`_applyMovement`)).
+- **التعريف:** `FakeApiClient._applyMovement` يخزّن `previous - entered`، و`_accountsView` يضيف الفرق نفسه إلى `summary.netBalance` **و** `summary.totalDebt` (`packages/api_layer/lib/data/fake/fake_api_client.dart:1629-1646` (`_accountsView`)، و`:1703` (`_applyMovement`)).
 - **الإجابة:** «`summary.totalDebt` (مجموع الموجب فقط) و`summary.netBalance` (الصافي الموقّع) على كامل القسم» (`README.ar.md:51`). «لا يرفض السداد الأكبر من الرصيد؛ ينشئ رصيدًا سالبًا» (`README.ar.md:66`). الحسابات تقطع ناتج الضرب والقسمة للأسفل (`:47`).
 - **القرار: يلزم إصلاح، في الـ Fake فقط.** إضافة الفرق نفسه إلى `totalDebt` خطأ حين يعبر رصيد الصفر، لأن `totalDebt` يجمع الموجب فقط. المسار الحقيقي لا يتأثر: التطبيق لا يحسب الملخص ويعرض رد الخادم.
 - **الإجراء التالي:** PR صغير في `fake_api_client.dart` يعيد حساب الملخص من الأرصدة، فيصير `totalDebt = Σ max(balance, 0)` و`netBalance = Σ balance`، ويسمح بالرصيد السالب، مع اختبار يعبر الصفر. يُغلق DEF-028 بعد مراجعة QA.
 
 ## DEF-029: مقياس وحدة المال غير مؤكد
 
-- **التعريف:** `ApiConfig.moneyUnitScale` افتراضه 0 وموسوم 🔶 (`packages/api_layer/lib/core/config/api_config.dart:25,56,75`)، وP0-04 لم يُشغَّل.
+- **التعريف:** `ApiConfig.moneyUnitScale` افتراضه 0 وموسوم 🔶 (`packages/api_layer/lib/core/config/api_config.dart:66,85,107`)، وP0-04 لم يُشغَّل.
 - **الإجابة:** «القيم `amountUnits` و`balanceUnits` و`inputValue` و`egpValueUnits` و`paidUnits` هي **وحدات عملة كاملة**، وليست ×100 ولا ×1000. مثال 250 يعني 250 دينارًا» (`README.ar.md:45`). `openapi.json` `components.schemas.Transaction.inputValue`: «Whole currency units, not minor units». السعر وحده بمنازل حتى 6، و`factorMicros` ليس مبلغًا.
 - **الدليل الحي:** كل حقول المال المفحوصة أعداد صحيحة JSON (273 قيمة عبر الأدوار الثلاثة، صفر غير صحيح)، كما في `staging-readonly-check.ar.md` §3. لقطات الموقع تعرض «1.000 د.ل» لـ `balanceUnits=1000` (`evidence/03-customer-initial.png`)، و«250» لـ 250.
 - **القرار: مغلق.** الافتراض `0` صحيح. لا تغيير في كود الحساب.

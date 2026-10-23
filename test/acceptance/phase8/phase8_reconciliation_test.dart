@@ -365,9 +365,9 @@ void main() {
     expect(tester.takeException(), isNull);
   }, tags: [tag]);
 
-  // TODO(after #68 merges): merge main into this branch normally. Keep the
-  // DEF-029 assertions above. For DEF-033, use vodafoneCurrency and keep the
-  // 4,900 ج.م assertion. Citation line numbers are reviewed after #68 and #66.
+  // main 84f012d is merged, including #66. #68 is still open, so this file
+  // had no conflict with it. DEF-029 assertions above are unchanged. DEF-033
+  // keeps vodafoneCurrency and 4,900 ج.م. Purchases citations still match.
   test('DEF-033 Vodafone currency is EGP', () {
     expect(vodafoneCurrencyAssumption, Currency.egp);
     expect(money.format(4900, vodafoneCurrencyAssumption), '4,900 ج.م');
