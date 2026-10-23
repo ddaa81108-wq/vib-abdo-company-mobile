@@ -290,7 +290,9 @@ class _DayCard extends ConsumerWidget {
                       _PurchaseForm(book: book, version: day.version),
                     ),
                   ),
-                if (canFinalize && day.status == 'draft')
+                if (canFinalize &&
+                    day.status == 'draft' &&
+                    day.version != null)
                   GuardedMutation(
                     buttonKey: ValueKey('finalize-day-$label'),
                     inputs: 'finalize:$label:${day.version}',
@@ -568,10 +570,11 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
   }
 }
 
-/// Opening is a write on an open day. A missing day, or a finalized day
-/// whose correction is closed, does not offer the button.
+/// Opening is a write on an open day that has a version. A missing day, a
+/// day with no version, or a finalized day whose correction is closed, does
+/// not offer the button.
 bool _openingWritable(PurchaseDayDto? day) {
-  if (day == null) return false;
+  if (day == null || day.version == null) return false;
   return day.status == 'draft' || day.correctionOpen;
 }
 

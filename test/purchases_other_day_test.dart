@@ -2,11 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
+import 'package:flutter_api_layer/core/network/api_endpoints.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
-import 'package:vib_abdo_company_mobile/state/section_providers.dart';
+import 'package:vib_abdo_company_mobile/features/purchases/purchases_screen.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import 'support/pump_app.dart';
@@ -15,23 +16,20 @@ void main() {
   testWidgets(
     'an entry from another day has no edit or delete, and the write uses its dayVersion',
     (tester) async {
-      final layer = await pumpFakeApp(
-        tester,
-        size: const Size(800, 1800),
-        overrides: [purchasesProvider.overrideWith((ref) async => _page())],
-      );
+      final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
       final fake = layer.client as FakeApiClient;
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/purchases');
 
-      expect(find.byKey(const Key('purchase-entry-pe_today')), findsOneWidget);
-      expect(find.byKey(const Key('purchase-entry-pe_other')), findsOneWidget);
-      expect(find.byKey(const Key('edit-pe_today')), findsOneWidget);
-      expect(find.byKey(const Key('delete-pe_today')), findsOneWidget);
-      expect(find.byKey(const Key('edit-pe_other')), findsNothing);
-      expect(find.byKey(const Key('delete-pe_other')), findsNothing);
+      expect(find.byKey(const Key('purchase-entry-pe_1')), findsOneWidget);
+      expect(find.byKey(const Key('purchase-entry-pe_old')), findsOneWidget);
+      await show(tester, find.byKey(const Key('edit-pe_1')));
+      expect(find.byKey(const Key('edit-pe_1')), findsOneWidget);
+      expect(find.byKey(const Key('delete-pe_1')), findsOneWidget);
+      expect(find.byKey(const Key('edit-pe_old')), findsNothing);
+      expect(find.byKey(const Key('delete-pe_old')), findsNothing);
 
-      await tester.tap(find.byKey(const Key('delete-pe_today')));
+      await tester.tap(find.byKey(const Key('delete-pe_1')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text(AppStrings.confirmDelete), findsOneWidget);
@@ -39,10 +37,10 @@ void main() {
       await finishSend(tester);
 
       final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
-      expect(body['expectedDayVersion'], 4);
+      expect(body['expectedDayVersion'], 3);
       expect(
         fake.mutationPaths.last,
-        '/api/purchases/al_bayan/entries/pe_today',
+        '/api/purchases/al_bayan/entries/pe_1',
       );
       expect(tester.takeException(), isNull);
     },
@@ -51,115 +49,75 @@ void main() {
   testWidgets('opening is hidden with no day and on a locked day', (
     tester,
   ) async {
-    await pumpFakeApp(
-      tester,
-      size: const Size(800, 1400),
-      overrides: [
-        purchasesProvider.overrideWith((ref) async {
-          return PurchasesPage.fromData({
-            'entries': <Object>[],
-            'registerTotals': {
-              'resultUnits': 0,
-              'paidUnits': 0,
-              'remainingUnits': 0,
-              'vodafoneConsumedUnits': 0,
-              'vodafoneRemainingUnits': 0,
-            },
-          });
-        }),
-      ],
-    );
+    final missing = await pumpFakeApp(tester, size: const Size(800, 1400));
+    _scriptPurchases(missing.client as FakeApiClient, _page(day: null));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
     expect(find.byKey(const Key('opening-card')), findsOneWidget);
     expect(find.byKey(const Key('set-opening')), findsNothing);
 
-    await pumpFakeApp(
-      tester,
-      size: const Size(800, 1400),
-      overrides: [
-        purchasesProvider.overrideWith((ref) async => _day(status: 'draft')),
-      ],
-    );
+    await pumpFakeApp(tester, size: const Size(800, 1400));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
     expect(find.byKey(const Key('set-opening')), findsOneWidget);
 
-    await pumpFakeApp(
-      tester,
-      size: const Size(800, 1400),
-      overrides: [
-        purchasesProvider.overrideWith(
-          (ref) async => _day(status: 'finalized'),
-        ),
-      ],
-    );
+    final finalized = await pumpFakeApp(tester, size: const Size(800, 1400));
+    (finalized.client as FakeApiClient).purchaseFixtureStatus = 'finalized';
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
     expect(find.byKey(const Key('open-correction-12')), findsOneWidget);
     expect(find.byKey(const Key('set-opening')), findsNothing);
 
-    await pumpFakeApp(
-      tester,
-      size: const Size(800, 1400),
-      overrides: [
-        purchasesProvider.overrideWith(
-          (ref) async => _day(status: 'finalized', correctionOpen: true),
-        ),
-      ],
-    );
+    final correction = await pumpFakeApp(tester, size: const Size(800, 1400));
+    (correction.client as FakeApiClient).purchaseFixtureStatus = 'correction';
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
     expect(find.byKey(const Key('set-opening')), findsOneWidget);
+
+    final unversioned = await pumpFakeApp(tester, size: const Size(800, 1400));
+    _scriptPurchases(
+      unversioned.client as FakeApiClient,
+      _page(day: _day(version: null)),
+    );
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+    expect(find.byKey(const Key('purchase-day-12')), findsOneWidget);
+    expect(find.byKey(const Key('finalize-day-12')), findsNothing);
+    expect(find.byKey(const Key('set-opening')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
 
-PurchasesPage _page() {
-  return PurchasesPage.fromData({
-    'day': {
-      'id': '12',
-      'dayNumber': 12,
-      'status': 'draft',
-      'version': 9,
-      'correctionOpen': false,
-      'previousDebtUnits': 0,
-      'previousVodafoneUnits': 0,
-    },
-    'entries': [
-      {
-        'id': 'pe_today',
-        'dayId': '12',
-        'itemCode': 'fawry',
-        'itemLabel': 'اليوم',
-        'version': 1,
-        'dayVersion': 4,
-      },
-      {
-        'id': 'pe_other',
-        'dayId': '11',
-        'itemCode': 'fawry',
-        'itemLabel': 'أمس',
-        'version': 1,
-        'dayVersion': 1,
-      },
-    ],
-  });
+void _scriptPurchases(FakeApiClient fake, Map<String, Object?> body) {
+  fake.scriptedGetJson[ApiEndpoints.purchases(PurchaseBook.alBayan.path)] =
+      jsonEncode(body);
 }
 
-PurchasesPage _day({required String status, bool correctionOpen = false}) {
-  return PurchasesPage.fromData({
-    'day': {
-      'id': '12',
-      'dayNumber': 12,
-      'status': status,
-      'version': 3,
-      'correctionOpen': correctionOpen,
-      'previousDebtUnits': 1,
-      'previousVodafoneUnits': 2,
-    },
+Map<String, Object?> _page({Map<String, Object?>? day}) {
+  return {
+    'merchant': {'key': 'al_bayan', 'name': 'البيان'},
+    if (day != null) 'day': day,
     'entries': <Object>[],
-  });
+    'registerTotals': {
+      'resultUnits': 0,
+      'paidUnits': 0,
+      'remainingUnits': 0,
+      'vodafoneConsumedUnits': 0,
+      'vodafoneRemainingUnits': 0,
+    },
+  };
+}
+
+Map<String, Object?> _day({required int? version}) {
+  return {
+    'id': '12',
+    'dayNumber': 12,
+    'status': 'draft',
+    'version': version,
+    'correctionOpen': false,
+    'previousDebtUnits': 1,
+    'previousVodafoneUnits': 2,
+  };
 }
 
 Future<void> go(WidgetTester tester, String path) async {
@@ -180,4 +138,18 @@ Future<void> finishSend(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(seconds: 5));
   await tester.pump(const Duration(milliseconds: 400));
+}
+
+Future<void> show(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(
+    finder,
+    200,
+    scrollable: find.descendant(
+      of: find.byKey(PurchasesScreen.screenKey),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Scrollable && widget.axis == Axis.vertical,
+      ),
+    ),
+  );
+  await tester.pump();
 }
