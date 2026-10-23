@@ -78,7 +78,9 @@ void main() {
     expect(approved.version, isNull);
     expect(approved.raw['status'], 'approved');
     expect(approved.raw['transactionId'], 'collection-sb_1');
-    expect(approved.raw['balanceUnits'], 100);
+    // sb_1 is not linked to a card. The amount is not a balance.
+    expect(approved.balanceUnits, isNull);
+    expect(approved.raw.containsKey('balanceUnits'), isFalse);
     expect(approved.raw['eventSequences'], [3]);
     expect(approved.raw.containsKey('version'), isFalse);
 
@@ -121,8 +123,12 @@ void main() {
       'newAccountKind': 'customer',
     });
     expect(linked.raw['status'], 'approved');
-    expect(linked.raw['balanceUnits'], 50);
+    // ur_1 is 50 against customer c_55's stored 320. The ack is that balance.
+    expect(linked.balanceUnits?.units, 270);
+    expect(linked.raw['balanceUnits'], 270);
     expect(linked.raw.containsKey('version'), isFalse);
+    final card = await api.accounts.get(AccountSection.customers, 'c_55');
+    expect(card.balanceUnits?.units, 270);
 
     final unlinkedCash = await api.collections.markUnlinkedCashReceived(
       'ur_1',
