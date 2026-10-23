@@ -293,6 +293,91 @@ void main() {
   );
 
   testWidgets(
+    'DEF-031 a missing balance, including a currency mismatch, is a dash until reload',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(430, 1400));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      final unlinked = await tester.runAsync(
+        () => layer.collections.decideUnlinked(
+          'ur_1',
+          decision: CollectionDecision.approve,
+          meta: MutationMeta(requestId: 'ur-no-customer'),
+        ),
+      );
+      expect(unlinked!.balanceUnits, isNull);
+      expect(unlinked.raw.containsKey('balanceUnits'), isFalse);
+      expect(unlinked.raw['balanceUnits'], isNot(50));
+
+      final mismatch = await tester.runAsync(() async {
+        final assigned = await layer.collections.assign(
+          customerIds: const ['c_eg_08'],
+          assigneeUserId: 'u_12',
+          section: 'egyptian-deposits',
+          meta: MutationMeta(requestId: 'as-eg'),
+        );
+        final assignmentId = (assigned.raw['assignmentIds'] as List).single;
+        final submitted = await layer.collections.submit(
+          '$assignmentId',
+          mode: 'partial',
+          amountUnits: 400,
+          meta: MutationMeta(requestId: 'eg-submit'),
+        );
+        return layer.collections.decide(
+          submitted.id!,
+          CollectionDecision.approve,
+          meta: MutationMeta(requestId: 'eg-approve'),
+        );
+      });
+      expect(mismatch!.balanceUnits, isNull);
+      expect(mismatch.raw.containsKey('balanceUnits'), isFalse);
+      final stored = await tester.runAsync(
+        () => layer.accounts.get(AccountSection.egyptianDeposits, 'c_eg_08'),
+      );
+      expect(stored!.balanceUnits?.units, 300);
+
+      await go(tester, '/egyptian-deposits/c_eg_08');
+      final oldBalance = layer.money.format(300, Currency.egp);
+      final computed = layer.money.format(-100, Currency.egp);
+      final receiptAmount = layer.money.format(50, Currency.egp);
+      expect(_header(oldBalance), findsOneWidget);
+
+      await _openPayment(tester, '400');
+      final fake = layer.client as FakeApiClient;
+      final gate = Completer<void>();
+      const cardPath = '/api/egyptian-deposits/c_eg_08';
+      fake.pauseGets[cardPath] = gate;
+      fake.scriptedMutationJson[ApiEndpoints.accountTransactions(
+        'egyptian-deposits',
+        'c_eg_08',
+      )] = jsonEncode(
+        mismatch.raw,
+      );
+
+      await tester.tap(find.byKey(const Key('overpayment-continue')));
+      await _pumpUntilHeader(tester, AppStrings.dash);
+
+      expect(_header(AppStrings.dash), findsOneWidget);
+      expect(_header(oldBalance), findsNothing);
+      expect(_header(computed), findsNothing);
+      expect(_header(receiptAmount), findsNothing);
+      expect(_header(layer.money.format(400, Currency.egp)), findsNothing);
+
+      fake.scriptedGetJson[cardPath] = _cardJson(
+        15,
+        id: 'c_eg_08',
+        currency: 'EGP',
+      );
+      gate.complete();
+      await settle(tester);
+      expect(_header(layer.money.format(15, Currency.egp)), findsOneWidget);
+      expect(_header(AppStrings.dash), findsNothing);
+      expect(_header(oldBalance), findsNothing);
+      expect(_header(computed), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'DEF-031 overpayment warning screenshots',
     (tester) async {
       await tester.runAsync(loadScreenshotFonts);
@@ -329,8 +414,12 @@ const _cardPath = '/api/customers/c_55';
 
 final _transactionPath = ApiEndpoints.accountTransactions('customers', 'c_55');
 
-String _cardJson(int balanceUnits) =>
-    '{"id":"c_55","name":"عميل تجريبي","balanceUnits":$balanceUnits,"currency":"LYD","version":5}';
+String _cardJson(
+  int balanceUnits, {
+  String id = 'c_55',
+  String currency = 'LYD',
+}) =>
+    '{"id":"$id","name":"عميل تجريبي","balanceUnits":$balanceUnits,"currency":"$currency","version":5}';
 
 Future<void> _openPayment(WidgetTester tester, String amount) async {
   await tester.ensureVisible(find.byKey(const Key('add-payment')));
