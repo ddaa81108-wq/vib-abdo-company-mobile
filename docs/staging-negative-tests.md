@@ -10,15 +10,15 @@ The self-test is:
 tool/staging_negative_tests/run.sh --dry-run --junit "$RUNNER_TEMP/staging-negative-dry-run.xml"
 ```
 
-`--dry-run` does not read credentials and does not open a socket. It checks that missing env is refused, that production and non-staging hosts are refused, that a live run on GitHub is refused, that the live case list is intact, and that JUnit XML escapes text. No workflow sets a `STAGING_*` username or password.
+`--dry-run` does not read credentials and does not open a socket. It checks that missing env is refused, that production and non-staging hosts are refused, that the live case list is intact, and that JUnit XML escapes text. No workflow sets a `STAGING_*` variable.
 
-The required check `Negative permission tests` calls `tool/staging_negative_tests/run.sh --dry-run`. It does not call live mode. Live mode exits 2 when `CI=true` or `GITHUB_ACTIONS=true`. A permission check against staging runs on the bot machine only. GitHub does not store staging usernames or passwords, neither as secrets nor as variables. The only staging secret the smoke workflow reads is `STAGING_API_BASE`.
+[PR #32](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/32) runs this entrypoint. Its negative-permission job calls `tool/staging_negative_tests/run.sh --dry-run` when the file exists. Its manual workflow `Staging negative permission tests` calls `run.sh --junit staging-permissions-junit.xml` and uploads that file as the artifact `staging-permissions-junit`. That live call happens on GitHub Actions, so this script does not refuse `CI=true`. This branch does not add a workflow step of its own.
 
-`flutter test` on the app and on `packages/api_layer` includes the `permissions-negative` tests. Those tests use the fake client. A failure fails the job. That Fake API coverage is unchanged by keeping live mode off GitHub.
+`flutter test` on the app and on `packages/api_layer` includes the `permissions-negative` tests. Those tests use the fake client. A failure fails the job.
 
 ## Live run
 
-Export these variables in the shell on the bot machine. Do not commit them. Do not store them in GitHub as secrets or as variables.
+Export these variables in the shell. Do not commit them.
 
 | Variable | Required |
 |---|---|

@@ -113,13 +113,8 @@ class FakeApiClient implements ApiClient {
   /// Notification writes that changed state. A requestId replay is not counted.
   int notificationMutationApplies = 0;
 
-  /// `POST .../decision` when the row is no longer pending.
-  static const submissionAlreadyDecidedMessage =
-      'تمت مراجعة هذا الاستلام من قبل.';
-
-  /// `POST .../cash-received` when the row is not approved.
-  static const submissionNotApprovedMessage =
-      'استلام النقدية متاح للاستلام المعتمد فقط.';
+  /// The next N versioned collection mutations fail with VERSION_CONFLICT (tests).
+  int versionConflictRemaining = 0;
 
   /// When set, purchases days without a stored finalize or correction use this
   /// status on the next GET (tests).
@@ -982,19 +977,6 @@ class FakeApiClient implements ApiClient {
     if (method != 'GET' &&
         head != 'notifications' &&
         head != 'notification-preferences') {
-      // Decision and cash-received have no requestId. A shared null replay
-      // key would collapse distinct calls onto one stored success.
-      if (_collectionStatusPath(seg)) {
-        return _mutateWithoutRequestId(
-          method,
-          path,
-          seg,
-          head,
-          query,
-          () => _route(method, b, seg, head, query),
-          () => _ensureSession(options),
-        );
-      }
       return _mutate(
         b,
         method,
@@ -1129,42 +1111,6 @@ class FakeApiClient implements ApiClient {
     } finally {
       _pendingMutations.remove(key);
     }
-  }
-
-  /// Collection decision and cash-received. The contract has no `requestId`
-  /// and no `expectedVersion`. Session, permission, and the test failure gate
-  /// still run. A second call is not a stored replay; the row status decides.
-  Future<ApiResponse> _mutateWithoutRequestId(
-    String method,
-    String path,
-    List<String> seg,
-    String head,
-    Map<String, dynamic>? query,
-    Future<ApiResponse> Function() send,
-    void Function() ensureSession,
-  ) async {
-    ensureSession();
-    _authorize(method, seg, head, query);
-    mutationPaths.add(path);
-    if (lastWireBody != null) mutationBodies.add(lastWireBody!);
-    final paused = pauseMutations;
-    if (paused != null) await paused.future;
-    ensureSession();
-    _authorize(method, seg, head, query);
-    if (failMutationsRemaining > 0) {
-      failMutationsRemaining--;
-      _fail(400, 'MUTATION_FAILED', 'تعذر تنفيذ الطلب.');
-    }
-    return send();
-  }
-
-  /// `POST /api/collections/{submissions|unlinked-receipts}/{id}/{decision|cash-received}`.
-  bool _collectionStatusPath(List<String> seg) {
-    if (seg.length != 4 || seg.first != 'collections') return false;
-    final kind = seg[1];
-    final action = seg[3];
-    if (kind != 'submissions' && kind != 'unlinked-receipts') return false;
-    return action == 'decision' || action == 'cash-received';
   }
 
   Future<ApiResponse> _route(
@@ -1445,13 +1391,22 @@ class FakeApiClient implements ApiClient {
       return _ok({'items': []});
     }
     _requireCollectionMutation(seg);
+    final needsVersion = seg.isNotEmpty &&
+        (seg.last == 'decision' || seg.last == 'cash-received');
+    if (needsVersion && b['expectedVersion'] == null) {
+      _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
+    }
+    if (needsVersion && versionConflictRemaining > 0) {
+      versionConflictRemaining--;
+      _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
+    }
     if (seg.length == 4 && seg[1] == 'submissions' && seg[3] == 'decision') {
       return _applyDecision(seg[2], b);
     }
     if (seg.length == 4 &&
         seg[1] == 'submissions' &&
         seg[3] == 'cash-received') {
-      return _applyCash(seg[2], unlinked: false);
+      return _applyCash(seg[2], b, unlinked: false);
     }
     if (seg.length == 4 &&
         seg[1] == 'unlinked-receipts' &&
@@ -1461,7 +1416,7 @@ class FakeApiClient implements ApiClient {
     if (seg.length == 4 &&
         seg[1] == 'unlinked-receipts' &&
         seg[3] == 'cash-received') {
-      return _applyCash(seg[2], unlinked: true);
+      return _applyCash(seg[2], b, unlinked: true);
     }
     // CollectionsRepository.closeDay posts /api/collections/days/close.
     if (seg.length == 3 && seg[1] == 'days' && seg[2] == 'close') {
@@ -1696,14 +1651,12 @@ class FakeApiClient implements ApiClient {
       final item = Map<String, dynamic>.from(raw as Map);
       final state = _submissionState['${item['id']}'];
       if (state != null) item.addAll(state);
-      item.remove('version');
       items.add(item);
     }
     for (final extra in _extraSubmissions) {
       final item = Map<String, dynamic>.from(extra);
       final state = _submissionState['${item['id']}'];
       if (state != null) item.addAll(state);
-      item.remove('version');
       items.add(item);
     }
     body['submissions'] = items;
@@ -1712,14 +1665,12 @@ class FakeApiClient implements ApiClient {
       final item = Map<String, dynamic>.from(raw as Map);
       final state = _unlinkedState['${item['id']}'];
       if (state != null) item.addAll(state);
-      item.remove('version');
       receipts.add(item);
     }
     for (final extra in _extraUnlinked) {
       final item = Map<String, dynamic>.from(extra);
       final state = _unlinkedState['${item['id']}'];
       if (state != null) item.addAll(state);
-      item.remove('version');
       receipts.add(item);
     }
     body['unlinkedReceipts'] = receipts;
@@ -1754,6 +1705,7 @@ class FakeApiClient implements ApiClient {
       'mode': mode,
       if (amount != null) 'amountUnits': amount,
       'status': 'pending',
+      'version': 1,
       if (_userId != null) 'submittedByUserId': _userId,
       if (name != null) 'submittedByName': name,
     });
@@ -1774,6 +1726,7 @@ class FakeApiClient implements ApiClient {
       'customerName': name,
       'amountUnits': amount,
       'status': 'pending',
+      'version': 1,
       if (_userId != null) 'submittedByUserId': _userId,
     });
     return _ok({'id': id, 'version': 1});
@@ -1814,21 +1767,24 @@ class FakeApiClient implements ApiClient {
       if (item['id'] == id) submission = item;
     }
     if (submission == null) _fail(404, 'NOT_FOUND', 'الاستلام غير موجود');
-    if (submission['status'] != 'pending') {
-      _fail(
-        409,
-        'SUBMISSION_ALREADY_DECIDED',
-        submissionAlreadyDecidedMessage,
-      );
-    }
-    final status = _decisionStatus(b['decision']);
-    final next = {...?_submissionState[id], 'status': status};
-    next.remove('version');
-    _submissionState[id] = next;
-    return _decisionAck(id, status, submission);
+    _requireVersion(b['expectedVersion'], submission['version']);
+    final decision = b['decision'];
+    final status = switch (decision) {
+      'approve' => 'approved',
+      'reject' => 'rejected',
+      _ => null,
+    };
+    if (status == null) _fail(400, 'VALIDATION_ERROR', 'قرار غير معروف');
+    final version = (submission['version'] as int) + 1;
+    _submissionState[id] = {
+      ...?_submissionState[id],
+      'status': status,
+      'version': version,
+    };
+    return _ok({'id': 'ok', 'version': version});
   }
 
-  ApiResponse _applyCash(String id, {required bool unlinked}) {
+  ApiResponse _applyCash(String id, Map b, {required bool unlinked}) {
     final view = _collectionsView();
     final items =
         (unlinked ? view['unlinkedReceipts'] : view['submissions']) as List;
@@ -1837,34 +1793,16 @@ class FakeApiClient implements ApiClient {
       id,
       unlinked ? 'الإيصال غير موجود' : 'الاستلام غير موجود',
     );
-    if (current['status'] != 'approved') {
-      _fail(409, 'SUBMISSION_NOT_APPROVED', submissionNotApprovedMessage);
-    }
+    _requireVersion(b['expectedVersion'], current['version']);
+    final version = (current['version'] as int) + 1;
     final store = unlinked ? _unlinkedState : _submissionState;
-    final receivedAt = current['cashReceivedAt'];
-    if (current['cashStatus'] == 'received' ||
-        (receivedAt is String && receivedAt.isNotEmpty)) {
-      return _ok({
-        'id': id,
-        'cashReceivedAt': receivedAt,
-        'eventSequences': <int>[4],
-        'replayed': true,
-      });
-    }
-    const at = '2026-10-22T22:00:00.000Z';
-    final next = {
+    store[id] = {
       ...?store[id],
       'cashStatus': 'received',
       'cashPending': false,
-      'cashReceivedAt': at,
+      'version': version,
     };
-    next.remove('version');
-    store[id] = next;
-    return _ok({
-      'id': id,
-      'cashReceivedAt': at,
-      'eventSequences': <int>[4],
-    });
+    return _ok({'id': 'ok', 'version': version});
   }
 
   ApiResponse _applyUnlinkedDecision(String id, Map b) {
@@ -1873,53 +1811,23 @@ class FakeApiClient implements ApiClient {
       id,
       'الإيصال غير موجود',
     );
-    if (current['status'] != 'pending') {
-      _fail(
-        409,
-        'SUBMISSION_ALREADY_DECIDED',
-        submissionAlreadyDecidedMessage,
-      );
-    }
-    final status = _decisionStatus(b['decision']);
-    final customerId = b['customerId'];
-    final next = {
-      ...?_unlinkedState[id],
-      'status': status,
-      if (customerId != null) 'customerId': customerId,
-    };
-    next.remove('version');
-    _unlinkedState[id] = next;
-    return _decisionAck(id, status, current);
-  }
-
-  String _decisionStatus(Object? decision) {
+    _requireVersion(b['expectedVersion'], current['version']);
+    final decision = b['decision'];
     final status = switch (decision) {
       'approve' => 'approved',
       'reject' => 'rejected',
       _ => null,
     };
     if (status == null) _fail(400, 'VALIDATION_ERROR', 'قرار غير معروف');
-    return status;
-  }
-
-  /// Approve includes the illustrative ledger ack. Reject is id, status, and
-  /// events only. Nothing here posts a customer balance or a cash movement.
-  ApiResponse _decisionAck(String id, String status, Map current) {
-    if (status != 'approved') {
-      return _ok({
-        'id': id,
-        'status': status,
-        'eventSequences': <int>[3],
-      });
-    }
-    final amount = current['amountUnits'];
-    return _ok({
-      'id': id,
+    final version = (current['version'] as int) + 1;
+    final customerId = b['customerId'];
+    _unlinkedState[id] = {
+      ...?_unlinkedState[id],
       'status': status,
-      'transactionId': 'collection-$id',
-      if (amount is int) 'balanceUnits': amount,
-      'eventSequences': <int>[3],
-    });
+      'version': version,
+      if (customerId != null) 'customerId': customerId,
+    };
+    return _ok({'id': 'ok', 'version': version});
   }
 
   Map<String, dynamic> _purchasesView(String book) {

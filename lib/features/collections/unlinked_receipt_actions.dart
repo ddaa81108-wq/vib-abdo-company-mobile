@@ -115,27 +115,11 @@ class UnlinkedReceiptActions extends ConsumerWidget {
       return null;
     } catch (error) {
       final failure = ref.read(errorHandlerProvider).toFailure(error);
-      final message = failure.code == 'VERSION_CONFLICT'
-          ? AppStrings.versionConflict
-          : failure.message;
-      final refresh = failure.code == 'VERSION_CONFLICT' ||
-          failure.code == 'SUBMISSION_ALREADY_DECIDED' ||
-          failure.code == 'SUBMISSION_NOT_APPROVED';
-      if (!context.mounted) return refresh ? message : failureText(failure);
-      if (refresh) {
-        _announce(context, message);
+      if (failure.code == 'VERSION_CONFLICT') {
         ref.invalidate(collectionsProvider);
-        return message;
+        return AppStrings.versionConflict;
       }
       return failureText(failure);
     }
-  }
-
-  void _announce(BuildContext context, String message) {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) return;
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }

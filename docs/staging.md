@@ -78,10 +78,6 @@ tool/check.sh
 
 That runs `flutter analyze` and `flutter test` for the app and for `packages/api_layer`.
 
-## Permission checks against staging
-
-`tool/staging_negative_tests/run.sh` without `--dry-run` runs on the bot machine only. GitHub Actions calls that script only with `--dry-run`, which does not open a socket and does not read accounts. The required check `Negative permission tests` stays on the Fake API. No staging username or password is stored in GitHub as a secret or as a variable. The only staging name the smoke workflow reads is `STAGING_API_BASE`. See [TESTING.md](TESTING.md).
-
 ## P7-01 staging smoke
 
 `packages/api_layer/test/phase7/staging_smoke_test.dart` is skipped unless all three variables are set. `tool/check.sh` and CI do not set them, and the test does not open a socket in that case. It uses the real client (`useFakeApi: false`) with no custom HTTP adapter.
@@ -93,11 +89,7 @@ STAGING_ADMIN_PASSWORD='<password>' \
 flutter test packages/api_layer/test/phase7/staging_smoke_test.dart
 ```
 
-`STAGING_API_BASE` is an origin only, same rules as `API_BASE`. The intended staging value is `https://staging.vip2100.com` with no `/erp` suffix. The password is read from the local environment and is not written into the repo. Do not store staging usernames or passwords in GitHub, neither as secrets nor as variables.
-
-This login command runs on the bot machine only. GitHub Actions does not run it. The manual **Staging smoke** workflow (`.github/workflows/staging-smoke.yml`, `workflow_dispatch`, environment `staging`) only probes unauthenticated `GET /api/health`. `STAGING_API_BASE` for that job should be a secret. See [api/staging-smoke.ar.md](api/staging-smoke.ar.md).
-
-**After a login failure, do not run this local check more than once within 15 minutes.** The login limit is 8 attempts per account. `STAGING_SMOKE_ACCOUNT_ID` stays unset until P-07.
+`STAGING_API_BASE` is an origin only, same rules as `API_BASE`. The password is read from the environment and is not written into the repo.
 
 The smoke signs in, reads `GET /api/me` (the client path; the phase-7 matrix text says `GET /api/auth/me`), reads one section (`STAGING_SMOKE_SECTION`, default `customers`), then `POST /api/auth/logout`. That logout is the write. Set `STAGING_SMOKE_ACCOUNT_ID` as well to send one `setPinned` of that card's current flag before logout. The smoke does not add a ledger line unless that id is set.
 

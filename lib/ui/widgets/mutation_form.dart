@@ -78,9 +78,7 @@ class GuardedMutation extends ConsumerStatefulWidget {
   /// The request id is kept only when a later send is still this same [inputs]
   /// and [expectedVersion]. A thrown [ConflictException] with code
   /// `VERSION_CONFLICT` is shown as [AppStrings.versionConflict] and runs
-  /// [onVersionConflict] so the caller can refetch. Collection status conflicts
-  /// (`SUBMISSION_ALREADY_DECIDED`, `SUBMISSION_NOT_APPROVED`) refetch the same
-  /// way and show the server message. Once that refetch changes
+  /// [onVersionConflict] so the caller can refetch. Once that refetch changes
   /// [expectedVersion] or [inputs], the next send is a new request.
   final Future<String?> Function(MutationMeta meta) onSubmit;
   final String label;
@@ -95,8 +93,7 @@ class GuardedMutation extends ConsumerStatefulWidget {
   final IconData? icon;
   final String? tooltip;
 
-  /// Refetch the record this write was based on. Used for VERSION_CONFLICT and
-  /// for a collection status conflict.
+  /// Refetch the record this write was based on. Used only for VERSION_CONFLICT.
   final VoidCallback? onVersionConflict;
 
   @override
@@ -247,24 +244,18 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
   String _presentFailure(Object error) {
     final failure = ref.read(errorHandlerProvider).toFailure(error);
     if (failure.code == 'FORBIDDEN') return AppStrings.forbidden;
-    if (failure.code == 'SUBMISSION_ALREADY_DECIDED' ||
-        failure.code == 'SUBMISSION_NOT_APPROVED') {
-      _announce(failure.message);
-      widget.onVersionConflict?.call();
-      return failure.message;
-    }
     if (failure.code != 'VERSION_CONFLICT') return failure.message;
-    _announce(AppStrings.versionConflict);
+    _announceConflict();
     widget.onVersionConflict?.call();
     return AppStrings.versionConflict;
   }
 
-  void _announce(String message) {
+  void _announceConflict() {
     final messenger = ScaffoldMessenger.maybeOf(context);
     if (!mounted || messenger == null) return;
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(const SnackBar(content: Text(AppStrings.versionConflict)));
   }
 
   /// Null when the confirmed send is accepted.

@@ -5,10 +5,9 @@
 # the default branch, and a temporary push trigger was rejected before.
 #
 # P7-23 release cold start uses real mode (USE_FAKE_API=false, API_BASE from
-# the secret STAGING_API_BASE). It does not read staging usernames or
-# passwords. Login-to-home timing stays on the bot machine. P7-24 and P7-25
-# use a profile build and the large Fake dataset. P7-26 is the API 29 / 33 /
-# 34 matrix plus the device form in docs/testing/PHASE7_PERFORMANCE.md.
+# the secret STAGING_API_BASE). P7-24 and P7-25 use a profile build and the
+# large Fake dataset. P7-26 is the API 29 / 33 / 34 matrix plus the device
+# form in docs/testing/PHASE7_PERFORMANCE.md.
 #
 # Acceptance Pass is not claimed. Ali sets acceptance thresholds.
 #
@@ -203,6 +202,8 @@ jobs:
         api: [29, 33, 34]
     env:
       STAGING_API_BASE: ${{ secrets.STAGING_API_BASE }}
+      STAGING_ADMIN_USERNAME: ${{ secrets.STAGING_ADMIN_USERNAME }}
+      STAGING_ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
       PERF_SURFACE: emulator
     steps:
       - name: Checkout

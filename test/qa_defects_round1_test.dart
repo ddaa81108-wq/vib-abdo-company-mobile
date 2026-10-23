@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
-import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
@@ -114,19 +113,13 @@ void main() {
       await tester.tap(approve);
       for (var i = 0; i < 10; i++) {
         await tester.pump(const Duration(milliseconds: 50));
-        if (find
-                .text(FakeApiClient.submissionAlreadyDecidedMessage)
-                .evaluate()
-                .isNotEmpty &&
+        if (find.text(AppStrings.versionConflict).evaluate().isNotEmpty &&
             find.byKey(const Key('approve-sb_1')).evaluate().isEmpty) {
           break;
         }
       }
 
-      expect(
-        find.text(FakeApiClient.submissionAlreadyDecidedMessage),
-        findsWidgets,
-      );
+      expect(find.text(AppStrings.versionConflict), findsWidgets);
       expect(find.byKey(const Key('approve-sb_1')), findsNothing);
       expect(find.text(AppStrings.approved), findsNWidgets(2));
       await settle(tester);

@@ -1,0 +1,162 @@
+# Manual staging run of the integration negative-permission script.
+#
+# The job is pinned to the GitHub Environment named `staging`. It refuses an
+# origin that looks like production or is not a staging/test host. Secret
+# values are masked and never printed. If tool/staging_negative_tests/run.sh
+# is not on the selected branch, the job skips. See docs/TESTING.md.
+
+name: Staging negative permission tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: staging-negative-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  staging-negative:
+    name: Staging negative permission tests
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Detect integration script
+        id: script
+        run: |
+          if [[ -f tool/staging_negative_tests/run.sh ]]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "Found tool/staging_negative_tests/run.sh."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Staging negative tests skipped::tool/staging_negative_tests/run.sh is not on this branch yet. Nothing ran against a server."
+            {
+              echo "### Staging negative permission tests"
+              echo
+              echo "Skipped: \`tool/staging_negative_tests/run.sh\` is not in this checkout."
+              echo "The integration engineer owns that entrypoint."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Mask staging secrets
+        if: steps.script.outputs.present == 'true'
+        env:
+          STAGING_API_BASE: ${{ secrets.STAGING_API_BASE }}
+          STAGING_ADMIN_USERNAME: ${{ secrets.STAGING_ADMIN_USERNAME }}
+          STAGING_ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
+          STAGING_EMPLOYEE_USERNAME: ${{ secrets.STAGING_EMPLOYEE_USERNAME }}
+          STAGING_EMPLOYEE_PASSWORD: ${{ secrets.STAGING_EMPLOYEE_PASSWORD }}
+          STAGING_EMPLOYEE2_USERNAME: ${{ secrets.STAGING_EMPLOYEE2_USERNAME }}
+          STAGING_EMPLOYEE2_PASSWORD: ${{ secrets.STAGING_EMPLOYEE2_PASSWORD }}
+          STAGING_LIMITED_MANAGER_USERNAME: ${{ secrets.STAGING_LIMITED_MANAGER_USERNAME }}
+          STAGING_LIMITED_MANAGER_PASSWORD: ${{ secrets.STAGING_LIMITED_MANAGER_PASSWORD }}
+        run: |
+          python3 - << 'PY'
+          import os
+          names = [
+              "STAGING_API_BASE",
+              "STAGING_ADMIN_USERNAME",
+              "STAGING_ADMIN_PASSWORD",
+              "STAGING_EMPLOYEE_USERNAME",
+              "STAGING_EMPLOYEE_PASSWORD",
+              "STAGING_EMPLOYEE2_USERNAME",
+              "STAGING_EMPLOYEE2_PASSWORD",
+              "STAGING_LIMITED_MANAGER_USERNAME",
+              "STAGING_LIMITED_MANAGER_PASSWORD",
+          ]
+          for name in names:
+              value = os.environ.get(name) or ""
+              if value:
+                  print(f"::add-mask::{value}")
+          PY
+
+      - name: Check staging secrets and origin
+        id: preflight
+        if: steps.script.outputs.present == 'true'
+        env:
+          STAGING_API_BASE: ${{ secrets.STAGING_API_BASE }}
+          STAGING_ADMIN_USERNAME: ${{ secrets.STAGING_ADMIN_USERNAME }}
+          STAGING_ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
+          STAGING_EMPLOYEE_USERNAME: ${{ secrets.STAGING_EMPLOYEE_USERNAME }}
+          STAGING_EMPLOYEE_PASSWORD: ${{ secrets.STAGING_EMPLOYEE_PASSWORD }}
+          STAGING_EMPLOYEE2_USERNAME: ${{ secrets.STAGING_EMPLOYEE2_USERNAME }}
+          STAGING_EMPLOYEE2_PASSWORD: ${{ secrets.STAGING_EMPLOYEE2_PASSWORD }}
+          STAGING_LIMITED_MANAGER_USERNAME: ${{ secrets.STAGING_LIMITED_MANAGER_USERNAME }}
+          STAGING_LIMITED_MANAGER_PASSWORD: ${{ secrets.STAGING_LIMITED_MANAGER_PASSWORD }}
+        run: |
+          set +e
+          python3 tool/staging_negative_tests/preflight.py | tee "$RUNNER_TEMP/preflight.txt"
+          code=$?
+          set -e
+          status="$(awk -F= '$1=="status"{print $2}' "$RUNNER_TEMP/preflight.txt")"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Staging negative permission tests"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/preflight.txt"
+            echo '```'
+            echo
+            echo "Secret values were not printed."
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$status" == "skip" ]]; then
+            echo "::notice title=Staging negative tests skipped::Required staging secrets are not all set. Names are in the job summary. No tests ran."
+            exit 0
+          fi
+          if [[ "$code" -ne 0 || "$status" != "ready" ]]; then
+            echo "::error title=Staging run refused::STAGING_API_BASE was not accepted as a staging origin. The value was not printed."
+            exit 1
+          fi
+
+      - name: Set up Java 17
+        if: steps.preflight.outputs.status == 'ready'
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter 3.47.7
+        if: steps.preflight.outputs.status == 'ready'
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          flutter-version: "3.47.7"
+          cache: true
+          pub-cache: true
+
+      - name: Resolve packages
+        if: steps.preflight.outputs.status == 'ready'
+        run: |
+          flutter pub get
+          flutter pub get --directory packages/api_layer
+
+      - name: Run staging negative tests
+        id: invoke
+        if: steps.preflight.outputs.status == 'ready'
+        env:
+          STAGING_API_BASE: ${{ secrets.STAGING_API_BASE }}
+          STAGING_ADMIN_USERNAME: ${{ secrets.STAGING_ADMIN_USERNAME }}
+          STAGING_ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
+          STAGING_EMPLOYEE_USERNAME: ${{ secrets.STAGING_EMPLOYEE_USERNAME }}
+          STAGING_EMPLOYEE_PASSWORD: ${{ secrets.STAGING_EMPLOYEE_PASSWORD }}
+          STAGING_EMPLOYEE2_USERNAME: ${{ secrets.STAGING_EMPLOYEE2_USERNAME }}
+          STAGING_EMPLOYEE2_PASSWORD: ${{ secrets.STAGING_EMPLOYEE2_PASSWORD }}
+          STAGING_LIMITED_MANAGER_USERNAME: ${{ secrets.STAGING_LIMITED_MANAGER_USERNAME }}
+          STAGING_LIMITED_MANAGER_PASSWORD: ${{ secrets.STAGING_LIMITED_MANAGER_PASSWORD }}
+        run: bash tool/staging_negative_tests/run.sh --junit "$GITHUB_WORKSPACE/staging-permissions-junit.xml"
+
+      - name: Upload JUnit
+        if: steps.invoke.outcome == 'success' || steps.invoke.outcome == 'failure'
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: staging-permissions-junit
+          path: staging-permissions-junit.xml
+          if-no-files-found: warn
+          retention-days: 14

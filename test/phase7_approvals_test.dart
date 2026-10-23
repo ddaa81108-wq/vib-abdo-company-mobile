@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
@@ -44,39 +43,31 @@ void main() {
       overview.submissions.firstWhere((row) => row.id == 'sb_9').status,
       'rejected',
     );
-    // The screen hides a second decision. Another decision is a 409 once the
-    // row is no longer pending.
+    // The screen hides a second decision. The fake still accepts another
+    // decision when the caller sends the new version. That second accept is
+    // 🔶 and is not asserted as a forbidden transition.
   });
 
-  testWidgets('P7-12 a changed status is a conflict and the list refreshes', (
+  testWidgets('P7-12 a version conflict leaves the pending button in place', (
     tester,
   ) async {
     final layer = await pumpFakeApp(tester, size: const Size(800, 2400));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
-    await tester.runAsync(
-      () => layer.collections.decide(
-        'sb_9',
-        CollectionDecision.approve,
-        meta: MutationMeta(),
-      ),
-    );
+    (layer.client as FakeApiClient).versionConflictRemaining = 1;
 
     final reject = find.byKey(const Key('reject-sb_9'));
     await tester.ensureVisible(reject);
     await tester.tap(reject);
     await settle(tester);
 
-    expect(
-      find.text(FakeApiClient.submissionAlreadyDecidedMessage),
-      findsWidgets,
-    );
-    expect(find.byKey(const Key('reject-sb_9')), findsNothing);
+    expect(find.text(AppStrings.versionConflict), findsWidgets);
+    expect(find.byKey(const Key('reject-sb_9')), findsOneWidget);
 
     final overview = await tester.runAsync(() => layer.collections.overview());
     expect(
       overview!.submissions.firstWhere((row) => row.id == 'sb_9').status,
-      'approved',
+      'pending',
     );
   });
 }

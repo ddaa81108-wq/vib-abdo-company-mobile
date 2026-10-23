@@ -62,14 +62,14 @@ void main() {
     expect(stored.mode, 'partial');
     expect(stored.amountUnits?.units, 40);
     expect(stored.status, 'pending');
-    expect(stored.version, isNull);
+    expect(stored.version, 1);
     expect(stored.cashStatus, isNull);
     expect(stored.submittedByName, 'موظف استلام تجريبي');
     final created = overview.unlinkedReceipts.last;
     expect(created.customerName, 'زبون جديد');
     expect(created.amountUnits?.units, 25);
     expect(created.status, 'pending');
-    expect(created.version, isNull);
+    expect(created.version, 1);
     expect(created.cashStatus, isNull);
     // Stored literals. The new rows are not summed into these figures.
     expect(overview.pendingCount, before.pendingCount);
@@ -95,12 +95,11 @@ void main() {
       meta:
           MutationMeta(expectedVersion: ack.version, requestId: 'admin-decide'),
     );
-    expect(decided.version, isNull);
-    expect(decided.raw['status'], 'approved');
+    expect(decided.version, 2);
     final overview = await api.collections.overview();
     final row = overview.submissions.singleWhere((item) => item.id == ack.id);
     expect(row.status, 'approved');
-    expect(row.version, isNull);
+    expect(row.version, 2);
     expect(row.amountUnits?.units, 40);
   });
 }

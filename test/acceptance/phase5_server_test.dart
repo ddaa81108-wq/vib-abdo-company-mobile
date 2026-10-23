@@ -45,7 +45,7 @@ void main() {
     final overview = await api.collections.overview();
     final sb1 = overview.submissions.singleWhere((s) => s.id == 'sb_1');
     expect(sb1.status, 'pending');
-    expect(sb1.version, isNull);
+    expect(sb1.version, 1);
   });
 
   test('P5-21 limited admin matches the fixture, including DEF-002', () async {
@@ -58,8 +58,7 @@ void main() {
       CollectionDecision.approve,
       meta: MutationMeta(expectedVersion: 1, requestId: 'p5-21-decide'),
     );
-    expect(decision.version, isNull);
-    expect(decision.raw['status'], 'approved');
+    expect(decision.version, 2);
     final overview = await api.collections.overview();
     expect(
       overview.submissions.singleWhere((s) => s.id == 'sb_1').status,

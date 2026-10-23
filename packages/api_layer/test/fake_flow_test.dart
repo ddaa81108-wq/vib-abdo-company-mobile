@@ -89,20 +89,24 @@ void main() {
     expect(overview.submissions.first.cashStatus, CashStatus.notApplicable);
     final pendingUnlinked =
         overview.unlinkedReceipts.firstWhere((r) => r.id == 'ur_1');
-    expect(pendingUnlinked.version, isNull);
+    expect(pendingUnlinked.version, 1);
     expect(pendingUnlinked.cashStatus, CashStatus.notApplicable);
     final rejectedUnlinked =
         overview.unlinkedReceipts.firstWhere((r) => r.id == 'ur_2');
     expect(rejectedUnlinked.status, 'rejected');
-    expect(rejectedUnlinked.version, isNull);
+    expect(rejectedUnlinked.version, 4);
     expect(rejectedUnlinked.cashStatus, CashStatus.pending);
 
+    // Without expectedVersion the repository refuses to send, per API contract.
+    expect(
+      () => api.collections.markCashReceived('sb_2', MutationMeta()),
+      throwsArgumentError,
+    );
     final ack = await api.collections.markCashReceived(
       'sb_2',
-      MutationMeta(),
+      MutationMeta(expectedVersion: approved.version),
     );
-    expect(ack.version, isNull);
-    expect(ack.raw['cashReceivedAt'], '2026-10-22T22:00:00.000Z');
+    expect(ack.version, 4);
     final afterCash = await api.collections.overview();
     expect(
       afterCash.submissions.firstWhere((s) => s.id == 'sb_2').cashStatus,

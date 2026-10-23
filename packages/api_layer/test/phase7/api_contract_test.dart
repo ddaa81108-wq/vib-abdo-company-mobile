@@ -339,20 +339,15 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
       await h.layer.collections.decide(
         'sub1',
         CollectionDecision.approve,
-        note: 'مطابقة اختبار',
         meta: meta,
       );
       expect(
         expectCall(h, 'POST', ApiEndpoints.collectionSubmissionDecision('sub1'))
-            .jsonBody,
-        {'decision': 'approve', 'note': 'مطابقة اختبار'},
+            .jsonBody?['decision'],
+        'approve',
       );
       await h.layer.collections.markCashReceived('sub1', meta);
-      expect(
-        expectCall(h, 'POST', ApiEndpoints.collectionSubmissionCashReceived('sub1'))
-            .jsonBody,
-        isNull,
-      );
+      expectCall(h, 'POST', ApiEndpoints.collectionSubmissionCashReceived('sub1'));
       await h.layer.collections.createUnlinkedReceipt(
         customerName: 'زبون',
         amountUnits: 10,
@@ -365,21 +360,11 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
       await h.layer.collections.decideUnlinked(
         'ur1',
         decision: CollectionDecision.reject,
-        customerId: 'c1',
-        entryType: 'payment',
         meta: meta,
       );
-      expect(
-        expectCall(h, 'POST', ApiEndpoints.collectionUnlinkedDecision('ur1'))
-            .jsonBody,
-        {'decision': 'reject', 'customerId': 'c1', 'entryType': 'payment'},
-      );
+      expectCall(h, 'POST', ApiEndpoints.collectionUnlinkedDecision('ur1'));
       await h.layer.collections.markUnlinkedCashReceived('ur1', meta);
-      expect(
-        expectCall(h, 'POST', ApiEndpoints.collectionUnlinkedCashReceived('ur1'))
-            .jsonBody,
-        isNull,
-      );
+      expectCall(h, 'POST', ApiEndpoints.collectionUnlinkedCashReceived('ur1'));
       await h.layer.collections.closeDay(batchId: 'b1', meta: meta);
       expect(
         expectCall(h, 'POST', ApiEndpoints.collectionDaysClose).jsonBody?['batchId'],

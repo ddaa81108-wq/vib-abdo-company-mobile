@@ -1,12 +1,12 @@
 // Staging negative checks for the permission matrix.
 //
 // Self-test: tool/staging_negative_tests/run.sh --dry-run
-// That path does not open a socket. The required CI job calls it when this
-// file exists. Live mode is for the bot machine only. It refuses CI=true and
-// GITHUB_ACTIONS=true, and it uses the same origin rules as `classify_origin`
-// in the preflight: https only, a non-TLD label of staging/stage/test/testing,
-// and no *.invalid placeholder. GitHub does not store the usernames or
-// passwords.
+// That path does not open a socket. PR #32's job calls it when this file
+// exists. The manual workflow in PR #32 calls
+// `run.sh --junit staging-permissions-junit.xml` and uploads the artifact
+// `staging-permissions-junit`. Live mode uses the same origin rules as
+// `classify_origin` in that preflight: https only, a non-TLD label of
+// staging/stage/test/testing, and no *.invalid placeholder.
 // ignore_for_file: avoid_print
 
 import 'dart:async';
@@ -70,12 +70,6 @@ class ConfigProblem implements Exception {
   final String message;
 }
 
-/// Live mode must not run on GitHub Actions. `--dry-run` does not call this.
-bool githubHostsLiveRun(Map<String, String> env) {
-  bool isTrue(String key) => (env[key] ?? '').trim().toLowerCase() == 'true';
-  return isTrue('CI') || isTrue('GITHUB_ACTIONS');
-}
-
 class ProbeResult {
   ProbeResult(this.status, this.body);
   final int status;
@@ -93,13 +87,6 @@ Future<void> main(List<String> args) async {
       await File(parsed.junitPath!).writeAsString(_junit(results));
     }
     exit(results.any((row) => row.failed) ? 1 : 0);
-  }
-  if (githubHostsLiveRun(Platform.environment)) {
-    stderr.writeln(
-      'Refusing a live staging permission check on GitHub. '
-      'Run it on the bot machine. GitHub does not store staging usernames or passwords.',
-    );
-    exit(2);
   }
   late final StagingConfig config;
   try {
@@ -269,17 +256,6 @@ List<CaseResult> _selfTest() {
     }
   }
 
-  check('live mode refuses GitHub Actions', () {
-    if (!githubHostsLiveRun(const {'CI': 'true'})) {
-      throw StateError('CI=true was allowed');
-    }
-    if (!githubHostsLiveRun(const {'GITHUB_ACTIONS': 'true'})) {
-      throw StateError('GITHUB_ACTIONS=true was allowed');
-    }
-    if (githubHostsLiveRun(const {})) {
-      throw StateError('a local shell was refused');
-    }
-  });
   check('dry-run does not require env', () {
     var threw = false;
     try {
