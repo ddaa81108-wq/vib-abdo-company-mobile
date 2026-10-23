@@ -16,18 +16,39 @@ import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
 import 'edit_account_card_screen.dart';
+import 'overpayment_warning.dart';
 import 'transaction_correction_form.dart';
 
 /// Ledger for one card. Customers, companies, Libyan deposits, and Egyptian
 /// deposits all use this screen; [section] selects the repository and the labels.
-class LedgerScreen extends ConsumerWidget {
+class LedgerScreen extends ConsumerStatefulWidget {
   const LedgerScreen({required this.section, required this.id, super.key});
 
   final AccountSection section;
   final String id;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LedgerScreen> createState() => _LedgerScreenState();
+}
+
+class _LedgerScreenState extends ConsumerState<LedgerScreen> {
+  /// `balanceUnits` from the last successful payment response, when the
+  /// server included it. Never an app-computed figure.
+  int? _postedBalanceUnits;
+
+  AccountSection get section => widget.section;
+  String get id => widget.id;
+
+  @override
+  void didUpdateWidget(LedgerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.section != widget.section || oldWidget.id != widget.id) {
+      _postedBalanceUnits = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final permissions = permissionsOf(ref);
     if (!permissions.canRead(section.sectionKey)) return const ForbiddenPane();
     final ledger = ref.watch(ledgerProvider((section, id)));
@@ -133,6 +154,7 @@ class LedgerScreen extends ConsumerWidget {
                             card: loadedCard,
                             money: money,
                             title: _ledgerTitle(section),
+                            postedBalanceUnits: _postedBalanceUnits,
                           ),
                         ),
                       ],
@@ -219,11 +241,14 @@ class LedgerScreen extends ConsumerWidget {
     WidgetRef ref, {
     required String type,
   }) async {
-    final saved = await showAppForm<bool>(
+    final saved = await showAppForm<PostedMovement>(
       context,
       _MovementForm(section: section, id: id, type: type),
     );
-    if (saved == true) {
+    if (saved != null) {
+      if (saved.balanceUnits != null) {
+        setState(() => _postedBalanceUnits = saved.balanceUnits);
+      }
       ref.invalidate(ledgerProvider((section, id)));
       ref.invalidate(accountCardProvider((section, id)));
       ref.invalidate(accountsProvider(section));
@@ -426,20 +451,37 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
     final units = parseUnits(_amount.text);
     if (units == null) return AppStrings.integerOnly;
     // Direct partial payment only. A rate is not an amount, so it is not
-    // compared. This reads the server balance; it does not compute one.
-    // An invalid balance is refused. It is not treated as 0.
+    // compared. An invalid balance is refused. It is not treated as 0.
+    // An amount above the fresh balance is not refused: the warning is
+    // display-only and the send still uses this form's requestId.
     if (widget.type == 'payment' && _mode == CalculationMode.direct) {
-      final remaining = ref
-          .read(accountCardProvider((widget.section, widget.id)))
-          .asData
-          ?.value
-          .balanceUnits;
+      // The same repository call accountCardProvider uses. Reading it here,
+      // instead of refreshing that provider, leaves the form's watched
+      // expectedVersion (and therefore its requestId) unchanged.
+      final AccountCardDto fresh;
+      try {
+        fresh = await ref
+            .read(apiLayerProvider)
+            .accounts
+            .get(widget.section, widget.id);
+      } catch (error) {
+        return failureText(ref.read(errorHandlerProvider).toFailure(error));
+      }
+      if (!mounted) return '';
+      final remaining = fresh.balanceUnits;
       if (remaining != null && remaining.isInvalid) {
         return AppStrings.invalidAmount;
       }
       final remainingUnits = remaining?.asInt;
-      if (remainingUnits != null && units > remainingUnits) {
-        return AppStrings.amountAboveRemaining;
+      if (remainingUnits != null) {
+        final preview = OverpaymentPreview.aboveBalance(
+          amountUnits: units,
+          balanceUnits: remainingUnits,
+        );
+        if (preview != null) {
+          final proceed = await _confirmOverpayment(fresh.currency, preview);
+          if (proceed != true) return '';
+        }
       }
     }
     final parsedDate = DateTime.tryParse(_date.text);
@@ -473,7 +515,8 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
       );
-      Navigator.of(context).pop(true);
+      Navigator.of(context)
+          .pop(PostedMovement(balanceUnits: postedBalanceUnits(ack)));
       return null;
     } catch (error) {
       // A returned string never reaches GuardedMutation's conflict path.
@@ -483,6 +526,64 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       return failureText(failure);
     }
   }
+
+  /// Null or false sends nothing. True continues with the same [MutationMeta].
+  Future<bool?> _confirmOverpayment(
+    Currency currency,
+    OverpaymentPreview preview,
+  ) {
+    final money = ref.read(apiLayerProvider).money;
+    final overage = money.format(preview.overageUnits, currency);
+    final expected = money.format(preview.expectedBalanceUnits, currency);
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        final negative = dialogContext.statusColors.debtText;
+        final amountStyle = dialogContext.textExtras.amount;
+        return RepaintBoundary(
+          key: const Key('overpayment-boundary'),
+          child: AlertDialog(
+            key: const Key('overpayment-warning'),
+            content: Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(text: AppStrings.overpaymentLead),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: MoneyText(overage),
+                  ),
+                  const TextSpan(text: ' ${AppStrings.overpaymentMiddle} '),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: MoneyText(
+                      expected,
+                      key: const Key('overpayment-expected'),
+                      style: amountStyle.copyWith(color: negative),
+                    ),
+                  ),
+                  const TextSpan(text: '. ${AppStrings.overpaymentAsk}'),
+                ],
+              ),
+              key: const Key('overpayment-copy'),
+            ),
+            actions: [
+              TextButton(
+                key: const Key('overpayment-cancel'),
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text(AppStrings.cancel),
+              ),
+              FilledButton(
+                key: const Key('overpayment-continue'),
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text(AppStrings.overpaymentAsk),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _Header extends StatelessWidget {
@@ -491,12 +592,16 @@ class _Header extends StatelessWidget {
     required this.card,
     required this.money,
     required this.title,
+    this.postedBalanceUnits,
   });
 
   final AccountSection section;
   final AccountCardDto? card;
   final MoneyFormatter money;
   final String title;
+
+  /// Server `balanceUnits` from the payment response, when that field was sent.
+  final int? postedBalanceUnits;
 
   @override
   Widget build(BuildContext context) {
@@ -517,6 +622,12 @@ class _Header extends StatelessWidget {
     final accent = colored
         ? (visual.accent ?? colors.onStatus)
         : scheme.onSurfaceVariant;
+    final shownBalance = postedBalanceUnits != null
+        ? MoneyValue.known(postedBalanceUnits!)
+        : value.balanceUnits;
+    final negativePosted =
+        postedBalanceUnits != null && postedBalanceUnits! < 0 && !colored;
+    final balanceColor = negativePosted ? colors.debtText : foreground;
     return Material(
       key: const Key('ledger-header'),
       color: colored
@@ -559,10 +670,10 @@ class _Header extends StatelessWidget {
               if (value.phone != null)
                 LtrText(value.phone!, style: cairo(12, 500, color: accent)),
               MoneyText(
-                money.formatOrDash(value.balanceUnits, value.currency),
+                money.formatOrDash(shownBalance, value.currency),
                 key: const Key('ledger-header-balance'),
                 style: context.textExtras.amountLarge.copyWith(
-                  color: foreground,
+                  color: balanceColor,
                 ),
               ),
               if (value.systemManaged)

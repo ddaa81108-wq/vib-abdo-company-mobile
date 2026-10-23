@@ -93,6 +93,42 @@ void main() {
   }, timeout: const Timeout(Duration(minutes: 3)));
 }
 
+Future<void> saveBoundaryShot(
+  WidgetTester tester,
+  Finder finder,
+  String name,
+) async {
+  RenderRepaintBoundary? boundary;
+  for (var i = 0; i < 12; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+    boundary = tester.renderObject<RenderRepaintBoundary>(finder);
+    if (!boundary.debugNeedsPaint) break;
+  }
+  expect(boundary!.debugNeedsPaint, isFalse, reason: 'boundary still dirty');
+  // toImage asserts the layer is painted. A later await lets a spinner schedule
+  // another frame and mark the boundary dirty before the assert runs.
+  final imageFuture = boundary.toImage(pixelRatio: 1);
+  final captured = await tester.runAsync(() async {
+    final image = await imageFuture;
+    final width = image.width;
+    final height = image.height;
+    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    image.dispose();
+    return (width, height, data!.buffer.asUint8List());
+  });
+  expect(captured, isNotNull, reason: 'no pixels for $name');
+  final png = _pngFromRgba(captured!.$3, captured.$1, captured.$2);
+  expect(png.length, greaterThan(500), reason: name);
+  Directory('build/screenshots').createSync(recursive: true);
+  File('build/screenshots/$name.png').writeAsBytesSync(png);
+  try {
+    Directory('/opt/cursor/artifacts/screenshots').createSync(recursive: true);
+    File('/opt/cursor/artifacts/screenshots/$name.png').writeAsBytesSync(png);
+  } on FileSystemException {
+    // The artifact directory exists for this agent, not in CI.
+  }
+}
+
 Future<void> saveShot(WidgetTester tester, String name) async {
   await tester.pump();
   final view = tester.view.physicalSize / tester.view.devicePixelRatio;

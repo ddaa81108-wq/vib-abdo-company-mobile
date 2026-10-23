@@ -94,8 +94,12 @@ abstract final class AppStrings {
   static const invalidAmount = MoneyValue.invalidLabel;
 
   /// Direct partial payment compared with the card balance the server sent.
-  /// The app does not subtract or store a new balance.
+  /// The app does not subtract or store a new balance. The payment form no
+  /// longer blocks on this sentence; the fake server may still return it.
   static const amountAboveRemaining = 'المبلغ أكبر من المتبقي المسجّل.';
+  static const overpaymentLead = 'الدفع يتجاوز الرصيد بـ';
+  static const overpaymentMiddle = 'وسيصبح الرصيد';
+  static const overpaymentAsk = 'هل تريد المتابعة؟';
   static const dateInvalid = 'أدخل التاريخ بصيغة سنة-شهر-يوم.';
   static const unitsHint =
       'عدد صحيح بالوحدة الصغرى التي يخزّنها الخادم. بلا فواصل وبلا كسور. التطبيق لا يحوّل هذا الرقم ولا يحسبه.';
