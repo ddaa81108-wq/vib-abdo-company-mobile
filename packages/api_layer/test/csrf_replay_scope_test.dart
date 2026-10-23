@@ -1,5 +1,6 @@
-// A 419 never refreshes or replays. The cookie strategy and the interceptor
-// are real. The server is FakeApiClient, reached through the Dio transport.
+// Replay is only HTTP 403 CSRF_REJECTED. A 419 never refreshes or replays.
+// The cookie strategy and the interceptor are real. The server is
+// FakeApiClient, reached through the Dio transport. No socket.
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -9,6 +10,70 @@ import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('403 CSRF_REJECTED refreshes once and replays once', () async {
+    final harness = await _open();
+    final cookie = await harness.cookies.cookieHeader();
+    await harness.fake.serveHttp(
+      method: 'GET',
+      path: ApiEndpoints.csrf,
+      headers: {'Cookie': cookie!},
+    );
+    harness.transport.calls.clear();
+
+    await harness.layer.client.post(
+      ApiEndpoints.changePassword,
+      body: const {'currentPassword': 'x', 'newPassword': '0123456789ab'},
+    );
+
+    final writes = harness.transport.matching(
+      'POST',
+      ApiEndpoints.changePassword,
+    );
+    expect(writes, hasLength(2));
+    expect(writes.first.csrf, 'fake-csrf');
+    expect(writes.last.csrf, isNot('fake-csrf'));
+    expect(harness.transport.matching('GET', ApiEndpoints.csrf), hasLength(1));
+    expect(harness.layer.session.state, isA<SessionAuthenticated>());
+    expect(await harness.cookies.cookieHeader(), contains('abdo_session'));
+  });
+
+  test('a 409 whose message contains CSRF is not refreshed', () async {
+    await _expectNoReplay(
+      status: 409,
+      code: 'VERSION_CONFLICT',
+      message: 'missing CSRF token',
+      wipes: false,
+    );
+  });
+
+  test('a 500 whose message contains CSRF is not refreshed', () async {
+    await _expectNoReplay(
+      status: 500,
+      code: 'SERVER_ERROR',
+      message: 'CSRF token mismatch.',
+      wipes: false,
+    );
+  });
+
+  test('a 403 CSRF_MISSING is not refreshed', () async {
+    await _expectNoReplay(
+      status: 403,
+      code: 'CSRF_MISSING',
+      message: 'الرمز غير موجود',
+      wipes: false,
+    );
+  });
+
+  test('403 PERMISSION_DENIED with CSRF only in the message is not refreshed',
+      () async {
+    await _expectNoReplay(
+      status: 403,
+      code: 'PERMISSION_DENIED',
+      message: 'CSRF check failed',
+      wipes: false,
+    );
+  });
+
   test('a 419 whose code contains CSRF is not replayed', () async {
     await _expectNoReplay(
       status: 419,
@@ -118,9 +183,10 @@ class _Harness {
 }
 
 class _Call {
-  _Call(this.method, this.path);
+  _Call(this.method, this.path, this.csrf);
   final String method;
   final String path;
+  final String? csrf;
 }
 
 class _Transport implements HttpClientAdapter {
@@ -147,7 +213,11 @@ class _Transport implements HttpClientAdapter {
       headers[key] = value is List ? value.join(', ') : '$value';
     });
     final path = options.uri.path.isEmpty ? options.path : options.uri.path;
-    calls.add(_Call(options.method.toUpperCase(), path));
+    String? csrf;
+    for (final entry in headers.entries) {
+      if (entry.key.toLowerCase() == 'x-csrf-token') csrf = entry.value;
+    }
+    calls.add(_Call(options.method.toUpperCase(), path, csrf));
     final query = options.queryParameters.isEmpty
         ? null
         : Map<String, dynamic>.from(options.queryParameters);
