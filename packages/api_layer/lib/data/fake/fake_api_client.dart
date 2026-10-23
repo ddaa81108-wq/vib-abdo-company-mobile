@@ -195,6 +195,9 @@ class FakeApiClient implements ApiClient {
   /// is read (tests). A path that is absent is not delayed.
   final Map<String, Completer<void>> pauseGets = {};
 
+  /// GET paths that answer 503 until removed (tests).
+  final Set<String> failGetPaths = {};
+
   /// One-shot raw `data` JSON for a non-GET, decoded with [PreciseJson].
   ///
   /// The write is not applied. Tests use this to feed one invalid money field
@@ -998,6 +1001,9 @@ class FakeApiClient implements ApiClient {
     if (method == 'GET') {
       final gate = pauseGets[path];
       if (gate != null) await gate.future;
+      if (failGetPaths.contains(path)) {
+        _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الكارت.');
+      }
       final scripted = scriptedGetJson.remove(path);
       if (scripted != null) {
         return ApiResponse(

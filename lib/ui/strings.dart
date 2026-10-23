@@ -93,12 +93,7 @@ abstract final class AppStrings {
   static const integerOnly = 'أدخل عددًا صحيحًا كما هو، بلا كسور.';
   static const invalidAmount = MoneyValue.invalidLabel;
 
-  /// The fake used to reject a direct partial payment above the stored
-  /// balance with this sentence. It now accepts that payment. The ledger
-  /// does not show this sentence and does not block on it.
-  static const amountAboveRemaining = 'المبلغ أكبر من المتبقي المسجّل.';
-
-  /// Overpayment warning. Names the balance the server just returned and the
+  /// Overpayment warning. Names the balance already on the card and the
   /// amount the user typed. It does not state a difference or a new balance.
   static const overpaymentCurrent = 'الرصيد الحالي';
   static const overpaymentEntered = 'والمبلغ المدخل';

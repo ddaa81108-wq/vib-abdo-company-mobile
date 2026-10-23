@@ -4,7 +4,6 @@ import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
-import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import 'support/pump_app.dart';
 
@@ -34,7 +33,7 @@ void main() {
       await pumpUntil(tester, find.byKey(const Key('overpayment-warning')));
 
       expect(find.byKey(const Key('overpayment-warning')), findsOneWidget);
-      expect(find.text(AppStrings.amountAboveRemaining), findsNothing);
+      expect(find.text('المبلغ أكبر من المتبقي المسجّل.'), findsNothing);
       expect(find.byKey(const Key('save-movement')), findsOneWidget);
       expect(fake.mutationPaths, hasLength(postsBefore));
       expect(_header('320 د.ل'), findsOneWidget);
@@ -42,6 +41,8 @@ void main() {
 
       await tester.tap(find.byKey(const Key('overpayment-cancel')));
       await settle(tester);
+      expect(find.byKey(const Key('mutation-error')), findsNothing);
+      expect(find.byKey(const Key('save-movement')), findsOneWidget);
       expect(fake.mutationPaths, hasLength(postsBefore));
       expect(
         fake.mutationPaths.where((path) => path.contains('/transactions')),

@@ -76,12 +76,13 @@ void main() {
             Theme.of(dialog).brightness,
             dark ? Brightness.dark : Brightness.light,
           );
-          expect(find.text(AppStrings.amountAboveRemaining), findsNothing);
+          expect(find.text('المبلغ أكبر من المتبقي المسجّل.'), findsNothing);
           expect(fake.mutationPaths, hasLength(postsBefore));
 
           await tester.tap(find.byKey(const Key('overpayment-cancel')));
           await settle(tester);
           expect(find.byKey(const Key('overpayment-warning')), findsNothing);
+          expect(find.byKey(const Key('mutation-error')), findsNothing);
           expect(fake.mutationPaths, hasLength(postsBefore));
           expect(
             fake.mutationPaths.where((path) => path.contains('/transactions')),
@@ -110,10 +111,7 @@ void main() {
       final positiveInk = tester.widget<MoneyText>(balance).style?.color;
       expect(_header('320 د.ل'), findsOneWidget);
       expect(positiveInk, isNotNull);
-      expect(
-        positiveInk,
-        isNot(tester.element(balance).statusColors.debtText),
-      );
+      expect(positiveInk, isNot(tester.element(balance).statusColors.debtText));
 
       await _openPayment(tester, '400');
       expect(fake.mutationPaths, hasLength(postsBefore));
@@ -122,7 +120,7 @@ void main() {
       await settle(tester);
 
       expect(find.byKey(const Key('overpayment-warning')), findsNothing);
-      expect(find.text(AppStrings.amountAboveRemaining), findsNothing);
+      expect(find.text('المبلغ أكبر من المتبقي المسجّل.'), findsNothing);
       expect(fake.mutationPaths, hasLength(postsBefore + 1));
       final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
       expect(body['expectedVersion'], 4);
@@ -382,6 +380,64 @@ void main() {
       expect(_header(AppStrings.dash), findsNothing);
       expect(_header(oldBalance), findsNothing);
       expect(_header(computed), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('DEF-031 a failing card read does not block the payment', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(tester, size: const Size(430, 932));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    expect(_header('320 د.ل'), findsOneWidget);
+    final fake = layer.client as FakeApiClient;
+    fake.failGetPaths.add(_cardPath);
+    final postsBefore = fake.mutationPaths.length;
+
+    await _openPayment(tester, '400');
+
+    expect(find.byKey(const Key('overpayment-warning')), findsOneWidget);
+    expect(find.byKey(const Key('mutation-error')), findsNothing);
+    expect(
+      tester
+          .widget<MoneyText>(find.byKey(const Key('overpayment-current')))
+          .text,
+      '320 د.ل',
+    );
+    expect(fake.mutationPaths, hasLength(postsBefore));
+
+    fake.failGetPaths.remove(_cardPath);
+    await tester.tap(find.byKey(const Key('overpayment-continue')));
+    await settle(tester);
+
+    expect(fake.mutationPaths, hasLength(postsBefore + 1));
+    expect(
+      fake.mutationPaths.where((path) => path.contains('/transactions')),
+      isNotEmpty,
+    );
+    expect(find.byKey(const Key('mutation-error')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'DEF-031 a failed card reload keeps the acknowledgement and not the old balance',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(430, 932));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/customers/c_55');
+      await _openPayment(tester, '400');
+      final fake = layer.client as FakeApiClient;
+      fake.failGetPaths.add(_cardPath);
+
+      await tester.tap(find.byKey(const Key('overpayment-continue')));
+      await settle(tester);
+
+      expect(_header('-80 د.ل'), findsOneWidget);
+      expect(_header('320 د.ل'), findsNothing);
+      expect(find.byKey(const Key('ledger-reload-failed')), findsOneWidget);
+      expect(find.text('تعذر تحميل الكارت.'), findsWidgets);
+      expect(find.byType(ErrorPane), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

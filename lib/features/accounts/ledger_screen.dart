@@ -57,6 +57,8 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   Widget build(BuildContext context) {
     ref.listen(accountCardProvider((section, id)), (previous, next) {
       if (!_balanceAwaitingReload) return;
+      // A failed reload keeps [MutationAck.balanceUnits]. The header does
+      // not go back to the card that was on screen before the payment.
       if (next.isLoading || next.isRefreshing || next.hasError) return;
       if (!next.hasValue) return;
       setState(() {
@@ -73,6 +75,9 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     String messageOf(Object error) =>
         failureText(ref.read(errorHandlerProvider).toFailure(error));
     failureOf(Object error) => ref.read(errorHandlerProvider).toFailure(error);
+    final reloadError = _balanceAwaitingReload && card.hasError
+        ? messageOf(card.error!)
+        : null;
 
     return Scaffold(
       key: Key('screen-ledger-${section.path}'),
@@ -171,6 +176,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                             title: _ledgerTitle(section),
                             awaitingServerBalance: _balanceAwaitingReload,
                             ackBalance: _ackBalance,
+                            reloadError: reloadError,
                           ),
                         ),
                       ],
@@ -469,45 +475,27 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
     if (units == null) return AppStrings.integerOnly;
     // Direct partial payment only. A rate is not an amount, so it is not
     // compared. An invalid balance is refused. It is not treated as 0.
-    // An amount above the fresh balance is not refused. The warning names
-    // the current balance and the typed amount, then the send still uses
-    // this form's requestId.
+    // The warning uses the balance already on the card. It does not read
+    // the card again, so a failed read cannot block the send. An amount
+    // above that balance is not refused. Cancel returns null and sends
+    // nothing. The send still uses this form's requestId.
     if (widget.type == 'payment' && _mode == CalculationMode.direct) {
-      // An invalid balance already on screen is not a number. Refuse it
-      // before any send. It is not treated as 0.
-      final watched = ref
+      final loaded = ref
           .read(accountCardProvider((widget.section, widget.id)))
           .asData
-          ?.value
-          .balanceUnits;
+          ?.value;
+      final watched = loaded?.balanceUnits;
       if (watched != null && watched.isInvalid) {
         return AppStrings.invalidAmount;
       }
-      // The same repository call accountCardProvider uses. Reading it here,
-      // instead of refreshing that provider, leaves the form's watched
-      // expectedVersion (and therefore its requestId) unchanged.
-      final AccountCardDto fresh;
-      try {
-        fresh = await ref
-            .read(apiLayerProvider)
-            .accounts
-            .get(widget.section, widget.id);
-      } catch (error) {
-        return failureText(ref.read(errorHandlerProvider).toFailure(error));
-      }
-      if (!mounted) return '';
-      final remaining = fresh.balanceUnits;
-      if (remaining != null && remaining.isInvalid) {
-        return AppStrings.invalidAmount;
-      }
-      final remainingUnits = remaining?.asInt;
-      if (remainingUnits != null && units > remainingUnits) {
+      final remainingUnits = watched?.asInt;
+      if (loaded != null && remainingUnits != null && units > remainingUnits) {
         final proceed = await _confirmOverpayment(
-          fresh.currency,
+          loaded.currency,
           remainingUnits,
           units,
         );
-        if (proceed != true) return '';
+        if (!mounted || proceed != true) return null;
       }
     }
     final parsedDate = DateTime.tryParse(_date.text);
@@ -620,6 +608,7 @@ class _Header extends StatelessWidget {
     required this.title,
     this.awaitingServerBalance = false,
     this.ackBalance,
+    this.reloadError,
   });
 
   final AccountSection section;
@@ -632,6 +621,10 @@ class _Header extends StatelessWidget {
 
   /// [MutationAck.balanceUnits] while [awaitingServerBalance] is set.
   final MoneyValue? ackBalance;
+
+  /// Set when the card reload after that acknowledgement failed.
+  /// The figure stays [ackBalance]. This is the reload failure, not a new balance.
+  final String? reloadError;
 
   @override
   Widget build(BuildContext context) {
@@ -705,6 +698,12 @@ class _Header extends StatelessWidget {
                   color: balanceColor,
                 ),
               ),
+              if (reloadError != null)
+                Text(
+                  reloadError!,
+                  key: const Key('ledger-reload-failed'),
+                  style: cairo(12, 500, color: accent),
+                ),
               if (value.systemManaged)
                 Text(
                   AppStrings.systemCard,
