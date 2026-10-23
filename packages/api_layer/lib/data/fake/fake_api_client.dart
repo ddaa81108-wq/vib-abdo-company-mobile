@@ -161,6 +161,13 @@ class FakeApiClient implements ApiClient {
   /// null when the request omitted them.
   final List<AccountListQuery> accountListQueries = [];
 
+  /// Financial-ledger reads, in call order (tests).
+  ///
+  /// [FinancialLedgerQuery.section] is the contract query name. It is null
+  /// when the request omitted it. [FinancialLedgerQuery.sectionKey] is set
+  /// only when a caller sent that query name; the repository sends `section`.
+  final List<FinancialLedgerQuery> financialLedgerQueries = [];
+
   /// When set, the first account-list page reports this `nextCursor` (tests).
   String? accountNextCursor;
 
@@ -1261,10 +1268,18 @@ class FakeApiClient implements ApiClient {
         });
       case 'financial-ledger':
         _requireFullAccess();
-        return _ok({
-          'items': [],
-          'scopeTotals': {'LYD': 0, 'EGP': 0},
-        });
+        final section = _queryText(query, 'section');
+        financialLedgerQueries.add(
+          FinancialLedgerQuery(
+            section: section,
+            sectionKey: _queryText(query, 'sectionKey'),
+          ),
+        );
+        return _ok(
+          FakeFixtures.financialLedger(
+            sectionKey: section ?? _queryText(query, 'sectionKey'),
+          ),
+        );
       case 'notifications':
         return _notifications(method, seg, b, query);
       case 'notification-preferences':
@@ -2589,6 +2604,14 @@ String? _queryText(Map<String, dynamic>? query, String key) {
   final text = '$value';
   if (text.isEmpty) return null;
   return text;
+}
+
+/// One recorded `GET /api/financial-ledger` (tests).
+class FinancialLedgerQuery {
+  const FinancialLedgerQuery({this.section, this.sectionKey});
+
+  final String? section;
+  final String? sectionKey;
 }
 
 /// One recorded `GET /api/{section}` (tests).
