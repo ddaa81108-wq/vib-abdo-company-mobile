@@ -128,7 +128,7 @@ P-08 وP-09 وP-12 مستقلة، ويمكن أن تسير بالتوازي مع
 - **النطاق:** `error_mapper.dart:124-135`.
   - `409 CLIENT_VERSION_MISMATCH` يتحول إلى «حدّث التطبيق»، لا تعارض.
   - `403 CSRF_REJECTED` يمر بمسار جلب CSRF مرة واحدة.
-  - **isCsrfRejection** (P-09، PR #73): قرّره علي بكلماته للمنسق في 2026-10-23: «أبقِ المطابقة الواسعة الحالية لـ CSRF». أي رمز أو رسالة تحوي CSRF تبقى رفض CSRF (`error_mapper.dart:110`).
+  - **isCsrfRejection** (P-09، PR #73): قرّره علي بكلماته للمنسق في 2026-10-23: «ضيّق إعادة إرسال CSRF إلى 403 برمز CSRF_REJECTED فقط». التجديد وإعادة الإرسال يحدثان فقط عند HTTP 403 والرمز `CSRF_REJECTED`. الجملة «أبقِ المطابقة الواسعة الحالية لـ CSRF» ملغاة.
   - `401 INVALID_CURRENT_PASSWORD` في تغيير كلمة المرور لا يمسح الجلسة.
   - `409 PENDING_SUBMISSION_EXISTS` و`FULL_AMOUNT_CHANGED` و`NO_POSITIVE_DEBT` و`DUPLICATE_SAME_WORKDAY` تُعرض برسائل محددة.
   - `details.field` يُقرأ صحيحًا.
