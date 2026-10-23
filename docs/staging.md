@@ -78,6 +78,10 @@ tool/check.sh
 
 That runs `flutter analyze` and `flutter test` for the app and for `packages/api_layer`.
 
+## Permission checks against staging
+
+`tool/staging_negative_tests/run.sh` without `--dry-run` runs on the bot machine only. GitHub Actions calls that script only with `--dry-run`, which does not open a socket and does not read accounts. The required check `Negative permission tests` stays on the Fake API. No staging username or password is stored in GitHub as a secret or as a variable. The only staging name the smoke workflow reads is `STAGING_API_BASE`. See [TESTING.md](TESTING.md).
+
 ## P7-01 staging smoke
 
 `packages/api_layer/test/phase7/staging_smoke_test.dart` is skipped unless all three variables are set. `tool/check.sh` and CI do not set them, and the test does not open a socket in that case. It uses the real client (`useFakeApi: false`) with no custom HTTP adapter.

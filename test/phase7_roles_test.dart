@@ -32,15 +32,10 @@ void main() {
     ], settings: false);
   });
 
-  testWidgets('P7-05 employee sees customers and collections only', (
-    tester,
-  ) async {
+  testWidgets('P7-05 collector sees collections only', (tester) async {
     await _signIn(tester, 'employee.demo');
     _expectIdentity('موظف استلام تجريبي', AppStrings.roleEmployee);
-    _expectSections(const [
-      SectionKey.customers,
-      SectionKey.collections,
-    ], settings: false);
+    _expectSections(const [SectionKey.collections], settings: false);
   });
 
   testWidgets('P7-05 guest sees no sections despite the codes on the user', (

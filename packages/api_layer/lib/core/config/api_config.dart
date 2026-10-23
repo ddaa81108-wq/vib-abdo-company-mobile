@@ -45,6 +45,16 @@ class ApiConfigException implements Exception {
 }
 
 class ApiConfig {
+  /// Sent on every request, including the CSRF fetch and the background poll.
+  static const clientApiVersionHeader = 'X-Client-Api-Version';
+
+  /// Contract value of [clientApiVersionHeader]. API version 1.
+  static const clientApiVersion = '1';
+
+  /// Session cookie the real server sets. The jar stores every `Set-Cookie`
+  /// name and does not look up an older name.
+  static const sessionCookieName = 'abdo_session';
+
   const ApiConfig({
     required this.baseUrl,
     this.connectTimeout = const Duration(seconds: 15),

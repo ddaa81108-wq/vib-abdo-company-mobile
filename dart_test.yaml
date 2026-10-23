@@ -16,3 +16,5 @@ tags:
   known-bug:
   # Phase 8. Included in the default run. Select with --tags reconciliation.
   reconciliation:
+  # Site contract samples. Included in the default run. Select with --tags contract.
+  contract:

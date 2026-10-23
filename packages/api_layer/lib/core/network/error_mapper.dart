@@ -17,6 +17,10 @@ class ErrorMapper {
   /// Status wins after login: any authenticated 401, and any 419 that is not
   /// a CSRF error, is session expiry even when the code is something else.
   /// A 401 on the login request itself stays invalid credentials.
+  ///
+  /// `docs/api/error-catalog.json` has no 419. `CSRF_REJECTED` is HTTP 403.
+  /// A 419 whose code or message contains CSRF still refreshes; any other 419
+  /// still wipes the session.
   static const sessionExpiredCodes = {
     'AUTH_REQUIRED',
     'SESSION_EXPIRED',
@@ -128,6 +132,7 @@ class ErrorMapper {
     }
     // After login, any 401 and any non-CSRF 419 end the session, whatever
     // the code is. Named session codes do the same on other statuses.
+    // The catalog has no 419; this 419 branch is defensive. CSRF_REJECTED is 403.
     if (sessionExpiredCodes.contains(code) ||
         (authenticated && status == 401) ||
         status == 419) {
