@@ -89,7 +89,11 @@ STAGING_ADMIN_PASSWORD='<password>' \
 flutter test packages/api_layer/test/phase7/staging_smoke_test.dart
 ```
 
-`STAGING_API_BASE` is an origin only, same rules as `API_BASE`. The password is read from the environment and is not written into the repo.
+`STAGING_API_BASE` is an origin only, same rules as `API_BASE`. The intended staging value is `https://staging.vip2100.com` with no `/erp` suffix. The password is read from the local environment and is not written into the repo. Do not store staging usernames or passwords in GitHub, neither as secrets nor as variables.
+
+This login command runs on the bot machine only. GitHub Actions does not run it. The manual **Staging smoke** workflow (`.github/workflows/staging-smoke.yml`, `workflow_dispatch`, environment `staging`) only probes unauthenticated `GET /api/health`. `STAGING_API_BASE` for that job should be a secret. See [api/staging-smoke.ar.md](api/staging-smoke.ar.md).
+
+**After a login failure, do not run this local check more than once within 15 minutes.** The login limit is 8 attempts per account. `STAGING_SMOKE_ACCOUNT_ID` stays unset until P-07.
 
 The smoke signs in, reads `GET /api/me` (the client path; the phase-7 matrix text says `GET /api/auth/me`), reads one section (`STAGING_SMOKE_SECTION`, default `customers`), then `POST /api/auth/logout`. That logout is the write. Set `STAGING_SMOKE_ACCOUNT_ID` as well to send one `setPinned` of that card's current flag before logout. The smoke does not add a ledger line unless that id is set.
 

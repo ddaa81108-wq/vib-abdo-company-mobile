@@ -113,15 +113,43 @@ class Paged<T> {
 
 /// Minimal acknowledgement of a mutation. After any mutation the UI refetches /
 /// invalidates the affected providers; it never patches numbers locally.
+///
+/// [balanceUnits] is the balance the server stored, when the response includes
+/// it (`data.balanceUnits` on a ledger write or a collection decision). It is
+/// a whole currency unit, the same integer rule as every other `*Units` field.
+/// Missing and JSON null stay null. A present non-integer is invalid on this
+/// field only: no rounding and not 0. The id and version still parse.
 class MutationAck {
-  const MutationAck({this.id, this.version, this.raw = const {}});
+  const MutationAck({
+    this.id,
+    this.version,
+    this.balanceUnits,
+    this.raw = const {},
+  });
   final String? id;
   final int? version;
+
+  /// Server balance after the write. Null when the body omitted it.
+  final MoneyValue? balanceUnits;
   final Json raw;
   factory MutationAck.fromData(Object? data) {
     final d = asJson(data);
+    final transaction = d['transaction'];
+    final nestedId = transaction is Map ? strOrNull(transaction['id']) : null;
+    // Contract ledger writes use `transaction.id` and `customerVersion`.
+    // Older fake bodies use top-level `id` and `version`. Prefer those when
+    // both are present so an existing ack id does not move.
+    final id = strOrNull(d['id']) ?? nestedId;
     return MutationAck(
-        id: strOrNull(d['id']), version: intOrNull(d['version']), raw: d);
+      id: id,
+      version: intOrNull(d['version']) ?? intOrNull(d['customerVersion']),
+      balanceUnits: unitsOrNull(
+        d['balanceUnits'],
+        fieldPath: 'balanceUnits',
+        rowId: id,
+      ),
+      raw: d,
+    );
   }
 }
 
