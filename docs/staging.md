@@ -30,7 +30,7 @@ Other defines, all optional:
 | `API_BASE` | empty | Required origin when fake mode is off |
 | `AUTH_BEARER` | `false` | `true` selects the bearer stub. The live server is cookie + CSRF until the owner says otherwise |
 | `API_DEBUG_LOG` | `false` | Redacted request logs |
-| `MONEY_UNIT_SCALE` | `0` | Amounts are whole currency units, scale 0. This is reported evidence, not an independent QA verification: the site handoff commit 537f073 in `docs/api/evidence/MATCHING.ar.md`, and a read-only staging check reported by the integration engineer at 01:17 (Africa/Tripoli, 2026-10-23) finding the amounts are integers. See `docs/api/defect-decisions.ar.md` DEF-029. |
+| `MONEY_UNIT_SCALE` | `0` | Whole currency units, scale 0. Evidence in this repo: `docs/api/openapi.json` lines 31254–31257 (`Transaction.inputValue`, whole currency units), `docs/api/README.ar.md:45`, `docs/api/defect-decisions.ar.md` DEF-029, and the site handoff commit 537f073 in `docs/api/evidence/MATCHING.ar.md` and `docs/api/evidence/api-samples.json`. |
 | `RATE_WIRE_FORMAT` | `number` | `string` sends rates as JSON strings |
 
 Check the binary without a device:
@@ -106,4 +106,4 @@ These are assumed, not confirmed. The contract notes are outside this repository
 5. CSRF failure: which status and code? A code or message containing `CSRF` refreshes once. A bare `419` logs the user out.
 6. Login failure: which `401` code means bad credentials rather than a dead session?
 7. Validation: is it HTTP `422`, `400`, or both, and is `details` a `{ "fields": { "name": "..." } }` map, a flat map, or a list of `{ "field", "code", "message" }`?
-8. Still unconfirmed on a real response: `fullAccess`, management permission codes, `cashStatus`, `GET /api/home`, and whether rates are JSON numbers or strings. `MONEY_UNIT_SCALE` is reported as whole currency units, scale 0. That is reported evidence, not an independent QA verification: the site handoff commit 537f073 in `docs/api/evidence/MATCHING.ar.md`, and a read-only staging check reported by the integration engineer at 01:17 (Africa/Tripoli, 2026-10-23) finding the amounts are integers. See `docs/api/defect-decisions.ar.md` DEF-029.
+8. Still unconfirmed on a real response: `fullAccess`, management permission codes, `cashStatus`, `GET /api/home`, and whether rates are JSON numbers or strings. `MONEY_UNIT_SCALE` is whole currency units, scale 0, from `docs/api/openapi.json` lines 31254–31257, `docs/api/README.ar.md:45`, `docs/api/defect-decisions.ar.md` DEF-029, and the site handoff commit 537f073 in `docs/api/evidence/MATCHING.ar.md` and `docs/api/evidence/api-samples.json`.
