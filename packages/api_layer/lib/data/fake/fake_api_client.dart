@@ -23,8 +23,18 @@ import 'fake_large_catalog.dart';
 /// Fake-only fixture switch by USERNAME (see FakeFixtures.meFor): `admin…` = admin like the real
 /// server today (empty permission list), `limited.admin…`, `flag.admin…`, `guest…`,
 /// `mustchange…`, else employee.
-/// Password "wrong" -> 401 invalid credentials. A successful login sets a
-/// session cookie. There is no bearer token and no refresh token. Session
+/// Password "wrong" -> 401 invalid credentials. A successful login sets an
+/// `abdo_session` cookie and returns `csrfToken`.
+///
+/// Header checks live only on [serveHttp], the HTTP boundary the Dio adapter
+/// uses. An authenticated write that arrives there without
+/// `X-Client-Api-Version: 1` returns 409 `CLIENT_VERSION_MISMATCH`. An
+/// authenticated write whose `X-CSRF-Token` is missing or stale returns 403
+/// `CSRF_REJECTED`. `GET /api/auth/csrf` rotates the token and rejects the
+/// previous one. Direct in-process calls (`get`, `post`, and the other
+/// [ApiClient] methods when no gateway is bound) skip those header checks so
+/// repository tests can call this client without a Dio stack.
+/// There is no bearer token and no refresh token. Session
 /// lifetime is not known (🔶): this client does not run a local timer. Call
 /// [expireSession] to make the current cookie fail the next request.
 /// POST /api/auth/logout revokes that cookie. A missing, revoked, or expired
@@ -200,9 +210,10 @@ class FakeApiClient implements ApiClient {
   /// Headers of the latest request, as the fake server saw them (tests).
   Map<String, String> lastRequestHeaders = const {};
 
-  /// Server-side cookie sessions. The id is the `session` cookie value.
+  /// Server-side cookie sessions. The id is the `abdo_session` cookie value.
   final Map<String, _FakeSession> _sessions = {};
   int _sessionSeq = 0;
+  int _csrfSeq = 0;
   String? _jarId;
   String? _latestSessionId;
 
@@ -302,6 +313,13 @@ class FakeApiClient implements ApiClient {
   /// Routes later public calls through [gateway] (the auth interceptor).
   void bindGateway(ApiClient gateway) => _gateway = gateway;
 
+  /// Client installed by [bindGateway]. The fake stack sets the Dio client.
+  ///
+  /// A test that observes a call has to wrap this client. Replacing it with
+  /// a direct [serveHttp] call skips `X-Client-Api-Version`, the cookie, and
+  /// `X-CSRF-Token`, which the HTTP boundary now requires.
+  ApiClient? get boundGateway => _gateway;
+
   /// Drops the in-process cookie jar. The server session is left as it is.
   void dropHeldCookie() => _jarId = null;
 
@@ -373,6 +391,7 @@ class FakeApiClient implements ApiClient {
         ApiRequestOptions(authenticated: authenticated, headers: headers),
         query: query,
         setCookie: setCookie,
+        enforceTransportContract: true,
       );
       return FakeHttpResult(
         status: response.statusCode,
@@ -436,6 +455,7 @@ class FakeApiClient implements ApiClient {
     String code,
     String message, {
     bool authenticated = true,
+    Map<String, Object?>? details,
   }) {
     if (code == 'NETWORK_UNAVAILABLE' || code == 'TIMEOUT') {
       ApiReachability.instance.recordTransportFailure();
@@ -447,7 +467,7 @@ class FakeApiClient implements ApiClient {
         'error': {
           'code': code,
           'message': message,
-          'details': {},
+          'details': details ?? <String, Object?>{},
           'correlationId': 'fake',
         },
       },
@@ -898,6 +918,7 @@ class FakeApiClient implements ApiClient {
     ApiRequestOptions options, {
     Map<String, dynamic>? query,
     List<String>? setCookie,
+    bool enforceTransportContract = false,
   }) async {
     await Future<void>.delayed(latency);
     lastRequestHeaders = Map<String, String>.from(options.headers);
@@ -917,8 +938,10 @@ class FakeApiClient implements ApiClient {
         .skip(1)
         .toList(); // drop "api"
     final head = seg.isEmpty ? '' : seg.first;
+    final unsafe = method != 'GET' && method != 'HEAD';
 
     if (method == 'POST' && path == '/api/auth/login') {
+      if (enforceTransportContract) _requireClientApiVersion(options);
       if (b['password'] == 'wrong') {
         _fail(
           401,
@@ -933,14 +956,26 @@ class FakeApiClient implements ApiClient {
       }
       _activate(FakeFixtures.meFor('${b['username']}'));
       final id = 'fake-session-${++_sessionSeq}';
-      _sessions[id] = _FakeSession(id: id, me: _me);
+      final csrfToken = _allocateCsrf();
+      _sessions[id] = _FakeSession(id: id, me: _me, csrfToken: csrfToken);
       _latestSessionId = id;
       _jarId = id;
-      setCookie?.add('session=$id; Path=/; HttpOnly');
-      return _ok({..._me, 'csrfToken': 'fake-csrf'});
+      setCookie?.add(
+        '${ApiConfig.sessionCookieName}=$id; Path=/; HttpOnly; Secure; SameSite=Strict',
+      );
+      return _ok({..._me, 'csrfToken': csrfToken});
     }
-    if (path == '/api/auth/csrf') return _ok({'csrfToken': 'fake-csrf'});
+    if (path == '/api/auth/csrf') {
+      return _rotateCsrf(options);
+    }
     if (options.authenticated) _ensureSession(options);
+    // 401 from the session check stays ahead of 409 and 403.
+    if (enforceTransportContract && unsafe) {
+      _requireClientApiVersion(options);
+    }
+    if (enforceTransportContract && unsafe && options.authenticated) {
+      _requireCurrentCsrf(options);
+    }
     if (method == 'GET') {
       final scripted = scriptedGetJson.remove(path);
       if (scripted != null) {
@@ -1046,12 +1081,15 @@ class FakeApiClient implements ApiClient {
     return _jarId;
   }
 
-  bool _hasHeader(ApiRequestOptions options, String name) =>
-      options.headers.keys.any((key) => key.toLowerCase() == name);
+  bool _hasHeader(ApiRequestOptions options, String name) {
+    final wanted = name.toLowerCase();
+    return options.headers.keys.any((key) => key.toLowerCase() == wanted);
+  }
 
   String? _header(ApiRequestOptions options, String name) {
+    final wanted = name.toLowerCase();
     for (final entry in options.headers.entries) {
-      if (entry.key.toLowerCase() == name) {
+      if (entry.key.toLowerCase() == wanted) {
         final value = entry.value.trim();
         return value.isEmpty ? null : value;
       }
@@ -1066,9 +1104,61 @@ class FakeApiClient implements ApiClient {
       final eq = piece.indexOf('=');
       if (eq <= 0) continue;
       final name = piece.substring(0, eq).trim().toLowerCase();
-      if (name == 'session') return piece.substring(eq + 1).trim();
+      if (name == ApiConfig.sessionCookieName) {
+        return piece.substring(eq + 1).trim();
+      }
     }
     return null;
+  }
+
+  /// First issued token stays `fake-csrf` so existing header assertions hold.
+  /// Later issues, including a CSRF rotation, are distinct and the previous
+  /// value is no longer accepted.
+  String _allocateCsrf() {
+    final token = _csrfSeq == 0 ? 'fake-csrf' : 'fake-csrf-$_csrfSeq';
+    _csrfSeq++;
+    return token;
+  }
+
+  void _requireClientApiVersion(ApiRequestOptions options) {
+    final version = _header(options, ApiConfig.clientApiVersionHeader);
+    if (version == ApiConfig.clientApiVersion) return;
+    _fail(
+      409,
+      'CLIENT_VERSION_MISMATCH',
+      'إصدار العميل غير مدعوم.',
+      details: const <String, Object?>{
+        'requiredApiVersion': ApiConfig.clientApiVersion,
+      },
+    );
+  }
+
+  _FakeSession? _liveSession(ApiRequestOptions options) {
+    final id = _presentedSessionId(options);
+    if (id == null) return null;
+    final session = _sessions[id];
+    if (session == null || session.expired) return null;
+    return session;
+  }
+
+  ApiResponse _rotateCsrf(ApiRequestOptions options) {
+    final session = _liveSession(options);
+    if (session == null) {
+      _fail(401, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
+    }
+    session.csrfToken = _allocateCsrf();
+    return _ok({'csrfToken': session.csrfToken});
+  }
+
+  void _requireCurrentCsrf(ApiRequestOptions options) {
+    final session = _liveSession(options);
+    if (session == null) {
+      _fail(401, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
+    }
+    final sent = _header(options, 'x-csrf-token');
+    if (sent == null || sent != session.csrfToken) {
+      _fail(403, 'CSRF_REJECTED', 'تم رفض طلب الحماية.');
+    }
   }
 
   /// A repeated [requestId] for this user returns the original success and
@@ -2562,10 +2652,15 @@ class FakeApiClient implements ApiClient {
 
 /// One in-memory cookie session. Lifetime is not counted down locally.
 class _FakeSession {
-  _FakeSession({required this.id, required this.me});
+  _FakeSession({
+    required this.id,
+    required this.me,
+    required this.csrfToken,
+  });
 
   final String id;
   final Map<String, dynamic> me;
+  String csrfToken;
   bool expired = false;
 }
 
