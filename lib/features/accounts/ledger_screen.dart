@@ -16,18 +16,54 @@ import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
 import 'edit_account_card_screen.dart';
+import 'overpayment_warning.dart';
 import 'transaction_correction_form.dart';
 
 /// Ledger for one card. Customers, companies, Libyan deposits, and Egyptian
 /// deposits all use this screen; [section] selects the repository and the labels.
-class LedgerScreen extends ConsumerWidget {
+class LedgerScreen extends ConsumerStatefulWidget {
   const LedgerScreen({required this.section, required this.id, super.key});
 
   final AccountSection section;
   final String id;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LedgerScreen> createState() => _LedgerScreenState();
+}
+
+class _LedgerScreenState extends ConsumerState<LedgerScreen> {
+  /// True from a successful movement until [accountCardProvider] returns
+  /// the reload. While this is set, the header does not use the card that
+  /// was on screen before the payment.
+  bool _balanceAwaitingReload = false;
+
+  /// [MutationAck.balanceUnits] for that movement. Null and invalid stay
+  /// as they arrived.
+  MoneyValue? _ackBalance;
+
+  AccountSection get section => widget.section;
+  String get id => widget.id;
+
+  @override
+  void didUpdateWidget(LedgerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.section != widget.section || oldWidget.id != widget.id) {
+      _balanceAwaitingReload = false;
+      _ackBalance = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(accountCardProvider((section, id)), (previous, next) {
+      if (!_balanceAwaitingReload) return;
+      if (next.isLoading || next.isRefreshing || next.hasError) return;
+      if (!next.hasValue) return;
+      setState(() {
+        _balanceAwaitingReload = false;
+        _ackBalance = null;
+      });
+    });
     final permissions = permissionsOf(ref);
     if (!permissions.canRead(section.sectionKey)) return const ForbiddenPane();
     final ledger = ref.watch(ledgerProvider((section, id)));
@@ -133,6 +169,8 @@ class LedgerScreen extends ConsumerWidget {
                             card: loadedCard,
                             money: money,
                             title: _ledgerTitle(section),
+                            awaitingServerBalance: _balanceAwaitingReload,
+                            ackBalance: _ackBalance,
                           ),
                         ),
                       ],
@@ -219,11 +257,15 @@ class LedgerScreen extends ConsumerWidget {
     WidgetRef ref, {
     required String type,
   }) async {
-    final saved = await showAppForm<bool>(
+    final saved = await showAppForm<PostedMovement>(
       context,
       _MovementForm(section: section, id: id, type: type),
     );
-    if (saved == true) {
+    if (saved != null) {
+      setState(() {
+        _balanceAwaitingReload = true;
+        _ackBalance = saved.balanceUnits;
+      });
       ref.invalidate(ledgerProvider((section, id)));
       ref.invalidate(accountCardProvider((section, id)));
       ref.invalidate(accountsProvider(section));
@@ -426,20 +468,46 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
     final units = parseUnits(_amount.text);
     if (units == null) return AppStrings.integerOnly;
     // Direct partial payment only. A rate is not an amount, so it is not
-    // compared. This reads the server balance; it does not compute one.
-    // An invalid balance is refused. It is not treated as 0.
+    // compared. An invalid balance is refused. It is not treated as 0.
+    // An amount above the fresh balance is not refused. The warning names
+    // the current balance and the typed amount, then the send still uses
+    // this form's requestId.
     if (widget.type == 'payment' && _mode == CalculationMode.direct) {
-      final remaining = ref
+      // An invalid balance already on screen is not a number. Refuse it
+      // before any send. It is not treated as 0.
+      final watched = ref
           .read(accountCardProvider((widget.section, widget.id)))
           .asData
           ?.value
           .balanceUnits;
+      if (watched != null && watched.isInvalid) {
+        return AppStrings.invalidAmount;
+      }
+      // The same repository call accountCardProvider uses. Reading it here,
+      // instead of refreshing that provider, leaves the form's watched
+      // expectedVersion (and therefore its requestId) unchanged.
+      final AccountCardDto fresh;
+      try {
+        fresh = await ref
+            .read(apiLayerProvider)
+            .accounts
+            .get(widget.section, widget.id);
+      } catch (error) {
+        return failureText(ref.read(errorHandlerProvider).toFailure(error));
+      }
+      if (!mounted) return '';
+      final remaining = fresh.balanceUnits;
       if (remaining != null && remaining.isInvalid) {
         return AppStrings.invalidAmount;
       }
       final remainingUnits = remaining?.asInt;
       if (remainingUnits != null && units > remainingUnits) {
-        return AppStrings.amountAboveRemaining;
+        final proceed = await _confirmOverpayment(
+          fresh.currency,
+          remainingUnits,
+          units,
+        );
+        if (proceed != true) return '';
       }
     }
     final parsedDate = DateTime.tryParse(_date.text);
@@ -473,7 +541,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
       );
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(PostedMovement(balanceUnits: ack.balanceUnits));
       return null;
     } catch (error) {
       // A returned string never reaches GuardedMutation's conflict path.
@@ -483,6 +551,65 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       return failureText(failure);
     }
   }
+
+  /// Null or false sends nothing. True continues with the same [MutationMeta].
+  Future<bool?> _confirmOverpayment(
+    Currency currency,
+    int currentUnits,
+    int enteredUnits,
+  ) {
+    final money = ref.read(apiLayerProvider).money;
+    final current = money.format(currentUnits, currency);
+    final entered = money.format(enteredUnits, currency);
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return RepaintBoundary(
+          key: const Key('overpayment-boundary'),
+          child: AlertDialog(
+            key: const Key('overpayment-warning'),
+            content: Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(text: '${AppStrings.overpaymentCurrent} '),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: MoneyText(
+                      current,
+                      key: const Key('overpayment-current'),
+                    ),
+                  ),
+                  const TextSpan(text: ' ${AppStrings.overpaymentEntered} '),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: MoneyText(
+                      entered,
+                      key: const Key('overpayment-entered'),
+                    ),
+                  ),
+                  const TextSpan(text: '. ${AppStrings.overpaymentAsk}'),
+                ],
+              ),
+              key: const Key('overpayment-copy'),
+            ),
+            actions: [
+              TextButton(
+                key: const Key('overpayment-cancel'),
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text(AppStrings.cancel),
+              ),
+              FilledButton(
+                key: const Key('overpayment-continue'),
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text(AppStrings.overpaymentAsk),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _Header extends StatelessWidget {
@@ -491,12 +618,20 @@ class _Header extends StatelessWidget {
     required this.card,
     required this.money,
     required this.title,
+    this.awaitingServerBalance = false,
+    this.ackBalance,
   });
 
   final AccountSection section;
   final AccountCardDto? card;
   final MoneyFormatter money;
   final String title;
+
+  /// The payment response has not been replaced by a completed card reload.
+  final bool awaitingServerBalance;
+
+  /// [MutationAck.balanceUnits] while [awaitingServerBalance] is set.
+  final MoneyValue? ackBalance;
 
   @override
   Widget build(BuildContext context) {
@@ -517,6 +652,11 @@ class _Header extends StatelessWidget {
     final accent = colored
         ? (visual.accent ?? colors.onStatus)
         : scheme.onSurfaceVariant;
+    // A credit balance uses the same ink as any other balance on this card.
+    final shownBalance = awaitingServerBalance
+        ? ackBalance
+        : value.balanceUnits;
+    final balanceColor = foreground;
     return Material(
       key: const Key('ledger-header'),
       color: colored
@@ -559,10 +699,10 @@ class _Header extends StatelessWidget {
               if (value.phone != null)
                 LtrText(value.phone!, style: cairo(12, 500, color: accent)),
               MoneyText(
-                money.formatOrDash(value.balanceUnits, value.currency),
+                money.formatOrDash(shownBalance, value.currency),
                 key: const Key('ledger-header-balance'),
                 style: context.textExtras.amountLarge.copyWith(
-                  color: foreground,
+                  color: balanceColor,
                 ),
               ),
               if (value.systemManaged)
