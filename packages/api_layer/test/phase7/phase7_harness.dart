@@ -112,7 +112,9 @@ class Phase7Transport implements HttpClientAdapter {
           details: details, headers: headers);
     }
     final cookie = call.path == ApiEndpoints.login
-        ? <String>['session=phase7-session; Path=/; HttpOnly']
+        ? <String>[
+            '${ApiConfig.sessionCookieName}=phase7-session; Path=/; HttpOnly; Secure; SameSite=Strict',
+          ]
         : null;
     return _ok(_successData(call), setCookie: cookie);
   }

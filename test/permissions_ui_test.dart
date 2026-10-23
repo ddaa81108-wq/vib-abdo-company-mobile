@@ -45,14 +45,14 @@ void main() {
   });
 
   testWidgets(
-    'employee sections follow server keys; collections is codes only',
+    'collector sections follow collections codes when sectionAccess is absent',
     (tester) async {
       await pumpFakeApp(tester);
       await signIn(tester, username: 'employee.demo', password: 'demo-only');
 
       expect(
         find.byKey(HomeShell.sectionKey(SectionKey.customers)),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(HomeShell.writeKey(SectionKey.customers)),

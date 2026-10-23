@@ -6,13 +6,13 @@ The session lifetime is unknown (contract-gap item 42). The app has no local tim
 
 ## Login
 
-`POST /api/auth/login` with `{username, password}` is sent with `skipAuth` (public). The server sets the session cookie. The body carries `csrfToken`. The token is kept in memory only. After a process restart the app calls `GET /api/auth/csrf` and then `GET /api/me`.
+`POST /api/auth/login` with `{username, password}` is sent with `skipAuth` (public). The server sets the session cookie. The body carries `csrfToken`. The token is kept in memory only. After a process restart the app calls `GET /api/me` and then `GET /api/auth/csrf`.
 
 A **login 401 is bad credentials**, including when the code is `AUTH_REQUIRED`. It does not clear a cookie or the token store, and it does not emit `session_expired`.
 
 ## CSRF
 
-Unsafe methods (`POST`, `PUT`, `PATCH`, `DELETE`) send `X-CSRF-Token` when the in-memory token is present. `GET` and `HEAD` do not. A code **or a server message** containing `CSRF` refreshes `GET /api/auth/csrf` once (single-flight) and replays that request once, with the same body and the same `requestId`. If the refresh fails, or that one replay was already spent, `CookieCsrfAuthStrategy` passes the error through. A 401 or 419 from the CSRF refresh stays on that pass-through path. An authenticated 401, and a 419 that is not a CSRF error, are session expiry in the table below. That path is what wipes the session.
+Unsafe methods (`POST`, `PUT`, `PATCH`, `DELETE`) send `X-CSRF-Token` when the in-memory token is present. `GET` and `HEAD` do not. A `GET /api/auth/csrf` made through the main client takes the same write mutex as those methods and is the strategy's single-flight refresh, because that GET invalidates the previous token. Other GETs are not queued. A code **or a server message** containing `CSRF` refreshes `GET /api/auth/csrf` once (single-flight) and replays that request once, with the same body and the same `requestId`. The error catalog has no HTTP 419; `CSRF_REJECTED` is 403. A 419 whose code or message contains `CSRF` still refreshes, and any other 419 still wipes the session. If the refresh fails, or that one replay was already spent, `CookieCsrfAuthStrategy` passes the error through. A 401 or 419 from the CSRF refresh stays on that pass-through path. An authenticated 401, and a 419 that is not a CSRF error, are session expiry in the table below. That path is what wipes the session.
 
 ## Expiry
 

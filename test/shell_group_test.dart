@@ -378,7 +378,7 @@ void main() {
   ) async {
     final layer = await pumpFakeApp(tester, size: const Size(360, 1000));
     (layer.client as FakeApiClient).failHomeRemaining = 8;
-    await signIn(tester, username: 'employee.demo', password: 'demo-only');
+    await signIn(tester, username: 'other.employee', password: 'demo-only');
     expect(find.byKey(const Key('home-fallback-banner')), findsOneWidget);
     expect(find.text(AppStrings.homeFallbackNote), findsOneWidget);
     expect(find.textContaining(AppStrings.netDebt), findsWidgets);

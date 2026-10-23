@@ -7,6 +7,11 @@ import 'package:flutter_test/flutter_test.dart';
 /// in the environment. CI does not set them, and this file does not use
 /// [FakeApiClient] or a hand-written [HttpClientAdapter].
 ///
+/// The cookie jar is [InMemoryCookieStore] so `flutter test` on a GitHub
+/// runner can keep the session without Keychain. The app default remains
+/// [SecureCookieStore]. Requests use the real Dio client, whose `dart:io`
+/// User-Agent is not Python-urllib.
+///
 /// ```bash
 /// STAGING_API_BASE=https://staging.example.invalid \
 /// STAGING_ADMIN_USERNAME=... \
@@ -42,6 +47,7 @@ void main() {
       );
       final layer = ApiLayer.create(
         config: ApiConfig(baseUrl: base, useFakeApi: false),
+        cookieStore: InMemoryCookieStore(),
       );
       try {
         await layer.session.login(username: username, password: password);

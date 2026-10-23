@@ -180,7 +180,7 @@ void main() {
       rate: true,
     );
 
-    await _switchUser(tester, 'employee.demo');
+    await _switchUser(tester, 'other.employee');
     await _expectActions(
       tester,
       path: '/customers',

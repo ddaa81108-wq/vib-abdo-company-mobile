@@ -13,6 +13,7 @@ import '../../core/network/error_mapper.dart';
 import '../../core/network/reachability.dart';
 import '../../core/permissions/permission_codes.dart';
 import '../../core/permissions/permission_service.dart';
+import '../models/profile_models.dart';
 import '../models/purchase_models.dart';
 import 'fake_fixtures.dart';
 import 'fake_large_catalog.dart';
@@ -22,8 +23,18 @@ import 'fake_large_catalog.dart';
 /// Fake-only fixture switch by USERNAME (see FakeFixtures.meFor): `admin…` = admin like the real
 /// server today (empty permission list), `limited.admin…`, `flag.admin…`, `guest…`,
 /// `mustchange…`, else employee.
-/// Password "wrong" -> 401 invalid credentials. A successful login sets a
-/// session cookie. There is no bearer token and no refresh token. Session
+/// Password "wrong" -> 401 invalid credentials. A successful login sets an
+/// `abdo_session` cookie and returns `csrfToken`.
+///
+/// Header checks live only on [serveHttp], the HTTP boundary the Dio adapter
+/// uses. An authenticated write that arrives there without
+/// `X-Client-Api-Version: 1` returns 409 `CLIENT_VERSION_MISMATCH`. An
+/// authenticated write whose `X-CSRF-Token` is missing or stale returns 403
+/// `CSRF_REJECTED`. `GET /api/auth/csrf` rotates the token and rejects the
+/// previous one. Direct in-process calls (`get`, `post`, and the other
+/// [ApiClient] methods when no gateway is bound) skip those header checks so
+/// repository tests can call this client without a Dio stack.
+/// There is no bearer token and no refresh token. Session
 /// lifetime is not known (🔶): this client does not run a local timer. Call
 /// [expireSession] to make the current cookie fail the next request.
 /// POST /api/auth/logout revokes that cookie. A missing, revoked, or expired
@@ -113,8 +124,13 @@ class FakeApiClient implements ApiClient {
   /// Notification writes that changed state. A requestId replay is not counted.
   int notificationMutationApplies = 0;
 
-  /// The next N versioned collection mutations fail with VERSION_CONFLICT (tests).
-  int versionConflictRemaining = 0;
+  /// `POST .../decision` when the row is no longer pending.
+  static const submissionAlreadyDecidedMessage =
+      'تمت مراجعة هذا الاستلام من قبل.';
+
+  /// `POST .../cash-received` when the row is not approved.
+  static const submissionNotApprovedMessage =
+      'استلام النقدية متاح للاستلام المعتمد فقط.';
 
   /// When set, purchases days without a stored finalize or correction use this
   /// status on the next GET (tests).
@@ -194,9 +210,10 @@ class FakeApiClient implements ApiClient {
   /// Headers of the latest request, as the fake server saw them (tests).
   Map<String, String> lastRequestHeaders = const {};
 
-  /// Server-side cookie sessions. The id is the `session` cookie value.
+  /// Server-side cookie sessions. The id is the `abdo_session` cookie value.
   final Map<String, _FakeSession> _sessions = {};
   int _sessionSeq = 0;
+  int _csrfSeq = 0;
   String? _jarId;
   String? _latestSessionId;
 
@@ -296,6 +313,13 @@ class FakeApiClient implements ApiClient {
   /// Routes later public calls through [gateway] (the auth interceptor).
   void bindGateway(ApiClient gateway) => _gateway = gateway;
 
+  /// Client installed by [bindGateway]. The fake stack sets the Dio client.
+  ///
+  /// A test that observes a call has to wrap this client. Replacing it with
+  /// a direct [serveHttp] call skips `X-Client-Api-Version`, the cookie, and
+  /// `X-CSRF-Token`, which the HTTP boundary now requires.
+  ApiClient? get boundGateway => _gateway;
+
   /// Drops the in-process cookie jar. The server session is left as it is.
   void dropHeldCookie() => _jarId = null;
 
@@ -367,6 +391,7 @@ class FakeApiClient implements ApiClient {
         ApiRequestOptions(authenticated: authenticated, headers: headers),
         query: query,
         setCookie: setCookie,
+        enforceTransportContract: true,
       );
       return FakeHttpResult(
         status: response.statusCode,
@@ -430,6 +455,7 @@ class FakeApiClient implements ApiClient {
     String code,
     String message, {
     bool authenticated = true,
+    Map<String, Object?>? details,
   }) {
     if (code == 'NETWORK_UNAVAILABLE' || code == 'TIMEOUT') {
       ApiReachability.instance.recordTransportFailure();
@@ -441,7 +467,7 @@ class FakeApiClient implements ApiClient {
         'error': {
           'code': code,
           'message': message,
-          'details': {},
+          'details': details ?? <String, Object?>{},
           'correlationId': 'fake',
         },
       },
@@ -762,9 +788,7 @@ class FakeApiClient implements ApiClient {
     _access.applyFromServer(
       (user['permissions'] as List).map((code) => '$code'),
       role: user['role'] as String?,
-      sectionAccess: section is Map
-          ? section.map((key, value) => MapEntry('$key', '$value'))
-          : const {},
+      sectionAccess: sectionAccessFromJson(section),
       fullAccess:
           user['fullAccess'] is bool ? user['fullAccess'] as bool : null,
     );
@@ -894,6 +918,7 @@ class FakeApiClient implements ApiClient {
     ApiRequestOptions options, {
     Map<String, dynamic>? query,
     List<String>? setCookie,
+    bool enforceTransportContract = false,
   }) async {
     await Future<void>.delayed(latency);
     lastRequestHeaders = Map<String, String>.from(options.headers);
@@ -913,8 +938,10 @@ class FakeApiClient implements ApiClient {
         .skip(1)
         .toList(); // drop "api"
     final head = seg.isEmpty ? '' : seg.first;
+    final unsafe = method != 'GET' && method != 'HEAD';
 
     if (method == 'POST' && path == '/api/auth/login') {
+      if (enforceTransportContract) _requireClientApiVersion(options);
       if (b['password'] == 'wrong') {
         _fail(
           401,
@@ -929,14 +956,26 @@ class FakeApiClient implements ApiClient {
       }
       _activate(FakeFixtures.meFor('${b['username']}'));
       final id = 'fake-session-${++_sessionSeq}';
-      _sessions[id] = _FakeSession(id: id, me: _me);
+      final csrfToken = _allocateCsrf();
+      _sessions[id] = _FakeSession(id: id, me: _me, csrfToken: csrfToken);
       _latestSessionId = id;
       _jarId = id;
-      setCookie?.add('session=$id; Path=/; HttpOnly');
-      return _ok({..._me, 'csrfToken': 'fake-csrf'});
+      setCookie?.add(
+        '${ApiConfig.sessionCookieName}=$id; Path=/; HttpOnly; Secure; SameSite=Strict',
+      );
+      return _ok({..._me, 'csrfToken': csrfToken});
     }
-    if (path == '/api/auth/csrf') return _ok({'csrfToken': 'fake-csrf'});
+    if (path == '/api/auth/csrf') {
+      return _rotateCsrf(options);
+    }
     if (options.authenticated) _ensureSession(options);
+    // 401 from the session check stays ahead of 409 and 403.
+    if (enforceTransportContract && unsafe) {
+      _requireClientApiVersion(options);
+    }
+    if (enforceTransportContract && unsafe && options.authenticated) {
+      _requireCurrentCsrf(options);
+    }
     if (method == 'GET') {
       final scripted = scriptedGetJson.remove(path);
       if (scripted != null) {
@@ -977,6 +1016,19 @@ class FakeApiClient implements ApiClient {
     if (method != 'GET' &&
         head != 'notifications' &&
         head != 'notification-preferences') {
+      // Decision and cash-received have no requestId. A shared null replay
+      // key would collapse distinct calls onto one stored success.
+      if (_collectionStatusPath(seg)) {
+        return _mutateWithoutRequestId(
+          method,
+          path,
+          seg,
+          head,
+          query,
+          () => _route(method, b, seg, head, query),
+          () => _ensureSession(options),
+        );
+      }
       return _mutate(
         b,
         method,
@@ -1029,12 +1081,15 @@ class FakeApiClient implements ApiClient {
     return _jarId;
   }
 
-  bool _hasHeader(ApiRequestOptions options, String name) =>
-      options.headers.keys.any((key) => key.toLowerCase() == name);
+  bool _hasHeader(ApiRequestOptions options, String name) {
+    final wanted = name.toLowerCase();
+    return options.headers.keys.any((key) => key.toLowerCase() == wanted);
+  }
 
   String? _header(ApiRequestOptions options, String name) {
+    final wanted = name.toLowerCase();
     for (final entry in options.headers.entries) {
-      if (entry.key.toLowerCase() == name) {
+      if (entry.key.toLowerCase() == wanted) {
         final value = entry.value.trim();
         return value.isEmpty ? null : value;
       }
@@ -1049,9 +1104,61 @@ class FakeApiClient implements ApiClient {
       final eq = piece.indexOf('=');
       if (eq <= 0) continue;
       final name = piece.substring(0, eq).trim().toLowerCase();
-      if (name == 'session') return piece.substring(eq + 1).trim();
+      if (name == ApiConfig.sessionCookieName) {
+        return piece.substring(eq + 1).trim();
+      }
     }
     return null;
+  }
+
+  /// First issued token stays `fake-csrf` so existing header assertions hold.
+  /// Later issues, including a CSRF rotation, are distinct and the previous
+  /// value is no longer accepted.
+  String _allocateCsrf() {
+    final token = _csrfSeq == 0 ? 'fake-csrf' : 'fake-csrf-$_csrfSeq';
+    _csrfSeq++;
+    return token;
+  }
+
+  void _requireClientApiVersion(ApiRequestOptions options) {
+    final version = _header(options, ApiConfig.clientApiVersionHeader);
+    if (version == ApiConfig.clientApiVersion) return;
+    _fail(
+      409,
+      'CLIENT_VERSION_MISMATCH',
+      'إصدار العميل غير مدعوم.',
+      details: const <String, Object?>{
+        'requiredApiVersion': ApiConfig.clientApiVersion,
+      },
+    );
+  }
+
+  _FakeSession? _liveSession(ApiRequestOptions options) {
+    final id = _presentedSessionId(options);
+    if (id == null) return null;
+    final session = _sessions[id];
+    if (session == null || session.expired) return null;
+    return session;
+  }
+
+  ApiResponse _rotateCsrf(ApiRequestOptions options) {
+    final session = _liveSession(options);
+    if (session == null) {
+      _fail(401, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
+    }
+    session.csrfToken = _allocateCsrf();
+    return _ok({'csrfToken': session.csrfToken});
+  }
+
+  void _requireCurrentCsrf(ApiRequestOptions options) {
+    final session = _liveSession(options);
+    if (session == null) {
+      _fail(401, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
+    }
+    final sent = _header(options, 'x-csrf-token');
+    if (sent == null || sent != session.csrfToken) {
+      _fail(403, 'CSRF_REJECTED', 'تم رفض طلب الحماية.');
+    }
   }
 
   /// A repeated [requestId] for this user returns the original success and
@@ -1111,6 +1218,42 @@ class FakeApiClient implements ApiClient {
     } finally {
       _pendingMutations.remove(key);
     }
+  }
+
+  /// Collection decision and cash-received. The contract has no `requestId`
+  /// and no `expectedVersion`. Session, permission, and the test failure gate
+  /// still run. A second call is not a stored replay; the row status decides.
+  Future<ApiResponse> _mutateWithoutRequestId(
+    String method,
+    String path,
+    List<String> seg,
+    String head,
+    Map<String, dynamic>? query,
+    Future<ApiResponse> Function() send,
+    void Function() ensureSession,
+  ) async {
+    ensureSession();
+    _authorize(method, seg, head, query);
+    mutationPaths.add(path);
+    if (lastWireBody != null) mutationBodies.add(lastWireBody!);
+    final paused = pauseMutations;
+    if (paused != null) await paused.future;
+    ensureSession();
+    _authorize(method, seg, head, query);
+    if (failMutationsRemaining > 0) {
+      failMutationsRemaining--;
+      _fail(400, 'MUTATION_FAILED', 'تعذر تنفيذ الطلب.');
+    }
+    return send();
+  }
+
+  /// `POST /api/collections/{submissions|unlinked-receipts}/{id}/{decision|cash-received}`.
+  bool _collectionStatusPath(List<String> seg) {
+    if (seg.length != 4 || seg.first != 'collections') return false;
+    final kind = seg[1];
+    final action = seg[3];
+    if (kind != 'submissions' && kind != 'unlinked-receipts') return false;
+    return action == 'decision' || action == 'cash-received';
   }
 
   Future<ApiResponse> _route(
@@ -1391,22 +1534,13 @@ class FakeApiClient implements ApiClient {
       return _ok({'items': []});
     }
     _requireCollectionMutation(seg);
-    final needsVersion = seg.isNotEmpty &&
-        (seg.last == 'decision' || seg.last == 'cash-received');
-    if (needsVersion && b['expectedVersion'] == null) {
-      _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
-    }
-    if (needsVersion && versionConflictRemaining > 0) {
-      versionConflictRemaining--;
-      _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
-    }
     if (seg.length == 4 && seg[1] == 'submissions' && seg[3] == 'decision') {
       return _applyDecision(seg[2], b);
     }
     if (seg.length == 4 &&
         seg[1] == 'submissions' &&
         seg[3] == 'cash-received') {
-      return _applyCash(seg[2], b, unlinked: false);
+      return _applyCash(seg[2], unlinked: false);
     }
     if (seg.length == 4 &&
         seg[1] == 'unlinked-receipts' &&
@@ -1416,7 +1550,7 @@ class FakeApiClient implements ApiClient {
     if (seg.length == 4 &&
         seg[1] == 'unlinked-receipts' &&
         seg[3] == 'cash-received') {
-      return _applyCash(seg[2], b, unlinked: true);
+      return _applyCash(seg[2], unlinked: true);
     }
     // CollectionsRepository.closeDay posts /api/collections/days/close.
     if (seg.length == 3 && seg[1] == 'days' && seg[2] == 'close') {
@@ -1651,12 +1785,14 @@ class FakeApiClient implements ApiClient {
       final item = Map<String, dynamic>.from(raw as Map);
       final state = _submissionState['${item['id']}'];
       if (state != null) item.addAll(state);
+      item.remove('version');
       items.add(item);
     }
     for (final extra in _extraSubmissions) {
       final item = Map<String, dynamic>.from(extra);
       final state = _submissionState['${item['id']}'];
       if (state != null) item.addAll(state);
+      item.remove('version');
       items.add(item);
     }
     body['submissions'] = items;
@@ -1665,12 +1801,14 @@ class FakeApiClient implements ApiClient {
       final item = Map<String, dynamic>.from(raw as Map);
       final state = _unlinkedState['${item['id']}'];
       if (state != null) item.addAll(state);
+      item.remove('version');
       receipts.add(item);
     }
     for (final extra in _extraUnlinked) {
       final item = Map<String, dynamic>.from(extra);
       final state = _unlinkedState['${item['id']}'];
       if (state != null) item.addAll(state);
+      item.remove('version');
       receipts.add(item);
     }
     body['unlinkedReceipts'] = receipts;
@@ -1705,7 +1843,6 @@ class FakeApiClient implements ApiClient {
       'mode': mode,
       if (amount != null) 'amountUnits': amount,
       'status': 'pending',
-      'version': 1,
       if (_userId != null) 'submittedByUserId': _userId,
       if (name != null) 'submittedByName': name,
     });
@@ -1726,7 +1863,6 @@ class FakeApiClient implements ApiClient {
       'customerName': name,
       'amountUnits': amount,
       'status': 'pending',
-      'version': 1,
       if (_userId != null) 'submittedByUserId': _userId,
     });
     return _ok({'id': id, 'version': 1});
@@ -1767,24 +1903,21 @@ class FakeApiClient implements ApiClient {
       if (item['id'] == id) submission = item;
     }
     if (submission == null) _fail(404, 'NOT_FOUND', 'الاستلام غير موجود');
-    _requireVersion(b['expectedVersion'], submission['version']);
-    final decision = b['decision'];
-    final status = switch (decision) {
-      'approve' => 'approved',
-      'reject' => 'rejected',
-      _ => null,
-    };
-    if (status == null) _fail(400, 'VALIDATION_ERROR', 'قرار غير معروف');
-    final version = (submission['version'] as int) + 1;
-    _submissionState[id] = {
-      ...?_submissionState[id],
-      'status': status,
-      'version': version,
-    };
-    return _ok({'id': 'ok', 'version': version});
+    if (submission['status'] != 'pending') {
+      _fail(
+        409,
+        'SUBMISSION_ALREADY_DECIDED',
+        submissionAlreadyDecidedMessage,
+      );
+    }
+    final status = _decisionStatus(b['decision']);
+    final next = {...?_submissionState[id], 'status': status};
+    next.remove('version');
+    _submissionState[id] = next;
+    return _decisionAck(id, status, submission);
   }
 
-  ApiResponse _applyCash(String id, Map b, {required bool unlinked}) {
+  ApiResponse _applyCash(String id, {required bool unlinked}) {
     final view = _collectionsView();
     final items =
         (unlinked ? view['unlinkedReceipts'] : view['submissions']) as List;
@@ -1793,16 +1926,34 @@ class FakeApiClient implements ApiClient {
       id,
       unlinked ? 'الإيصال غير موجود' : 'الاستلام غير موجود',
     );
-    _requireVersion(b['expectedVersion'], current['version']);
-    final version = (current['version'] as int) + 1;
+    if (current['status'] != 'approved') {
+      _fail(409, 'SUBMISSION_NOT_APPROVED', submissionNotApprovedMessage);
+    }
     final store = unlinked ? _unlinkedState : _submissionState;
-    store[id] = {
+    final receivedAt = current['cashReceivedAt'];
+    if (current['cashStatus'] == 'received' ||
+        (receivedAt is String && receivedAt.isNotEmpty)) {
+      return _ok({
+        'id': id,
+        'cashReceivedAt': receivedAt,
+        'eventSequences': <int>[4],
+        'replayed': true,
+      });
+    }
+    const at = '2026-10-22T22:00:00.000Z';
+    final next = {
       ...?store[id],
       'cashStatus': 'received',
       'cashPending': false,
-      'version': version,
+      'cashReceivedAt': at,
     };
-    return _ok({'id': 'ok', 'version': version});
+    next.remove('version');
+    store[id] = next;
+    return _ok({
+      'id': id,
+      'cashReceivedAt': at,
+      'eventSequences': <int>[4],
+    });
   }
 
   ApiResponse _applyUnlinkedDecision(String id, Map b) {
@@ -1811,23 +1962,53 @@ class FakeApiClient implements ApiClient {
       id,
       'الإيصال غير موجود',
     );
-    _requireVersion(b['expectedVersion'], current['version']);
-    final decision = b['decision'];
+    if (current['status'] != 'pending') {
+      _fail(
+        409,
+        'SUBMISSION_ALREADY_DECIDED',
+        submissionAlreadyDecidedMessage,
+      );
+    }
+    final status = _decisionStatus(b['decision']);
+    final customerId = b['customerId'];
+    final next = {
+      ...?_unlinkedState[id],
+      'status': status,
+      if (customerId != null) 'customerId': customerId,
+    };
+    next.remove('version');
+    _unlinkedState[id] = next;
+    return _decisionAck(id, status, current);
+  }
+
+  String _decisionStatus(Object? decision) {
     final status = switch (decision) {
       'approve' => 'approved',
       'reject' => 'rejected',
       _ => null,
     };
     if (status == null) _fail(400, 'VALIDATION_ERROR', 'قرار غير معروف');
-    final version = (current['version'] as int) + 1;
-    final customerId = b['customerId'];
-    _unlinkedState[id] = {
-      ...?_unlinkedState[id],
+    return status;
+  }
+
+  /// Approve includes the illustrative ledger ack. Reject is id, status, and
+  /// events only. Nothing here posts a customer balance or a cash movement.
+  ApiResponse _decisionAck(String id, String status, Map current) {
+    if (status != 'approved') {
+      return _ok({
+        'id': id,
+        'status': status,
+        'eventSequences': <int>[3],
+      });
+    }
+    final amount = current['amountUnits'];
+    return _ok({
+      'id': id,
       'status': status,
-      'version': version,
-      if (customerId != null) 'customerId': customerId,
-    };
-    return _ok({'id': 'ok', 'version': version});
+      'transactionId': 'collection-$id',
+      if (amount is int) 'balanceUnits': amount,
+      'eventSequences': <int>[3],
+    });
   }
 
   Map<String, dynamic> _purchasesView(String book) {
@@ -2471,10 +2652,15 @@ class FakeApiClient implements ApiClient {
 
 /// One in-memory cookie session. Lifetime is not counted down locally.
 class _FakeSession {
-  _FakeSession({required this.id, required this.me});
+  _FakeSession({
+    required this.id,
+    required this.me,
+    required this.csrfToken,
+  });
 
   final String id;
   final Map<String, dynamic> me;
+  String csrfToken;
   bool expired = false;
 }
 
