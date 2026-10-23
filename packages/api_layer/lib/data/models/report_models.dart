@@ -23,6 +23,16 @@ enum FinancialLedgerSectionKey {
   const FinancialLedgerSectionKey(this.wire);
 
   final String wire;
+
+  /// A contract wire value, or null when [text] is absent or not one of them.
+  /// [unknown] is not a wire value the ledger query accepts.
+  static FinancialLedgerSectionKey? fromWire(String? text) {
+    if (text == null || text.isEmpty) return null;
+    for (final value in values) {
+      if (value != unknown && value.wire == text) return value;
+    }
+    return null;
+  }
 }
 
 /// Contract `sourceStatus` on a financial-ledger row.
@@ -158,7 +168,10 @@ class ReportFiveAmClosingDto {
 
 /// GET /api/reports?limit=30 — one daily row, and the same shape for `current`.
 ///
-/// G-18 is pending docs PR cursor/docs-gap-g16-g18.
+/// Contract `DailyFinancialReport` (`docs/api/response-types.ts.txt`): `summary`
+/// is the row's string, and `daily` is the movement object. `current` on
+/// `ReportsDashboard` uses that same row. `methodology.note` is a different
+/// field.
 class DailyReportRowDto {
   const DailyReportRowDto({
     required this.sequence,

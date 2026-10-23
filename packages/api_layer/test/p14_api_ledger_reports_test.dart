@@ -350,20 +350,17 @@ void main() {
       expect(customers.pageTotals['LYD']?.units, -100);
       expect(customers.pageTotals.containsKey('EGP'), isFalse);
 
-      final treasury = await api.reports.financialLedger(section: 'treasury');
+      final treasury = await api.reports.financialLedger(
+        sectionKey: FinancialLedgerSectionKey.treasury,
+      );
       expect(treasury.page.items.single.sectionKey,
           FinancialLedgerSectionKey.treasury);
 
       final preferred = await api.reports.financialLedger(
         sectionKey: FinancialLedgerSectionKey.purchases,
-        section: 'treasury',
       );
       expect(preferred.page.items.single.sectionKey,
           FinancialLedgerSectionKey.purchases);
-
-      final none = await api.reports.financialLedger(section: 'no_such');
-      expect(none.page.items, isEmpty);
-      expect(none.pageTotals, isEmpty);
 
       expect(
         fake.financialLedgerQueries.map((query) => query.section),
@@ -372,12 +369,50 @@ void main() {
           'customer_debts',
           'treasury',
           'purchases',
-          'no_such',
         ],
       );
       expect(
         fake.financialLedgerQueries.map((query) => query.sectionKey),
         everyElement(isNull),
+      );
+    });
+
+    test('a raw section string is a known wire value or is omitted', () async {
+      final api = ApiLayer.create(
+        config:
+            const ApiConfig(baseUrl: 'https://fake.invalid', useFakeApi: true),
+        fakeLatency: Duration.zero,
+      );
+      addTearDown(api.dispose);
+      await api.session.login(username: 'admin.demo', password: 'x');
+      final fake = api.client as FakeApiClient;
+
+      // ignore: deprecated_member_use_from_same_package
+      final treasury = await api.reports.financialLedger(section: 'treasury');
+      expect(treasury.page.items.single.sectionKey,
+          FinancialLedgerSectionKey.treasury);
+
+      // ignore: deprecated_member_use_from_same_package
+      final unknown = await api.reports.financialLedger(section: 'no_such');
+      expect(unknown.page.items, hasLength(4));
+      expect(unknown.pageTotals['LYD']?.units, 480);
+
+      // ignore: deprecated_member_use_from_same_package
+      final preferred = await api.reports.financialLedger(
+        sectionKey: FinancialLedgerSectionKey.purchases,
+        section: 'no_such',
+      );
+      expect(preferred.page.items.single.sectionKey,
+          FinancialLedgerSectionKey.purchases);
+
+      final droppedEnum = await api.reports.financialLedger(
+        sectionKey: FinancialLedgerSectionKey.unknown,
+      );
+      expect(droppedEnum.page.items, hasLength(4));
+
+      expect(
+        fake.financialLedgerQueries.map((query) => query.section),
+        ['treasury', null, 'purchases', null],
       );
     });
   });
