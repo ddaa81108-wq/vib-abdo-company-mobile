@@ -258,6 +258,7 @@ class FakeApiClient implements ApiClient {
   /// Overview metrics stay the stored literals; these rows are not summed.
   final List<Map<String, dynamic>> _extraSubmissions = [];
   final List<Map<String, dynamic>> _extraUnlinked = [];
+  final List<Map<String, dynamic>> _extraAssignments = [];
 
   /// Purchase day fields changed by finalize or correction. Keyed by book|day.
   final Map<String, Map<String, dynamic>> _purchaseDays = {};
@@ -1475,6 +1476,9 @@ class FakeApiClient implements ApiClient {
     if (seg.length == 3 && seg[1] == 'days' && seg[2] == 'close') {
       return _applyClose(b);
     }
+    if (method == 'POST' && seg.length == 2 && seg[1] == 'assignments') {
+      return _applyAssignment(b);
+    }
     if (seg.length == 4 && seg[1] == 'assignments' && seg[3] == 'submissions') {
       return _applyAssignmentSubmission(seg[2], b);
     }
@@ -1775,6 +1779,12 @@ class FakeApiClient implements ApiClient {
       items.add(item);
     }
     body['submissions'] = items;
+    final assignments = <Map<String, dynamic>>[
+      for (final raw in body['assignments'] as List)
+        Map<String, dynamic>.from(raw as Map),
+      for (final extra in _extraAssignments) Map<String, dynamic>.from(extra),
+    ];
+    body['assignments'] = assignments;
     final receipts = <Map<String, dynamic>>[];
     for (final raw in body['unlinkedReceipts'] as List) {
       final item = Map<String, dynamic>.from(raw as Map);
@@ -1895,7 +1905,7 @@ class FakeApiClient implements ApiClient {
     final next = {...?_submissionState[id], 'status': status};
     next.remove('version');
     _submissionState[id] = next;
-    return _decisionAck(id, status, submission, postedBalance: posted);
+    return _decisionAck(id, status, postedBalance: posted);
   }
 
   ApiResponse _applyCash(String id, {required bool unlinked}) {
@@ -1953,14 +1963,17 @@ class FakeApiClient implements ApiClient {
         b['entryType'] == 'payment' &&
         customerId is String &&
         current['amountUnits'] is int) {
-      // Unlinked receipts are LYD. Posting the same integer into an EGP
-      // section is DEF-035 and is not done here.
-      posted = _postLinkedBalance({
-        'section': 'customers',
-        'customerId': customerId,
-        'mode': 'partial',
-        'amountUnits': current['amountUnits'],
-      });
+      final section = _unlinkedLinkSection(customerId);
+      if (section != null) {
+        // Standalone receipts are LYD until the company decides otherwise.
+        posted = _postLinkedBalance({
+          'section': section,
+          'customerId': customerId,
+          'mode': 'partial',
+          'amountUnits': current['amountUnits'],
+          'currency': 'LYD',
+        });
+      }
     }
     final next = {
       ...?_unlinkedState[id],
@@ -1969,7 +1982,7 @@ class FakeApiClient implements ApiClient {
     };
     next.remove('version');
     _unlinkedState[id] = next;
-    return _decisionAck(id, status, current, postedBalance: posted);
+    return _decisionAck(id, status, postedBalance: posted);
   }
 
   String _decisionStatus(Object? decision) {
@@ -1986,12 +1999,12 @@ class FakeApiClient implements ApiClient {
   /// events only: no `transactionId` and no `balanceUnits`.
   ///
   /// [postedBalance] is the balance stored on the linked card, and may be
-  /// negative. When the row is not linked to a card, the ack keeps the integer
-  /// amount already stored on that row. A missing amount stays absent, not 0.
+  /// negative. A missing link is not a balance: the receipt amount is not
+  /// copied into `balanceUnits`, and the field is omitted rather than sent
+  /// as 0.
   ApiResponse _decisionAck(
     String id,
-    String status,
-    Map current, {
+    String status, {
     int? postedBalance,
   }) {
     if (status != 'approved') {
@@ -2001,14 +2014,63 @@ class FakeApiClient implements ApiClient {
         'eventSequences': <int>[3],
       });
     }
-    final amount = current['amountUnits'];
-    final balance = postedBalance ?? (amount is int ? amount : null);
     return _ok({
       'id': id,
       'status': status,
       'transactionId': 'collection-$id',
-      if (balance != null) 'balanceUnits': balance,
+      if (postedBalance != null) 'balanceUnits': postedBalance,
       'eventSequences': <int>[3],
+    });
+  }
+
+  /// LYD card first. An id that exists only on Egyptian deposits is returned
+  /// so the currency check can refuse it. DEF-035: a standalone receipt is
+  /// not posted onto an Egyptian account.
+  String? _unlinkedLinkSection(String customerId) {
+    if (FakeFixtures.cardById('customers', customerId).isNotEmpty) {
+      return 'customers';
+    }
+    if (FakeFixtures.cardById('egyptian-deposits', customerId).isNotEmpty) {
+      return 'egyptian-deposits';
+    }
+    return null;
+  }
+
+  /// Stores one assignment the caller named. The ack keeps `id` and `version`
+  /// and also returns the contract `assignmentIds`.
+  ApiResponse _applyAssignment(Map b) {
+    final ids = b['customerIds'];
+    final section = b['section'];
+    final assignee = b['assigneeUserId'];
+    if (ids is! List || section is! String || assignee is! String) {
+      _fail(400, 'VALIDATION_ERROR', 'بيانات التوجيه ناقصة');
+    }
+    final created = <String>[];
+    for (final raw in ids) {
+      if (raw is! String || raw.isEmpty) {
+        _fail(400, 'VALIDATION_ERROR', 'customerId مطلوب');
+      }
+      if (FakeFixtures.cardById(section, raw).isEmpty) {
+        _fail(404, 'NOT_FOUND', 'الحساب غير موجود');
+      }
+      final id = 'as_posted_${_extraAssignments.length + 1}';
+      final card = FakeFixtures.cardById(section, raw);
+      _extraAssignments.add({
+        'id': id,
+        'customerId': raw,
+        'customerName': card['name'],
+        'section': section,
+        'balanceUnits': card['balanceUnits'],
+        'status': 'open',
+        'assigneeUserId': assignee,
+      });
+      created.add(id);
+    }
+    return _ok({
+      'id': 'ok',
+      'version': 1,
+      'assignmentIds': created,
+      'eventSequences': <int>[1],
     });
   }
 
@@ -2017,6 +2079,13 @@ class FakeApiClient implements ApiClient {
   /// Partial subtracts the stored amount and may go negative. Full stores 0,
   /// the same result as a full card payment. No link, or a balance that is
   /// not an int, returns null and does not write the card.
+  ///
+  /// The receipt currency must match the linked account. Collections are LYD
+  /// unless the row itself carries `currency`. Egyptian deposits are EGP.
+  /// `error-catalog.json` has no code for this mismatch.
+  /// `INVALID_LEDGER_CURRENCY` belongs to the financial-ledger query, not to
+  /// a collection post, so it is not used. The card is left unchanged and
+  /// the caller omits `balanceUnits`.
   int? _postLinkedBalance(Map submission) {
     final section = submission['section'];
     final customerId = submission['customerId'];
@@ -2026,6 +2095,11 @@ class FakeApiClient implements ApiClient {
     final card = _cardView(section, customerId);
     final previous = card['balanceUnits'];
     if (previous is! int) return null;
+    final paymentCurrency = submission['currency'] is String
+        ? submission['currency'] as String
+        : 'LYD';
+    final accountCurrency = section == 'egyptian-deposits' ? 'EGP' : 'LYD';
+    if (paymentCurrency != accountCurrency) return null;
     final mode = submission['mode'];
     final int stored;
     if (mode == 'full') {

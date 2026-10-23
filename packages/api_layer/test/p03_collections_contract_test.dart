@@ -78,7 +78,9 @@ void main() {
     expect(approved.version, isNull);
     expect(approved.raw['status'], 'approved');
     expect(approved.raw['transactionId'], 'collection-sb_1');
-    expect(approved.raw['balanceUnits'], 100);
+    // sb_1 is not linked to a card. The amount is not a balance.
+    expect(approved.balanceUnits, isNull);
+    expect(approved.raw.containsKey('balanceUnits'), isFalse);
     expect(approved.raw['eventSequences'], [3]);
     expect(approved.raw.containsKey('version'), isFalse);
 
