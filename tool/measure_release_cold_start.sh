@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # P7-23 and the release half of P7-26.
 # Real mode. USE_FAKE_API=false. API_BASE comes from STAGING_API_BASE.
-# Fails when that name, or the admin username/password names, are unset.
-# Does not print secret values. Does not upload the APK.
+# Fails when that origin is unset or is not a staging host.
+# Login-to-home timing runs only when STAGING_ADMIN_USERNAME and
+# STAGING_ADMIN_PASSWORD are already in the local environment (the bot
+# machine). GitHub Actions does not set them. Does not print secret values.
+# Does not upload the APK.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -24,13 +27,17 @@ if kind != "ok":
     print(f"P7-23 blocked: STAGING_API_BASE classify_origin={kind}.")
     print("The value is not printed. Use an https staging or test origin.")
     sys.exit(1)
-for name in ("STAGING_ADMIN_USERNAME", "STAGING_ADMIN_PASSWORD"):
-    if not os.environ.get(name, "").strip():
-        print(f"P7-23 blocked: {name} is unset.")
-        print("Set that secret on the GitHub environment staging. The value is not printed.")
-        sys.exit(1)
 print("P7-23 staging origin accepted. The value is not printed.")
 PY
+
+login_timing=0
+if [[ -n "${STAGING_ADMIN_USERNAME:-}" && -n "${STAGING_ADMIN_PASSWORD:-}" ]]; then
+  login_timing=1
+  echo "P7-23 login timing will use the local environment. Values are not printed."
+else
+  echo "P7-23 login timing skipped. Set STAGING_ADMIN_USERNAME and STAGING_ADMIN_PASSWORD on the bot machine to time login through home."
+  echo "GitHub Actions does not read those names. They are not stored as secrets or variables."
+fi
 
 python3 - << 'PY'
 from pathlib import Path
@@ -143,21 +150,27 @@ LOG="${PHASE7_LOG:-phase7-cold-start.log}"
 } > "$LOG"
 
 # Scripted home time. This test APK embeds the admin dart-defines.
-# Do not upload it. GitHub masks the secret values if they reach the log.
-set +e
-flutter drive \
-  --release \
-  --driver=test_driver/integration_test.dart \
-  --target=integration_test/p7_release_cold_start_test.dart \
-  -d "$DEVICE" \
-  --dart-define=USE_FAKE_API=false \
-  --dart-define=API_BASE="$STAGING_API_BASE" \
-  --dart-define=STAGING_ADMIN_USERNAME="$STAGING_ADMIN_USERNAME" \
-  --dart-define=STAGING_ADMIN_PASSWORD="$STAGING_ADMIN_PASSWORD" \
-  --dart-define=PERF_SURFACE="$SURFACE" \
-  2>&1 | tee -a "$LOG"
-status=${PIPESTATUS[0]}
-set -e
+# Do not upload it. Run it only on the bot machine, where the names are set
+# in the shell. GitHub Actions leaves them unset and skips this block.
+status=0
+if [[ "$login_timing" -eq 1 ]]; then
+  set +e
+  flutter drive \
+    --release \
+    --driver=test_driver/integration_test.dart \
+    --target=integration_test/p7_release_cold_start_test.dart \
+    -d "$DEVICE" \
+    --dart-define=USE_FAKE_API=false \
+    --dart-define=API_BASE="$STAGING_API_BASE" \
+    --dart-define=STAGING_ADMIN_USERNAME="$STAGING_ADMIN_USERNAME" \
+    --dart-define=STAGING_ADMIN_PASSWORD="$STAGING_ADMIN_PASSWORD" \
+    --dart-define=PERF_SURFACE="$SURFACE" \
+    2>&1 | tee -a "$LOG"
+  status=${PIPESTATUS[0]}
+  set -e
+else
+  echo "PHASE7 p7_23_login_timing=local-only" | tee -a "$LOG"
+fi
 
 rm -rf build/app/outputs/flutter-apk build/app/outputs/apk || true
 
