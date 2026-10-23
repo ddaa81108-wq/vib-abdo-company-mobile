@@ -60,7 +60,7 @@ class PurchasesScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        KeptData<PurchasesBookPage>(
+        KeptData<PurchasesPage>(
           value: page,
           resetKey: book,
           onRetry: () => ref.invalidate(purchasesProvider),
@@ -75,48 +75,63 @@ class PurchasesScreen extends ConsumerWidget {
               SkeletonBox(),
             ],
           ),
-          builder: (data) => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _OpeningCard(
-                book: book,
-                opening: ResolvedPurchaseOpening.fromPage(data),
-                money: money,
-                canWrite: canWrite,
-                online: online,
-              ),
-              if (data.page.items.isEmpty)
-                const EmptyPane(
-                  key: Key('purchases-empty'),
-                  message: AppStrings.emptyPurchases,
-                ),
-              for (final day in data.page.items)
-                _DayCard(
+          builder: (data) {
+            final day = data.day;
+            final empty = day == null && data.entries.isEmpty;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _OpeningCard(
+                  book: book,
                   day: day,
                   money: money,
                   canWrite: canWrite,
-                  canFinalize: canFinalize,
                   online: online,
-                  book: book,
                 ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                AppStrings.registerTotals,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              _LifetimeTotals(totals: data.lifetimeTotals, money: money),
-            ],
-          ),
+                if (empty)
+                  const EmptyPane(
+                    key: Key('purchases-empty'),
+                    message: AppStrings.emptyPurchases,
+                  ),
+                if (day != null)
+                  _DayCard(
+                    day: day,
+                    entries: data.entries,
+                    money: money,
+                    canWrite: canWrite,
+                    canFinalize: canFinalize,
+                    online: online,
+                    book: book,
+                  )
+                else
+                  for (final entry in data.entries)
+                    _Entry(
+                      entry: entry,
+                      money: money,
+                      book: book,
+                      version: entry.dayVersion,
+                      canWrite: false,
+                      online: online,
+                    ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  AppStrings.registerTotals,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                _RegisterTotals(totals: data.registerTotals, money: money),
+              ],
+            );
+          },
         ),
       ],
     );
   }
 }
 
-class _LifetimeTotals extends StatelessWidget {
-  const _LifetimeTotals({required this.totals, required this.money});
+class _RegisterTotals extends StatelessWidget {
+  const _RegisterTotals({required this.totals, required this.money});
 
-  final PurchasesLifetimeTotalsDto? totals;
+  final PurchasesRegisterTotalsDto? totals;
   final MoneyFormatter money;
 
   @override
@@ -136,6 +151,18 @@ class _LifetimeTotals extends StatelessWidget {
           AppStrings.remaining,
           totals?.remainingUnits,
           Currency.lyd,
+          money,
+        ),
+        _AmountLine(
+          AppStrings.vodafoneConsumed,
+          totals?.vodafoneConsumedUnits,
+          vodafoneCurrency,
+          money,
+        ),
+        _AmountLine(
+          AppStrings.vodafoneRemaining,
+          totals?.vodafoneRemainingUnits,
+          vodafoneCurrency,
           money,
         ),
       ],
@@ -192,6 +219,7 @@ class _RateLine extends StatelessWidget {
 class _DayCard extends ConsumerWidget {
   const _DayCard({
     required this.day,
+    required this.entries,
     required this.money,
     required this.canWrite,
     required this.canFinalize,
@@ -200,6 +228,7 @@ class _DayCard extends ConsumerWidget {
   });
 
   final PurchaseDayDto day;
+  final List<PurchaseEntryDto> entries;
   final MoneyFormatter money;
   final bool canWrite;
   final bool canFinalize;
@@ -208,13 +237,14 @@ class _DayCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tone = dayToneIndex(day.day);
+    final label = day.numberLabel;
+    final tone = dayToneIndex(label);
     final band = tone == null ? null : context.statusColors.dayTones[tone];
-    final editable = dayIsEditable(day.status);
-    final correctionOpen = dayCorrectionIsOpen(day.status);
+    final correctionOpen = day.correctionOpen;
+    final editable = day.status == 'draft' || correctionOpen;
     final caption = vodafoneCaption(day.vodafoneRemainingUnits);
     return Card(
-      key: Key('purchase-day-${day.day}'),
+      key: Key('purchase-day-$label'),
       color: band,
       margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
       child: Padding(
@@ -228,10 +258,10 @@ class _DayCard extends ConsumerWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text(
-                  '${AppStrings.todayTab} ${day.day}',
+                  '${AppStrings.todayTab} $label',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
-                _CorrectionStatus(day: day.day, open: correctionOpen),
+                _CorrectionStatus(day: label, open: correctionOpen),
               ],
             ),
             _line(AppStrings.previousDebt, day.previousDebtUnits, Currency.lyd),
@@ -241,7 +271,7 @@ class _DayCard extends ConsumerWidget {
             _line(
               AppStrings.vodafoneRemaining,
               day.vodafoneRemainingUnits,
-              Currency.egp,
+              vodafoneCurrency,
             ),
             if (caption != null) Text(caption),
             Column(
@@ -249,28 +279,30 @@ class _DayCard extends ConsumerWidget {
               children: [
                 if (canWrite && editable)
                   GatedButton(
-                    buttonKey: ValueKey('add-purchase-${day.day}'),
+                    buttonKey: ValueKey('add-purchase-$label'),
                     allowed: true,
                     online: online,
                     label: AppStrings.add,
                     onPressed: () => showAppForm<void>(
                       context,
+                      // expectedDayVersion is the open day's version. The row
+                      // version stays on the entry until P-05.
                       _PurchaseForm(book: book, version: day.version),
                     ),
                   ),
                 if (canFinalize && day.status == 'draft')
                   GuardedMutation(
-                    buttonKey: ValueKey('finalize-day-${day.day}'),
-                    inputs: 'finalize:${day.day}:${day.version}',
+                    buttonKey: ValueKey('finalize-day-$label'),
+                    inputs: 'finalize:$label:${day.version}',
                     expectedVersion: day.version,
                     label: AppStrings.finalizeDay,
                     confirmText: AppStrings.finalizeConfirm,
                     onSubmit: (meta) => _finalize(context, ref, meta),
                   ),
-                if (canFinalize && day.status == 'finalized')
+                if (canFinalize && day.status == 'finalized' && !correctionOpen)
                   GuardedMutation(
-                    buttonKey: Key('open-correction-${day.day}'),
-                    inputs: 'open-correction:${day.day}:${day.version}',
+                    buttonKey: Key('open-correction-$label'),
+                    inputs: 'open-correction:$label:${day.version}',
                     expectedVersion: day.version,
                     label: AppStrings.openDayCorrection,
                     confirmText: AppStrings.openCorrectionConfirm,
@@ -280,8 +312,8 @@ class _DayCard extends ConsumerWidget {
                   ),
                 if (canFinalize && correctionOpen)
                   GuardedMutation(
-                    buttonKey: Key('close-correction-${day.day}'),
-                    inputs: 'close-correction:${day.day}:${day.version}',
+                    buttonKey: Key('close-correction-$label'),
+                    inputs: 'close-correction:$label:${day.version}',
                     expectedVersion: day.version,
                     label: AppStrings.closeDayCorrection,
                     confirmText: AppStrings.closeCorrectionConfirm,
@@ -291,7 +323,7 @@ class _DayCard extends ConsumerWidget {
                   ),
               ],
             ),
-            for (final entry in day.entries)
+            for (final entry in entries)
               _Entry(
                 entry: entry,
                 money: money,
@@ -341,7 +373,7 @@ class _DayCard extends ConsumerWidget {
     final ack = await ref
         .read(apiLayerProvider)
         .purchases
-        .setDayCorrection(book, day.day, open: open, meta: meta);
+        .setDayCorrection(book, day.id, open: open, meta: meta);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -538,14 +570,14 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
 class _OpeningCard extends StatelessWidget {
   const _OpeningCard({
     required this.book,
-    required this.opening,
+    required this.day,
     required this.money,
     required this.canWrite,
     required this.online,
   });
 
   final PurchaseBook book;
-  final ResolvedPurchaseOpening opening;
+  final PurchaseDayDto? day;
   final MoneyFormatter money;
   final bool canWrite;
   final bool online;
@@ -566,14 +598,14 @@ class _OpeningCard extends StatelessWidget {
             ),
             _MoneyLine(
               AppStrings.previousDebt,
-              opening.previousDebtUnits,
+              day?.previousDebtUnits,
               Currency.lyd,
               money,
             ),
             _MoneyLine(
               AppStrings.previousVodafone,
-              opening.previousVodafoneUnits,
-              Currency.egp,
+              day?.previousVodafoneUnits,
+              vodafoneCurrency,
               money,
             ),
             if (canWrite)
@@ -584,7 +616,7 @@ class _OpeningCard extends StatelessWidget {
                 label: AppStrings.purchaseOpening,
                 onPressed: () => showAppForm<void>(
                   context,
-                  _OpeningForm(book: book, opening: opening),
+                  _OpeningForm(book: book, day: day),
                 ),
               ),
           ],
@@ -617,10 +649,10 @@ class _MoneyLine extends StatelessWidget {
 }
 
 class _OpeningForm extends ConsumerStatefulWidget {
-  const _OpeningForm({required this.book, required this.opening});
+  const _OpeningForm({required this.book, required this.day});
 
   final PurchaseBook book;
-  final ResolvedPurchaseOpening opening;
+  final PurchaseDayDto? day;
 
   @override
   ConsumerState<_OpeningForm> createState() => _OpeningFormState();
@@ -633,8 +665,8 @@ class _OpeningFormState extends ConsumerState<_OpeningForm> {
   @override
   void initState() {
     super.initState();
-    final debt = widget.opening.previousDebtUnits;
-    final vodafone = widget.opening.previousVodafoneUnits;
+    final debt = widget.day?.previousDebtUnits;
+    final vodafone = widget.day?.previousVodafoneUnits;
     if (debt != null && debt.isValid) _debt.text = '${debt.units}';
     if (vodafone != null && vodafone.isValid) {
       _vodafone.text = '${vodafone.units}';
@@ -683,8 +715,8 @@ class _OpeningFormState extends ConsumerState<_OpeningForm> {
         const SizedBox(height: AppSpacing.md),
         GuardedMutation(
           buttonKey: const Key('save-opening'),
-          inputs: '${_debt.text}|${_vodafone.text}|${widget.opening.version}',
-          expectedVersion: widget.opening.version,
+          inputs: '${_debt.text}|${_vodafone.text}|${widget.day?.version}',
+          expectedVersion: widget.day?.version,
           label: AppStrings.saveOpening,
           confirmText: valid ? AppStrings.openingConfirm : null,
           normalizedValue: valid ? '$debt · $vodafone' : null,

@@ -32,11 +32,12 @@ enum Currency {
 }
 
 class MoneyFormatter {
-  /// [unitScale] = fractional digits encoded in *Units (observed: 0 -> whole units). 🔶
-  const MoneyFormatter(
-      {this.unitScale = 0,
-      this.groupSeparator = ',',
-      this.decimalSeparator = '.'});
+  /// [unitScale] = fractional digits encoded in *Units. Confirmed 0: whole units.
+  const MoneyFormatter({
+    this.unitScale = 0,
+    this.groupSeparator = ',',
+    this.decimalSeparator = '.',
+  });
 
   final int unitScale;
   final String groupSeparator;
@@ -71,11 +72,11 @@ class MoneyFormatter {
   /// rejects grouping commas. This is still a cut of the digit string: no
   /// division and no rounding.
   String plainScaled(int scaledValue, int scale) => formatNumber(
-        scaledValue,
-        scale: scale,
-        trimTrailingZeros: true,
-        groupDigits: false,
-      );
+    scaledValue,
+    scale: scale,
+    trimTrailingZeros: true,
+    groupDigits: false,
+  );
 
   /// Rate/factor text ("9.5" -> "9.5", "12500.25" -> "12,500.25"). String-only, no parsing to a number.
   String formatDecimal(DecimalString d) {

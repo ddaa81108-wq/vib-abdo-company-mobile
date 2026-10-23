@@ -60,10 +60,10 @@ void main() {
     final page = (await tester.runAsync(
       () => layer.purchases.list(PurchaseBook.alBayan),
     ))!;
-    expect(page.page.items.single.status, 'finalized');
-    expect(page.page.items.single.version, 4);
-    expect(page.page.items.single.entries.single.id, 'pe_1');
-    expect(page.page.items.single.entries.single.paidUnits?.units, 500);
+    expect(page.day!.status, 'finalized');
+    expect(page.day!.version, 4);
+    expect(page.entries.single.id, 'pe_1');
+    expect(page.entries.single.paidUnits?.asInt, 500);
     expect(tester.takeException(), isNull);
   });
 
@@ -94,10 +94,10 @@ void main() {
     final page = (await tester.runAsync(
       () => layer.purchases.list(PurchaseBook.alBayan),
     ))!;
-    expect(page.page.items.single.status, 'finalized');
-    expect(page.page.items.single.version, 4);
-    expect(page.page.items.single.entries, hasLength(1));
-    expect(page.page.items.single.entries.single.id, 'pe_1');
+    expect(page.day!.status, 'finalized');
+    expect(page.day!.version, 4);
+    expect(page.entries, hasLength(1));
+    expect(page.entries.single.id, 'pe_1');
     expect(tester.takeException(), isNull);
   });
 }

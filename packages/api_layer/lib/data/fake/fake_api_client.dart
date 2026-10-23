@@ -46,11 +46,10 @@ import 'fake_large_catalog.dart';
 /// from the route that does not take an employee id. A missing session is 401.
 ///
 /// Creating, updating, or deleting a purchase entry on a day whose status is
-/// `finalized` is rejected with 409 [dayFinalizedCode]. The README and the
-/// in-repo API notes do not name this status or code. `PurchaseDayDto.status`
-/// is still marked proposed, so this code is an open stand-in, not a confirmed
-/// contract field. A stored success for the same `requestId` does not skip the
-/// check.
+/// `finalized` and whose `correctionOpen` is false is rejected with 409
+/// [dayFinalizedCode]. The contract names `draft` and `finalized`; this 409
+/// code is still a stand-in. A stored success for the same `requestId` does
+/// not skip the check. Write bodies still send `expectedDayVersion` only.
 class FakeApiClient implements ApiClient {
   FakeApiClient({
     this.latency = const Duration(milliseconds: 250),
@@ -116,8 +115,9 @@ class FakeApiClient implements ApiClient {
   /// The next N versioned collection mutations fail with VERSION_CONFLICT (tests).
   int versionConflictRemaining = 0;
 
-  /// When set, purchases days without a stored finalize or correction use this
-  /// status on the next GET (tests).
+  /// When set, a purchase day without a stored finalize or correction uses this
+  /// status on the next GET (tests). `correction` is the contract flag
+  /// `correctionOpen` on a finalized day, not a third status.
   String? purchaseFixtureStatus;
 
   /// GET /api/collections calls, including a refetch after a conflict (tests).
@@ -313,8 +313,7 @@ class FakeApiClient implements ApiClient {
     String path, {
     Map<String, dynamic>? query,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) =>
-      _send('GET', path, null, options, query: query);
+  }) => _send('GET', path, null, options, query: query);
 
   @override
   Future<ApiResponse> post(
@@ -322,32 +321,28 @@ class FakeApiClient implements ApiClient {
     Object? body,
     Map<String, dynamic>? query,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) =>
-      _send('POST', path, body, options, query: query);
+  }) => _send('POST', path, body, options, query: query);
 
   @override
   Future<ApiResponse> put(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) =>
-      _send('PUT', path, body, options);
+  }) => _send('PUT', path, body, options);
 
   @override
   Future<ApiResponse> patch(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) =>
-      _send('PATCH', path, body, options);
+  }) => _send('PATCH', path, body, options);
 
   @override
   Future<ApiResponse> delete(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) =>
-      _send('DELETE', path, body, options);
+  }) => _send('DELETE', path, body, options);
 
   /// One HTTP exchange for the interceptor's adapter. Does not call [bindGateway].
   Future<FakeHttpResult> serveHttp({
@@ -476,11 +471,7 @@ class FakeApiClient implements ApiClient {
 
   /// 🔶 Query names the fake treats as an employee id. Own data is not read
   /// through these names.
-  static const _employeeQueryKeys = [
-    'employeeId',
-    'userId',
-    'employeeUserId',
-  ];
+  static const _employeeQueryKeys = ['employeeId', 'userId', 'employeeUserId'];
 
   String? _queryEmployeeId(Map<String, dynamic>? query) {
     if (query == null) return null;
@@ -745,10 +736,12 @@ class FakeApiClient implements ApiClient {
       failEmployeeTotalsRemaining--;
       _fail(500, 'SERVER_ERROR', 'تعذر تحميل إجماليات الموظفين.');
     }
-    return _ok(FakeFixtures.employeeTotals(
-      from: _queryText(query, 'from'),
-      to: _queryText(query, 'to'),
-    ));
+    return _ok(
+      FakeFixtures.employeeTotals(
+        from: _queryText(query, 'from'),
+        to: _queryText(query, 'to'),
+      ),
+    );
   }
 
   void _activate(Map<String, dynamic> me) {
@@ -765,8 +758,9 @@ class FakeApiClient implements ApiClient {
       sectionAccess: section is Map
           ? section.map((key, value) => MapEntry('$key', '$value'))
           : const {},
-      fullAccess:
-          user['fullAccess'] is bool ? user['fullAccess'] as bool : null,
+      fullAccess: user['fullAccess'] is bool
+          ? user['fullAccess'] as bool
+          : null,
     );
   }
 
@@ -902,8 +896,9 @@ class FakeApiClient implements ApiClient {
     if (body is String) {
       lastWireBody = body;
     } else {
-      lastWireBody =
-          body == null ? null : WireJson.encode(body, rateWireFormat);
+      lastWireBody = body == null
+          ? null
+          : WireJson.encode(body, rateWireFormat);
     }
     final decoded = lastWireBody == null ? null : jsonDecode(lastWireBody!);
     final b = decoded is Map ? decoded : const {};
@@ -1163,7 +1158,8 @@ class FakeApiClient implements ApiClient {
         if (_isPurchaseEntryWrite(method, seg)) {
           _rejectIfPurchaseDayFinalized(seg);
         }
-        final entryWrite = (method == 'POST' && seg.length == 2) ||
+        final entryWrite =
+            (method == 'POST' && seg.length == 2) ||
             ((method == 'POST' || method == 'PATCH') &&
                 seg.length > 3 &&
                 seg[2] == 'entries');
@@ -1391,7 +1387,8 @@ class FakeApiClient implements ApiClient {
       return _ok({'items': []});
     }
     _requireCollectionMutation(seg);
-    final needsVersion = seg.isNotEmpty &&
+    final needsVersion =
+        seg.isNotEmpty &&
         (seg.last == 'decision' || seg.last == 'cash-received');
     if (needsVersion && b['expectedVersion'] == null) {
       _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
@@ -1830,60 +1827,99 @@ class FakeApiClient implements ApiClient {
     return _ok({'id': 'ok', 'version': version});
   }
 
+  /// Open day after stored finalize, correction, fixture status, and opening.
+  /// Opening amounts land on the day. The contract has no `opening` object.
+  Map<String, dynamic>? _openPurchaseDay(String book) {
+    final raw = _copy(FakeFixtures.purchases())['day'];
+    if (raw is! Map) return null;
+    final day = Map<String, dynamic>.from(raw);
+    final state = _purchaseDays['$book|${day['id']}'];
+    if (state != null) {
+      day.addAll(state);
+    } else if (purchaseFixtureStatus != null) {
+      _paintPurchaseStatus(day, purchaseFixtureStatus!);
+    }
+    final opening = _openingByBook[book];
+    if (opening != null) {
+      day['previousDebtUnits'] = opening['previousDebtUnits'];
+      day['previousVodafoneUnits'] = opening['previousVodafoneUnits'];
+    }
+    return day;
+  }
+
+  /// `correction` is the test hook for `correctionOpen` on a finalized day.
+  void _paintPurchaseStatus(Map<String, dynamic> day, String status) {
+    if (status == 'correction') {
+      day['status'] = 'finalized';
+      day['correctionOpen'] = true;
+      return;
+    }
+    day['status'] = status;
+    day['correctionOpen'] = false;
+  }
+
   Map<String, dynamic> _purchasesView(String book) {
     final body = _copy(FakeFixtures.purchases());
-    final days = <Map<String, dynamic>>[];
-    for (final raw in body['days'] as List) {
-      final day = Map<String, dynamic>.from(raw as Map);
-      final state = _purchaseDays['$book|${day['day']}'];
-      if (state != null) {
-        day.addAll(state);
-      } else if (purchaseFixtureStatus != null) {
-        day['status'] = purchaseFixtureStatus;
-      }
-      days.add(day);
+    final merchant = body['merchant'];
+    if (merchant is Map) {
+      merchant['key'] = book;
+      merchant['name'] = book == PurchaseBook.simsim.path
+          ? PurchaseBook.simsim.label
+          : PurchaseBook.alBayan.label;
     }
-    body['days'] = days;
-    final opening = _openingByBook[book];
-    if (opening != null) body['opening'] = Map<String, dynamic>.from(opening);
+    final day = _openPurchaseDay(book);
+    if (day == null) return body;
+    body['day'] = day;
+    final entries = body['entries'];
+    if (entries is List) {
+      body['entries'] = [
+        for (final raw in entries)
+          if (raw is Map)
+            _paintPurchaseEntry(Map<String, dynamic>.from(raw), day),
+      ];
+    }
     return body;
   }
 
+  Map<String, dynamic> _paintPurchaseEntry(
+    Map<String, dynamic> entry,
+    Map<String, dynamic> day,
+  ) {
+    entry['dayId'] = day['id'];
+    entry['dayNumber'] = day['dayNumber'];
+    entry['dayStatus'] = day['status'];
+    entry['dayVersion'] = day['version'];
+    entry['correctionOpen'] = day['correctionOpen'] == true;
+    return entry;
+  }
+
   ApiResponse _applyOpening(String book, Map b) {
-    final days = _purchasesView(book)['days'] as List;
-    final stored = _openingByBook[book];
-    final current = stored != null
-        ? stored['version']
-        : (days.isEmpty ? null : (days.first as Map)['version']);
+    final day = _openPurchaseDay(book);
+    final current = day?['version'];
     _requireVersion(b['expectedDayVersion'], current);
     _openingByBook[book] = {
       'previousDebtUnits': b['previousDebtUnits'],
       'previousVodafoneUnits': b['previousVodafoneUnits'],
-      'version': current,
     };
     return _ok({'id': 'opening', 'version': current});
   }
 
   ApiResponse _applyCorrection(String book, String dayId, Map b) {
-    Map<String, dynamic>? day;
-    for (final raw in _purchasesView(book)['days'] as List) {
-      final item = raw as Map<String, dynamic>;
-      if ('${item['day']}' == dayId) {
-        day = item;
-        break;
-      }
+    final day = _openPurchaseDay(book);
+    if (day == null || '${day['id']}' != dayId) {
+      _fail(404, 'NOT_FOUND', 'اليوم غير موجود');
     }
-    if (day == null) _fail(404, 'NOT_FOUND', 'اليوم غير موجود');
     _requireVersion(b['expectedDayVersion'], day['version']);
     final open = b['open'] == true;
     _purchaseDays['$book|$dayId'] = {
       ...?_purchaseDays['$book|$dayId'],
-      'status': open ? 'correction' : 'finalized',
+      'status': 'finalized',
+      'correctionOpen': open,
     };
     return _ok({
       'id': dayId,
       'version': day['version'],
-      'status': open ? 'correction' : 'finalized',
+      'correctionOpen': open,
     });
   }
 
@@ -1935,8 +1971,11 @@ class FakeApiClient implements ApiClient {
   /// Idempotent replay enters here with the path only. [_mutate] is used for
   /// non-GET calls, so an entry-shaped path is a create, update, or delete.
   void _rejectFinalizedPurchaseEntry(String path) {
-    final seg =
-        path.split('/').where((part) => part.isNotEmpty).skip(1).toList();
+    final seg = path
+        .split('/')
+        .where((part) => part.isNotEmpty)
+        .skip(1)
+        .toList();
     if (seg.length < 2 || seg.first != 'purchases') return;
     final entryPath =
         seg.length == 2 || (seg.length >= 4 && seg[2] == 'entries');
@@ -1944,53 +1983,30 @@ class FakeApiClient implements ApiClient {
     _rejectIfPurchaseDayFinalized(seg);
   }
 
-  /// The in-repo contract does not define this rejection. Status `finalized`
-  /// is the value [_applyFinalize] stores. A day in `correction` stays writable.
+  /// Status `finalized` with `correctionOpen` false is what [_applyFinalize]
+  /// stores. An open correction stays writable. The check does not read an
+  /// entry version (P-05).
   void _rejectIfPurchaseDayFinalized(List<String> seg) {
-    final rawDays = _purchasesView(seg[1])['days'];
-    if (rawDays is! List || rawDays.isEmpty) return;
-    final days = <Map<String, dynamic>>[
-      for (final raw in rawDays)
-        if (raw is Map) Map<String, dynamic>.from(raw),
-    ];
-    if (days.isEmpty) return;
-    if (seg.length >= 4 && seg[2] == 'entries') {
-      final entryId = seg[3];
-      Map<String, dynamic>? owner;
-      for (final day in days) {
-        final entries = day['entries'];
-        if (entries is! List) continue;
-        for (final entry in entries) {
-          if (entry is Map && '${entry['id']}' == entryId) {
-            owner = day;
-            break;
-          }
-        }
-        if (owner != null) break;
-      }
-      final blocked = owner != null
-          ? owner['status'] == 'finalized'
-          : days.every((day) => day['status'] == 'finalized');
-      if (blocked) _failDayFinalized();
-      return;
-    }
-    if (days.every((day) => day['status'] == 'finalized')) {
-      _failDayFinalized();
-    }
+    final day = _openPurchaseDay(seg.length > 1 ? seg[1] : '');
+    if (day == null) return;
+    final closed =
+        day['status'] == 'finalized' && day['correctionOpen'] != true;
+    if (!closed) return;
+    _failDayFinalized();
   }
 
   Never _failDayFinalized() =>
       _fail(409, dayFinalizedCode, dayFinalizedMessage);
 
   ApiResponse _applyFinalize(String book, Map b) {
-    final days = _purchasesView(book)['days'] as List;
-    if (days.isEmpty) _fail(404, 'NOT_FOUND', 'اليوم غير موجود');
-    final day = days.first as Map<String, dynamic>;
+    final day = _openPurchaseDay(book);
+    if (day == null) _fail(404, 'NOT_FOUND', 'اليوم غير موجود');
     _requireVersion(b['expectedDayVersion'], day['version']);
     final version = (day['version'] as int) + 1;
-    _purchaseDays['$book|${day['day']}'] = {
+    _purchaseDays['$book|${day['id']}'] = {
       'status': 'finalized',
       'version': version,
+      'correctionOpen': false,
     };
     return _ok({'id': 'ok', 'version': version});
   }
@@ -2140,8 +2156,9 @@ class FakeApiClient implements ApiClient {
     body['unlinkedReceipts'] = const [];
     body['employeeTotals'] = _owned(body['employeeTotals'], 'userId', id);
     if (id == FakeFixtures.demoEmployeeId) {
-      body['metrics'] =
-          Map<String, dynamic>.from(FakeFixtures.ownCollectionMetrics);
+      body['metrics'] = Map<String, dynamic>.from(
+        FakeFixtures.ownCollectionMetrics,
+      );
     } else {
       body['metrics'] = {
         'collectedUnits': 0,
@@ -2161,13 +2178,17 @@ class FakeApiClient implements ApiClient {
     final id = _userId;
     body['assignments'] = _owned(body['assignments'], 'assigneeUserId', id);
     body['submissions'] = _owned(body['submissions'], 'submittedByUserId', id);
-    body['unlinkedReceipts'] =
-        _owned(body['unlinkedReceipts'], 'submittedByUserId', id);
+    body['unlinkedReceipts'] = _owned(
+      body['unlinkedReceipts'],
+      'submittedByUserId',
+      id,
+    );
     body['employeeTotals'] = _owned(body['employeeTotals'], 'userId', id);
     // 🔶 Own overview figures are stored literals, not a sum of the rows above.
     if (id == FakeFixtures.demoEmployeeId) {
-      body['metrics'] =
-          Map<String, dynamic>.from(FakeFixtures.ownCollectionMetrics);
+      body['metrics'] = Map<String, dynamic>.from(
+        FakeFixtures.ownCollectionMetrics,
+      );
       body['assignedCount'] = FakeFixtures.ownAssignedCount;
     } else {
       body['metrics'] = {
@@ -2292,9 +2313,7 @@ class FakeApiClient implements ApiClient {
           : sorted.skip(index + 1).toList(growable: false);
     }
     return {
-      'items': [
-        for (final item in page) Map<String, dynamic>.from(item),
-      ],
+      'items': [for (final item in page) Map<String, dynamic>.from(item)],
       'unreadCount': _unreadByUser[_userId] ?? 0,
       // 🔶 No extra page in the fixture, so the cursor is absent.
       'nextBefore': null,
@@ -2422,10 +2441,7 @@ class FakeApiClient implements ApiClient {
 
   ApiResponse _accountRequests(List<String> seg, Map b) {
     if (seg.length >= 3 && seg[2] == 'decision') {
-      return _ok({
-        'id': seg[1],
-        'status': '${b['decision'] ?? 'approved'}',
-      });
+      return _ok({'id': seg[1], 'status': '${b['decision'] ?? 'approved'}'});
     }
     return _ok({
       'items': [

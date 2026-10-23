@@ -94,12 +94,15 @@ void main() {
       size: const Size(360, 800),
       overrides: [
         purchasesProvider.overrideWith((ref) async {
-          return PurchasesBookPage.fromData({
-            'days': <Map<String, dynamic>>[],
-            'lifetimeTotals': {
+          return PurchasesPage.fromData({
+            'entries': <Map<String, dynamic>>[],
+            'nextBefore': null,
+            'registerTotals': {
               'resultUnits': 10,
               'paidUnits': 4,
               'remainingUnits': 6,
+              'vodafoneConsumedUnits': 0,
+              'vodafoneRemainingUnits': 0,
             },
           });
         }),
@@ -123,7 +126,7 @@ void main() {
   testWidgets('loading hides actions until the server page arrives', (
     tester,
   ) async {
-    final pending = Completer<PurchasesBookPage>();
+    final pending = Completer<PurchasesPage>();
     await pumpFakeApp(
       tester,
       size: const Size(360, 800),
@@ -137,12 +140,14 @@ void main() {
     expect(find.byKey(const Key('purchases-empty')), findsNothing);
 
     pending.complete(
-      PurchasesBookPage.fromData({
-        'days': <Map<String, dynamic>>[],
-        'lifetimeTotals': {
+      PurchasesPage.fromData({
+        'entries': <Map<String, dynamic>>[],
+        'registerTotals': {
           'resultUnits': 1,
           'paidUnits': 1,
           'remainingUnits': 0,
+          'vodafoneConsumedUnits': 0,
+          'vodafoneRemainingUnits': 0,
         },
       }),
     );
@@ -227,27 +232,26 @@ void main() {
       size: const Size(360, 900),
       overrides: [
         purchasesProvider.overrideWith((ref) async {
-          return PurchasesBookPage.fromData({
-            'days': [
-              for (final id in ['1', '2'])
-                {
-                  'day': id,
-                  'version': 1,
-                  'status': 'draft',
-                  'entries': <Map<String, dynamic>>[],
-                  'totals': {
-                    'previousDebtUnits': 1,
-                    'todayResultUnits': 1,
-                    'todayPaidUnits': 1,
-                    'totalDebtUnits': 1,
-                    'vodafoneRemainingUnits': 0,
-                  },
-                },
-            ],
-            'lifetimeTotals': {
+          return PurchasesPage.fromData({
+            'day': {
+              'id': '1',
+              'dayNumber': 1,
+              'version': 1,
+              'status': 'draft',
+              'correctionOpen': false,
+              'previousDebtUnits': 1,
+              'todayResultUnits': 1,
+              'todayPaidUnits': 1,
+              'totalDebtUnits': 1,
+              'vodafoneRemainingUnits': 0,
+            },
+            'entries': <Map<String, dynamic>>[],
+            'registerTotals': {
               'resultUnits': 1,
               'paidUnits': 1,
               'remainingUnits': 0,
+              'vodafoneConsumedUnits': 0,
+              'vodafoneRemainingUnits': 0,
             },
           });
         }),
@@ -257,9 +261,9 @@ void main() {
     await go(tester, '/purchases');
 
     expect(find.byKey(const Key('add-purchase-1')), findsOneWidget);
-    expect(find.byKey(const Key('add-purchase-2')), findsOneWidget);
+    expect(find.byKey(const Key('add-purchase-2')), findsNothing);
     expect(find.byKey(const Key('finalize-day-1')), findsOneWidget);
-    expect(find.byKey(const Key('finalize-day-2')), findsOneWidget);
+    expect(find.byKey(const Key('finalize-day-2')), findsNothing);
     expect(find.byKey(const Key('add-purchase')), findsNothing);
     expect(find.byKey(const Key('finalize-day')), findsNothing);
     expect(tester.takeException(), isNull);

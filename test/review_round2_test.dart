@@ -52,39 +52,46 @@ void main() {
     await settle(tester);
   });
 
-  testWidgets('a bad lifetime field stays invalid and the other total remains', (
-    tester,
-  ) async {
-    final gate = _FailGate();
-    await pumpFakeApp(
-      tester,
-      size: const Size(800, 1600),
-      overrides: [
-        purchasesProvider.overrideWith((ref) async {
-          gate.calls++;
-          if (gate.failing) {
-            return PurchasesBookPage.fromData({
-              'days': [],
-              'lifetimeTotals': {'resultUnits': 50000, 'paidUnits': '1'},
-            });
-          }
-          return ref
-              .read(apiLayerProvider)
-              .purchases
-              .list(PurchaseBook.alBayan);
-        }),
-      ],
-    );
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/purchases');
+  testWidgets(
+    'a bad lifetime field stays invalid and the other total remains',
+    (tester) async {
+      final gate = _FailGate();
+      await pumpFakeApp(
+        tester,
+        size: const Size(800, 1600),
+        overrides: [
+          purchasesProvider.overrideWith((ref) async {
+            gate.calls++;
+            if (gate.failing) {
+              return PurchasesPage.fromData({
+                'entries': <Object>[],
+                'registerTotals': {
+                  'resultUnits': 50000,
+                  'paidUnits': '1',
+                  'remainingUnits': 0,
+                  'vodafoneConsumedUnits': 0,
+                  'vodafoneRemainingUnits': 0,
+                },
+              });
+            }
+            return ref
+                .read(apiLayerProvider)
+                .purchases
+                .list(PurchaseBook.alBayan);
+          }),
+        ],
+      );
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/purchases');
 
-    expect(find.byKey(const Key('screen-purchases')), findsOneWidget);
-    expect(find.text(AppStrings.retry), findsNothing);
-    expect(find.textContaining('50,000'), findsWidgets);
-    expect(find.text(MoneyValue.invalidLabel), findsWidgets);
-    expect(find.text('1 د.ل'), findsNothing);
-    expect(find.textContaining('47,447'), findsNothing);
-  });
+      expect(find.byKey(const Key('screen-purchases')), findsOneWidget);
+      expect(find.text(AppStrings.retry), findsNothing);
+      expect(find.textContaining('50,000'), findsWidgets);
+      expect(find.text(MoneyValue.invalidLabel), findsWidgets);
+      expect(find.text('1 د.ل'), findsNothing);
+      expect(find.textContaining('47,447'), findsNothing);
+    },
+  );
 
   testWidgets('custom purchase item requires a free-text label', (
     tester,

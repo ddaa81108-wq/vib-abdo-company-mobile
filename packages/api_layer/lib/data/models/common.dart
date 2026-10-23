@@ -44,11 +44,7 @@ bool boolOf(Object? v) => v == true;
 ///
 /// [fieldPath] and the current endpoint ([runWithMoneyEndpoint]) are logged with
 /// [rowId]. The value itself is not read into the log.
-MoneyValue? unitsOrNull(
-  Object? v, {
-  String fieldPath = '-',
-  String? rowId,
-}) {
+MoneyValue? unitsOrNull(Object? v, {String fieldPath = '-', String? rowId}) {
   if (v == null) return null;
   if (v is int) return MoneyValue.known(v);
   if (v is MoneyValue) return v;
@@ -62,7 +58,7 @@ MoneyValue? unitsOrNull(
 
 /// Present container must be a JSON object. Missing is allowed.
 ///
-/// Used for a whole object (`summary`, `totals`, `opening`, `lifetimeTotals`,
+/// Used for a whole object (`summary`, `totals`, `day`, `registerTotals`,
 /// or the response `data`). A string, list, or number here fails the response.
 /// A bad money field inside a real object does not: that is [unitsOrNull].
 void requireJsonObject(Object? value, String label) {
@@ -86,18 +82,22 @@ Currency currencyOr(Object? serverValue, Currency fallback) =>
 /// Pagination exactly as the server returns it (inside `data`):
 /// `?limit&cursor` -> `nextCursor`/`hasMore`; ledgers `?limit&before`.
 class Paged<T> {
-  const Paged(
-      {required this.items,
-      this.nextCursor,
-      this.hasMore = false,
-      this.raw = const {}});
+  const Paged({
+    required this.items,
+    this.nextCursor,
+    this.hasMore = false,
+    this.raw = const {},
+  });
   final List<T> items;
   final String? nextCursor; // cursor or `before` value for the next page
   final bool hasMore;
   final Json raw; // full `data` object (for server-provided summary fields)
 
-  static Paged<T> fromData<T>(Object? data, T Function(Json) parse,
-      {String itemsKey = 'items'}) {
+  static Paged<T> fromData<T>(
+    Object? data,
+    T Function(Json) parse, {
+    String itemsKey = 'items',
+  }) {
     if (data is List) {
       return Paged(items: asJsonList(data).map(parse).toList(growable: false));
     }
@@ -121,7 +121,10 @@ class MutationAck {
   factory MutationAck.fromData(Object? data) {
     final d = asJson(data);
     return MutationAck(
-        id: strOrNull(d['id']), version: intOrNull(d['version']), raw: d);
+      id: strOrNull(d['id']),
+      version: intOrNull(d['version']),
+      raw: d,
+    );
   }
 }
 

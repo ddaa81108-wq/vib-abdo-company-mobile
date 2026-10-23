@@ -70,8 +70,8 @@ class ApiConfig {
   /// Fallback polling of /api/event-changes when SSE is down (web client: 4s while visible).
   final Duration pollingInterval;
 
-  /// Number of fractional digits encoded in `*Units` integers. Observed web display
-  /// uses maximumFractionDigits: 0 -> assumed 0 (whole dinar/pound). 🔶 to confirm.
+  /// Fractional digits encoded in `*Units`. Confirmed 0: whole currency units
+  /// (250 means 250), not minor units. DEF-029.
   final int moneyUnitScale;
 
   /// Wire encoding for DecimalString values in request bodies (serialization layer only).
@@ -101,11 +101,13 @@ class ApiConfig {
       useFakeApi: useFakeApi,
       apiBase: apiBase,
       enableDebugLogging: debug,
-      authStrategy:
-          bearer ? AuthStrategyKind.bearerToken : AuthStrategyKind.cookieCsrf,
+      authStrategy: bearer
+          ? AuthStrategyKind.bearerToken
+          : AuthStrategyKind.cookieCsrf,
       moneyUnitScale: scale,
-      rateWireFormat:
-          rate == 'string' ? RateWireFormat.string : RateWireFormat.number,
+      rateWireFormat: rate == 'string'
+          ? RateWireFormat.string
+          : RateWireFormat.number,
       employeeTotalsSource: totals == 'collections'
           ? EmployeeTotalsSource.collections
           : EmployeeTotalsSource.standalone,

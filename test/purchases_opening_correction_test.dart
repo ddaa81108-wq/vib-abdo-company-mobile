@@ -155,7 +155,7 @@ void main() {
     expect(fake.mutationPaths.last, '/api/purchases/simsim/opening');
   });
 
-  testWidgets('a server opening object supplies the version that is sent', (
+  testWidgets('the open day version is the expectedDayVersion that is sent', (
     tester,
   ) async {
     final layer = await pumpFakeApp(
@@ -163,24 +163,17 @@ void main() {
       size: const Size(800, 1600),
       overrides: [
         purchasesProvider.overrideWith((ref) async {
-          return PurchasesBookPage.fromData({
-            'opening': {
+          return PurchasesPage.fromData({
+            'day': {
+              'id': '1',
+              'dayNumber': 1,
+              'version': 11,
+              'status': 'draft',
+              'correctionOpen': false,
               'previousDebtUnits': 7,
               'previousVodafoneUnits': 8,
-              'version': 11,
             },
-            'days': [
-              {
-                'day': '1',
-                'version': 3,
-                'status': 'draft',
-                'entries': [],
-                'totals': {
-                  'previousDebtUnits': 99,
-                  'previousVodafoneUnits': 99,
-                },
-              },
-            ],
+            'entries': <Object>[],
           });
         }),
       ],
@@ -218,19 +211,17 @@ void main() {
         overrides: [
           purchasesProvider.overrideWith((ref) async {
             loads++;
-            return PurchasesBookPage.fromData({
-              'days': [
-                {
-                  'day': '9',
-                  'version': -1,
-                  'status': 'draft',
-                  'entries': [],
-                  'totals': {
-                    'previousDebtUnits': 10,
-                    'previousVodafoneUnits': 2,
-                  },
-                },
-              ],
+            return PurchasesPage.fromData({
+              'day': {
+                'id': '9',
+                'dayNumber': 9,
+                'version': -1,
+                'status': 'draft',
+                'correctionOpen': false,
+                'previousDebtUnits': 10,
+                'previousVodafoneUnits': 2,
+              },
+              'entries': <Object>[],
             });
           }),
         ],
@@ -299,7 +290,8 @@ void main() {
       await tester.tap(find.byKey(const Key('confirm-mutation')));
       await finishSend(tester);
 
-      final opened = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
+      final opened =
+          jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
       expect(opened['requestId'], isNotEmpty);
       expect(opened['expectedDayVersion'], 3);
       expect(opened['open'], isTrue);
@@ -318,7 +310,8 @@ void main() {
       expect(find.text(AppStrings.closeCorrectionConfirm), findsOneWidget);
       await tester.tap(find.byKey(const Key('confirm-mutation')));
       await finishSend(tester);
-      final closed = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
+      final closed =
+          jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
       expect(closed['requestId'], isNotEmpty);
       expect(closed['expectedDayVersion'], 3);
       expect(closed['open'], isFalse);
@@ -338,16 +331,16 @@ void main() {
         overrides: [
           purchasesProvider.overrideWith((ref) async {
             loads++;
-            return PurchasesBookPage.fromData({
-              'days': [
-                {
-                  'day': '12',
-                  'version': -1,
-                  'status': 'finalized',
-                  'entries': [],
-                  'totals': {'previousDebtUnits': 1},
-                },
-              ],
+            return PurchasesPage.fromData({
+              'day': {
+                'id': '12',
+                'dayNumber': 12,
+                'version': -1,
+                'status': 'finalized',
+                'correctionOpen': false,
+                'previousDebtUnits': 1,
+              },
+              'entries': <Object>[],
             });
           }),
         ],
@@ -447,9 +440,7 @@ void main() {
       size: const Size(800, 1800),
       overrides: [
         purchasesProvider.overrideWith((ref) async {
-          return _constBook(
-            days: const [_Day('1', 'finalized'), _Day('2', 'correction')],
-          );
+          return _openDay(id: '1', status: 'finalized');
         }),
       ],
     );
@@ -459,16 +450,14 @@ void main() {
     expect(themeOf(tester).brightness, Brightness.light);
     expectRtl(tester);
     expect(chipColor(tester, '1'), AppStatusColors.light.chipNormalBg);
-    expect(chipColor(tester, '2'), AppStatusColors.light.chipReviewBg);
     expect(find.byKey(const Key('open-correction-1')), findsOneWidget);
-    expect(find.byKey(const Key('close-correction-2')), findsOneWidget);
+    expect(find.byKey(const Key('close-correction-1')), findsNothing);
 
     await tester.tap(find.byTooltip(AppStrings.themeDark));
     await settle(tester);
     expect(themeOf(tester).brightness, Brightness.dark);
     expectRtl(tester);
     expect(chipColor(tester, '1'), AppStatusColors.dark.chipNormalBg);
-    expect(chipColor(tester, '2'), AppStatusColors.dark.chipReviewBg);
     expect(
       themeOf(tester).scaffoldBackgroundColor,
       buildAppTheme(Brightness.dark).scaffoldBackgroundColor,
@@ -528,9 +517,7 @@ void main() {
       size: const Size(360, 1100),
       overrides: [
         purchasesProvider.overrideWith((ref) async {
-          return _constBook(
-            days: const [_Day('1', 'draft'), _Day('2', 'draft')],
-          );
+          return _openDay(id: '1', status: 'draft');
         }),
       ],
     );
@@ -538,9 +525,9 @@ void main() {
     await go(tester, '/purchases');
 
     expect(find.byKey(const Key('add-purchase-1')), findsOneWidget);
-    expect(find.byKey(const Key('add-purchase-2')), findsOneWidget);
+    expect(find.byKey(const Key('add-purchase-2')), findsNothing);
     expect(find.byKey(const Key('finalize-day-1')), findsOneWidget);
-    expect(find.byKey(const Key('finalize-day-2')), findsOneWidget);
+    expect(find.byKey(const Key('finalize-day-2')), findsNothing);
     expect(find.byKey(const Key('add-purchase')), findsNothing);
     expect(find.byKey(const Key('finalize-day')), findsNothing);
     expect(tester.takeException(), isNull);
@@ -554,9 +541,7 @@ void main() {
       size: const Size(320, 900),
       overrides: [
         purchasesProvider.overrideWith((ref) async {
-          return _constBook(
-            days: const [_Day('1', 'finalized'), _Day('2', 'correction')],
-          );
+          return _openDay(id: '1', status: 'finalized');
         }),
       ],
     );
@@ -584,35 +569,32 @@ void main() {
   });
 }
 
-class _Day {
-  const _Day(this.id, this.status);
-  final String id;
-  final String status;
-}
-
-PurchasesBookPage _constBook({required List<_Day> days}) {
-  return PurchasesBookPage.fromData({
-    'days': [
-      for (final day in days)
-        {
-          'day': day.id,
-          'version': 3,
-          'status': day.status,
-          'entries': <Map<String, dynamic>>[],
-          'totals': {
-            'previousDebtUnits': 2000,
-            'previousVodafoneUnits': 80,
-            'todayResultUnits': 1053,
-            'todayPaidUnits': 500,
-            'totalDebtUnits': 2553,
-            'vodafoneRemainingUnits': 0,
-          },
-        },
-    ],
-    'lifetimeTotals': {
+PurchasesPage _openDay({
+  required String id,
+  required String status,
+  bool correctionOpen = false,
+}) {
+  return PurchasesPage.fromData({
+    'day': {
+      'id': id,
+      'dayNumber': int.parse(id),
+      'version': 3,
+      'status': status,
+      'correctionOpen': correctionOpen,
+      'previousDebtUnits': 2000,
+      'previousVodafoneUnits': 80,
+      'todayResultUnits': 1053,
+      'todayPaidUnits': 500,
+      'totalDebtUnits': 2553,
+      'vodafoneRemainingUnits': 0,
+    },
+    'entries': <Map<String, dynamic>>[],
+    'registerTotals': {
       'resultUnits': 50000,
       'paidUnits': 47447,
       'remainingUnits': 2553,
+      'vodafoneConsumedUnits': 0,
+      'vodafoneRemainingUnits': 0,
     },
   });
 }
@@ -780,9 +762,7 @@ Future<void> exercisePhone(
     size: size,
     overrides: [
       purchasesProvider.overrideWith((ref) async {
-        return _constBook(
-          days: const [_Day('1', 'finalized'), _Day('2', 'correction')],
-        );
+        return _openDay(id: '1', status: 'finalized');
       }),
     ],
   );
@@ -819,7 +799,6 @@ Future<void> exercisePhone(
   await show(tester, find.byKey(const Key('open-correction-1')));
   final colors = dark ? AppStatusColors.dark : AppStatusColors.light;
   expect(chipColor(tester, '1'), colors.chipNormalBg);
-  expect(chipColor(tester, '2'), colors.chipReviewBg);
   await tester.tap(find.byKey(const Key('open-correction-1')));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 300));

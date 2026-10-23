@@ -22,131 +22,136 @@ void main() {
     HistoryWindow.trimEnabled = HistoryWindow.trimEnabledFromEnvironment;
   });
 
-  testWidgets('section totals and the sample card match the formatted server fields', (
-    tester,
-  ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+  testWidgets(
+    'section totals and the sample card match the formatted server fields',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
 
-    await _expectSummary(
-      tester,
-      layer,
-      AccountSection.customers,
-      const Key('screen-customers'),
-      Currency.lyd,
-      money,
-    );
-    await _expectSummary(
-      tester,
-      layer,
-      AccountSection.companies,
-      const Key('screen-companies'),
-      Currency.lyd,
-      money,
-    );
-    await _expectSummary(
-      tester,
-      layer,
-      AccountSection.libyanDeposits,
-      const Key('screen-libyan-deposits'),
-      Currency.lyd,
-      money,
-    );
-    await _expectSummary(
-      tester,
-      layer,
-      AccountSection.egyptianDeposits,
-      const Key('screen-egyptian-deposits'),
-      Currency.egp,
-      money,
-    );
+      await _expectSummary(
+        tester,
+        layer,
+        AccountSection.customers,
+        const Key('screen-customers'),
+        Currency.lyd,
+        money,
+      );
+      await _expectSummary(
+        tester,
+        layer,
+        AccountSection.companies,
+        const Key('screen-companies'),
+        Currency.lyd,
+        money,
+      );
+      await _expectSummary(
+        tester,
+        layer,
+        AccountSection.libyanDeposits,
+        const Key('screen-libyan-deposits'),
+        Currency.lyd,
+        money,
+      );
+      await _expectSummary(
+        tester,
+        layer,
+        AccountSection.egyptianDeposits,
+        const Key('screen-egyptian-deposits'),
+        Currency.egp,
+        money,
+      );
 
-    await go(tester, '/customers/c_55');
-    final card = await _flushed(
-      tester,
-      () => layer.accounts.get(AccountSection.customers, 'c_55'),
-    );
-    expect(card.balanceUnits, isNotNull);
-    final balance = _fmt(money, card.balanceUnits, card.currency);
-    expect(balance, '320 د.ل');
-    expect(_inside(const Key('ledger-header-balance'), balance), findsOneWidget);
+      await go(tester, '/customers/c_55');
+      final card = await _flushed(
+        tester,
+        () => layer.accounts.get(AccountSection.customers, 'c_55'),
+      );
+      expect(card.balanceUnits, isNotNull);
+      final balance = _fmt(money, card.balanceUnits, card.currency);
+      expect(balance, '320 د.ل');
+      expect(
+        _inside(const Key('ledger-header-balance'), balance),
+        findsOneWidget,
+      );
 
-    await go(tester, '/purchases');
-    final book = await _flushed(
-      tester,
-      () => layer.purchases.list(PurchaseBook.alBayan),
-    );
-    final totals = book.lifetimeTotals!;
-    expect(
-      _inside(
-        const Key('purchases-lifetime'),
-        _fmt(money, totals.remainingUnits, Currency.lyd),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      _inside(
-        const Key('purchases-lifetime'),
-        _fmt(money, totals.resultUnits, Currency.lyd),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      _inside(
-        const Key('purchases-lifetime'),
-        _fmt(money, totals.paidUnits, Currency.lyd),
-      ),
-      findsOneWidget,
-    );
-    expect(_fmt(money, totals.remainingUnits, Currency.lyd), '2,553 د.ل');
-
-    await go(tester, '/treasury');
-    final treasury = await _flushed(tester, () => layer.treasury.summary());
-    expect(
-      _inside(
-        const Key('screen-treasury'),
-        _fmt(money, treasury.netUnits, Currency.lyd),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      _inside(
-        const Key('screen-treasury'),
-        _fmt(money, treasury.egyptianSourceUnits, Currency.egp),
-      ),
-      findsOneWidget,
-    );
-    expect(_fmt(money, treasury.netUnits, Currency.lyd), '51,000 د.ل');
-    expect(
-      _fmt(money, treasury.egyptianSourceUnits, Currency.egp),
-      '95,000 ج.م',
-    );
-
-    await go(tester, '/collections');
-    final collections = await _flushed(
-      tester,
-      () => layer.collections.overview(),
-    );
-    for (final units in [
-      collections.collectedUnits,
-      collections.dayTotalUnits,
-      collections.cashOutstandingUnits,
-    ]) {
+      await go(tester, '/purchases');
+      final book = await _flushed(
+        tester,
+        () => layer.purchases.list(PurchaseBook.alBayan),
+      );
+      final totals = book.registerTotals!;
       expect(
         _inside(
-          const Key('screen-collections'),
-          _fmt(money, units, Currency.lyd),
+          const Key('purchases-lifetime'),
+          _fmt(money, totals.remainingUnits, Currency.lyd),
         ),
-        findsWidgets,
+        findsOneWidget,
       );
-    }
-    expect(_fmt(money, collections.dayTotalUnits, Currency.lyd), '100 د.ل');
-    expect(
-      _fmt(money, collections.cashOutstandingUnits, Currency.lyd),
-      '250 د.ل',
-    );
-    expect(tester.takeException(), isNull);
-  }, tags: [tag]);
+      expect(
+        _inside(
+          const Key('purchases-lifetime'),
+          _fmt(money, totals.resultUnits, Currency.lyd),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        _inside(
+          const Key('purchases-lifetime'),
+          _fmt(money, totals.paidUnits, Currency.lyd),
+        ),
+        findsOneWidget,
+      );
+      expect(_fmt(money, totals.remainingUnits, Currency.lyd), '2,553 د.ل');
+
+      await go(tester, '/treasury');
+      final treasury = await _flushed(tester, () => layer.treasury.summary());
+      expect(
+        _inside(
+          const Key('screen-treasury'),
+          _fmt(money, treasury.netUnits, Currency.lyd),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        _inside(
+          const Key('screen-treasury'),
+          _fmt(money, treasury.egyptianSourceUnits, Currency.egp),
+        ),
+        findsOneWidget,
+      );
+      expect(_fmt(money, treasury.netUnits, Currency.lyd), '51,000 د.ل');
+      expect(
+        _fmt(money, treasury.egyptianSourceUnits, Currency.egp),
+        '95,000 ج.م',
+      );
+
+      await go(tester, '/collections');
+      final collections = await _flushed(
+        tester,
+        () => layer.collections.overview(),
+      );
+      for (final units in [
+        collections.collectedUnits,
+        collections.dayTotalUnits,
+        collections.cashOutstandingUnits,
+      ]) {
+        expect(
+          _inside(
+            const Key('screen-collections'),
+            _fmt(money, units, Currency.lyd),
+          ),
+          findsWidgets,
+        );
+      }
+      expect(_fmt(money, collections.dayTotalUnits, Currency.lyd), '100 د.ل');
+      expect(
+        _fmt(money, collections.cashOutstandingUnits, Currency.lyd),
+        '250 د.ل',
+      );
+      expect(tester.takeException(), isNull);
+    },
+    tags: [tag],
+  );
 
   testWidgets('partial and full payment headers match the refetched card', (
     tester,
@@ -193,11 +198,16 @@ void main() {
     expect(afterFull.balanceUnits, isNotNull);
     final fullText = _fmt(money, afterFull.balanceUnits, afterFull.currency);
     expect(fullText, '0 د.ل');
-    expect(_inside(const Key('ledger-header-balance'), fullText), findsOneWidget);
+    expect(
+      _inside(const Key('ledger-header-balance'), fullText),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   }, tags: [tag]);
 
-  testWidgets('a trimmed account window keeps the server total', (tester) async {
+  testWidgets('a trimmed account window keeps the server total', (
+    tester,
+  ) async {
     HistoryWindow.trimEnabled = true;
     final layer = await pumpFakeApp(
       tester,
@@ -237,7 +247,9 @@ void main() {
     expect(tester.takeException(), isNull);
   }, tags: [tag]);
 
-  testWidgets('a large integer card is grouped and not rounded', (tester) async {
+  testWidgets('a large integer card is grouped and not rounded', (
+    tester,
+  ) async {
     final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
     final fake = layer.client as FakeApiClient;
     fake.accountNextCursor = 'extra';
@@ -258,11 +270,17 @@ void main() {
     final total = _fmt(money, page.summary.totalDebtUnits, Currency.lyd);
     expect(_inside(const Key('screen-customers'), total), findsWidgets);
     expect(
-      _inside(const Key('screen-customers'), money.format(1250000000, Currency.lyd)),
+      _inside(
+        const Key('screen-customers'),
+        money.format(1250000000, Currency.lyd),
+      ),
       findsOneWidget,
     );
     expect(
-      _inside(const Key('screen-customers'), money.format(999999995, Currency.lyd)),
+      _inside(
+        const Key('screen-customers'),
+        money.format(999999995, Currency.lyd),
+      ),
       findsOneWidget,
     );
     expect(find.text('1,000,000,000 د.ل'), findsNothing);
@@ -270,48 +288,50 @@ void main() {
     expect(tester.takeException(), isNull);
   }, tags: [tag]);
 
-  testWidgets('a fractional money field is rejected and not rounded on screen', (
-    tester,
-  ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
-    final fake = layer.client as FakeApiClient;
-    fake.accountNextCursor = 'frac';
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers');
-    final shown = money.format(10635, Currency.lyd);
-    expect(_inside(const Key('screen-customers'), shown), findsWidgets);
-
-    for (final fraction in [10.005, 0.995, 1.995]) {
+  testWidgets(
+    'a fractional money field is rejected and not rounded on screen',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
+      final fake = layer.client as FakeApiClient;
       fake.accountNextCursor = 'frac';
-      fake.accountNextItems = [
-        {'id': 'frac', 'name': 'كسر', 'balanceUnits': fraction},
-      ];
-      final page = await _flushed(
-        tester,
-        () => layer.accounts.list(AccountSection.customers, cursor: 'frac'),
-      );
-      final bad = page.page.items.single;
-      expect(bad.balanceUnits!.isInvalid, isTrue);
-      expect(bad.balanceUnits!.asInt, isNull);
-      expect(bad.balanceUnits!.asInt, isNot(0));
-      expect(bad.balanceUnits!.asInt, isNot(2));
-      expect(bad.balanceUnits!.asInt, isNot(10));
-      expect(
-        layer.money.formatOrDash(bad.balanceUnits, Currency.lyd),
-        'مبلغ غير صالح',
-      );
-    }
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/customers');
+      final shown = money.format(10635, Currency.lyd);
+      expect(_inside(const Key('screen-customers'), shown), findsWidgets);
 
-    await tester.ensureVisible(find.byKey(const Key('load-more-accounts')));
-    await tester.tap(find.byKey(const Key('load-more-accounts')));
-    await settle(tester);
-    expect(find.text('مبلغ غير صالح'), findsWidgets);
-    expect(find.text('10 د.ل'), findsNothing);
-    expect(find.text('1 د.ل'), findsNothing);
-    expect(find.text('2 د.ل'), findsNothing);
-    expect(_inside(const Key('screen-customers'), shown), findsWidgets);
-    expect(tester.takeException(), isNull);
-  }, tags: [tag]);
+      for (final fraction in [10.005, 0.995, 1.995]) {
+        fake.accountNextCursor = 'frac';
+        fake.accountNextItems = [
+          {'id': 'frac', 'name': 'كسر', 'balanceUnits': fraction},
+        ];
+        final page = await _flushed(
+          tester,
+          () => layer.accounts.list(AccountSection.customers, cursor: 'frac'),
+        );
+        final bad = page.page.items.single;
+        expect(bad.balanceUnits!.isInvalid, isTrue);
+        expect(bad.balanceUnits!.asInt, isNull);
+        expect(bad.balanceUnits!.asInt, isNot(0));
+        expect(bad.balanceUnits!.asInt, isNot(2));
+        expect(bad.balanceUnits!.asInt, isNot(10));
+        expect(
+          layer.money.formatOrDash(bad.balanceUnits, Currency.lyd),
+          'مبلغ غير صالح',
+        );
+      }
+
+      await tester.ensureVisible(find.byKey(const Key('load-more-accounts')));
+      await tester.tap(find.byKey(const Key('load-more-accounts')));
+      await settle(tester);
+      expect(find.text('مبلغ غير صالح'), findsWidgets);
+      expect(find.text('10 د.ل'), findsNothing);
+      expect(find.text('1 د.ل'), findsNothing);
+      expect(find.text('2 د.ل'), findsNothing);
+      expect(_inside(const Key('screen-customers'), shown), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+    tags: [tag],
+  );
 
   test('DEF-028 the fake delta is not a website balance', () {
     markTestSkipped(
@@ -320,10 +340,10 @@ void main() {
     );
   }, tags: [tag]);
 
-  test('DEF-029 website display precision is unconfirmed', () {
+  test('DEF-029 whole currency units are confirmed; the QA record is not', () {
     markTestSkipped(
-      'DEF-029. moneyUnitScale 0 is unconfirmed and P0-04 is not run. '
-      'No website fraction is available to compare.',
+      'DEF-029. moneyUnitScale 0 is confirmed as whole currency units. '
+      'The official close and the P0-04 note belong to the docs PR.',
     );
   }, tags: [tag]);
 
@@ -362,17 +382,15 @@ void main() {
     expect(tester.takeException(), isNull);
   }, tags: [tag]);
 
-  test('DEF-033 Vodafone currency is an assumption', () {
-    markTestSkipped(
-      'DEF-033. The day line prints ج.م from vodafoneCurrencyAssumption. '
-      'The website currency is not confirmed.',
-    );
+  test('DEF-033 Vodafone currency is EGP', () {
+    expect(vodafoneCurrency, Currency.egp);
   }, tags: [tag]);
 
-  test('DEF-034 purchase lifetime key names are unconfirmed', () {
+  test('DEF-034 the cumulative remaining caption is still a UI follow-up', () {
     markTestSkipped(
-      'DEF-034. The screen reads resultUnits, paidUnits, and remainingUnits. '
-      'Other key names would stay off screen.',
+      'DEF-034. registerTotals is parsed, including the Vodafone fields. '
+      'The explanatory text that remaining is a carried balance, and a match '
+      'to screenshot 08, belong to the UI PR.',
     );
   }, tags: [tag]);
 
