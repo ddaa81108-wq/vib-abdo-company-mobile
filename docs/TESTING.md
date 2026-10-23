@@ -126,6 +126,12 @@ Accounts are created on the staging server, outside this repository.
 
 Until `run.sh` lands, the workflow skips. Regular CI still runs the tagged fake-API tests.
 
+## Staging smoke (P-01)
+
+Manual workflow: `.github/workflows/staging-smoke.yml`, name `Staging smoke`. It runs on `workflow_dispatch` only and is bound to the GitHub Environment `staging`. It is not one of the three required pull-request checks and does not call `tool/staging_negative_tests/run.sh`.
+
+`STAGING_API_BASE` is a secret on the `staging` environment. A variable of the same name is an unrecommended fallback. The intended value is `https://staging.vip2100.com` with no `/erp` suffix. Empty and `/erp` fail the job. The job only runs unauthenticated `GET /api/health` via curl with User-Agent `VibAbdoMobileSmoke/1.0 (+github-actions)`. It does not read staging usernames or passwords, and those names are not stored in GitHub for this workflow, neither as secrets nor as variables. The login smoke runs locally on the bot machine only. After a login failure, do not run that local check more than once within 15 minutes (the login limit is 8 attempts per account). Dispatch steps and the secret table are in [api/staging-smoke.ar.md](api/staging-smoke.ar.md).
+
 ## Release builds and the fake API
 
 `USE_FAKE_API` defaults to `true` so `flutter run`, `flutter test`, and the debug APK stay on the in-memory client. That default is wrong for a release binary.
