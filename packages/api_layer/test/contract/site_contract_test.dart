@@ -388,11 +388,12 @@ void main() {
     expect(login.raw['csrfToken'], '<session-csrf-token>');
     final me = MeResponse.fromData(_data(samples, 'GET /api/me'));
     expect(me.user.displayName, 'مدير الاختبار');
-    expect(me.user.sectionAccess, isEmpty);
+    // P-08: an omitted sectionAccess key is null, not an empty map.
+    expect(me.user.sectionAccess, isNull);
     final limited = MeResponse.fromData(_data(samples, 'limitedMe'));
     expect(limited.user.role, 'employee');
     expect(limited.user.permissions, contains('companies.read'));
-    expect(limited.user.sectionAccess, isEmpty);
+    expect(limited.user.sectionAccess, isNull);
   });
 
   test(
