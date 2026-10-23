@@ -115,3 +115,4 @@ These are assumed, not confirmed. The contract notes are outside this repository
 6. Login failure: which `401` code means bad credentials rather than a dead session?
 7. Validation: is it HTTP `422`, `400`, or both, and is `details` a `{ "fields": { "name": "..." } }` map, a flat map, or a list of `{ "field", "code", "message" }`?
 8. Still unconfirmed on a real response: `fullAccess`, management permission codes, `cashStatus`, `GET /api/home`, `MONEY_UNIT_SCALE`, and whether rates are JSON numbers or strings.
+9. P-15 / DEF-031: when a receipt or collection is approved and linked to an account whose currency differs from the receipt's, what does the server do? The Fake in PR #79 approves without posting a balance and omits `balanceUnits`. The error catalog has no code for this; `INVALID_LEDGER_CURRENCY` is only the financial-ledger query. Please confirm whether the server rejects (and with which code), converts, or posts nothing.
