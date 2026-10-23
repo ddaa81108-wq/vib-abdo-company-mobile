@@ -401,7 +401,7 @@ void main() {
   });
 
   test('CSRF, version conflict, permission, and auth samples map by code', () {
-    final mapper = const ErrorMapper();
+    const mapper = ErrorMapper();
     final csrf = mapper.fromResponse(403, _body(samples, 'csrfError'), null);
     expect(csrf, isA<CsrfInvalidException>());
     expect(csrf.code, 'CSRF_REJECTED');
@@ -437,7 +437,7 @@ void main() {
   test(
     'REQUEST_ID_REUSED and DUPLICATE_SAME_WORKDAY are not generic conflicts',
     () {
-      final mapper = const ErrorMapper();
+      const mapper = ErrorMapper();
       final reused =
           mapper.fromResponse(409, _body(samples, 'reusedId'), null);
       final duplicate =
@@ -485,7 +485,7 @@ void main() {
     () async {
       final api = await _session();
       final repo = RemotePurchasesRepository(api);
-      final request = PurchaseEntryRequest(
+      const request = PurchaseEntryRequest(
         itemCode: 'custom',
         itemLabel: 'عقد',
         egpValueUnits: 1000,
