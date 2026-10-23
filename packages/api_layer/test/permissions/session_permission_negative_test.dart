@@ -340,4 +340,8 @@ class _LogoutOnExpiry implements AuthStrategy {
 
   @override
   void releaseWrite(RequestOptions options) {}
+
+  @override
+  Future<Response<dynamic>?> adoptCsrfGet(RequestOptions options) async =>
+      null;
 }

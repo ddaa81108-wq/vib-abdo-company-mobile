@@ -24,14 +24,22 @@ abstract interface class AuthStrategy {
   Future<void> attach(RequestOptions options, {required bool authenticated});
 
   /// Serializes POST, PUT, PATCH, and DELETE when a strategy must not overlap
-  /// a CSRF refresh. GET and HEAD return immediately. A replay of the same
-  /// [options] must not take a second turn.
+  /// a CSRF refresh. GET and HEAD return immediately, except
+  /// [adoptCsrfGet]. A replay of the same [options] must not take a second turn.
   ///
   /// Only [CookieCsrfAuthStrategy] queues. Other strategies return immediately.
   Future<void> acquireWrite(RequestOptions options);
 
   /// Releases a turn taken by [acquireWrite]. Safe to call more than once.
   void releaseWrite(RequestOptions options);
+
+  /// GET /api/auth/csrf through the main client. Returns null for every
+  /// other request.
+  ///
+  /// The real strategy takes the write mutex and performs its single-flight
+  /// refresh, because this GET invalidates the previous token. The interceptor
+  /// resolves with the returned response and does not send a second GET.
+  Future<Response<dynamic>?> adoptCsrfGet(RequestOptions options) async => null;
 
   /// Inspect every response (success or error), e.g. persist Set-Cookie.
   Future<void> capture(Response<dynamic> response);

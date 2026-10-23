@@ -32,11 +32,16 @@ String? csrfTokenFromPayload(Object? body) {
 /// - The CSRF token is kept IN MEMORY only; after an app restart it is refetched
 ///   from GET /api/auth/csrf (same as the web client's `resume`).
 /// - GET /api/auth/csrf invalidates the previous token. Every POST/PUT/PATCH/DELETE
-///   therefore takes one mutex. The refresh stays single-flight, runs only when
-///   no other write holds the mutex, and a rejected write is replayed once.
-/// - GET and HEAD are not queued.
+///   takes one mutex, and so does that GET when it arrives through the main
+///   client. It is not a second request: [adoptCsrfGet] runs the single-flight
+///   refresh. The refresh waits until the mutex is free, then holds it.
+///   A rejected write is replayed once.
+/// - Other GET and HEAD requests are not queued.
 /// - No refresh flow: AUTH_REQUIRED -> forced logout.
 /// - A 419 that is not a CSRF error is session expiry (see [ErrorMapper]).
+///   `docs/api/error-catalog.json` has no 419. `CSRF_REJECTED` is HTTP 403.
+///   A 419 whose code or message contains CSRF still refreshes; any other 419
+///   still wipes the session.
 class CookieCsrfAuthStrategy implements AuthStrategy {
   CookieCsrfAuthStrategy(
       {required CookieStore cookieStore, required Dio bareDio})
@@ -50,6 +55,8 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
 
   String? _csrfToken;
   Completer<bool>? _csrfInFlight;
+  Response<dynamic>? _flightResponse;
+  Object? _flightError;
 
   /// 1 while a write or a CSRF refresh holds the mutex.
   ///
@@ -70,6 +77,48 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
 
   bool _isAuthPath(String path, String endpoint) =>
       path == endpoint || path.endsWith(endpoint);
+
+  bool _isCsrfGet(RequestOptions options) {
+    if (options.method.toUpperCase() != 'GET') return false;
+    final path = options.uri.path.isEmpty ? options.path : options.uri.path;
+    return _isAuthPath(path, ApiEndpoints.csrf) ||
+        _isAuthPath(options.path, ApiEndpoints.csrf);
+  }
+
+  @override
+  Future<Response<dynamic>?> adoptCsrfGet(RequestOptions options) async {
+    if (!_isCsrfGet(options)) return null;
+    // An in-flight refresh already holds the mutex. Joining it avoids a
+    // second rotation. Otherwise wait for writes, then hold the mutex.
+    if (_csrfInFlight != null) {
+      await _fetchCsrfSingleFlight();
+      return _responseOrThrow(options);
+    }
+    return _whenWritesIdle(() async {
+      await _fetchCsrfSingleFlight();
+      return _responseOrThrow(options);
+    });
+  }
+
+  Response<dynamic> _responseOrThrow(RequestOptions options) {
+    final response = _flightResponse;
+    if (response != null && _flightError == null) {
+      return Response<dynamic>(
+        requestOptions: options,
+        data: response.data,
+        statusCode: response.statusCode,
+        statusMessage: response.statusMessage,
+        headers: response.headers,
+      );
+    }
+    final error = _flightError;
+    if (error is DioException) throw error;
+    throw DioException(
+      requestOptions: options,
+      error: error,
+      type: DioExceptionType.unknown,
+    );
+  }
 
   @override
   Future<void> acquireWrite(RequestOptions options) async {
@@ -240,6 +289,8 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
   Future<bool> _fetchCsrfSingleFlight() {
     final existing = _csrfInFlight;
     if (existing != null) return existing.future;
+    _flightResponse = null;
+    _flightError = null;
     final completer = Completer<bool>();
     _csrfInFlight = completer;
     unawaited(_finishCsrfFetch(completer));
@@ -248,17 +299,20 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
 
   Future<void> _finishCsrfFetch(Completer<bool> completer) async {
     try {
-      final ok = await _fetchCsrf();
-      if (!completer.isCompleted) completer.complete(ok);
-    } catch (_) {
+      final response = await _fetchCsrf();
+      _flightResponse = response;
+      final token = csrfTokenFromPayload(response.data);
+      if (!completer.isCompleted) completer.complete(token != null);
+    } catch (error) {
       // No token, cookie, or response text in this path.
+      _flightError = error;
       if (!completer.isCompleted) completer.complete(false);
     } finally {
       if (identical(_csrfInFlight, completer)) _csrfInFlight = null;
     }
   }
 
-  Future<bool> _fetchCsrf() async {
+  Future<Response<dynamic>> _fetchCsrf() async {
     final cookie = await _cookies.cookieHeader();
     final res = await _bareDio.get<Object?>(
       ApiEndpoints.csrf,
@@ -272,7 +326,7 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
     await capture(res);
     final token = csrfTokenFromPayload(res.data);
     _csrfToken = token;
-    return token != null;
+    return res;
   }
 
   @override

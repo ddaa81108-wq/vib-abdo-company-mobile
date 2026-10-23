@@ -8,8 +8,10 @@ import 'api_exception.dart';
 import 'error_mapper.dart';
 
 /// Delegates credentials to the active [AuthStrategy].
-/// - onRequest: strategy.acquireWrite (POST/PUT/PATCH/DELETE only), then attach
-///   (cookies + X-CSRF-Token, or Bearer). GET and HEAD are not queued.
+/// - onRequest: GET /api/auth/csrf is [AuthStrategy.adoptCsrfGet] (write mutex
+///   and the single-flight refresh). Other requests call acquireWrite
+///   (POST/PUT/PATCH/DELETE only), then attach (cookies + X-CSRF-Token, or
+///   Bearer). Other GETs and HEADs are not queued.
 /// - onResponse/onError: strategy.capture (Set-Cookie) and releaseWrite.
 /// - onError: maps the error; CSRF invalid -> strategy refetches token -> replay ONCE
 ///   while the write turn is still held; AUTH_REQUIRED -> forced logout
@@ -42,9 +44,17 @@ class AuthInterceptor extends Interceptor {
   Future<void> onRequest(
       RequestOptions options, RequestInterceptorHandler handler) async {
     try {
+      final adopted = await _strategy.adoptCsrfGet(options);
+      if (adopted != null) {
+        handler.resolve(adopted);
+        return;
+      }
       await _strategy.acquireWrite(options);
       await _strategy.attach(options, authenticated: _authenticated(options));
       handler.next(options);
+    } on DioException catch (error) {
+      _strategy.releaseWrite(options);
+      handler.reject(error);
     } catch (error, stack) {
       _strategy.releaseWrite(options);
       handler.reject(

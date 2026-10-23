@@ -166,6 +166,9 @@ class _FakeCookieStrategy implements AuthStrategy {
 
   @override
   void releaseWrite(RequestOptions options) {}
+
+  @override
+  Future<Response<dynamic>?> adoptCsrfGet(RequestOptions options) async => null;
 }
 
 /// Speaks HTTP to [FakeApiClient] on this isolate. No socket.

@@ -23,11 +23,16 @@ import 'fake_large_catalog.dart';
 /// server today (empty permission list), `limited.admin…`, `flag.admin…`, `guest…`,
 /// `mustchange…`, else employee.
 /// Password "wrong" -> 401 invalid credentials. A successful login sets an
-/// `abdo_session` cookie and returns `csrfToken`. GET /api/auth/csrf rotates
-/// that token and rejects the previous one. An authenticated write that
-/// arrives through [serveHttp] without `X-Client-Api-Version` returns 409
-/// `CLIENT_VERSION_MISMATCH`. Direct in-process calls skip those header
-/// checks so repository tests can call this client without a Dio stack.
+/// `abdo_session` cookie and returns `csrfToken`.
+///
+/// Header checks live only on [serveHttp], the HTTP boundary the Dio adapter
+/// uses. An authenticated write that arrives there without
+/// `X-Client-Api-Version: 1` returns 409 `CLIENT_VERSION_MISMATCH`. An
+/// authenticated write whose `X-CSRF-Token` is missing or stale returns 403
+/// `CSRF_REJECTED`. `GET /api/auth/csrf` rotates the token and rejects the
+/// previous one. Direct in-process calls (`get`, `post`, and the other
+/// [ApiClient] methods when no gateway is bound) skip those header checks so
+/// repository tests can call this client without a Dio stack.
 /// There is no bearer token and no refresh token. Session
 /// lifetime is not known (🔶): this client does not run a local timer. Call
 /// [expireSession] to make the current cookie fail the next request.

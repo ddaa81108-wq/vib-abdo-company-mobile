@@ -112,6 +112,59 @@ void main() {
     }
   });
 
+  test('a main-client CSRF GET takes the write mutex and shares one refresh',
+      () async {
+    final harness = await _Harness.open();
+    addTearDown(harness.dispose);
+    await harness.login();
+    final gate = Completer<void>();
+    harness.adapter.blockFirstWrite = gate;
+    final write = harness.layer.client.post(
+      '/api/work',
+      body: const {'requestId': 'hold-for-csrf'},
+    );
+    try {
+      await _until(() => harness.adapter.writes.length == 1);
+      final rotation = harness.layer.client.get(ApiEndpoints.csrf);
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(harness.adapter.csrfFetches, 0);
+      expect(harness.adapter.writes, hasLength(1));
+
+      if (!gate.isCompleted) gate.complete();
+      final rotated = await rotation.timeout(const Duration(seconds: 2));
+      await write;
+      expect(harness.adapter.csrfFetches, 1);
+      expect(rotated.dataMap['csrfToken'], 't-1');
+      expect(harness.adapter.writes.single.csrf, 't-login');
+
+      await harness.layer.client.post(
+        '/api/work',
+        body: const {'requestId': 'after-queued-csrf'},
+      );
+      expect(harness.adapter.csrfFetches, 1);
+      expect(harness.adapter.writes.last.csrf, 't-1');
+    } finally {
+      if (!gate.isCompleted) gate.complete();
+    }
+
+    final pause = Completer<void>();
+    harness.adapter.blockNextCsrf = pause;
+    final first = harness.layer.client.get(ApiEndpoints.csrf);
+    try {
+      await _until(() => harness.adapter.csrfFetches == 2);
+      final second = harness.layer.client.get(ApiEndpoints.csrf);
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(harness.adapter.csrfFetches, 2);
+      if (!pause.isCompleted) pause.complete();
+      final both = await Future.wait([first, second]);
+      expect(harness.adapter.csrfFetches, 2);
+      expect(both[0].dataMap['csrfToken'], 't-2');
+      expect(both[1].dataMap['csrfToken'], 't-2');
+    } finally {
+      if (!pause.isCompleted) pause.complete();
+    }
+  });
+
   test('a write after CSRF rotation sends the new token once', () async {
     final harness = await _Harness.open();
     addTearDown(harness.dispose);
@@ -451,6 +504,7 @@ class _Adapter implements HttpClientAdapter {
   ({int status, String code})? failNext;
   Completer<void>? blockFirstWrite;
   bool _blocked = false;
+  Completer<void>? blockNextCsrf;
 
   @override
   void close({bool force = false}) {}
@@ -485,6 +539,9 @@ class _Adapter implements HttpClientAdapter {
     }
     if (path == ApiEndpoints.csrf) {
       csrfFetches++;
+      final pause = blockNextCsrf;
+      blockNextCsrf = null;
+      if (pause != null) await pause.future;
       accepted = 't-$csrfFetches';
       return _ok({'csrfToken': accepted});
     }
