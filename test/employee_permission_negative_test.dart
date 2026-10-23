@@ -33,6 +33,16 @@ void main() {
     expect(failure.message, 'لا تملك صلاحية لهذا الإجراء');
     expect(retryUnlessForbidden(0, error), isNull);
     expect(retryUnlessForbidden(0, Exception('other')), isNotNull);
+
+    const denied = ForbiddenException(
+      code: 'PERMISSION_DENIED',
+      message: 'سر الخادم',
+      statusCode: 403,
+    );
+    final permission = const ErrorHandler().toFailure(denied);
+    expect(permission.code, 'PERMISSION_DENIED');
+    expect(permission.isForbidden, isTrue);
+    expect(retryUnlessForbidden(0, denied), isNull);
   });
 
   test('forbidden and admin paths redirect to /forbidden without a loop', () {
