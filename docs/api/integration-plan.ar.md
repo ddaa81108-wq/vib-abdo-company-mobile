@@ -8,7 +8,7 @@
 - **إصلاحات التطبيق تطابق المسارات الموجودة في `openapi.json`.** طلب تغيير الخادم لـ DEF-037 مكتوب في `server-requests.ar.md` ولا يُنفَّذ داخل PRs التطبيق. **الاعتماد المالي النهائي موقوف** حتى يُشحن ذلك الإصلاح ويجتاز اختبار انقطاع الاتصال وإعادة المحاولة.
 - **PR صغير لكل بند**، يُفتح من `main` الحالي ويمر بالوظائف الثلاث في `ci.yml`. لا دمج قبل مراجعة الـ senior وQA للبند.
 - **الـ Fake وfixtures تتبع العقد.** كل PR يغيّر شكل رد يحدّث `FakeApiClient` واختبار عقد من `docs/api/evidence/api-samples.json`.
-- **لا بيانات دخول في المستودع.** staging يُشغَّل فقط من GitHub Environment `staging` بأسرار مُقنَّعة.
+- **لا بيانات دخول في المستودع ولا في GitHub.** فحص الصلاحيات والدخول ضد staging يعمل على جهاز البوت فقط. وظيفة الدخان تقرأ `STAGING_API_BASE` وحده.
 
 ## المالكون
 
@@ -53,13 +53,13 @@ P-08 وP-09 وP-12 مستقلة، ويمكن أن تسير بالتوازي مع
 ### P-01: أسرار staging وتشغيل smoke (OPS)
 
 - **النطاق:**
-  - إنشاء أسرار Environment `staging` (`STAGING_API_BASE` و`STAGING_ADMIN_USERNAME` و`STAGING_ADMIN_PASSWORD`، وأسرار الأدوار المحدودة الموجودة في `.github/workflows/staging-negative-permissions.yml:51-59`) من القناة الآمنة. لا تُلصق في issue أو PR.
+  - سر Environment `staging` الوحيد هو `STAGING_API_BASE`. لا يُنشأ سر ولا متغير لاسم مستخدم أو كلمة مرور (مدير، موظف، موظف ثانٍ، مدير محدود). لا تُلصق في issue أو PR. الحسابات تبقى على جهاز البوت.
   - **`STAGING_API_BASE` هو الأصل `https://staging.vip2100.com` بلا `/erp`** (`staging-readonly-check.ar.md` §4).
-  - إضافة workflow `workflow_dispatch` بـ `environment: staging` يشغّل `flutter test packages/api_layer/test/phase7/staging_smoke_test.dart` بالأسرار من `env:`، بنمط الإقناع (`::add-mask::`) ورفض الأصل الإنتاجي نفسه في `staging-negative-permissions.yml`. لا يُشغَّل على `pull_request`.
+  - وظيفة `workflow_dispatch` باسم Staging smoke، مربوطة بـ `environment: staging`، تفحص `GET /api/health` بلا دخول. لا تُشغَّل على `pull_request`. فحص الدخول وفحص الصلاحيات السالبة ضد staging محليان على جهاز البوت.
   - أي سكربت CI يستدعي staging يستخدم UA غير `Python-urllib`، لأن Cloudflare يحجبه بـ 403.
 - **القبول:**
-  - تشغيل يدوي يمر بـ P7-01 للقراءة (login و`/api/me` والقائمة).
-  - السجل لا يحتوي أي قيمة سر.
+  - وظيفة GitHub اليدوية تمر بـ `GET /api/health` بلا دخول. فحص P7-01 (login و`/api/me` والقائمة) يبقى على جهاز البوت.
+  - السجل لا يحتوي أي قيمة سر. لا اسم مستخدم ولا كلمة مرور في أسرار GitHub أو متغيراتها.
   - يبقى المسار الاختياري `STAGING_SMOKE_ACCOUNT_ID` (كتابة pin) **غير مضبوط** حتى يُدمج P-07، لأن جسمه الحالي `pinned` بلا `expectedVersion` (G-05).
 
 ### P-02: fixtures العقد (QA + API)

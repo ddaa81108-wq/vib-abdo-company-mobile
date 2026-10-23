@@ -112,8 +112,13 @@ class FakeApiClient implements ApiClient {
   /// Notification writes that changed state. A requestId replay is not counted.
   int notificationMutationApplies = 0;
 
-  /// The next N versioned collection mutations fail with VERSION_CONFLICT (tests).
-  int versionConflictRemaining = 0;
+  /// `POST .../decision` when the row is no longer pending.
+  static const submissionAlreadyDecidedMessage =
+      'تمت مراجعة هذا الاستلام من قبل.';
+
+  /// `POST .../cash-received` when the row is not approved.
+  static const submissionNotApprovedMessage =
+      'استلام النقدية متاح للاستلام المعتمد فقط.';
 
   /// When set, a purchase day without a stored finalize or correction uses this
   /// status on the next GET (tests). `correction` is the contract flag
@@ -313,7 +318,8 @@ class FakeApiClient implements ApiClient {
     String path, {
     Map<String, dynamic>? query,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _send('GET', path, null, options, query: query);
+  }) =>
+      _send('GET', path, null, options, query: query);
 
   @override
   Future<ApiResponse> post(
@@ -321,28 +327,32 @@ class FakeApiClient implements ApiClient {
     Object? body,
     Map<String, dynamic>? query,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _send('POST', path, body, options, query: query);
+  }) =>
+      _send('POST', path, body, options, query: query);
 
   @override
   Future<ApiResponse> put(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _send('PUT', path, body, options);
+  }) =>
+      _send('PUT', path, body, options);
 
   @override
   Future<ApiResponse> patch(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _send('PATCH', path, body, options);
+  }) =>
+      _send('PATCH', path, body, options);
 
   @override
   Future<ApiResponse> delete(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _send('DELETE', path, body, options);
+  }) =>
+      _send('DELETE', path, body, options);
 
   /// One HTTP exchange for the interceptor's adapter. Does not call [bindGateway].
   Future<FakeHttpResult> serveHttp({
@@ -758,9 +768,8 @@ class FakeApiClient implements ApiClient {
       sectionAccess: section is Map
           ? section.map((key, value) => MapEntry('$key', '$value'))
           : const {},
-      fullAccess: user['fullAccess'] is bool
-          ? user['fullAccess'] as bool
-          : null,
+      fullAccess:
+          user['fullAccess'] is bool ? user['fullAccess'] as bool : null,
     );
   }
 
@@ -896,9 +905,8 @@ class FakeApiClient implements ApiClient {
     if (body is String) {
       lastWireBody = body;
     } else {
-      lastWireBody = body == null
-          ? null
-          : WireJson.encode(body, rateWireFormat);
+      lastWireBody =
+          body == null ? null : WireJson.encode(body, rateWireFormat);
     }
     final decoded = lastWireBody == null ? null : jsonDecode(lastWireBody!);
     final b = decoded is Map ? decoded : const {};
@@ -972,6 +980,19 @@ class FakeApiClient implements ApiClient {
     if (method != 'GET' &&
         head != 'notifications' &&
         head != 'notification-preferences') {
+      // Decision and cash-received have no requestId. A shared null replay
+      // key would collapse distinct calls onto one stored success.
+      if (_collectionStatusPath(seg)) {
+        return _mutateWithoutRequestId(
+          method,
+          path,
+          seg,
+          head,
+          query,
+          () => _route(method, b, seg, head, query),
+          () => _ensureSession(options),
+        );
+      }
       return _mutate(
         b,
         method,
@@ -1108,6 +1129,42 @@ class FakeApiClient implements ApiClient {
     }
   }
 
+  /// Collection decision and cash-received. The contract has no `requestId`
+  /// and no `expectedVersion`. Session, permission, and the test failure gate
+  /// still run. A second call is not a stored replay; the row status decides.
+  Future<ApiResponse> _mutateWithoutRequestId(
+    String method,
+    String path,
+    List<String> seg,
+    String head,
+    Map<String, dynamic>? query,
+    Future<ApiResponse> Function() send,
+    void Function() ensureSession,
+  ) async {
+    ensureSession();
+    _authorize(method, seg, head, query);
+    mutationPaths.add(path);
+    if (lastWireBody != null) mutationBodies.add(lastWireBody!);
+    final paused = pauseMutations;
+    if (paused != null) await paused.future;
+    ensureSession();
+    _authorize(method, seg, head, query);
+    if (failMutationsRemaining > 0) {
+      failMutationsRemaining--;
+      _fail(400, 'MUTATION_FAILED', 'تعذر تنفيذ الطلب.');
+    }
+    return send();
+  }
+
+  /// `POST /api/collections/{submissions|unlinked-receipts}/{id}/{decision|cash-received}`.
+  bool _collectionStatusPath(List<String> seg) {
+    if (seg.length != 4 || seg.first != 'collections') return false;
+    final kind = seg[1];
+    final action = seg[3];
+    if (kind != 'submissions' && kind != 'unlinked-receipts') return false;
+    return action == 'decision' || action == 'cash-received';
+  }
+
   Future<ApiResponse> _route(
     String method,
     Map b,
@@ -1158,8 +1215,7 @@ class FakeApiClient implements ApiClient {
         if (_isPurchaseEntryWrite(method, seg)) {
           _rejectIfPurchaseDayFinalized(seg);
         }
-        final entryWrite =
-            (method == 'POST' && seg.length == 2) ||
+        final entryWrite = (method == 'POST' && seg.length == 2) ||
             ((method == 'POST' || method == 'PATCH') &&
                 seg.length > 3 &&
                 seg[2] == 'entries');
@@ -1387,23 +1443,13 @@ class FakeApiClient implements ApiClient {
       return _ok({'items': []});
     }
     _requireCollectionMutation(seg);
-    final needsVersion =
-        seg.isNotEmpty &&
-        (seg.last == 'decision' || seg.last == 'cash-received');
-    if (needsVersion && b['expectedVersion'] == null) {
-      _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
-    }
-    if (needsVersion && versionConflictRemaining > 0) {
-      versionConflictRemaining--;
-      _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
-    }
     if (seg.length == 4 && seg[1] == 'submissions' && seg[3] == 'decision') {
       return _applyDecision(seg[2], b);
     }
     if (seg.length == 4 &&
         seg[1] == 'submissions' &&
         seg[3] == 'cash-received') {
-      return _applyCash(seg[2], b, unlinked: false);
+      return _applyCash(seg[2], unlinked: false);
     }
     if (seg.length == 4 &&
         seg[1] == 'unlinked-receipts' &&
@@ -1413,7 +1459,7 @@ class FakeApiClient implements ApiClient {
     if (seg.length == 4 &&
         seg[1] == 'unlinked-receipts' &&
         seg[3] == 'cash-received') {
-      return _applyCash(seg[2], b, unlinked: true);
+      return _applyCash(seg[2], unlinked: true);
     }
     // CollectionsRepository.closeDay posts /api/collections/days/close.
     if (seg.length == 3 && seg[1] == 'days' && seg[2] == 'close') {
@@ -1648,12 +1694,14 @@ class FakeApiClient implements ApiClient {
       final item = Map<String, dynamic>.from(raw as Map);
       final state = _submissionState['${item['id']}'];
       if (state != null) item.addAll(state);
+      item.remove('version');
       items.add(item);
     }
     for (final extra in _extraSubmissions) {
       final item = Map<String, dynamic>.from(extra);
       final state = _submissionState['${item['id']}'];
       if (state != null) item.addAll(state);
+      item.remove('version');
       items.add(item);
     }
     body['submissions'] = items;
@@ -1662,12 +1710,14 @@ class FakeApiClient implements ApiClient {
       final item = Map<String, dynamic>.from(raw as Map);
       final state = _unlinkedState['${item['id']}'];
       if (state != null) item.addAll(state);
+      item.remove('version');
       receipts.add(item);
     }
     for (final extra in _extraUnlinked) {
       final item = Map<String, dynamic>.from(extra);
       final state = _unlinkedState['${item['id']}'];
       if (state != null) item.addAll(state);
+      item.remove('version');
       receipts.add(item);
     }
     body['unlinkedReceipts'] = receipts;
@@ -1702,7 +1752,6 @@ class FakeApiClient implements ApiClient {
       'mode': mode,
       if (amount != null) 'amountUnits': amount,
       'status': 'pending',
-      'version': 1,
       if (_userId != null) 'submittedByUserId': _userId,
       if (name != null) 'submittedByName': name,
     });
@@ -1723,7 +1772,6 @@ class FakeApiClient implements ApiClient {
       'customerName': name,
       'amountUnits': amount,
       'status': 'pending',
-      'version': 1,
       if (_userId != null) 'submittedByUserId': _userId,
     });
     return _ok({'id': id, 'version': 1});
@@ -1764,24 +1812,21 @@ class FakeApiClient implements ApiClient {
       if (item['id'] == id) submission = item;
     }
     if (submission == null) _fail(404, 'NOT_FOUND', 'الاستلام غير موجود');
-    _requireVersion(b['expectedVersion'], submission['version']);
-    final decision = b['decision'];
-    final status = switch (decision) {
-      'approve' => 'approved',
-      'reject' => 'rejected',
-      _ => null,
-    };
-    if (status == null) _fail(400, 'VALIDATION_ERROR', 'قرار غير معروف');
-    final version = (submission['version'] as int) + 1;
-    _submissionState[id] = {
-      ...?_submissionState[id],
-      'status': status,
-      'version': version,
-    };
-    return _ok({'id': 'ok', 'version': version});
+    if (submission['status'] != 'pending') {
+      _fail(
+        409,
+        'SUBMISSION_ALREADY_DECIDED',
+        submissionAlreadyDecidedMessage,
+      );
+    }
+    final status = _decisionStatus(b['decision']);
+    final next = {...?_submissionState[id], 'status': status};
+    next.remove('version');
+    _submissionState[id] = next;
+    return _decisionAck(id, status, submission);
   }
 
-  ApiResponse _applyCash(String id, Map b, {required bool unlinked}) {
+  ApiResponse _applyCash(String id, {required bool unlinked}) {
     final view = _collectionsView();
     final items =
         (unlinked ? view['unlinkedReceipts'] : view['submissions']) as List;
@@ -1790,16 +1835,34 @@ class FakeApiClient implements ApiClient {
       id,
       unlinked ? 'الإيصال غير موجود' : 'الاستلام غير موجود',
     );
-    _requireVersion(b['expectedVersion'], current['version']);
-    final version = (current['version'] as int) + 1;
+    if (current['status'] != 'approved') {
+      _fail(409, 'SUBMISSION_NOT_APPROVED', submissionNotApprovedMessage);
+    }
     final store = unlinked ? _unlinkedState : _submissionState;
-    store[id] = {
+    final receivedAt = current['cashReceivedAt'];
+    if (current['cashStatus'] == 'received' ||
+        (receivedAt is String && receivedAt.isNotEmpty)) {
+      return _ok({
+        'id': id,
+        'cashReceivedAt': receivedAt,
+        'eventSequences': <int>[4],
+        'replayed': true,
+      });
+    }
+    const at = '2026-10-22T22:00:00.000Z';
+    final next = {
       ...?store[id],
       'cashStatus': 'received',
       'cashPending': false,
-      'version': version,
+      'cashReceivedAt': at,
     };
-    return _ok({'id': 'ok', 'version': version});
+    next.remove('version');
+    store[id] = next;
+    return _ok({
+      'id': id,
+      'cashReceivedAt': at,
+      'eventSequences': <int>[4],
+    });
   }
 
   ApiResponse _applyUnlinkedDecision(String id, Map b) {
@@ -1808,23 +1871,53 @@ class FakeApiClient implements ApiClient {
       id,
       'الإيصال غير موجود',
     );
-    _requireVersion(b['expectedVersion'], current['version']);
-    final decision = b['decision'];
+    if (current['status'] != 'pending') {
+      _fail(
+        409,
+        'SUBMISSION_ALREADY_DECIDED',
+        submissionAlreadyDecidedMessage,
+      );
+    }
+    final status = _decisionStatus(b['decision']);
+    final customerId = b['customerId'];
+    final next = {
+      ...?_unlinkedState[id],
+      'status': status,
+      if (customerId != null) 'customerId': customerId,
+    };
+    next.remove('version');
+    _unlinkedState[id] = next;
+    return _decisionAck(id, status, current);
+  }
+
+  String _decisionStatus(Object? decision) {
     final status = switch (decision) {
       'approve' => 'approved',
       'reject' => 'rejected',
       _ => null,
     };
     if (status == null) _fail(400, 'VALIDATION_ERROR', 'قرار غير معروف');
-    final version = (current['version'] as int) + 1;
-    final customerId = b['customerId'];
-    _unlinkedState[id] = {
-      ...?_unlinkedState[id],
+    return status;
+  }
+
+  /// Approve includes the illustrative ledger ack. Reject is id, status, and
+  /// events only. Nothing here posts a customer balance or a cash movement.
+  ApiResponse _decisionAck(String id, String status, Map current) {
+    if (status != 'approved') {
+      return _ok({
+        'id': id,
+        'status': status,
+        'eventSequences': <int>[3],
+      });
+    }
+    final amount = current['amountUnits'];
+    return _ok({
+      'id': id,
       'status': status,
-      'version': version,
-      if (customerId != null) 'customerId': customerId,
-    };
-    return _ok({'id': 'ok', 'version': version});
+      'transactionId': 'collection-$id',
+      if (amount is int) 'balanceUnits': amount,
+      'eventSequences': <int>[3],
+    });
   }
 
   /// Open day after stored finalize, correction, fixture status, and opening.
@@ -1971,11 +2064,8 @@ class FakeApiClient implements ApiClient {
   /// Idempotent replay enters here with the path only. [_mutate] is used for
   /// non-GET calls, so an entry-shaped path is a create, update, or delete.
   void _rejectFinalizedPurchaseEntry(String path) {
-    final seg = path
-        .split('/')
-        .where((part) => part.isNotEmpty)
-        .skip(1)
-        .toList();
+    final seg =
+        path.split('/').where((part) => part.isNotEmpty).skip(1).toList();
     if (seg.length < 2 || seg.first != 'purchases') return;
     final entryPath =
         seg.length == 2 || (seg.length >= 4 && seg[2] == 'entries');
