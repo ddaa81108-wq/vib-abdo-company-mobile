@@ -136,31 +136,38 @@ class _RegisterTotals extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Widget key kept from the old lifetime totals. The contract field is
+    // registerTotals; lifetimeTotals is not on this response.
     return Column(
       key: const Key('purchases-lifetime'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _AmountLine(
-          AppStrings.resultFromServer,
+          AppStrings.registerResult,
           totals?.resultUnits,
           Currency.lyd,
           money,
         ),
-        _AmountLine(AppStrings.paid, totals?.paidUnits, Currency.lyd, money),
         _AmountLine(
-          AppStrings.remaining,
+          AppStrings.todayPaid,
+          totals?.paidUnits,
+          Currency.lyd,
+          money,
+        ),
+        _AmountLine(
+          AppStrings.registerRemaining,
           totals?.remainingUnits,
           Currency.lyd,
           money,
         ),
         _AmountLine(
-          AppStrings.vodafoneConsumed,
+          AppStrings.registerVodafoneConsumed,
           totals?.vodafoneConsumedUnits,
           vodafoneCurrency,
           money,
         ),
         _AmountLine(
-          AppStrings.vodafoneRemaining,
+          AppStrings.registerVodafoneRemaining,
           totals?.vodafoneRemainingUnits,
           vodafoneCurrency,
           money,
@@ -188,6 +195,26 @@ class _AmountLine extends StatelessWidget {
         runSpacing: AppSpacing.xxs,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [Text(label), MoneyText(money.formatOrDash(units, currency))],
+      ),
+    );
+  }
+}
+
+class _TextLine extends StatelessWidget {
+  const _TextLine(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.xs),
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.xxs,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [Text(label), Text(value)],
       ),
     );
   }
@@ -242,7 +269,7 @@ class _DayCard extends ConsumerWidget {
     final band = tone == null ? null : context.statusColors.dayTones[tone];
     final correctionOpen = day.correctionOpen;
     final editable = day.status == 'draft' || correctionOpen;
-    final caption = vodafoneCaption(day.vodafoneRemainingUnits);
+    final vodafone = day.vodafoneRemainingUnits;
     return Card(
       key: Key('purchase-day-$label'),
       color: band,
@@ -264,16 +291,27 @@ class _DayCard extends ConsumerWidget {
                 _CorrectionStatus(day: label, open: correctionOpen),
               ],
             ),
-            _line(AppStrings.previousDebt, day.previousDebtUnits, Currency.lyd),
+            _line(
+              AppStrings.previousValue,
+              day.previousDebtUnits,
+              Currency.lyd,
+            ),
             _line(AppStrings.todayResult, day.todayResultUnits, Currency.lyd),
             _line(AppStrings.todayPaid, day.todayPaidUnits, Currency.lyd),
-            _line(AppStrings.totalDebt, day.totalDebtUnits, Currency.lyd),
             _line(
-              AppStrings.vodafoneRemaining,
-              day.vodafoneRemainingUnits,
+              AppStrings.purchaseTotalDebt,
+              day.totalDebtUnits,
+              Currency.lyd,
+            ),
+            // Day card only. `function me` prints
+            // `v.format(Math.abs(e.vodafoneRemainingUnits))`
+            // (docs/api/evidence/purchases-section-js-excerpt.md).
+            // The register row (`function xe`) keeps the raw server value.
+            _line(
+              vodafoneRemainingLabel(vodafone),
+              _dayCardVodafoneFigure(vodafone),
               vodafoneCurrency,
             ),
-            if (caption != null) Text(caption),
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -282,7 +320,7 @@ class _DayCard extends ConsumerWidget {
                     buttonKey: ValueKey('add-purchase-$label'),
                     allowed: true,
                     online: online,
-                    label: AppStrings.add,
+                    label: AppStrings.addPurchaseEntry,
                     onPressed: () => showAppForm<void>(
                       context,
                       // expectedDayVersion is the open day's version. The row
@@ -299,7 +337,10 @@ class _DayCard extends ConsumerWidget {
                     confirmText: AppStrings.finalizeConfirm,
                     onSubmit: (meta) => _finalize(context, ref, meta),
                   ),
-                if (canFinalize && day.status == 'finalized' && !correctionOpen)
+                if (canFinalize &&
+                    day.status == 'finalized' &&
+                    !correctionOpen &&
+                    day.version != null)
                   GuardedMutation(
                     buttonKey: Key('open-correction-$label'),
                     inputs: 'open-correction:$label:${day.version}',
@@ -310,7 +351,7 @@ class _DayCard extends ConsumerWidget {
                     onSubmit: (meta) =>
                         _correct(context, ref, meta, open: true),
                   ),
-                if (canFinalize && correctionOpen)
+                if (canFinalize && correctionOpen && day.version != null)
                   GuardedMutation(
                     buttonKey: Key('close-correction-$label'),
                     inputs: 'close-correction:$label:${day.version}',
@@ -572,6 +613,17 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
   }
 }
 
+/// Day-card Vodafone figure. `function me` prints
+/// `v.format(Math.abs(e.vodafoneRemainingUnits))`
+/// (docs/api/evidence/purchases-section-js-excerpt.md).
+/// Invalid and missing figures stay as they are. The register row does not
+/// use this.
+MoneyValue? _dayCardVodafoneFigure(MoneyValue? units) {
+  final value = units?.asInt;
+  if (value == null || value >= 0) return units;
+  return MoneyValue.known(value.abs());
+}
+
 /// Opening is a write on an open day that has a version. A missing day, a
 /// day with no version, or a finalized day whose correction is closed, does
 /// not offer the button.
@@ -610,13 +662,13 @@ class _OpeningCard extends StatelessWidget {
               style: Theme.of(context).textTheme.titleSmall,
             ),
             _MoneyLine(
-              AppStrings.previousDebt,
+              AppStrings.previousValue,
               day?.previousDebtUnits,
               Currency.lyd,
               money,
             ),
             _MoneyLine(
-              AppStrings.previousVodafone,
+              AppStrings.carriedVodafone,
               day?.previousVodafoneUnits,
               vodafoneCurrency,
               money,
@@ -626,7 +678,7 @@ class _OpeningCard extends StatelessWidget {
                 buttonKey: const Key('set-opening'),
                 allowed: true,
                 online: online,
-                label: AppStrings.purchaseOpening,
+                label: AppStrings.saveOpening,
                 onPressed: () => showAppForm<void>(
                   context,
                   _OpeningForm(book: book, day: day),
@@ -717,13 +769,13 @@ class _OpeningFormState extends ConsumerState<_OpeningForm> {
         UnitsField(
           key: const Key('opening-debt'),
           controller: _debt,
-          label: AppStrings.previousDebt,
+          label: AppStrings.previousValue,
         ),
         const SizedBox(height: AppSpacing.md),
         UnitsField(
           key: const Key('opening-vodafone'),
           controller: _vodafone,
-          label: AppStrings.previousVodafone,
+          label: AppStrings.carriedVodafone,
         ),
         const SizedBox(height: AppSpacing.md),
         GuardedMutation(
@@ -829,10 +881,11 @@ class _Entry extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                entry.itemLabel ?? AppStrings.dash,
-                style: Theme.of(context).textTheme.titleSmall,
+              _TextLine(
+                AppStrings.sequence,
+                '${entry.sequence ?? AppStrings.dash}',
               ),
+              _TextLine(AppStrings.kind, entry.itemLabel ?? AppStrings.dash),
               _AmountLine(
                 AppStrings.egpValue,
                 entry.egpValueUnits,
@@ -840,7 +893,11 @@ class _Entry extends ConsumerWidget {
                 money,
               ),
               _RateLine(
+                AppStrings.operation,
                 calculationLabel(entry.calculationMode),
+              ),
+              _RateLine(
+                AppStrings.purchasePrice,
                 entry.exchangeRate == null
                     ? AppStrings.dash
                     : money.formatDecimal(entry.exchangeRate!),
@@ -858,12 +915,19 @@ class _Entry extends ConsumerWidget {
                 money,
               ),
               _AmountLine(
-                AppStrings.remaining,
+                AppStrings.purchaseRemaining,
                 entry.remainingUnits,
                 Currency.lyd,
                 money,
               ),
-              if (canWrite)
+              _AmountLine(
+                AppStrings.vodafoneConsumed,
+                entry.vodafoneConsumedUnits,
+                vodafoneCurrency,
+                money,
+              ),
+              if (canWrite) ...[
+                Text(AppStrings.actions),
                 Wrap(
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.xs,
@@ -895,6 +959,7 @@ class _Entry extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ],
             ],
           ),
         ),

@@ -13,6 +13,7 @@ import 'package:vib_abdo_company_mobile/features/collections/collections_screen.
 import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
+import 'package:vib_abdo_company_mobile/features/purchases/purchases_screen.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'package:vib_abdo_company_mobile/ui/widgets/common.dart';
@@ -132,6 +133,29 @@ void main() {
     expect(find.byKey(const Key('approve-sb_1')), findsNothing);
     await tester.pump(const Duration(seconds: 1));
     expect(reads, readsAfterSignIn + 1);
+  });
+
+  testWidgets('purchases write without purchases.finalize hides ترحيل اليوم', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+    expect(find.byKey(const Key('add-purchase-12')), findsOneWidget);
+    expect(find.byKey(const Key('finalize-day-12')), findsOneWidget);
+
+    layer.permissions.applyFromServer(
+      const ['purchases.read', 'purchases.write'],
+      role: 'employee',
+      sectionAccess: const {'purchases': 'manage'},
+    );
+    await tester.pump();
+
+    expect(find.byKey(PurchasesScreen.screenKey), findsOneWidget);
+    expect(find.byKey(const Key('add-purchase-12')), findsOneWidget);
+    expect(find.byKey(const Key('edit-pe_1')), findsOneWidget);
+    expect(find.byKey(const Key('finalize-day-12')), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 }
 
