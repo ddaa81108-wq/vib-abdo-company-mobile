@@ -110,7 +110,7 @@ These are assumed, not confirmed. The contract notes are outside this repository
 1. Is a staging origin available, and who issues the test accounts? Keep both outside the repo.
 2. Does mobile stay on the cookie session, or will the bearer endpoints (`/api/auth/mobile/*`, currently a stub) exist?
 3. CSRF: is `GET /api/auth/csrf` correct, and is the body `{ "ok": true, "data": { "csrfToken": "..." } }` with header `X-CSRF-Token`? Does `POST /api/auth/login` itself require a token?
-4. Session expiry: which status and code should force a new login? This client treats authenticated `401` and non-CSRF `419` as expiry (`AUTH_REQUIRED` is the only code observed; `SESSION_EXPIRED`, `SESSION_REVOKED`, and `PAGE_EXPIRED` are defensive).
+4. Session expiry: which status and code should force a new login? This client treats an authenticated `401`, or a `419` whose code and message do not mention CSRF, as expiry. A `419` is never refreshed or replayed. A `419` that mentions CSRF is a CSRF error and does not wipe the session (`AUTH_REQUIRED` is the only code observed; `SESSION_EXPIRED`, `SESSION_REVOKED`, and `PAGE_EXPIRED` are defensive).
 5. CSRF failure: which status and code? After P-09/#73, only HTTP 403 with code `CSRF_REJECTED` triggers one refresh and one replay. A bare `419` still logs the user out.
 6. Login failure: which `401` code means bad credentials rather than a dead session?
 7. Validation: is it HTTP `422`, `400`, or both, and is `details` a `{ "fields": { "name": "..." } }` map, a flat map, or a list of `{ "field", "code", "message" }`?
