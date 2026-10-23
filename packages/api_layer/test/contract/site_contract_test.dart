@@ -4,7 +4,10 @@
 /// placeholder `<session-csrf-token>`. There is no password, cookie, or bearer
 /// token. Transport is [FakeApiClient] (one scripted GET). Parsing is the real
 /// repository and DTO path. A case that does not match the contract today is
-/// skipped with the G id from `docs/api/integration-plan.ar.md` / gap analysis §0.
+/// skipped with a G id from `docs/api/gap-analysis.ar.md` section 0 only.
+/// GET /api/collections is not parsed here (G-01, owned by P-03). GET
+/// /api/purchases is not parsed here (G-02, owned by P-04). DEF-028 and the
+/// Egyptian part of DEF-035 have no G id.
 @Tags(['contract'])
 library;
 
@@ -168,49 +171,29 @@ void main() {
   );
 
   test(
-    'purchases registerTotals and the flat entries are the page',
-    () async {
-      final api = await _session();
-      final repo = RemotePurchasesRepository(api);
-      for (final book in PurchaseBook.values) {
-        final raw = _data(samples, 'GET /api/purchases/${book.path}');
-        api.scriptedGetJson['/api/purchases/${book.path}'] = jsonEncode(raw);
-        final page = await repo.list(book);
-        final totals = raw['registerTotals'] as Map;
-        expect(page.page.items, isNotEmpty, reason: book.path);
-        expect(page.lifetimeTotals?.remainingUnits?.asInt,
-            totals['remainingUnits'],
-            reason: book.path);
-        expect(page.lifetimeTotals?.resultUnits?.asInt, totals['resultUnits'],
-            reason: book.path);
-      }
-    },
+    'GET /api/purchases sample parse',
+    () {},
     skip: 'G-02. PurchasesBookPage reads days[] and lifetimeTotals/totals. '
-        'The sample is merchant, day, entries, nextBefore, and registerTotals, '
-        'so the book is empty and the totals are null (DEF-034).',
+        'The sample is merchant, day, entries, nextBefore, and registerTotals '
+        '(DEF-034). The passing parse belongs to P-04 '
+        '(cursor/p04-purchases-contract-shape). This suite does not add one.',
   );
 
-  test('collections money is integer LYD and a missing version stays null',
-      () async {
-    final api = await _session();
-    final raw = _data(samples, 'GET /api/collections');
-    api.scriptedGetJson[ApiEndpoints.collections] = jsonEncode(raw);
-    final page = await RemoteCollectionsRepository(api).overview();
-    expect(page.currency, Currency.lyd);
-    expect(page.collectedUnits?.asInt, 100);
-    expect(page.cashOutstandingUnits?.asInt, 100);
-    expect(page.assignedCount, 1);
-    expect(page.assignments.single.balanceUnits?.asInt, 300);
-    expect(page.submissions.first.amountUnits?.asInt, 50);
-    expect(page.submissions.first.version, isNull);
-    expect(page.unlinkedReceipts.single.amountUnits?.asInt, 75);
-    expect(page.unlinkedReceipts.single.version, isNull);
-    expect(page.employeeTotals.first.collectedUnits?.asInt, 100);
-    expect(
-      _money.format(page.collectedUnits!.asInt!, page.currency),
-      '100 د.ل',
-    );
-  });
+  test(
+    'GET /api/collections sample parse',
+    () {},
+    skip: 'G-01. The passing parse of this sample belongs to P-03 '
+        '(PR #66, cursor/p03-collections-no-version). This suite does not '
+        'add a second one. Submissions and unlinked receipts have no version.',
+  );
+
+  test(
+    'an unlinked receipt can be linked to an Egyptian deposit',
+    () {},
+    skip: 'DEF-035. No G id. Linking an unlinked receipt to '
+        'egyptian_deposits stays open (P-20). The collections sample itself '
+        'is not parsed here.',
+  );
 
   test(
     'a collection decision sends without expectedVersion',
@@ -240,6 +223,14 @@ void main() {
     expect(payroll.employees.first.openingCarryUnits?.asInt, 0);
   });
 
+  test(
+    'payroll employeeName is the displayed name',
+    () {},
+    skip: 'No id in gap-analysis section 0. PayrollEmployeeDto reads '
+        'displayName or name. The sample sends employeeName, so the parsed '
+        'name is empty.',
+  );
+
   test('masraweya day money stays whole pounds, including zero', () async {
     final api = await _session();
     final raw = _data(samples, 'GET /api/masraweya/day');
@@ -264,6 +255,14 @@ void main() {
     expect(page.items.length, 3);
     expect(page.items.first.id, '4');
   });
+
+  test(
+    'a notification row uses sectionKey',
+    () {},
+    skip: 'No id in gap-analysis section 0. NotificationDto reads section. '
+        'The sample sends sectionKey. G-12 is the financial-ledger fields, '
+        'not this row.',
+  );
 
   test('report rows keep the sample integers', () async {
     final api = await _session();
@@ -293,9 +292,10 @@ void main() {
         raw['current']['summary'],
       );
     },
-    skip: 'G-12. ReportsDto reads items[] and methodology.note. '
-        'It does not read current, current.daily, or current.summary. '
-        'netChangeUnits is not in the sample.',
+    skip: 'No id in gap-analysis section 0. ReportsDto reads items[] and '
+        'methodology.note. It does not read current, current.daily, or '
+        'current.summary. G-12 is only sectionKey, sourceStatus, and '
+        'occurredAt.',
   );
 
   test('the financial ledger keeps integer page totals and row amounts',
@@ -463,6 +463,14 @@ void main() {
   );
 
   test(
+    'MFA_REQUIRED is not shown as invalid credentials',
+    () {},
+    skip: 'G-07. api-samples.json has no MFA_REQUIRED body, and this suite '
+        'does not invent one. An unauthenticated 401 becomes '
+        'InvalidCredentialsException. P-09 owns the MFA mapping.',
+  );
+
+  test(
     'pin sends isPinned and expectedVersion',
     () async {
       final api = await _session();
@@ -523,10 +531,10 @@ void main() {
     () {
       expect(samples.containsKey('collectionSubmissionReplay'), isTrue);
     },
-    skip: 'G-03. The replay sample is a debt payment (meta.replayed on the '
-        'envelope). No sample shows exactly-once for '
-        'POST /api/collections/assignments/{id}/submissions, which the '
-        'contract says does not read requestId.',
+    skip: 'G-03. DEF-037. The replay sample is a debt payment (meta.replayed '
+        'on the envelope). No sample shows exactly-once for '
+        'POST /api/collections/assignments/{id}/submissions. '
+        'Stays skip until the server fix.',
   );
 
   test(
