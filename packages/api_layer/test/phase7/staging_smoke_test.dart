@@ -7,10 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 /// in the environment. CI does not set them, and this file does not use
 /// [FakeApiClient] or a hand-written [HttpClientAdapter].
 ///
-/// The cookie jar is [InMemoryCookieStore] so `flutter test` on a GitHub
-/// runner can keep the session without Keychain. The app default remains
-/// [SecureCookieStore]. Requests use the real Dio client, whose `dart:io`
-/// User-Agent is not Python-urllib.
+/// The cookie jar is [InMemoryCookieStore] so a local bot run can keep the
+/// session without Keychain. The app default remains [SecureCookieStore].
+/// Requests use the real Dio client, whose `dart:io` User-Agent is not
+/// Python-urllib. GitHub skips this test before the client is created.
 ///
 /// ```bash
 /// STAGING_API_BASE=https://staging.example.invalid \
@@ -20,15 +20,25 @@ import 'package:flutter_test/flutter_test.dart';
 /// ```
 ///
 /// Optional `STAGING_SMOKE_SECTION` (default `customers`).
-/// Optional `STAGING_SMOKE_ACCOUNT_ID` also sends one `setPinned` of the
-/// card's current flag before logout. Without it, the write is
-/// `POST /api/auth/logout`. No ledger line is created unless that id is set.
+/// `STAGING_SMOKE_ACCOUNT_ID` is not read. `setPinned` was removed: a read
+/// of the card would not cover the P-07 pin body, so that write stays
+/// deferred until Ali decides. The only write on the bot machine is
+/// `POST /api/auth/logout`. No ledger line is created.
 ///
 /// The client calls `GET /api/me`. The matrix text says `GET /api/auth/me`.
+/// GitHub never runs the body: any non-empty `CI` or `GITHUB_ACTIONS` skips
+/// before a client is created.
 void main() {
   test(
-    'P7-01 staging smoke: login, GET /api/me, one section read, one write',
+    'P7-01 staging smoke: login, GET /api/me, one section read, logout',
     () async {
+      if (_githubHosted(Platform.environment)) {
+        markTestSkipped(
+          'GitHub does not run the staging login smoke and does not send '
+          'writes. CI and GITHUB_ACTIONS must be empty.',
+        );
+        return;
+      }
       final base = Platform.environment['STAGING_API_BASE'] ?? '';
       final username = Platform.environment['STAGING_ADMIN_USERNAME'] ?? '';
       final password = Platform.environment['STAGING_ADMIN_PASSWORD'] ?? '';
@@ -57,16 +67,6 @@ void main() {
         expect(me!.id, isNotEmpty);
         final page = await layer.accounts.list(section, limit: 1);
         expect(page.page.items, isA<List<AccountCardDto>>());
-        final accountId = Platform.environment['STAGING_SMOKE_ACCOUNT_ID'];
-        if (accountId != null && accountId.isNotEmpty) {
-          final card = await layer.accounts.get(section, accountId);
-          await layer.accounts.setPinned(
-            section,
-            accountId,
-            card.pinned,
-            MutationMeta(expectedVersion: card.version),
-          );
-        }
         await layer.session.logout();
         expect(
           layer.session.state,
@@ -82,4 +82,20 @@ void main() {
     },
     timeout: const Timeout(Duration(minutes: 2)),
   );
+
+  test('P7-01 does not run when CI or GITHUB_ACTIONS is non-empty', () {
+    for (final value in ['true', '1', 'false', 'yes']) {
+      expect(_githubHosted({'CI': value}), isTrue);
+      expect(_githubHosted({'GITHUB_ACTIONS': value}), isTrue);
+    }
+    expect(_githubHosted({}), isFalse);
+    expect(_githubHosted({'CI': ''}), isFalse);
+    expect(_githubHosted({'GITHUB_ACTIONS': ''}), isFalse);
+    expect(_githubHosted({'CI': '   '}), isFalse);
+  });
+}
+
+bool _githubHosted(Map<String, String> env) {
+  bool blocks(String key) => (env[key] ?? '').trim().isNotEmpty;
+  return blocks('CI') || blocks('GITHUB_ACTIONS');
 }
