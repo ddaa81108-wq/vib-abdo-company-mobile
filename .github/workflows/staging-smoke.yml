@@ -4,19 +4,21 @@
 # There is no push, pull_request, or schedule trigger. Do not add a temporary
 # push trigger.
 #
-# The job is pinned to the GitHub Environment named staging. STAGING_API_BASE
-# is a secret or variable on that environment. Its intended value is
+# The job is pinned to the GitHub Environment named staging. It only probes
+# unauthenticated GET /api/health. It does not log in and it does not read
+# account credentials. Do not store staging usernames or passwords in GitHub.
+#
+# STAGING_API_BASE is a secret on that environment. Its intended value is
 # https://staging.vip2100.com with no /erp suffix (the UI is under /erp, the
 # API is /api on the origin). An empty value or an /erp suffix fails the job.
+# A same-named variable is accepted only as a fallback and is not recommended.
 # The value is masked and never printed.
 #
-# Unauthenticated GET /api/health always runs, via curl, with User-Agent
-# VibAbdoMobileSmoke/1.0 (+github-actions). Python in tool/staging_smoke does
-# not open a socket. Cloudflare rejects Python-urllib.
+# curl sends User-Agent VibAbdoMobileSmoke/1.0 (+github-actions). Python in
+# tool/staging_smoke does not open a socket. Cloudflare rejects Python-urllib.
 #
-# STAGING_ADMIN_USERNAME and STAGING_ADMIN_PASSWORD are names only. When either
-# is missing the authenticated P7-01 step is skipped with "secret not configured".
-# STAGING_SMOKE_ACCOUNT_ID is not read. The pin write stays off until P-07.
+# actions/checkout is pinned to a commit SHA because this job can see the
+# staging secret. The tag is only a comment.
 #
 # This workflow is not one of the required pull-request checks and does not
 # change them.
@@ -38,63 +40,20 @@ jobs:
     name: Staging smoke
     runs-on: ubuntu-latest
     environment: staging
-    timeout-minutes: 45
+    timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Offline smoke self-check
         run: bash tool/staging_smoke/reachability_test.sh
 
-      - name: Mask staging values
+      - name: Mask staging origin
         env:
           STAGING_API_BASE: ${{ secrets.STAGING_API_BASE || vars.STAGING_API_BASE }}
-          STAGING_ADMIN_USERNAME: ${{ secrets.STAGING_ADMIN_USERNAME }}
-          STAGING_ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
         run: bash tool/staging_smoke/reachability.sh --mask
 
       - name: Unauthenticated reachability
         env:
           STAGING_API_BASE: ${{ secrets.STAGING_API_BASE || vars.STAGING_API_BASE }}
-          STAGING_ADMIN_USERNAME: ${{ secrets.STAGING_ADMIN_USERNAME }}
-          STAGING_ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
         run: bash tool/staging_smoke/reachability.sh
-
-      - name: Pin write stays off
-        if: success()
-        run: bash tool/staging_smoke/reachability.sh --pin-notice
-
-      - name: Detect admin credentials
-        id: auth
-        if: success()
-        env:
-          STAGING_ADMIN_USERNAME: ${{ secrets.STAGING_ADMIN_USERNAME }}
-          STAGING_ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
-        run: bash tool/staging_smoke/reachability.sh --auth-status
-
-      - name: Skip authenticated smoke
-        if: steps.auth.outputs.configured == 'false'
-        env:
-          SMOKE_AUTH_MISSING: ${{ steps.auth.outputs.missing }}
-        run: bash tool/staging_smoke/reachability.sh --skip-auth-notice
-
-      - name: Set up Flutter 3.47.7
-        if: steps.auth.outputs.configured == 'true'
-        uses: subosito/flutter-action@v2.23.0
-        with:
-          channel: stable
-          flutter-version: "3.47.7"
-          cache: true
-          pub-cache: true
-
-      - name: Resolve API package
-        if: steps.auth.outputs.configured == 'true'
-        run: flutter pub get --directory packages/api_layer
-
-      - name: Authenticated P7-01 smoke
-        if: steps.auth.outputs.configured == 'true'
-        env:
-          STAGING_API_BASE: ${{ secrets.STAGING_API_BASE || vars.STAGING_API_BASE }}
-          STAGING_ADMIN_USERNAME: ${{ secrets.STAGING_ADMIN_USERNAME }}
-          STAGING_ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
-        run: bash tool/staging_smoke/reachability.sh --flutter

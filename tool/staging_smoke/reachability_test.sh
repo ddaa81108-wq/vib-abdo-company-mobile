@@ -57,9 +57,33 @@ if "environment: staging" not in text:
     sys.exit("job must set environment: staging")
 if "secrets.STAGING_SMOKE_ACCOUNT_ID" in text or "vars.STAGING_SMOKE_ACCOUNT_ID" in text:
     sys.exit("workflow must not read STAGING_SMOKE_ACCOUNT_ID")
-for needle in ("secrets.STAGING_API_BASE", "vars.STAGING_API_BASE", "STAGING_ADMIN_USERNAME", "STAGING_ADMIN_PASSWORD"):
+for needle in ("secrets.STAGING_API_BASE", "vars.STAGING_API_BASE"):
     if needle not in text:
         sys.exit(f"missing {needle}")
+banned = (
+    "STAGING_ADMIN_USERNAME",
+    "STAGING_ADMIN_PASSWORD",
+    "STAGING_EMPLOYEE_USERNAME",
+    "STAGING_EMPLOYEE_PASSWORD",
+    "STAGING_EMPLOYEE2_USERNAME",
+    "STAGING_EMPLOYEE2_PASSWORD",
+    "STAGING_LIMITED_MANAGER_USERNAME",
+    "STAGING_LIMITED_MANAGER_PASSWORD",
+    "flutter-action",
+    "flutter test",
+)
+for needle in banned:
+    if needle in text:
+        sys.exit(f"workflow must not mention {needle}")
+uses = re.findall(r"uses:\s*(\S+)", text)
+if not uses:
+    sys.exit("workflow has no actions")
+for use in uses:
+    if not re.search(r"@[0-9a-f]{40}$", use):
+        sys.exit(f"action is not pinned to a full commit SHA: {use}")
+checkout = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+if checkout not in text:
+    sys.exit("checkout is not pinned to the v7.0.1 commit")
 print("workflow shape ok")
 PY
 
