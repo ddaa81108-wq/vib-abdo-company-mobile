@@ -904,7 +904,7 @@ StagingConfig _offlineConfig() => StagingConfig(
 
 Future<List<CaseResult>> _runLive(
   StagingConfig config, {
-  ProbeClient? client,
+  _ProbeClient? client,
   bool allowSandboxWrites = false,
   bool announceSkips = true,
 }) async {
@@ -1231,7 +1231,7 @@ class _Live {
     required this.announceSkips,
   });
 
-  final ProbeClient client;
+  final _ProbeClient client;
   final StagingConfig config;
   final bool allowSandboxWrites;
   final bool announceSkips;
@@ -1262,7 +1262,7 @@ class _Live {
 
 /// HTTP for one probe. The live client uses `dart:io`. The dry-run uses
 /// [_FakeProbeClient] and must not construct an [HttpClient].
-abstract class ProbeClient {
+abstract class _ProbeClient {
   Future<ProbeResult> send({
     required Uri base,
     required String method,
@@ -1275,7 +1275,7 @@ abstract class ProbeClient {
   void close();
 }
 
-class _IoProbeClient implements ProbeClient {
+class _IoProbeClient implements _ProbeClient {
   _IoProbeClient() {
     _http.connectionTimeout = const Duration(seconds: 20);
     _http.findProxy = HttpClient.findProxyFromEnvironment;
@@ -1308,7 +1308,7 @@ class _IoProbeClient implements ProbeClient {
 }
 
 /// In-memory host for the offline login-count check. No socket.
-class _FakeProbeClient implements ProbeClient {
+class _FakeProbeClient implements _ProbeClient {
   final Map<String, int> loginsByAccount = {};
   final List<String> writeCalls = [];
   final Set<String> _loggedOut = {};
@@ -1433,7 +1433,7 @@ class _ProbeProblem implements Exception {
 }
 
 Future<_Session> _login(
-  ProbeClient client,
+  _ProbeClient client,
   StagingConfig config,
   String username,
   String password,
