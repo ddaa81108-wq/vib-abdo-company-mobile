@@ -5,13 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/core/network/api_endpoints.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
+import 'package:vib_abdo_company_mobile/state/pending_mutation.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'package:vib_abdo_company_mobile/ui/theme.dart';
 import 'package:vib_abdo_company_mobile/ui/widgets/common.dart';
+import 'package:vib_abdo_company_mobile/ui/widgets/mutation_form.dart';
 
 import 'shell_screenshots_test.dart' show loadScreenshotFonts, saveBoundaryShot;
 import 'support/pump_app.dart';
@@ -436,8 +439,184 @@ void main() {
       expect(_header('-80 د.ل'), findsOneWidget);
       expect(_header('320 د.ل'), findsNothing);
       expect(find.byKey(const Key('ledger-reload-failed')), findsOneWidget);
+      expect(find.text(AppStrings.ledgerReloadFailed), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('ledger-reload-failed'))).data,
+        AppStrings.ledgerReloadFailed,
+      );
+      final semantics = tester.ensureSemantics();
+      expect(
+        tester
+            .getSemantics(find.byKey(const Key('ledger-reload-failed')))
+            .label,
+        AppStrings.ledgerReloadFailed,
+      );
+      semantics.dispose();
       expect(find.text('تعذر تحميل الكارت.'), findsWidgets);
       expect(find.byType(ErrorPane), findsOneWidget);
+      expect(find.byKey(const Key('add-debt')), findsNothing);
+      expect(find.byKey(const Key('add-payment')), findsNothing);
+      expect(find.byKey(const Key('full-payment')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'DEF-031 cancel keeps the request id and the next submit reuses it',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(430, 932));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/customers/c_55');
+      final fake = layer.client as FakeApiClient;
+      final postsBefore = fake.mutationPaths.length;
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.tap(find.byKey(const Key('add-payment')));
+      await settle(tester);
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const Key('movement-amount')),
+          matching: find.byType(TextField),
+        ),
+        '400',
+      );
+      await settle(tester);
+      final save = find.byKey(const Key('save-movement'));
+      final before = tester.widget<GuardedMutation>(
+        find.ancestor(of: save, matching: find.byType(GuardedMutation)),
+      );
+      expect(before.inputs, contains('|400|'));
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      for (var i = 0; i < 30; i++) {
+        if (find
+            .byKey(const Key('overpayment-warning'))
+            .evaluate()
+            .isNotEmpty) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      await tester.tap(find.byKey(const Key('overpayment-cancel')));
+      await settle(tester);
+
+      expect(find.byKey(const Key('overpayment-warning')), findsNothing);
+      expect(find.byKey(const Key('mutation-error')), findsNothing);
+      expect(fake.mutationPaths, hasLength(postsBefore));
+      final draft = ProviderScope.containerOf(tester.element(save))
+          .read(pendingMutationProvider);
+      expect(draft, isNotNull);
+      final requestId = draft!.requestId;
+      final mutation = tester.widget<GuardedMutation>(
+        find.ancestor(of: save, matching: find.byType(GuardedMutation)),
+      );
+      expect(draft.inputs, mutation.inputs);
+      expect(draft.expectedVersion, mutation.expectedVersion);
+      expect(requestId, isNotEmpty);
+
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      for (var i = 0; i < 30; i++) {
+        if (find
+            .byKey(const Key('overpayment-warning'))
+            .evaluate()
+            .isNotEmpty) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(find.byKey(const Key('overpayment-warning')), findsOneWidget);
+      expect(find.byKey(const Key('mutation-error')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('overpayment-continue')));
+      await settle(tester);
+
+      expect(fake.mutationPaths, hasLength(postsBefore + 1));
+      final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
+      expect(body['requestId'], requestId);
+      expect(body['expectedVersion'], 4);
+      expect(body['inputValue'], 400);
+      expect(fake.mutationRequestIds.where((id) => id == requestId), [
+        requestId,
+      ]);
+      expect(find.byKey(const Key('mutation-error')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'DEF-031 a 409 refetches, then the warning names the new balance and the submit uses the new version',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/customers/c_55');
+      expect(_header('320 د.ل'), findsOneWidget);
+      final fake = layer.client as FakeApiClient;
+
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.tap(find.byKey(const Key('add-payment')));
+      await settle(tester);
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const Key('movement-amount')),
+          matching: find.byType(TextField),
+        ),
+        '320',
+      );
+      await tester.runAsync(
+        () => layer.accounts.addTransaction(
+          AccountSection.customers,
+          'c_55',
+          AccountTransactionRequest.partialPayment(
+            inputValue: 100,
+            date: DateTime.utc(2026, 10, 22),
+          ),
+          MutationMeta(expectedVersion: 4),
+        ),
+      );
+
+      final save = find.byKey(const Key('save-movement'));
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await settle(tester);
+
+      expect(find.byKey(const Key('overpayment-warning')), findsNothing);
+      expect(find.text(AppStrings.versionConflict), findsWidgets);
+      expect(find.text('تم تعديل البيانات من مستخدم آخر'), findsNothing);
+      expect(_header('220 د.ل'), findsOneWidget);
+      expect(_header('320 د.ل'), findsNothing);
+
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      for (var i = 0; i < 30; i++) {
+        if (find
+            .byKey(const Key('overpayment-warning'))
+            .evaluate()
+            .isNotEmpty) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(find.byKey(const Key('overpayment-warning')), findsOneWidget);
+      expect(
+        tester
+            .widget<MoneyText>(find.byKey(const Key('overpayment-current')))
+            .text,
+        layer.money.format(220, Currency.lyd),
+      );
+
+      await tester.tap(find.byKey(const Key('overpayment-continue')));
+      await settle(tester);
+
+      final sent = fake.mutationBodies
+          .map((raw) => jsonDecode(raw) as Map<String, dynamic>)
+          .where((body) => body['inputValue'] == 320)
+          .toList();
+      expect(sent, hasLength(2));
+      expect(sent.first['expectedVersion'], 4);
+      expect(sent.last['expectedVersion'], 5);
+      expect(sent.last['inputValue'], 320);
+      expect(find.byKey(const Key('overpayment-warning')), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

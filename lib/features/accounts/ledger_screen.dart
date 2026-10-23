@@ -19,6 +19,14 @@ import 'edit_account_card_screen.dart';
 import 'overpayment_warning.dart';
 import 'transaction_correction_form.dart';
 
+/// A write may send [expectedVersion] only from a settled card. Loading,
+/// refresh, and error (including a failed reload) keep the previous figure
+/// on screen, and [AsyncValue.asData] is either null or still the old card.
+bool _cardReadyForWrite(AsyncValue<AccountCardDto> card) {
+  if (card.isLoading || card.hasError) return false;
+  return card.asData?.value.version != null;
+}
+
 /// Ledger for one card. Customers, companies, Libyan deposits, and Egyptian
 /// deposits all use this screen; [section] selects the repository and the labels.
 class LedgerScreen extends ConsumerStatefulWidget {
@@ -113,10 +121,11 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                 for (final entry in page.page.items) entry.id,
               ];
               final tight = layoutIsTight(context);
+              final cardReady = _cardReadyForWrite(card);
               final writes = <Widget>[
                 GatedButton(
                   buttonKey: const Key('add-debt'),
-                  allowed: true,
+                  allowed: cardReady,
                   online: online,
                   label: section == AccountSection.libyanDeposits
                       ? AppStrings.depositIn
@@ -127,7 +136,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                 ),
                 GatedButton(
                   buttonKey: const Key('add-payment'),
-                  allowed: true,
+                  allowed: cardReady,
                   online: online,
                   label: section == AccountSection.libyanDeposits
                       ? AppStrings.depositOut
@@ -139,6 +148,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                 GuardedMutation(
                   buttonKey: const Key('full-payment'),
                   allowed:
+                      cardReady &&
                       section != AccountSection.libyanDeposits &&
                       section != AccountSection.egyptianDeposits,
                   filled: false,
@@ -397,6 +407,9 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
 
   @override
   Widget build(BuildContext context) {
+    final watchedCard = ref.watch(
+      accountCardProvider((widget.section, widget.id)),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -450,13 +463,10 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
         const SizedBox(height: AppSpacing.md),
         GuardedMutation(
           buttonKey: const Key('save-movement'),
+          allowed: _cardReadyForWrite(watchedCard),
           inputs:
               '${widget.type}|$_mode|${_amount.text}|${_factor.text}|${_date.text}|${_note.text}',
-          expectedVersion: ref
-              .watch(accountCardProvider((widget.section, widget.id)))
-              .asData
-              ?.value
-              .version,
+          expectedVersion: watchedCard.asData?.value.version,
           label: AppStrings.save,
           onVersionConflict: () {
             ref.invalidate(ledgerProvider((widget.section, widget.id)));
@@ -477,8 +487,9 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
     // compared. An invalid balance is refused. It is not treated as 0.
     // The warning uses the balance already on the card. It does not read
     // the card again, so a failed read cannot block the send. An amount
-    // above that balance is not refused. Cancel returns null and sends
-    // nothing. The send still uses this form's requestId.
+    // above that balance is not refused. Cancel returns an empty string
+    // and sends nothing. Null would be treated as success and would drop
+    // this form's request id. The empty string is not shown.
     if (widget.type == 'payment' && _mode == CalculationMode.direct) {
       final loaded = ref
           .read(accountCardProvider((widget.section, widget.id)))
@@ -495,7 +506,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
           remainingUnits,
           units,
         );
-        if (!mounted || proceed != true) return null;
+        if (!mounted || proceed != true) return '';
       }
     }
     final parsedDate = DateTime.tryParse(_date.text);
@@ -699,10 +710,15 @@ class _Header extends StatelessWidget {
                 ),
               ),
               if (reloadError != null)
-                Text(
-                  reloadError!,
-                  key: const Key('ledger-reload-failed'),
-                  style: cairo(12, 500, color: accent),
+                Semantics(
+                  container: true,
+                  excludeSemantics: true,
+                  label: AppStrings.ledgerReloadFailed,
+                  child: Text(
+                    AppStrings.ledgerReloadFailed,
+                    key: const Key('ledger-reload-failed'),
+                    style: cairo(12, 500, color: accent),
+                  ),
                 ),
               if (value.systemManaged)
                 Text(

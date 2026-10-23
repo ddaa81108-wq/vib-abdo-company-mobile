@@ -98,6 +98,11 @@ abstract final class AppStrings {
   static const overpaymentCurrent = 'الرصيد الحالي';
   static const overpaymentEntered = 'والمبلغ المدخل';
   static const overpaymentAsk = 'هل تريد المتابعة؟';
+
+  /// Ledger header when the card reload after a movement fails. The figure
+  /// above it is the acknowledgement balance from the server reply.
+  static const ledgerReloadFailed =
+      'الرصيد المعروض من رد الخادم؛ تعذّر تحديث الكارت';
   static const dateInvalid = 'أدخل التاريخ بصيغة سنة-شهر-يوم.';
   static const unitsHint =
       'عدد صحيح بالوحدة الصغرى التي يخزّنها الخادم. بلا فواصل وبلا كسور. التطبيق لا يحوّل هذا الرقم ولا يحسبه.';
