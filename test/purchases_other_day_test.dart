@@ -38,10 +38,7 @@ void main() {
 
       final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
       expect(body['expectedDayVersion'], 3);
-      expect(
-        fake.mutationPaths.last,
-        '/api/purchases/al_bayan/entries/pe_1',
-      );
+      expect(fake.mutationPaths.last, '/api/purchases/al_bayan/entries/pe_1');
       expect(tester.takeException(), isNull);
     },
   );
@@ -77,11 +74,25 @@ void main() {
     final unversioned = await pumpFakeApp(tester, size: const Size(800, 1400));
     _scriptPurchases(
       unversioned.client as FakeApiClient,
-      _page(day: _day(version: null)),
+      _page(
+        day: _day(version: null),
+        entries: [
+          {
+            'id': 'pe_1',
+            'dayId': '12',
+            'dayVersion': null,
+            'itemLabel': 'فودافون كاش',
+          },
+        ],
+      ),
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
     expect(find.byKey(const Key('purchase-day-12')), findsOneWidget);
+    expect(find.byKey(const Key('purchase-entry-pe_1')), findsOneWidget);
+    expect(find.byKey(const Key('add-purchase-12')), findsNothing);
+    expect(find.byKey(const Key('edit-pe_1')), findsNothing);
+    expect(find.byKey(const Key('delete-pe_1')), findsNothing);
     expect(find.byKey(const Key('finalize-day-12')), findsNothing);
     expect(find.byKey(const Key('set-opening')), findsNothing);
     expect(tester.takeException(), isNull);
@@ -93,11 +104,14 @@ void _scriptPurchases(FakeApiClient fake, Map<String, Object?> body) {
       jsonEncode(body);
 }
 
-Map<String, Object?> _page({Map<String, Object?>? day}) {
+Map<String, Object?> _page({
+  Map<String, Object?>? day,
+  List<Map<String, Object?>> entries = const [],
+}) {
   return {
     'merchant': {'key': 'al_bayan', 'name': 'البيان'},
     'day': ?day,
-    'entries': <Object>[],
+    'entries': entries,
     'registerTotals': {
       'resultUnits': 0,
       'paidUnits': 0,

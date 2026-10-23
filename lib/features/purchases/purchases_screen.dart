@@ -277,7 +277,7 @@ class _DayCard extends ConsumerWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (canWrite && editable)
+                if (canWrite && editable && day.version != null)
                   GatedButton(
                     buttonKey: ValueKey('add-purchase-$label'),
                     allowed: true,
@@ -290,9 +290,7 @@ class _DayCard extends ConsumerWidget {
                       _PurchaseForm(book: book, version: day.version),
                     ),
                   ),
-                if (canFinalize &&
-                    day.status == 'draft' &&
-                    day.version != null)
+                if (canFinalize && day.status == 'draft' && day.version != null)
                   GuardedMutation(
                     buttonKey: ValueKey('finalize-day-$label'),
                     inputs: 'finalize:$label:${day.version}',
@@ -332,7 +330,11 @@ class _DayCard extends ConsumerWidget {
                 book: book,
                 // The write names this row's day, not the open day's version.
                 version: entry.dayVersion,
-                canWrite: canWrite && editable && entry.dayId == day.id,
+                canWrite:
+                    canWrite &&
+                    editable &&
+                    entry.dayId == day.id &&
+                    entry.dayVersion != null,
                 online: online,
               ),
           ],
