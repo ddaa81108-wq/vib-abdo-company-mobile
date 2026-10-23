@@ -44,7 +44,7 @@ void main() {
         throwsA(isA<ForbiddenException>()),
       );
 
-      expect((await api.get('/api/customers')).statusCode, 200);
+      expect((await api.get('/api/collections')).statusCode, 200);
     },
   );
 }

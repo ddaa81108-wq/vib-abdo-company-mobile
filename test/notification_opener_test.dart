@@ -198,7 +198,7 @@ void main() {
     expect(find.byKey(NotificationsScreen.screenKey), findsOneWidget);
     expect(pathOf(tester), '/notifications');
 
-    final notFound = await finish(
+    final deniedSection = await finish(
       tester,
       signedInOpener.open(
         notice(
@@ -209,8 +209,8 @@ void main() {
         origin: NotificationOpenOrigin.list,
       ),
     );
-    expect(notFound, NotificationOpenResult.notFound);
-    expect(pathOf(tester), '/notifications');
+    expect(deniedSection, NotificationOpenResult.forbidden);
+    expect(pathOf(tester), '/forbidden');
 
     final opened = await finish(
       tester,
@@ -227,6 +227,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(CollectionsScreen.screenKey), findsOneWidget);
     expect(pathOf(tester), '/collections');
+  });
+
+  testWidgets('a reader is told a permitted card is missing', (tester) async {
+    await pumpFakeApp(tester);
+    await signIn(tester, username: 'limited.reader', password: 'demo-only');
+    final notFound = await finish(
+      tester,
+      (await openerOf(tester)).open(
+        notice(
+          id: '77',
+          recipient: 'u_5',
+          ref: const NotificationRelatedRef(type: 'customers', id: 'missing'),
+        ),
+        origin: NotificationOpenOrigin.list,
+      ),
+    );
+    expect(notFound, NotificationOpenResult.notFound);
+    expect(pathOf(tester), '/notifications');
   });
 
   testWidgets(
