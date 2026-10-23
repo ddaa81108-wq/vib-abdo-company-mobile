@@ -74,6 +74,41 @@ void main() {
           );
           expect(find.byKey(const Key('register-totals-note')), findsOneWidget);
           expect(find.text(AppStrings.remainingRunningBalance), findsOneWidget);
+          for (final label in [
+            AppStrings.registerTotals,
+            AppStrings.resultFromServer,
+            AppStrings.paid,
+            AppStrings.purchaseRemaining,
+            AppStrings.vodafoneConsumed,
+            AppStrings.vodafoneRemaining,
+            AppStrings.previousDebt,
+            AppStrings.todayResult,
+            AppStrings.todayPaid,
+            AppStrings.purchaseTotalDebt,
+            AppStrings.finalizeDay,
+            AppStrings.addPurchaseEntry,
+            AppStrings.purchasePrice,
+            AppStrings.operation,
+            AppStrings.egpValue,
+          ]) {
+            expect(find.text(label), findsWidgets, reason: label);
+          }
+          for (final gone in [
+            'الناتج من الخادم',
+            'المسدد',
+            'مستهلك فودافون',
+            'باقي فودافون',
+            'الدين السابق',
+            'ناتج اليوم',
+            'المسدد اليوم',
+            'إجمالي الديون',
+            'ترحيل اليوم',
+            'إجماليات السجل',
+            'سعر الصرف',
+            'المتبقي',
+          ]) {
+            expect(find.text(gone), findsNothing, reason: gone);
+          }
           // The entry's own remaining is not the register figure.
           expect(
             _inside(

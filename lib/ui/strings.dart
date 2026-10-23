@@ -106,8 +106,8 @@ abstract final class AppStrings {
   static const awaitingCash = 'ينتظر النقد';
   static const closeBatch = 'إغلاق ومسح الدفعة';
   static const closeBatchConfirm = 'تأكيد إغلاق الدفعة ومسحها؟';
-  static const finalizeDay = 'ترحيل اليوم';
-  static const finalizeConfirm = 'تأكيد ترحيل اليوم؟';
+  static const finalizeDay = 'اعتماد اليوم';
+  static const finalizeConfirm = 'تأكيد اعتماد اليوم؟';
   static const purchaseOpening = 'الرصيد الافتتاحي';
   static const previousVodafone = 'فودافون سابق';
   static const saveOpening = 'حفظ الرصيد الافتتاحي';
@@ -211,21 +211,34 @@ abstract final class AppStrings {
   static const byActor = 'بواسطة';
   static const sequence = 'التسلسل';
   static const status = 'الحالة';
-  static const previousDebt = 'الدين السابق';
-  static const todayResult = 'ناتج اليوم';
-  static const todayPaid = 'المسدد اليوم';
-  static const vodafoneRemaining = 'باقي فودافون';
+  static const previousDebt = 'مديونية سابقة';
+  static const todayResult = 'نتيجة اليوم';
+  static const todayPaid = 'مدفوع اليوم';
+  static const vodafoneRemaining = 'فودافون المتبقي';
   static const exchangeRate = 'سعر الصرف';
-  static const paid = 'المسدد';
+  static const paid = 'المدفوع';
   static const egpValue = 'القيمة ج.م';
   static const operation = 'العملية';
-  static const vodafoneConsumed = 'مستهلك فودافون';
-  static const registerTotals = 'إجماليات السجل';
+  static const vodafoneConsumed = 'فودافون المستهلك';
+  static const registerTotals = 'إجماليات السجل من البداية';
+
+  /// Day total on the purchases card. The customers headline stays
+  /// [totalDebt].
+  static const purchaseTotalDebt = 'إجمالي الدين';
+
+  /// Purchases column. Other sections keep [remaining].
+  static const purchaseRemaining = 'الباقي';
+
+  /// Purchases rate column. Other sections keep [exchangeRate].
+  static const purchasePrice = 'السعر';
+
+  /// Purchases add button. Other sections keep [add].
+  static const addPurchaseEntry = 'إضافة معاملة';
 
   /// `registerTotals.remainingUnits` and `vodafoneRemainingUnits`.
   /// Both are the open day's carried balance. The screen does not add them.
   static const remainingRunningBalance =
-      'المتبقي وباقي فودافون رصيد متراكم لليوم المفتوح، ويشمل الافتتاحي، وليس مجموع البطاقات.';
+      'الباقي وفودافون المتبقي رصيد متراكم لليوم المفتوح، ويشمل مديونية سابقة، وليس مجموع البطاقات.';
   static const kind = 'النوع';
   static const customerName = 'اسم العميل';
   static const modeFull = 'كلي';
@@ -305,7 +318,7 @@ abstract final class AppStrings {
   static const reference = 'المرجع';
   static const actor = 'المنفّذ';
   static const inputValue = 'المدخل';
-  static const resultFromServer = 'الناتج من الخادم';
+  static const resultFromServer = 'نتيجة المشتريات';
   static const lock = 'مقفل';
   static const expand = 'توسيع';
   static const collapse = 'طي';

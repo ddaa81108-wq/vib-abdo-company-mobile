@@ -150,7 +150,7 @@ class _RegisterTotals extends StatelessWidget {
         ),
         _AmountLine(AppStrings.paid, totals?.paidUnits, Currency.lyd, money),
         _AmountLine(
-          AppStrings.remaining,
+          AppStrings.purchaseRemaining,
           totals?.remainingUnits,
           Currency.lyd,
           money,
@@ -274,7 +274,11 @@ class _DayCard extends ConsumerWidget {
             _line(AppStrings.previousDebt, day.previousDebtUnits, Currency.lyd),
             _line(AppStrings.todayResult, day.todayResultUnits, Currency.lyd),
             _line(AppStrings.todayPaid, day.todayPaidUnits, Currency.lyd),
-            _line(AppStrings.totalDebt, day.totalDebtUnits, Currency.lyd),
+            _line(
+              AppStrings.purchaseTotalDebt,
+              day.totalDebtUnits,
+              Currency.lyd,
+            ),
             _line(
               AppStrings.vodafoneRemaining,
               day.vodafoneRemainingUnits,
@@ -289,7 +293,7 @@ class _DayCard extends ConsumerWidget {
                     buttonKey: ValueKey('add-purchase-$label'),
                     allowed: true,
                     online: online,
-                    label: AppStrings.add,
+                    label: AppStrings.addPurchaseEntry,
                     onPressed: () => showAppForm<void>(
                       context,
                       // expectedDayVersion is the open day's version. The row
@@ -507,7 +511,9 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
         TextField(
           controller: _rate,
           textDirection: TextDirection.ltr,
-          decoration: const InputDecoration(labelText: AppStrings.exchangeRate),
+          decoration: const InputDecoration(
+            labelText: AppStrings.purchasePrice,
+          ),
         ),
         UnitsField(controller: _paid, label: AppStrings.paid),
         UnitsField(controller: _vodafone, label: AppStrings.vodafoneConsumed),
@@ -834,7 +840,11 @@ class _Entry extends ConsumerWidget {
                 money,
               ),
               _RateLine(
+                AppStrings.operation,
                 calculationLabel(entry.calculationMode),
+              ),
+              _RateLine(
+                AppStrings.purchasePrice,
                 entry.exchangeRate == null
                     ? AppStrings.dash
                     : money.formatDecimal(entry.exchangeRate!),
@@ -852,7 +862,7 @@ class _Entry extends ConsumerWidget {
                 money,
               ),
               _AmountLine(
-                AppStrings.remaining,
+                AppStrings.purchaseRemaining,
                 entry.remainingUnits,
                 Currency.lyd,
                 money,

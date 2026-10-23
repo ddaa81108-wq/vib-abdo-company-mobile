@@ -26,6 +26,8 @@ void main() {
     expect(find.byKey(const Key('edit-pe_1')), findsNothing);
     expect(find.byKey(const Key('delete-pe_1')), findsNothing);
     expect(find.text(AppStrings.add), findsNothing);
+    expect(find.text(AppStrings.addPurchaseEntry), findsNothing);
+    expect(find.text(AppStrings.finalizeDay), findsNothing);
     expect(find.text(AppStrings.edit), findsNothing);
     expect(find.text(AppStrings.delete), findsNothing);
     expect(find.byKey(const Key('finalize-day-12')), findsNothing);
@@ -42,7 +44,7 @@ void main() {
     await tester.tap(find.byKey(const Key('purchase-kind-vodafone_cash')));
     await tester.pump();
     await fillLabeled(tester, AppStrings.egpValue, '10000');
-    await fillLabeled(tester, AppStrings.exchangeRate, '9.5');
+    await fillLabeled(tester, AppStrings.purchasePrice, '9.5');
     await fillLabeled(tester, AppStrings.paid, '500');
 
     await tester.runAsync(
