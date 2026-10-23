@@ -9,7 +9,6 @@ import 'auth_strategy.dart';
 import 'cookie_store.dart';
 
 const _writeHeld = 'cookieCsrf.writeHeld';
-const _writeGate = 'cookieCsrf.writeGate';
 
 /// Reads `csrfToken` from a login or CSRF payload.
 ///
@@ -51,7 +50,15 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
 
   String? _csrfToken;
   Completer<bool>? _csrfInFlight;
-  Future<void> _writeTail = Future<void>.value();
+
+  /// 1 while a write or a CSRF refresh holds the mutex.
+  ///
+  /// The free path does not await. Awaiting an already-completed [Future]
+  /// resumes in the zone that completed it. Widget tests create that future
+  /// under fake async and then call `runAsync`, which does not pump fake
+  /// async, so login would wait forever.
+  int _heldWrites = 0;
+  final List<Completer<void>> _writeWaiters = [];
 
   @override
   String get name => 'cookie+csrf';
@@ -69,11 +76,14 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
     if (!_isUnsafe(options.method)) return;
     // Replay of the request that already holds the turn.
     if (options.extra[_writeHeld] == true) return;
-    final gate = Completer<void>();
-    final previous = _writeTail;
-    _writeTail = gate.future;
-    options.extra[_writeGate] = gate;
-    await previous;
+    if (_heldWrites == 0) {
+      _heldWrites = 1;
+      options.extra[_writeHeld] = true;
+      return;
+    }
+    final waiter = Completer<void>();
+    _writeWaiters.add(waiter);
+    await waiter.future;
     options.extra[_writeHeld] = true;
   }
 
@@ -81,23 +91,39 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
   void releaseWrite(RequestOptions options) {
     if (options.extra[_writeHeld] != true) return;
     options.extra[_writeHeld] = false;
-    final gate = options.extra.remove(_writeGate);
-    if (gate is Completer<void> && !gate.isCompleted) gate.complete();
+    _passTurn();
+  }
+
+  /// Hands the mutex to the next waiter after this call returns.
+  ///
+  /// [_heldWrites] stays 1 until that microtask, so a write that starts in
+  /// between queues instead of running beside the handoff.
+  void _passTurn() {
+    scheduleMicrotask(() {
+      if (_writeWaiters.isNotEmpty) {
+        final next = _writeWaiters.removeAt(0);
+        if (!next.isCompleted) next.complete();
+        return;
+      }
+      _heldWrites = 0;
+    });
   }
 
   /// Runs [action] only after every write that already holds the mutex has
   /// finished, and holds the mutex itself so a new write cannot start.
-  Future<T> _whenWritesIdle<T>(Future<T> Function() action) {
-    final gate = Completer<void>();
-    final previous = _writeTail;
-    _writeTail = gate.future;
-    return previous.then((_) async {
-      try {
-        return await action();
-      } finally {
-        if (!gate.isCompleted) gate.complete();
-      }
-    });
+  Future<T> _whenWritesIdle<T>(Future<T> Function() action) async {
+    if (_heldWrites != 0 || _writeWaiters.isNotEmpty) {
+      final waiter = Completer<void>();
+      _writeWaiters.add(waiter);
+      await waiter.future;
+    } else {
+      _heldWrites = 1;
+    }
+    try {
+      return await action();
+    } finally {
+      _passTurn();
+    }
   }
 
   @override

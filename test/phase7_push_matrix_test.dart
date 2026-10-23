@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_api_layer/core/network/api_client.dart';
@@ -259,9 +257,8 @@ Future<_DevicePostLog> _watchDevicePosts(
     notificationsPermission: permission,
     overrides: [pushTransportProvider.overrideWithValue(transport)],
   );
-  (layer.client as FakeApiClient).bindGateway(
-    _ObservingGateway(layer.client as FakeApiClient, log),
-  );
+  final fake = layer.client as FakeApiClient;
+  fake.bindGateway(_ObservingGateway(fake.boundGateway!, log));
   return log;
 }
 
@@ -328,9 +325,9 @@ class _DevicePostLog {
 }
 
 class _ObservingGateway implements ApiClient {
-  _ObservingGateway(this._fake, this._log);
+  _ObservingGateway(this._inner, this._log);
 
-  final FakeApiClient _fake;
+  final ApiClient _inner;
   final _DevicePostLog _log;
 
   void _note(String method, String path, Object? body) {
@@ -351,22 +348,18 @@ class _ObservingGateway implements ApiClient {
     Map<String, dynamic>? query,
   }) async {
     _note(method, path, body);
-    final result = await _fake.serveHttp(
-      method: method,
-      path: path,
-      data: body,
-      query: query,
-      headers: options.headers,
-      authenticated: options.authenticated,
-    );
-    if (result.status >= 400) {
-      throw StateError('fake ${result.status} $path');
-    }
-    final decoded = jsonDecode(result.body);
-    final data = decoded is Map && decoded.containsKey('data')
-        ? decoded['data']
-        : decoded;
-    return ApiResponse(statusCode: result.status, data: data);
+    return switch (method) {
+      'GET' => _inner.get(path, query: query, options: options),
+      'POST' => _inner.post(
+        path,
+        body: body,
+        query: query,
+        options: options,
+      ),
+      'PUT' => _inner.put(path, body: body, options: options),
+      'PATCH' => _inner.patch(path, body: body, options: options),
+      _ => _inner.delete(path, body: body, options: options),
+    };
   }
 
   @override

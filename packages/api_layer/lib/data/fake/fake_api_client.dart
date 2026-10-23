@@ -302,6 +302,13 @@ class FakeApiClient implements ApiClient {
   /// Routes later public calls through [gateway] (the auth interceptor).
   void bindGateway(ApiClient gateway) => _gateway = gateway;
 
+  /// Client installed by [bindGateway]. The fake stack sets the Dio client.
+  ///
+  /// A test that observes a call has to wrap this client. Replacing it with
+  /// a direct [serveHttp] call skips `X-Client-Api-Version`, the cookie, and
+  /// `X-CSRF-Token`, which the HTTP boundary now requires.
+  ApiClient? get boundGateway => _gateway;
+
   /// Drops the in-process cookie jar. The server session is left as it is.
   void dropHeldCookie() => _jarId = null;
 
