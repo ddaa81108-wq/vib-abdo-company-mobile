@@ -159,14 +159,6 @@ void main() {
     final error = mapper.fromResponse(403, _envelope('CSRF_REJECTED'));
     expect(isCsrfRejection(error), isTrue);
     expect(
-      isCsrfRejection(mapper.fromResponse(419, _envelope('CSRF_REJECTED'))),
-      isFalse,
-    );
-    expect(
-      isCsrfRejection(mapper.fromResponse(403, _envelope('CSRF_MISSING'))),
-      isFalse,
-    );
-    expect(
         isCsrfRejection(const ConflictException(
           code: 'VERSION_CONFLICT',
           message: 'تغيرت البيانات على الخادم، يرجى التحديث',

@@ -40,8 +40,8 @@ String? csrfTokenFromPayload(Object? body) {
 /// - No refresh flow: AUTH_REQUIRED -> forced logout.
 /// - A 419 that is not a CSRF error is session expiry (see [ErrorMapper]).
 ///   `docs/api/error-catalog.json` has no 419. `CSRF_REJECTED` is HTTP 403.
-///   Only that status and code is refreshed once and replayed once. A 419
-///   is not refreshed. Any other 419 still wipes the session.
+///   A 419 whose code or message contains CSRF still refreshes; any other 419
+///   still wipes the session.
 class CookieCsrfAuthStrategy implements AuthStrategy {
   CookieCsrfAuthStrategy(
       {required CookieStore cookieStore, required Dio bareDio})

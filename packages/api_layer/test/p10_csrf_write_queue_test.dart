@@ -190,8 +190,7 @@ void main() {
     expect(me.csrf, isNull);
   });
 
-  test(
-      '403 CSRF_REJECTED refreshes once; a 419 CSRF_REJECTED does not; a non-CSRF 419 wipes once',
+  test('403 and 419 CSRF_REJECTED refresh once; a non-CSRF 419 wipes once',
       () async {
     final harness = await _Harness.open();
     addTearDown(harness.dispose);
@@ -218,19 +217,14 @@ void main() {
     harness.adapter.rejectionStatus = 419;
     harness.adapter.writes.clear();
     final csrfBefore = harness.adapter.csrfFetches;
-    await expectLater(
-      harness.layer.client.post(
-        '/api/work',
-        body: const {'requestId': 'reject-419'},
-      ),
-      throwsA(
-        isA<CsrfRejectedException>()
-            .having((error) => error.statusCode, 'status', 419)
-            .having((error) => isCsrfRejection(error), 'replay', isFalse),
-      ),
+    await harness.layer.client.post(
+      '/api/work',
+      body: const {'requestId': 'reject-419'},
     );
-    expect(harness.adapter.csrfFetches, csrfBefore);
-    expect(harness.adapter.writes, hasLength(1));
+    expect(harness.adapter.csrfFetches, csrfBefore + 1);
+    expect(harness.adapter.writes, hasLength(2));
+    expect(harness.adapter.writes.last.csrf,
+        isNot(harness.adapter.writes.first.csrf));
     expect(harness.layer.session.state, isA<SessionAuthenticated>());
 
     harness.adapter.failNext = (status: 419, code: 'PAGE_EXPIRED');
