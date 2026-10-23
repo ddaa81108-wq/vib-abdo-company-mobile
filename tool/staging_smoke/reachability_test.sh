@@ -369,6 +369,35 @@ if grep -q 'placeholder-pass' "$stubdir/flutter-ok.out" "$flutter_capture"; then
   exit 1
 fi
 
+echo "== flutter smoke refuses any non-empty CI value =="
+for value in true 1 false yes; do
+  for var in CI GITHUB_ACTIONS; do
+    rm -f "$stubdir/should-not-flutter.txt"
+    set +e
+    env -i PATH="$stubdir:/usr/bin:/bin" HOME="${HOME:-/tmp}" \
+      FLUTTER_CAPTURE="$stubdir/should-not-flutter.txt" \
+      "$var=$value" \
+      STAGING_API_BASE='https://staging.company.test' \
+      STAGING_ADMIN_USERNAME='admin-placeholder' \
+      STAGING_ADMIN_PASSWORD='placeholder-pass' \
+      bash "$REACH" --flutter >"$stubdir/flutter-ci.out" 2>"$stubdir/flutter-ci.err"
+    code=$?
+    set -e
+    if [[ "$code" -eq 0 ]]; then
+      echo "$var=$value must refuse the authenticated smoke"
+      exit 1
+    fi
+    if [[ -f "$stubdir/should-not-flutter.txt" ]]; then
+      echo "$var=$value started flutter"
+      exit 1
+    fi
+    if grep -q 'placeholder-pass' "$stubdir/flutter-ci.out" "$stubdir/flutter-ci.err"; then
+      echo "$var=$value printed a password"
+      exit 1
+    fi
+  done
+done
+
 echo "== pin and auth notices =="
 out="$(SMOKE_AUTH_MISSING='STAGING_ADMIN_PASSWORD' bash "$REACH" --skip-auth-notice)"
 printf '%s\n' "$out" | grep -q 'secret not configured'

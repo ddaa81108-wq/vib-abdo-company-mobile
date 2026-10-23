@@ -2,11 +2,19 @@
 //
 // Self-test: tool/staging_negative_tests/run.sh --dry-run
 // That path does not open a socket. The required CI job calls it when this
-// file exists. Live mode is for the bot machine only. It refuses CI=true and
-// GITHUB_ACTIONS=true, and it uses the same origin rules as `classify_origin`
-// in the preflight: https only, a non-TLD label of staging/stage/test/testing,
-// and no *.invalid placeholder. GitHub does not store the usernames or
-// passwords.
+// file exists. Live mode is for the bot machine only. It refuses any
+// non-empty CI or GITHUB_ACTIONS value, and it uses the same origin rules as
+// `classify_origin` in the preflight: https only, a non-TLD label of
+// staging/stage/test/testing, and no *.invalid placeholder. GitHub does not
+// store the usernames or passwords.
+//
+// Live mode is read-only unless --allow-sandbox-writes is passed. Write
+// methods (POST, PUT, PATCH, DELETE) are skipped without that flag. The flag
+// is for a clean sandbox, not shared staging data, and needs Ali's explicit
+// approval each time. It is not an environment variable. Login is not a
+// negative write case: each account is logged in once per run and the
+// session is reused. Logout runs after the other cases so it does not
+// invalidate that session early.
 // ignore_for_file: avoid_print
 
 import 'dart:async';
@@ -19,6 +27,150 @@ const caseNames = <String>[
   'cookie-after-logout',
   'csrf-missing-and-invalid',
   'limited-manager-employee-totals',
+];
+
+/// Printed when a write probe is not sent. Live mode and `--dry-run` both use
+/// this sentence.
+const writeSkipDetail = 'skipped: write case, requires --allow-sandbox-writes';
+
+/// Process status for a live run that GitHub must not host.
+const liveCiExitCode = 2;
+
+const _employeeNegativeProbes = <_ProbeSpec>[
+  _ProbeSpec('GET', '/api/admin/employee-totals', {403}),
+  _ProbeSpec('GET', '/api/financial-ledger', {403, 404}),
+  _ProbeSpec('GET', '/api/statements/pdf', {403, 404}),
+  _ProbeSpec('GET', '/api/account-requests', {403, 404}),
+  _ProbeSpec('POST', '/api/collections/assignments', {403, 404}),
+  _ProbeSpec('POST', '/api/collections/days/close', {403, 404}),
+  _ProbeSpec('POST', '/api/collections/payroll/entries', {403, 404}),
+  _ProbeSpec(
+    'POST',
+    '/api/collections/submissions/staging-negative-other/decision',
+    {403, 404},
+  ),
+  _ProbeSpec(
+    'POST',
+    '/api/collections/submissions/staging-negative-other/cash-received',
+    {403, 404},
+  ),
+  _ProbeSpec(
+    'POST',
+    '/api/collections/unlinked-receipts/staging-negative-other/decision',
+    {403, 404},
+  ),
+  _ProbeSpec(
+    'PUT',
+    '/api/collections/payroll/employees/staging-negative-other/salary',
+    {403, 404},
+  ),
+];
+
+const _foreignWritePath = '/api/collections/<foreign-id>';
+
+/// Static catalogue. Dry-run prints this. The live runner uses the same
+/// methods and paths for the fixed probes.
+const plannedProbes = <PlannedProbe>[
+  PlannedProbe(
+    'employee-management-endpoints',
+    'GET',
+    '/api/admin/employee-totals',
+    note: 'admin',
+  ),
+  PlannedProbe(
+    'employee-management-endpoints',
+    'GET',
+    '/api/admin/employee-totals',
+    note: 'employee',
+  ),
+  PlannedProbe('employee-management-endpoints', 'GET', '/api/financial-ledger'),
+  PlannedProbe('employee-management-endpoints', 'GET', '/api/statements/pdf'),
+  PlannedProbe('employee-management-endpoints', 'GET', '/api/account-requests'),
+  PlannedProbe(
+    'employee-management-endpoints',
+    'POST',
+    '/api/collections/assignments',
+  ),
+  PlannedProbe(
+    'employee-management-endpoints',
+    'POST',
+    '/api/collections/days/close',
+  ),
+  PlannedProbe(
+    'employee-management-endpoints',
+    'POST',
+    '/api/collections/payroll/entries',
+  ),
+  PlannedProbe(
+    'employee-management-endpoints',
+    'POST',
+    '/api/collections/submissions/staging-negative-other/decision',
+  ),
+  PlannedProbe(
+    'employee-management-endpoints',
+    'POST',
+    '/api/collections/submissions/staging-negative-other/cash-received',
+  ),
+  PlannedProbe(
+    'employee-management-endpoints',
+    'POST',
+    '/api/collections/unlinked-receipts/staging-negative-other/decision',
+  ),
+  PlannedProbe(
+    'employee-management-endpoints',
+    'PUT',
+    '/api/collections/payroll/employees/staging-negative-other/salary',
+  ),
+  PlannedProbe(
+    'employee-foreign-resource-ids',
+    'GET',
+    '/api/collections',
+    note: 'employee 2',
+  ),
+  PlannedProbe(
+    'employee-foreign-resource-ids',
+    'GET',
+    '/api/collections',
+    note: 'employee 1',
+  ),
+  PlannedProbe(
+    'employee-foreign-resource-ids',
+    'POST',
+    _foreignWritePath,
+    note: 'discovered resource',
+  ),
+  PlannedProbe('cookie-after-logout', 'POST', '/api/auth/logout'),
+  PlannedProbe(
+    'cookie-after-logout',
+    'GET',
+    '/api/me',
+    note: 'after logout',
+    partOfWriteCase: true,
+  ),
+  PlannedProbe(
+    'cookie-after-logout',
+    'POST',
+    '/api/collections/unlinked-receipts',
+    note: 'after logout',
+  ),
+  PlannedProbe(
+    'csrf-missing-and-invalid',
+    'POST',
+    '/api/collections/unlinked-receipts',
+    note: 'missing CSRF',
+  ),
+  PlannedProbe(
+    'csrf-missing-and-invalid',
+    'POST',
+    '/api/collections/unlinked-receipts',
+    note: 'invalid CSRF',
+  ),
+  PlannedProbe(
+    'limited-manager-employee-totals',
+    'GET',
+    '/api/admin/employee-totals',
+    note: 'limited manager',
+  ),
 ];
 
 const _requiredEnv = <String>[
@@ -70,10 +222,75 @@ class ConfigProblem implements Exception {
   final String message;
 }
 
-/// Live mode must not run on GitHub Actions. `--dry-run` does not call this.
+/// Live mode must not run on GitHub. Any non-empty value blocks the run.
+/// Empty and unset are the only values that may proceed. `--dry-run` does
+/// not call this on the way to a socket.
 bool githubHostsLiveRun(Map<String, String> env) {
-  bool isTrue(String key) => (env[key] ?? '').trim().toLowerCase() == 'true';
-  return isTrue('CI') || isTrue('GITHUB_ACTIONS');
+  bool blocks(String key) => (env[key] ?? '').trim().isNotEmpty;
+  return blocks('CI') || blocks('GITHUB_ACTIONS');
+}
+
+/// Null when a live run may continue. Otherwise the message main prints
+/// before exiting [liveCiExitCode].
+String? liveRunRefusal(Map<String, String> env) {
+  if (!githubHostsLiveRun(env)) return null;
+  return 'Refusing a live staging permission check on GitHub. '
+      'CI or GITHUB_ACTIONS is set to a non-empty value. '
+      'Run it on the bot machine. GitHub does not store staging usernames or passwords.';
+}
+
+bool isReadMethod(String method) {
+  final upper = method.toUpperCase();
+  return upper == 'GET' || upper == 'HEAD';
+}
+
+String caseAccess(String name) {
+  final probes = plannedProbes.where((probe) => probe.caseName == name);
+  final skipped = probes.where((probe) => probe.skippedByDefault).length;
+  final total = probes.length;
+  if (total == 0) return 'read';
+  if (skipped == 0) return 'read';
+  if (skipped == total) return 'write';
+  return 'mixed';
+}
+
+String planRow(PlannedProbe probe, {required bool allowSandboxWrites}) {
+  final action = probe.skippedByDefault && !allowSandboxWrites
+      ? writeSkipDetail
+      : 'run';
+  final note = probe.note.isEmpty ? '' : ' (${probe.note})';
+  return '| ${probe.caseName} | ${caseAccess(probe.caseName)} | ${probe.method} | ${probe.path}$note | $action |';
+}
+
+List<String> probePlanLines({required bool allowSandboxWrites}) => [
+  for (final probe in plannedProbes)
+    planRow(probe, allowSandboxWrites: allowSandboxWrites),
+];
+
+void _printProbePlan({required bool allowSandboxWrites}) {
+  final reads = plannedProbes.where((probe) => !probe.skippedByDefault).length;
+  final writes = plannedProbes.where((probe) => probe.skippedByDefault).length;
+  print('live case plan:');
+  if (allowSandboxWrites) {
+    print(
+      '--allow-sandbox-writes is set. Write probes would run on a live run. This dry-run opens no socket.',
+    );
+  } else {
+    print(
+      'read-only default. Write probes are not sent unless --allow-sandbox-writes is set.',
+    );
+  }
+  print('| case | access | method | path | default |');
+  for (final row in probePlanLines(allowSandboxWrites: allowSandboxWrites)) {
+    print(row);
+  }
+  if (allowSandboxWrites) {
+    print(
+      'probes: $reads read, $writes write. Write probes would run. They still need a clean sandbox and Ali\'s approval.',
+    );
+  } else {
+    print('probes: $reads read, $writes write. Write probes $writeSkipDetail');
+  }
 }
 
 class ProbeResult {
@@ -87,19 +304,19 @@ class ProbeResult {
 Future<void> main(List<String> args) async {
   final parsed = _parseArgs(args);
   if (parsed.dryRun) {
-    final results = _selfTest();
+    final results = await _selfTest();
     _printTable(results);
+    print('');
+    _printProbePlan(allowSandboxWrites: parsed.allowSandboxWrites);
     if (parsed.junitPath != null) {
       await File(parsed.junitPath!).writeAsString(_junit(results));
     }
     exit(results.any((row) => row.failed) ? 1 : 0);
   }
-  if (githubHostsLiveRun(Platform.environment)) {
-    stderr.writeln(
-      'Refusing a live staging permission check on GitHub. '
-      'Run it on the bot machine. GitHub does not store staging usernames or passwords.',
-    );
-    exit(2);
+  final refusal = liveRunRefusal(Platform.environment);
+  if (refusal != null) {
+    stderr.writeln(refusal);
+    exit(liveCiExitCode);
   }
   late final StagingConfig config;
   try {
@@ -108,7 +325,10 @@ Future<void> main(List<String> args) async {
     stderr.writeln(error.message);
     exit(2);
   }
-  final results = await _runLive(config);
+  final results = await _runLive(
+    config,
+    allowSandboxWrites: parsed.allowSandboxWrites,
+  );
   _printTable(results);
   if (parsed.junitPath != null) {
     await File(parsed.junitPath!).writeAsString(_junit(results));
@@ -117,18 +337,26 @@ Future<void> main(List<String> args) async {
 }
 
 class _Args {
-  _Args({required this.dryRun, this.junitPath});
+  _Args({
+    required this.dryRun,
+    required this.allowSandboxWrites,
+    this.junitPath,
+  });
   final bool dryRun;
+  final bool allowSandboxWrites;
   final String? junitPath;
 }
 
 _Args _parseArgs(List<String> args) {
   var dryRun = false;
+  var allowSandboxWrites = false;
   String? junit;
   for (var i = 0; i < args.length; i++) {
     final arg = args[i];
     if (arg == '--dry-run') {
       dryRun = true;
+    } else if (arg == '--allow-sandbox-writes') {
+      allowSandboxWrites = true;
     } else if (arg == '--junit') {
       if (i + 1 >= args.length) {
         stderr.writeln('--junit needs a file path');
@@ -137,10 +365,17 @@ _Args _parseArgs(List<String> args) {
       junit = args[++i];
     } else {
       stderr.writeln('Unknown argument: $arg');
+      stderr.writeln(
+        'usage: run.sh [--dry-run] [--junit <file>] [--allow-sandbox-writes]',
+      );
       exit(2);
     }
   }
-  return _Args(dryRun: dryRun, junitPath: junit);
+  return _Args(
+    dryRun: dryRun,
+    allowSandboxWrites: allowSandboxWrites,
+    junitPath: junit,
+  );
 }
 
 StagingConfig requireConfig(Map<String, String> env) {
@@ -258,7 +493,7 @@ Uri _requireStagingBase(String raw) {
   return Uri.parse(raw.trim());
 }
 
-List<CaseResult> _selfTest() {
+Future<List<CaseResult>> _selfTest() async {
   final results = <CaseResult>[];
   void check(String name, void Function() body) {
     try {
@@ -269,15 +504,53 @@ List<CaseResult> _selfTest() {
     }
   }
 
-  check('live mode refuses GitHub Actions', () {
-    if (!githubHostsLiveRun(const {'CI': 'true'})) {
-      throw StateError('CI=true was allowed');
+  Future<void> checkAsync(String name, Future<void> Function() body) async {
+    try {
+      await body();
+      results.add(CaseResult(name, 'PASS', ''));
+    } on Object catch (error) {
+      results.add(CaseResult(name, 'FAIL', '$error'));
     }
-    if (!githubHostsLiveRun(const {'GITHUB_ACTIONS': 'true'})) {
-      throw StateError('GITHUB_ACTIONS=true was allowed');
+  }
+
+  check('live mode refuses any non-empty CI value', () {
+    const blocked = ['true', '1', 'false', 'yes', 'TRUE', ' false '];
+    for (final value in blocked) {
+      if (liveRunRefusal(const {}) != null) {
+        throw StateError('unset environment was refused');
+      }
+      if (!githubHostsLiveRun({'CI': value})) {
+        throw StateError('CI=$value was allowed');
+      }
+      if (!githubHostsLiveRun({'GITHUB_ACTIONS': value})) {
+        throw StateError('GITHUB_ACTIONS=$value was allowed');
+      }
+      final refusal = liveRunRefusal({'CI': value});
+      if (refusal == null || !refusal.contains('non-empty')) {
+        throw StateError('CI=$value had no refusal message');
+      }
+      if (liveRunRefusal({'GITHUB_ACTIONS': value}) == null) {
+        throw StateError('GITHUB_ACTIONS=$value had no refusal message');
+      }
+    }
+    if (githubHostsLiveRun(const {'CI': ''})) {
+      throw StateError('empty CI was refused');
+    }
+    if (githubHostsLiveRun(const {'GITHUB_ACTIONS': ''})) {
+      throw StateError('empty GITHUB_ACTIONS was refused');
+    }
+    if (githubHostsLiveRun(const {'CI': '   ', 'GITHUB_ACTIONS': ' \t '})) {
+      throw StateError('blank CI values were refused');
     }
     if (githubHostsLiveRun(const {})) {
       throw StateError('a local shell was refused');
+    }
+    if (liveRunRefusal(const {}) != null ||
+        liveRunRefusal(const {'CI': ''}) != null) {
+      throw StateError('empty or unset CI produced a refusal');
+    }
+    if (liveCiExitCode != 2) {
+      throw StateError('live CI exit code drifted from 2');
     }
   });
   check('dry-run does not require env', () {
@@ -301,6 +574,71 @@ List<CaseResult> _selfTest() {
     if (caseNames.toSet().length != expected.length ||
         !expected.containsAll(caseNames)) {
       throw StateError('case names drifted');
+    }
+    for (final probe in _employeeNegativeProbes) {
+      final planned = plannedProbes.where(
+        (row) =>
+            row.caseName == 'employee-management-endpoints' &&
+            row.method == probe.method &&
+            row.path == probe.path,
+      );
+      if (planned.isEmpty) {
+        throw StateError('plan missing ${probe.method} ${probe.path}');
+      }
+      final skipped = !isReadMethod(probe.method);
+      if (planned.any((row) => row.skippedByDefault != skipped)) {
+        throw StateError('plan kind drifted for ${probe.method} ${probe.path}');
+      }
+    }
+    if (plannedProbes.any((probe) => probe.path == '/api/auth/login')) {
+      throw StateError('login was listed as a negative case');
+    }
+  });
+  check('dry-run lists read and write probes', () {
+    if (caseAccess('limited-manager-employee-totals') != 'read') {
+      throw StateError('limited manager case is not read');
+    }
+    if (caseAccess('cookie-after-logout') != 'write') {
+      throw StateError('logout case is not write');
+    }
+    if (caseAccess('csrf-missing-and-invalid') != 'write') {
+      throw StateError('csrf case is not write');
+    }
+    if (caseAccess('employee-management-endpoints') != 'mixed') {
+      throw StateError('employee management case is not mixed');
+    }
+    if (caseAccess('employee-foreign-resource-ids') != 'mixed') {
+      throw StateError('foreign id case is not mixed');
+    }
+    final skipped = probePlanLines(allowSandboxWrites: false);
+    final running = probePlanLines(allowSandboxWrites: true);
+    if (skipped.length != plannedProbes.length ||
+        running.length != plannedProbes.length) {
+      throw StateError('plan row count drifted');
+    }
+    for (var i = 0; i < plannedProbes.length; i++) {
+      final probe = plannedProbes[i];
+      if (probe.skippedByDefault) {
+        if (!skipped[i].contains(writeSkipDetail)) {
+          throw StateError('write probe was not skipped: ${skipped[i]}');
+        }
+        if (running[i].contains(writeSkipDetail) ||
+            !running[i].endsWith('| run |')) {
+          throw StateError('flag did not enable ${running[i]}');
+        }
+      } else if (skipped[i].contains(writeSkipDetail) ||
+          !skipped[i].contains('| ${caseAccess(probe.caseName)} |') ||
+          !skipped[i].endsWith('| run |')) {
+        throw StateError('read probe was skipped: ${skipped[i]}');
+      }
+    }
+    final parsed = _parseArgs(const ['--dry-run']);
+    if (parsed.allowSandboxWrites || !parsed.dryRun) {
+      throw StateError('default dry-run parsed a write flag');
+    }
+    final enabled = _parseArgs(const ['--dry-run', '--allow-sandbox-writes']);
+    if (!enabled.allowSandboxWrites || !enabled.dryRun) {
+      throw StateError('write flag was not parsed');
     }
   });
   check('production and non-staging hosts are refused', () {
@@ -465,41 +803,144 @@ List<CaseResult> _selfTest() {
       ],
     }, 'longer id u_200');
   });
+  await checkAsync('each account logs in once', () async {
+    await _assertLoginOnce(allowSandboxWrites: false);
+    await _assertLoginOnce(allowSandboxWrites: true);
+  });
+  await checkAsync('read-only run does not send write methods', () async {
+    final fake = _FakeProbeClient();
+    final results = await _runLive(
+      _offlineConfig(),
+      client: fake,
+      allowSandboxWrites: false,
+      announceSkips: false,
+    );
+    if (fake.writeCalls.isNotEmpty) {
+      throw StateError('read-only run sent ${fake.writeCalls.join(', ')}');
+    }
+    if (fake.writeCalls.any((call) => call.contains('unlinked-receipts'))) {
+      throw StateError('unlinked receipt write was sent');
+    }
+    final byName = {for (final row in results) row.name: row};
+    for (final name in const [
+      'cookie-after-logout',
+      'csrf-missing-and-invalid',
+    ]) {
+      final row = byName[name]!;
+      if (row.status != 'SKIP' || row.detail != writeSkipDetail) {
+        throw StateError('$name was ${row.status}: ${row.detail}');
+      }
+    }
+    for (final name in const [
+      'employee-management-endpoints',
+      'employee-foreign-resource-ids',
+      'limited-manager-employee-totals',
+    ]) {
+      final row = byName[name]!;
+      if (row.failed) throw StateError('$name failed: ${row.detail}');
+      if (!row.detail.contains(writeSkipDetail) &&
+          name != 'limited-manager-employee-totals') {
+        throw StateError('$name did not record the write skip');
+      }
+    }
+  });
   return results;
 }
 
-Future<List<CaseResult>> _runLive(StagingConfig config) async {
-  final http = HttpClient();
-  http.connectionTimeout = const Duration(seconds: 20);
-  http.findProxy = HttpClient.findProxyFromEnvironment;
-  try {
-    final results = <CaseResult>[];
-    results.add(await _employeeManagement(http, config));
-    results.add(await _foreignIds(http, config));
-    results.add(await _afterLogout(http, config));
-    results.add(await _csrf(http, config));
-    results.add(await _limitedManager(http, config));
-    return results;
-  } finally {
-    http.close(force: true);
+Future<void> _assertLoginOnce({required bool allowSandboxWrites}) async {
+  final fake = _FakeProbeClient();
+  final results = await _runLive(
+    _offlineConfig(),
+    client: fake,
+    allowSandboxWrites: allowSandboxWrites,
+    announceSkips: false,
+  );
+  const accounts = ['admin', 'employee', 'employee2', 'limited'];
+  for (final account in accounts) {
+    final count = fake.loginsByAccount[account] ?? 0;
+    if (count != 1) {
+      throw StateError(
+        '$account login count was $count when allowSandboxWrites=$allowSandboxWrites',
+      );
+    }
+  }
+  if (fake.loginsByAccount.length != accounts.length) {
+    throw StateError(
+      'unexpected login accounts: ${fake.loginsByAccount.keys.join(', ')}',
+    );
+  }
+  if (!allowSandboxWrites) {
+    if (fake.writeCalls.isNotEmpty) {
+      throw StateError('writes sent without the flag: ${fake.writeCalls}');
+    }
+    return;
+  }
+  if (fake.writeCalls.isEmpty) {
+    throw StateError('sandbox run sent no write methods');
+  }
+  if (!fake.writeCalls.any((call) => call.contains('unlinked-receipts'))) {
+    throw StateError('sandbox run did not exercise the receipt write');
+  }
+  for (final row in results) {
+    if (row.failed) {
+      throw StateError(
+        '${row.name} failed in the offline sandbox run: ${row.detail}',
+      );
+    }
   }
 }
 
-Future<CaseResult> _employeeManagement(
-  HttpClient http,
-  StagingConfig config,
-) async {
+StagingConfig _offlineConfig() => StagingConfig(
+  base: Uri.parse('https://staging.company.test'),
+  adminUsername: 'admin',
+  adminPassword: 'admin-pw',
+  employeeUsername: 'employee',
+  employeePassword: 'employee-pw',
+  employee2Username: 'employee2',
+  employee2Password: 'employee2-pw',
+  limitedUsername: 'limited',
+  limitedPassword: 'limited-pw',
+);
+
+Future<List<CaseResult>> _runLive(
+  StagingConfig config, {
+  ProbeClient? client,
+  bool allowSandboxWrites = false,
+  bool announceSkips = true,
+}) async {
+  final owned = client == null;
+  final probe = client ?? _IoProbeClient();
+  final live = _Live(
+    client: probe,
+    config: config,
+    allowSandboxWrites: allowSandboxWrites,
+    announceSkips: announceSkips,
+  );
+  try {
+    // Logout is last so the shared employee session stays valid for the
+    // earlier cases. The printed table stays in [caseNames] order.
+    final byName = <String, CaseResult>{
+      'employee-management-endpoints': await _employeeManagement(live),
+      'employee-foreign-resource-ids': await _foreignIds(live),
+      'csrf-missing-and-invalid': await _csrf(live),
+      'limited-manager-employee-totals': await _limitedManager(live),
+      'cookie-after-logout': await _afterLogout(live),
+    };
+    return [for (final name in caseNames) byName[name]!];
+  } finally {
+    if (owned) probe.close();
+  }
+}
+
+Future<CaseResult> _employeeManagement(_Live live) async {
   const name = 'employee-management-endpoints';
   try {
-    final admin = await _login(
-      http,
-      config,
-      config.adminUsername,
-      config.adminPassword,
+    final admin = await live.account(
+      live.config.adminUsername,
+      live.config.adminPassword,
     );
-    final adminTotals = await _send(
-      http,
-      config.base,
+    final adminTotals = await live.client.send(
+      base: live.config.base,
       method: 'GET',
       path: '/api/admin/employee-totals',
       session: admin,
@@ -514,59 +955,31 @@ Future<CaseResult> _employeeManagement(
         'admin employee-totals -> ${adminTotals.status}',
       );
     }
-    final session = await _login(
-      http,
-      config,
-      config.employeeUsername,
-      config.employeePassword,
+    final session = await live.account(
+      live.config.employeeUsername,
+      live.config.employeePassword,
     );
-    final checks = <(String, String, Set<int>)>[
-      ('GET', '/api/admin/employee-totals', {403}),
-      ('GET', '/api/financial-ledger', {403, 404}),
-      ('GET', '/api/statements/pdf', {403, 404}),
-      ('GET', '/api/account-requests', {403, 404}),
-      ('POST', '/api/collections/assignments', {403, 404}),
-      ('POST', '/api/collections/days/close', {403, 404}),
-      ('POST', '/api/collections/payroll/entries', {403, 404}),
-      (
-        'POST',
-        '/api/collections/submissions/staging-negative-other/decision',
-        {403, 404},
-      ),
-      (
-        'POST',
-        '/api/collections/submissions/staging-negative-other/cash-received',
-        {403, 404},
-      ),
-      (
-        'POST',
-        '/api/collections/unlinked-receipts/staging-negative-other/decision',
-        {403, 404},
-      ),
-      (
-        'PUT',
-        '/api/collections/payroll/employees/staging-negative-other/salary',
-        {403, 404},
-      ),
-    ];
     final lines = <String>['admin employee-totals ${adminTotals.status}'];
-    for (final check in checks) {
-      final probe = await _send(
-        http,
-        config.base,
-        method: check.$1,
-        path: check.$2,
+    for (final check in _employeeNegativeProbes) {
+      if (live.blocksWrite(check.method)) {
+        live.noteSkip(lines, check.method, check.path);
+        continue;
+      }
+      final probe = await live.client.send(
+        base: live.config.base,
+        method: check.method,
+        path: check.path,
         session: session,
-        jsonBody: check.$1 == 'GET' ? null : _writeBody(check.$2),
+        jsonBody: isReadMethod(check.method) ? null : _writeBody(check.path),
       );
-      if (!check.$3.contains(probe.status) || probe.ok) {
+      if (!check.expected.contains(probe.status) || probe.ok) {
         return CaseResult(
           name,
           'FAIL',
-          '${check.$1} ${check.$2} -> ${probe.status}, expected ${check.$3.join('/')}',
+          '${check.method} ${check.path} -> ${probe.status}, expected ${check.expected.join('/')}',
         );
       }
-      lines.add('${check.$2} ${probe.status}');
+      lines.add('${check.path} ${probe.status}');
     }
     return CaseResult(name, 'PASS', lines.join('; '));
   } on _ProbeProblem catch (error) {
@@ -574,18 +987,15 @@ Future<CaseResult> _employeeManagement(
   }
 }
 
-Future<CaseResult> _foreignIds(HttpClient http, StagingConfig config) async {
+Future<CaseResult> _foreignIds(_Live live) async {
   const name = 'employee-foreign-resource-ids';
   try {
-    final other = await _login(
-      http,
-      config,
-      config.employee2Username,
-      config.employee2Password,
+    final other = await live.account(
+      live.config.employee2Username,
+      live.config.employee2Password,
     );
-    final overview = await _send(
-      http,
-      config.base,
+    final overview = await live.client.send(
+      base: live.config.base,
       method: 'GET',
       path: '/api/collections',
       session: other,
@@ -594,15 +1004,12 @@ Future<CaseResult> _foreignIds(HttpClient http, StagingConfig config) async {
       return CaseResult(name, 'FAIL', 'employee2 collections returned 401');
     }
     final ids = _ids(overview.body);
-    final employee = await _login(
-      http,
-      config,
-      config.employeeUsername,
-      config.employeePassword,
+    final employee = await live.account(
+      live.config.employeeUsername,
+      live.config.employeePassword,
     );
-    final own = await _send(
-      http,
-      config.base,
+    final own = await live.client.send(
+      base: live.config.base,
       method: 'GET',
       path: '/api/collections',
       session: employee,
@@ -618,6 +1025,11 @@ Future<CaseResult> _foreignIds(HttpClient http, StagingConfig config) async {
     // open question for Ali. A present array is not a failure. An owner
     // field equal to employee 2's userId or employeeId still fails
     // through _leaks above, including ids shorter than 8 characters.
+    final lines = <String>[];
+    if (!live.allowSandboxWrites) {
+      live.noteSkip(lines, 'POST', _foreignWritePath);
+      return CaseResult(name, 'PASS', lines.join('; '));
+    }
     if (ids.isEmpty) {
       return CaseResult(
         name,
@@ -625,11 +1037,9 @@ Future<CaseResult> _foreignIds(HttpClient http, StagingConfig config) async {
         'employee2 collections response had no resource id to probe',
       );
     }
-    final lines = <String>[];
     for (final id in ids) {
-      final probe = await _send(
-        http,
-        config.base,
+      final probe = await live.client.send(
+        base: live.config.base,
         method: 'POST',
         path: id.path,
         session: employee,
@@ -657,18 +1067,16 @@ Future<CaseResult> _foreignIds(HttpClient http, StagingConfig config) async {
   }
 }
 
-Future<CaseResult> _afterLogout(HttpClient http, StagingConfig config) async {
+Future<CaseResult> _afterLogout(_Live live) async {
   const name = 'cookie-after-logout';
+  if (!live.allowSandboxWrites) return live.skipCase(name);
   try {
-    final session = await _login(
-      http,
-      config,
-      config.employeeUsername,
-      config.employeePassword,
+    final session = await live.account(
+      live.config.employeeUsername,
+      live.config.employeePassword,
     );
-    final logout = await _send(
-      http,
-      config.base,
+    final logout = await live.client.send(
+      base: live.config.base,
       method: 'POST',
       path: '/api/auth/logout',
       session: session,
@@ -676,16 +1084,14 @@ Future<CaseResult> _afterLogout(HttpClient http, StagingConfig config) async {
     if (!logout.ok && logout.status != 204) {
       return CaseResult(name, 'FAIL', 'logout -> ${logout.status}');
     }
-    final me = await _send(
-      http,
-      config.base,
+    final me = await live.client.send(
+      base: live.config.base,
       method: 'GET',
       path: '/api/me',
       session: session,
     );
-    final write = await _send(
-      http,
-      config.base,
+    final write = await live.client.send(
+      base: live.config.base,
       method: 'POST',
       path: '/api/collections/unlinked-receipts',
       session: session,
@@ -704,18 +1110,16 @@ Future<CaseResult> _afterLogout(HttpClient http, StagingConfig config) async {
   }
 }
 
-Future<CaseResult> _csrf(HttpClient http, StagingConfig config) async {
+Future<CaseResult> _csrf(_Live live) async {
   const name = 'csrf-missing-and-invalid';
+  if (!live.allowSandboxWrites) return live.skipCase(name);
   try {
-    final session = await _login(
-      http,
-      config,
-      config.employeeUsername,
-      config.employeePassword,
+    final session = await live.account(
+      live.config.employeeUsername,
+      live.config.employeePassword,
     );
-    final missing = await _send(
-      http,
-      config.base,
+    final missing = await live.client.send(
+      base: live.config.base,
       method: 'POST',
       path: '/api/collections/unlinked-receipts',
       session: _Session(
@@ -727,9 +1131,8 @@ Future<CaseResult> _csrf(HttpClient http, StagingConfig config) async {
       jsonBody: _writeBody('/api/collections/unlinked-receipts'),
       sendCsrf: false,
     );
-    final invalid = await _send(
-      http,
-      config.base,
+    final invalid = await live.client.send(
+      base: live.config.base,
       method: 'POST',
       path: '/api/collections/unlinked-receipts',
       session: _Session(
@@ -757,12 +1160,10 @@ Future<CaseResult> _csrf(HttpClient http, StagingConfig config) async {
   }
 }
 
-Future<CaseResult> _limitedManager(
-  HttpClient http,
-  StagingConfig config,
-) async {
+Future<CaseResult> _limitedManager(_Live live) async {
   const name = 'limited-manager-employee-totals';
-  if (config.limitedUsername == null || config.limitedPassword == null) {
+  if (live.config.limitedUsername == null ||
+      live.config.limitedPassword == null) {
     return CaseResult(
       name,
       'SKIP',
@@ -770,15 +1171,12 @@ Future<CaseResult> _limitedManager(
     );
   }
   try {
-    final session = await _login(
-      http,
-      config,
-      config.limitedUsername!,
-      config.limitedPassword!,
+    final session = await live.account(
+      live.config.limitedUsername!,
+      live.config.limitedPassword!,
     );
-    final probe = await _send(
-      http,
-      config.base,
+    final probe = await live.client.send(
+      base: live.config.base,
       method: 'GET',
       path: '/api/admin/employee-totals',
       session: session,
@@ -794,6 +1192,208 @@ Future<CaseResult> _limitedManager(
   } on _ProbeProblem catch (error) {
     return CaseResult(name, 'FAIL', error.message);
   }
+}
+
+class PlannedProbe {
+  const PlannedProbe(
+    this.caseName,
+    this.method,
+    this.path, {
+    this.note = '',
+    this.partOfWriteCase = false,
+  });
+
+  final String caseName;
+  final String method;
+  final String path;
+  final String note;
+
+  /// A read method that only makes sense after a write in the same case.
+  /// `GET /api/me` after logout is one. Running it alone is not a read check.
+  final bool partOfWriteCase;
+
+  bool get skippedByDefault => !isReadMethod(method) || partOfWriteCase;
+}
+
+class _ProbeSpec {
+  const _ProbeSpec(this.method, this.path, this.expected);
+
+  final String method;
+  final String path;
+  final Set<int> expected;
+}
+
+class _Live {
+  _Live({
+    required this.client,
+    required this.config,
+    required this.allowSandboxWrites,
+    required this.announceSkips,
+  });
+
+  final ProbeClient client;
+  final StagingConfig config;
+  final bool allowSandboxWrites;
+  final bool announceSkips;
+  final Map<String, _Session> _sessions = {};
+
+  bool blocksWrite(String method) =>
+      !allowSandboxWrites && !isReadMethod(method);
+
+  Future<_Session> account(String username, String password) async {
+    final cached = _sessions[username];
+    if (cached != null) return cached;
+    final session = await _login(client, config, username, password);
+    _sessions[username] = session;
+    return session;
+  }
+
+  void noteSkip(List<String> lines, String method, String path) {
+    final line = '$writeSkipDetail ($method $path)';
+    if (announceSkips) print(line);
+    lines.add(line);
+  }
+
+  CaseResult skipCase(String name) {
+    if (announceSkips) print(writeSkipDetail);
+    return CaseResult(name, 'SKIP', writeSkipDetail);
+  }
+}
+
+/// HTTP for one probe. The live client uses `dart:io`. The dry-run uses
+/// [_FakeProbeClient] and must not construct an [HttpClient].
+abstract class ProbeClient {
+  Future<ProbeResult> send({
+    required Uri base,
+    required String method,
+    required String path,
+    _Session? session,
+    Object? jsonBody,
+    bool sendCsrf = true,
+  });
+
+  void close();
+}
+
+class _IoProbeClient implements ProbeClient {
+  _IoProbeClient() {
+    _http.connectionTimeout = const Duration(seconds: 20);
+    _http.findProxy = HttpClient.findProxyFromEnvironment;
+  }
+
+  final HttpClient _http = HttpClient();
+
+  @override
+  Future<ProbeResult> send({
+    required Uri base,
+    required String method,
+    required String path,
+    _Session? session,
+    Object? jsonBody,
+    bool sendCsrf = true,
+  }) {
+    return _send(
+      _http,
+      base,
+      method: method,
+      path: path,
+      session: session,
+      jsonBody: jsonBody,
+      sendCsrf: sendCsrf,
+    );
+  }
+
+  @override
+  void close() => _http.close(force: true);
+}
+
+/// In-memory host for the offline login-count check. No socket.
+class _FakeProbeClient implements ProbeClient {
+  final Map<String, int> loginsByAccount = {};
+  final List<String> writeCalls = [];
+  final Set<String> _loggedOut = {};
+
+  @override
+  Future<ProbeResult> send({
+    required Uri base,
+    required String method,
+    required String path,
+    _Session? session,
+    Object? jsonBody,
+    bool sendCsrf = true,
+  }) async {
+    if (path == '/api/auth/login') {
+      final body = jsonBody is Map ? jsonBody : const {};
+      final username = body['username'];
+      if (username is! String || username.isEmpty) {
+        return ProbeResult(401, '{}');
+      }
+      loginsByAccount[username] = (loginsByAccount[username] ?? 0) + 1;
+      final result = ProbeResult(
+        200,
+        jsonEncode({
+          'data': {
+            'csrfToken': 'csrf-$username',
+            'user': {
+              'id': 'id-$username',
+              'userId': 'id-$username',
+              'employeeId': 'emp-$username',
+              'displayName': username,
+            },
+          },
+        }),
+      );
+      result.cookieHeader = 'sid=$username';
+      return result;
+    }
+    final upper = method.toUpperCase();
+    if (!isReadMethod(upper)) writeCalls.add('$upper $path');
+    final cookie = session?.cookie ?? '';
+    if (path == '/api/auth/logout') {
+      _loggedOut.add(cookie);
+      return ProbeResult(204, '');
+    }
+    if (_loggedOut.contains(cookie)) return ProbeResult(401, '{}');
+    if (path == '/api/admin/employee-totals') {
+      if (cookie == 'sid=admin') return ProbeResult(200, '{"data":{}}');
+      return ProbeResult(403, '{}');
+    }
+    if (path == '/api/collections' && upper == 'GET') {
+      if (cookie == 'sid=employee2') {
+        return ProbeResult(
+          200,
+          jsonEncode({
+            'submissions': [
+              {'id': 'foreign-sub', 'mode': 'full', 'submittedByName': 'other'},
+            ],
+          }),
+        );
+      }
+      return ProbeResult(
+        200,
+        jsonEncode({
+          'submissions': [
+            {
+              'id': 'own-sub',
+              'mode': 'full',
+              'submittedByUserId': 'id-employee',
+            },
+          ],
+        }),
+      );
+    }
+    if (!sendCsrf || session == null || session.csrf.isEmpty) {
+      if (!isReadMethod(upper)) return ProbeResult(403, '{}');
+    }
+    if (session != null && session.csrf == 'staging-negative-invalid-csrf') {
+      return ProbeResult(403, '{}');
+    }
+    if (!isReadMethod(upper)) return ProbeResult(403, '{}');
+    return ProbeResult(403, '{}');
+  }
+
+  @override
+  void close() {}
 }
 
 class _Session {
@@ -833,14 +1433,13 @@ class _ProbeProblem implements Exception {
 }
 
 Future<_Session> _login(
-  HttpClient http,
+  ProbeClient client,
   StagingConfig config,
   String username,
   String password,
 ) async {
-  final probe = await _send(
-    http,
-    config.base,
+  final probe = await client.send(
+    base: config.base,
     method: 'POST',
     path: '/api/auth/login',
     jsonBody: {'username': username, 'password': password},
@@ -862,9 +1461,8 @@ Future<_Session> _login(
   }
   var csrf = token is String ? token : '';
   if (csrf.isEmpty) {
-    final fetched = await _send(
-      http,
-      config.base,
+    final fetched = await client.send(
+      base: config.base,
       method: 'GET',
       path: '/api/auth/csrf',
       session: _Session(cookie, '', '', ''),
