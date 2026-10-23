@@ -484,7 +484,8 @@ void main() {
     );
     expect(ack.version, isNull);
     expect(ack.raw['status'], 'approved');
-    expect(ack.raw['balanceUnits'], 50);
+    expect(ack.balanceUnits, isNull);
+    expect(ack.raw.containsKey('balanceUnits'), isFalse);
     expect(ack.raw.containsKey('version'), isFalse);
     var overview = await api.collections.overview();
     var receipt = overview.unlinkedReceipts.firstWhere(

@@ -98,15 +98,15 @@ void main() {
     tester,
   ) async {
     // 🔶 cashStatus / cashPending. ur_1 is not_applicable, so cash stays
-    // hidden. ur_2 is rejected and cash pending, so decide stays hidden and
-    // cash is shown.
+    // hidden. ur_2 is rejected with cash pending, so decide and cash both
+    // stay hidden. A linked submission still shows cash from its own flag.
     await pumpFakeApp(tester, size: const Size(800, 2400));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
 
     expect(find.byKey(const Key('unlinked-cash-ur_1')), findsNothing);
     expect(find.byKey(const Key('unlinked-reject-ur_2')), findsNothing);
-    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsOneWidget);
+    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
     expect(find.byKey(const Key('cash-sb_2')), findsOneWidget);
     expect(find.byKey(const Key('approve-sb_2')), findsNothing);
   }, tags: ['pending-decision']);

@@ -40,9 +40,9 @@ void main() {
       Key('unlinked-approve-ur_1'),
       Key('unlinked-link-ur_1'),
       Key('unlinked-reject-ur_1'),
-      Key('unlinked-cash-ur_2'),
     ]);
     expect(find.byKey(const Key('unlinked-cash-ur_1')), findsNothing);
+    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
     expect(find.byKey(const Key('unlinked-reject-ur_2')), findsNothing);
 
     await relog(tester, 'limited.admin.demo');
@@ -147,7 +147,7 @@ void main() {
           await expectFits(tester, const Key('cash-sb_2'), width);
           await expectFits(tester, const Key('close-batch'), width);
           await expectFits(tester, const Key('unlinked-reject-ur_1'), width);
-          await expectFits(tester, const Key('unlinked-cash-ur_2'), width);
+          expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
           await expectFits(tester, const Key('unlinked-collection'), width);
           await reveal(tester, const Key('assignment-as_1'));
           expectAmountInside(tester, const Key('assignment-as_1'), '320 د.ل');

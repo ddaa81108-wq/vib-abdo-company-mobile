@@ -6,7 +6,8 @@
 #
 # STAGING_API_BASE is the origin https://staging.vip2100.com with no /erp suffix.
 # An empty value or an /erp suffix fails. The value is not printed.
-# STAGING_SMOKE_ACCOUNT_ID is never sent (deferred to P-07).
+# STAGING_SMOKE_ACCOUNT_ID is never sent. setPinned was removed from the
+# smoke test and stays deferred to P-07 pending Ali's decision.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -52,13 +53,13 @@ skip_auth_notice() {
 }
 
 pin_notice() {
-  echo "::notice title=STAGING_SMOKE_ACCOUNT_ID skipped::STAGING_SMOKE_ACCOUNT_ID is not set. The pin write stays skipped until P-07 (G-05: body is still pinned, without isPinned and expectedVersion)."
+  echo "::notice title=STAGING_SMOKE_ACCOUNT_ID skipped::STAGING_SMOKE_ACCOUNT_ID is not read. setPinned was removed from the smoke. The pin write stays deferred to P-07 pending Ali's decision."
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     {
       echo "### Pin write"
       echo
       echo "Skipped. \`STAGING_SMOKE_ACCOUNT_ID\` is not read and is not set."
-      echo "P-07 enables it. Logout remains the only write inside the authenticated smoke, and only when that smoke runs."
+      echo "setPinned is not in this smoke. It stays deferred to P-07 pending Ali's decision. Logout remains the only write inside the local authenticated smoke, and GitHub does not run that smoke."
     } >> "$GITHUB_STEP_SUMMARY"
   fi
 }
@@ -196,6 +197,17 @@ probe() {
 
 flutter_smoke() {
   local origin_file auth_out
+  # Any non-empty CI or GITHUB_ACTIONS value means this process is on GitHub.
+  # GitHub may probe health and cold start only. It must not log in or write.
+  # ${VAR-} keeps `set -u` quiet when the variable is unset.
+  local ci_guard="${CI-}"
+  local actions_guard="${GITHUB_ACTIONS-}"
+  ci_guard="${ci_guard//[[:space:]]/}"
+  actions_guard="${actions_guard//[[:space:]]/}"
+  if [[ -n "$ci_guard" || -n "$actions_guard" ]]; then
+    echo "::error title=Staging write refused::Refusing the authenticated smoke on GitHub. CI or GITHUB_ACTIONS is set. GitHub may only call unauthenticated GET /api/health and the cold-start measurement."
+    exit 2
+  fi
   mask_if_actions
   unset STAGING_SMOKE_ACCOUNT_ID
   if [[ -n "${STAGING_SMOKE_ACCOUNT_ID:-}" ]]; then
@@ -215,7 +227,7 @@ flutter_smoke() {
     exit 1
   fi
   rm -f "$origin_file"
-  echo "::notice title=STAGING_SMOKE_ACCOUNT_ID skipped::Pin write skipped. STAGING_SMOKE_ACCOUNT_ID is unset until P-07."
+  echo "::notice title=STAGING_SMOKE_ACCOUNT_ID skipped::Pin write skipped. STAGING_SMOKE_ACCOUNT_ID is unset. setPinned stays deferred to P-07 pending Ali's decision."
   (
     cd "$ROOT/packages/api_layer"
     flutter test test/phase7/staging_smoke_test.dart
