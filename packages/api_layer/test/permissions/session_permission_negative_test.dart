@@ -16,9 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   const mapper = ErrorMapper();
 
-  test(
-      'login 401 stays invalid credentials and any later 401 or bare 419 does not',
-      () {
+  test('login 401 stays invalid credentials and any later 401 or bare 419 does not', () {
     final login = mapper.fromResponse(
       401,
       _envelope('AUTH_REQUIRED', 'يجب تسجيل الدخول'),
@@ -47,27 +45,16 @@ void main() {
       419,
       _envelope('CSRF_INVALID', 'csrf'),
     );
-    expect(csrf, isA<SessionExpiredException>());
-    expect(isCsrfRejection(csrf), isFalse);
+    expect(csrf, isA<CsrfInvalidException>());
 
     final csrfMessage = mapper.fromResponse(
       419,
       _envelope('PAGE_EXPIRED', 'missing CSRF token'),
     );
-    expect(csrfMessage, isA<SessionExpiredException>());
-    expect(isCsrfRejection(csrfMessage), isFalse);
-
-    final rejected = mapper.fromResponse(
-      403,
-      _envelope('CSRF_REJECTED', 'csrf'),
-    );
-    expect(rejected, isA<CsrfRejectedException>());
-    expect(isCsrfRejection(rejected), isTrue);
+    expect(csrfMessage, isA<CsrfInvalidException>());
   });
 
-  test(
-      'an authenticated 401 of any code asks the interceptor to end the session once',
-      () async {
+  test('an authenticated 401 of any code asks the interceptor to end the session once', () async {
     final reasons = <String>[];
     final dio = Dio(BaseOptions(baseUrl: 'https://fake.invalid'));
     dio.httpClientAdapter = _ScriptAdapter((options) {
@@ -93,9 +80,7 @@ void main() {
     expect(dio.interceptors, isNotEmpty);
   });
 
-  test(
-      'logout and expiry refuse every endpoint category and a replay stays a 401',
-      () async {
+  test('logout and expiry refuse every endpoint category and a replay stays a 401', () async {
     final api = FakeApiClient(latency: Duration.zero);
     await api.post(
       '/api/auth/login',
@@ -149,8 +134,7 @@ void main() {
     );
     await expectLater(api.post('/api/auth/logout'), throwsA(_unauthorized()));
     await expectLater(
-      api.get('/api/me',
-          options: const ApiRequestOptions(headers: {'Cookie': ''})),
+      api.get('/api/me', options: const ApiRequestOptions(headers: {'Cookie': ''})),
       throwsA(_unauthorized()),
     );
   });
@@ -186,8 +170,7 @@ void main() {
     );
     expect(after.statusCode, 200);
     final card = await api.get('/api/customers/c_55');
-    expect((card.data as Map)['balanceUnits'],
-        (before.data as Map)['balanceUnits']);
+    expect((card.data as Map)['balanceUnits'], (before.data as Map)['balanceUnits']);
   });
 
   test('many 401s share one wipe and logout does not show expiry', () async {
@@ -195,8 +178,7 @@ void main() {
     final tokens = InMemoryTokenStorage();
     var cleanups = 0;
     final api = ApiLayer.create(
-      config:
-          const ApiConfig(baseUrl: 'https://fake.invalid', useFakeApi: true),
+      config: const ApiConfig(baseUrl: 'https://fake.invalid', useFakeApi: true),
       cookieStore: cookies,
       tokenStorage: tokens,
       fakeLatency: Duration.zero,
@@ -208,8 +190,7 @@ void main() {
       ],
     );
     addTearDown(api.dispose);
-    await tokens.saveTokens(
-        accessToken: 'stale', refreshToken: 'stale-refresh');
+    await tokens.saveTokens(accessToken: 'stale', refreshToken: 'stale-refresh');
     await api.session.login(username: 'admin.demo', password: 'x');
     expect(await tokens.readAccessToken(), 'stale');
     expect(await cookies.cookieHeader(), contains('session='));
@@ -244,8 +225,7 @@ void main() {
     expect(await tokens.readAccessToken(), isNull);
 
     await api.session.login(username: 'employee.demo', password: 'x');
-    await tokens.saveTokens(
-        accessToken: 'leftover', refreshToken: 'leftover-refresh');
+    await tokens.saveTokens(accessToken: 'leftover', refreshToken: 'leftover-refresh');
     await api.session.logout();
     expect((api.session.state as SessionUnauthenticated).reason, 'logout');
     expect(await cookies.isEmpty(), isTrue);
@@ -280,14 +260,14 @@ const _categories = [
 ];
 
 Map<String, Object?> _envelope(String code, String message) => {
-      'ok': false,
-      'error': {
-        'code': code,
-        'message': message,
-        'details': <String, Object?>{},
-        'correlationId': 'c',
-      },
-    };
+  'ok': false,
+  'error': {
+    'code': code,
+    'message': message,
+    'details': <String, Object?>{},
+    'correlationId': 'c',
+  },
+};
 
 Matcher _unauthorized() => isA<SessionExpiredException>()
     .having((error) => error.statusCode, 'status', 401)
@@ -318,8 +298,7 @@ class _ScriptAdapter implements HttpClientAdapter {
     RequestOptions options,
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
-  ) async =>
-      _handler(options);
+  ) async => _handler(options);
 }
 
 class _LogoutOnExpiry implements AuthStrategy {
@@ -327,8 +306,7 @@ class _LogoutOnExpiry implements AuthStrategy {
   String get name => 'test';
 
   @override
-  Future<void> attach(RequestOptions options,
-      {required bool authenticated}) async {}
+  Future<void> attach(RequestOptions options, {required bool authenticated}) async {}
 
   @override
   Future<void> capture(Response<dynamic> response) async {}

@@ -23,8 +23,7 @@ void main() {
     }
   });
 
-  test('P7-02 wrong credentials stay invalid and do not wipe a session',
-      () async {
+  test('P7-02 wrong credentials stay invalid and do not wipe a session', () async {
     final harness = await Phase7Harness.open();
     try {
       harness.transport.loginStatus = 401;
@@ -157,8 +156,7 @@ void main() {
       expect(posts.first.header('x-csrf-token'), original);
       expect(posts.last.header('x-csrf-token'), harness.transport.csrfToken);
       expect(posts.last.header('x-csrf-token'), isNot(original));
-      expect(
-          harness.transport.matching('GET', ApiEndpoints.csrf), hasLength(1));
+      expect(harness.transport.matching('GET', ApiEndpoints.csrf), hasLength(1));
       expect(harness.layer.session.state, isA<SessionAuthenticated>());
     } finally {
       await harness.dispose();
@@ -175,14 +173,13 @@ void main() {
           currentPassword: 'current-demo',
           newPassword: 'new-password-demo',
         ),
-        throwsA(isA<CsrfRejectedException>()),
+        throwsA(isA<CsrfInvalidException>()),
       );
       expect(
         harness.transport.matching('POST', ApiEndpoints.changePassword),
         hasLength(2),
       );
-      expect(
-          harness.transport.matching('GET', ApiEndpoints.csrf), hasLength(1));
+      expect(harness.transport.matching('GET', ApiEndpoints.csrf), hasLength(1));
       expect(harness.layer.session.state, isA<SessionAuthenticated>());
     } finally {
       await harness.dispose();
@@ -206,8 +203,7 @@ void main() {
         harness.transport.matching('POST', ApiEndpoints.logout),
         hasLength(1),
       );
-      final logout =
-          harness.transport.matching('POST', ApiEndpoints.logout).single;
+      final logout = harness.transport.matching('POST', ApiEndpoints.logout).single;
       expect(logout.header('cookie'), contains('phase7-session'));
       expect(logout.header('x-csrf-token'), isNotNull);
       expect(await harness.cookies.isEmpty(), isTrue);

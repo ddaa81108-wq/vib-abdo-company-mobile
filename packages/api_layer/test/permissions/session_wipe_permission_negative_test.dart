@@ -49,8 +49,7 @@ void main() {
       419,
       _envelope('PAGE_EXPIRED', 'CSRF token missing'),
     );
-    expect(csrfText, isA<SessionExpiredException>());
-    expect(isCsrfRejection(csrfText), isFalse);
+    expect(csrfText, isA<CsrfInvalidException>());
 
     final page = mapper.fromResponse(
       403,

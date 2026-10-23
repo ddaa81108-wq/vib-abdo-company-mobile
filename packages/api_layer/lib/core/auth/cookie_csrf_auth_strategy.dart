@@ -14,7 +14,7 @@ import 'cookie_store.dart';
 /// - The CSRF token is kept IN MEMORY only; after an app restart it is refetched
 ///   from GET /api/auth/csrf (same as the web client's `resume`).
 /// - No refresh flow: AUTH_REQUIRED -> forced logout.
-/// - `CSRF_REJECTED` -> refetch the token ONCE (single-flight) and replay the request once.
+/// - CSRF invalid -> refetch the token ONCE (single-flight) and replay the request once.
 class CookieCsrfAuthStrategy implements AuthStrategy {
   CookieCsrfAuthStrategy(
       {required CookieStore cookieStore, required Dio bareDio})
