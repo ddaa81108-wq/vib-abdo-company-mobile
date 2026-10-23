@@ -18,9 +18,10 @@ void main() {
       final employee = FakeApiClient(latency: Duration.zero);
       await _login(employee, 'employee.demo');
 
-      final customers = await employee.get('/api/customers');
-      expect(customers.statusCode, 200);
-      expect((customers.data as Map)['totalItems'], 10);
+      await expectLater(
+        employee.get('/api/customers'),
+        throwsA(_forbidden()),
+      );
 
       await expectLater(
         employee.post(
@@ -364,14 +365,14 @@ void main() {
         (employeeHome['summaries'] as List).map(
           (item) => (item as Map)['section'],
         ),
-        ['customers', 'collections'],
+        ['collections'],
       );
-      final employeeCustomers = (employeeHome['summaries'] as List)
-          .cast<Map>()
-          .firstWhere((item) => item['section'] == 'customers');
-      expect(employeeCustomers['valueUnits'], 10635);
-      expect(employeeHome['counters']['customers'], 10);
-      expect((employeeHome['oldDebts'] as List).single['id'], 'c_55');
+      expect(
+        (employeeHome['counters'] as Map).containsKey('customers'),
+        isFalse,
+      );
+      expect(employeeHome['counters']['collections'], isNotNull);
+      expect(employeeHome.containsKey('oldDebts'), isFalse);
       expect(
         (employeeHome['summaries'] as List).any(
           (item) => (item as Map)['section'] == 'egyptian-deposits',
