@@ -206,7 +206,7 @@ final purchaseBookProvider = StateProvider<PurchaseBook>(
   (ref) => PurchaseBook.alBayan,
 );
 
-final purchasesProvider = FutureProvider<PurchasesBookPage>((ref) async {
+final purchasesProvider = FutureProvider<PurchasesPage>((ref) async {
   watchSignedIn(ref);
   final book = ref.watch(purchaseBookProvider);
   return ref.read(apiLayerProvider).purchases.list(book);

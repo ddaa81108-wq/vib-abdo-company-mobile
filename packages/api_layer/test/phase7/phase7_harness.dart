@@ -108,8 +108,13 @@ class Phase7Transport implements HttpClientAdapter {
       failNextCode = null;
       failNextDetails = null;
       failNextHeaders = const {};
-      return _fail(status, code, _defaultMessage(status),
-          details: details, headers: headers);
+      return _fail(
+        status,
+        code,
+        _defaultMessage(status),
+        details: details,
+        headers: headers,
+      );
     }
     final cookie = call.path == ApiEndpoints.login
         ? <String>[
@@ -195,7 +200,11 @@ class Phase7Transport implements HttpClientAdapter {
       };
     }
     if (path.startsWith('/api/purchases/')) {
-      return {'days': <Object>[]};
+      return {
+        'merchant': {'key': 'al_bayan', 'name': 'البيان'},
+        'entries': <Object>[],
+        'nextBefore': null,
+      };
     }
     if (path == ApiEndpoints.treasury) {
       return {
