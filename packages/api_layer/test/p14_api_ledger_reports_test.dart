@@ -153,7 +153,7 @@ void main() {
       expect(reports.current!.daily!.cashInUnits?.units, 500);
       expect(reports.current!.daily!.cashOutUnits?.units, 0);
       expect(reports.current!.netUnits?.units, 5160);
-      expect(reports.current!.egyptianRate, 10);
+      expect(reports.current!.egyptianRate?.value, '10');
       expect(reports.current!.fiveAmClosing!.state, FiveAmClosingState.pending);
       expect(reports.current!.fiveAmClosing!.netUnits, isNull);
       expect(reports.rows.single.summary, 'صف');
@@ -162,6 +162,21 @@ void main() {
       expect(reports.rows.single.reasons.single.label, 'افتتاح');
       expect(reports.formula, 'المعادلة');
       expect(reports.methodologyNote, 'ملاحظة');
+    });
+
+    test('egyptianRate is null or a decimal number', () {
+      final absent = DailyReportRowDto.fromJson({
+        'sequence': 1,
+        'egyptianRate': null,
+      });
+      expect(absent.egyptianRate, isNull);
+
+      final decimal = DailyReportRowDto.fromJson(
+        Map<String, dynamic>.from(
+          PreciseJson.decode('{"sequence":1,"egyptianRate":10.5}') as Map,
+        ),
+      );
+      expect(decimal.egyptianRate?.value, '10.5');
     });
 
     test('absent current, daily, and summary stay null', () {
@@ -239,7 +254,7 @@ void main() {
       final current = reports.current!;
       expect(current.summary, 'سليم');
       expect(current.netUnits?.units, 5160);
-      expect(current.egyptianRate, isNull);
+      expect(current.egyptianRate?.value, '10.5');
       expect(current.dayStatus, ReportStatus.unknown);
       expect(current.status, 'later');
       expect(current.daily!.receivablesAddedUnits?.units, 3650);
@@ -326,8 +341,9 @@ void main() {
       );
       expect(all.page.items[2].sourceStatus, FinancialLedgerSourceStatus.draft);
 
-      final customers =
-          await api.reports.financialLedger(sectionKey: 'customer_debts');
+      final customers = await api.reports.financialLedger(
+        sectionKey: FinancialLedgerSectionKey.customerDebts,
+      );
       expect(customers.page.items, hasLength(1));
       expect(customers.page.items.single.sectionKey,
           FinancialLedgerSectionKey.customerDebts);
@@ -339,13 +355,13 @@ void main() {
           FinancialLedgerSectionKey.treasury);
 
       final preferred = await api.reports.financialLedger(
-        sectionKey: 'purchases',
+        sectionKey: FinancialLedgerSectionKey.purchases,
         section: 'treasury',
       );
       expect(preferred.page.items.single.sectionKey,
           FinancialLedgerSectionKey.purchases);
 
-      final none = await api.reports.financialLedger(sectionKey: 'no_such');
+      final none = await api.reports.financialLedger(section: 'no_such');
       expect(none.page.items, isEmpty);
       expect(none.pageTotals, isEmpty);
 

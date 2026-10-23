@@ -7,15 +7,17 @@ import '../models/report_models.dart';
 abstract interface class ReportsRepository {
   Future<ReportsDto> daily({int limit = 30});
 
-  /// [sectionKey] filters by the contract row key (`customer_debts`, …).
+  /// [sectionKey] is the contract ledger section (`customer_debts`, …).
   /// It is sent as the query `section`, which is the name
   /// `GET /api/financial-ledger` documents. No other list operation in the
-  /// contract documents a section filter. [section] is the same value.
-  /// When both are set, [sectionKey] is sent.
+  /// contract documents a section filter. [section] is that same query as
+  /// raw text. When both are set, [sectionKey] is sent.
+  ///
+  /// P-14 api (G-12).
   Future<FinancialLedgerPage> financialLedger({
     String? before,
     String? section,
-    String? sectionKey,
+    FinancialLedgerSectionKey? sectionKey,
     String? currency,
     String? q,
   });
@@ -40,14 +42,14 @@ class RemoteReportsRepository implements ReportsRepository {
   Future<FinancialLedgerPage> financialLedger({
     String? before,
     String? section,
-    String? sectionKey,
+    FinancialLedgerSectionKey? sectionKey,
     String? currency,
     String? q,
   }) async {
     const path = ApiEndpoints.financialLedger;
     final data = (await _api.get(path, query: {
       'before': before,
-      'section': sectionKey ?? section,
+      'section': _financialLedgerSection(sectionKey, section),
       'currency': currency,
       'q': q,
     }))
@@ -68,4 +70,19 @@ class RemoteReportsRepository implements ReportsRepository {
         .data;
     return StatementFile.fromData(data);
   }
+}
+
+/// Wire value for `GET /api/financial-ledger?section`. A known [sectionKey]
+/// wins. [FinancialLedgerSectionKey.unknown] is not a query the contract
+/// names, so the raw [section] string is used instead.
+String? _financialLedgerSection(
+  FinancialLedgerSectionKey? sectionKey,
+  String? section,
+) {
+  if (sectionKey != null &&
+      sectionKey != FinancialLedgerSectionKey.unknown &&
+      sectionKey.wire.isNotEmpty) {
+    return sectionKey.wire;
+  }
+  return section;
 }

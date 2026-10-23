@@ -157,6 +157,8 @@ class ReportFiveAmClosingDto {
 }
 
 /// GET /api/reports?limit=30 — one daily row, and the same shape for `current`.
+///
+/// G-18 is pending docs PR cursor/docs-gap-g16-g18.
 class DailyReportRowDto {
   const DailyReportRowDto({
     required this.sequence,
@@ -207,8 +209,8 @@ class DailyReportRowDto {
   /// Contract `daily` object. Null when the object is absent.
   final ReportDailyDto? daily;
 
-  /// Contract integer rate. A non-integer is null and is not stored as a double.
-  final int? egyptianRate;
+  /// Contract `egyptianRate` (`number | null`), kept as decimal text.
+  final DecimalString? egyptianRate;
   final int? version;
   final DateTime? generatedAt;
   final DateTime? updatedAt;
@@ -283,7 +285,7 @@ class DailyReportRowDto {
         'daily',
         (object) => ReportDailyDto.fromJson(object, rowId: rowId),
       ),
-      egyptianRate: j['egyptianRate'] is int ? j['egyptianRate'] as int : null,
+      egyptianRate: decimalOrNull(j['egyptianRate']),
       version: j['version'] is int ? j['version'] as int : null,
       generatedAt: dateOrNull(j['generatedAt']),
       updatedAt: dateOrNull(j['updatedAt']),
@@ -411,6 +413,9 @@ class FinancialLedgerEntryDto {
       FinancialLedgerSourceStatus.unknown,
     );
     final occurredAt = dateOrNull(j['occurredAt']);
+    // Intentional compatibility. `section` and `status` are filled from the
+    // contract values so an older reader of those strings still sees
+    // `sectionKey` and `sourceStatus`. The typed fields are the contract.
     return FinancialLedgerEntryDto(
       id: str(j['id']),
       section: str(sectionKey.raw ?? j['section']),
