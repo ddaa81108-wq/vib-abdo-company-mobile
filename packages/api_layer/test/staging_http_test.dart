@@ -183,12 +183,13 @@ void main() {
       expect(failed.message, 'رفض');
     });
 
-    test('a 419 that names CSRF is a CSRF failure', () {
+    test('a 419 that mentions CSRF is session expiry, not a refresh', () {
       final csrf = mapper.fromResponse(419, {
         'message': 'CSRF token mismatch.',
       });
-      expect(csrf, isA<CsrfInvalidException>());
-      expect(csrf.code, 'CSRF_INVALID');
+      expect(csrf, isA<SessionExpiredException>());
+      expect(csrf.code, 'PAGE_EXPIRED');
+      expect(isCsrfRejection(csrf), isFalse);
     });
   });
 
@@ -265,7 +266,8 @@ void main() {
       expect(await cookies.cookieHeader(), 'sid=abc');
     });
 
-    test('CSRF 419 is refreshed once and a second CSRF failure is not a logout',
+    test(
+        'CSRF_REJECTED is refreshed once and a second rejection is not a logout',
         () async {
       final cookies = InMemoryCookieStore();
       final adapter = _Adapter((request) {
@@ -289,7 +291,7 @@ void main() {
             'data': {'csrfToken': 't2'},
           });
         }
-        return _fail(419, 'CSRF_TOKEN_MISMATCH', 'CSRF token mismatch.');
+        return _fail(403, 'CSRF_REJECTED', 'رمز حماية الطلب غير صالح');
       });
       final layer = open(adapter, cookies);
       await layer.session.login(username: 'person', password: 'secret');
@@ -297,7 +299,7 @@ void main() {
 
       await expectLater(
         layer.client.post('/api/collections', body: {'requestId': 'r1'}),
-        throwsA(isA<CsrfInvalidException>()),
+        throwsA(isA<CsrfRejectedException>()),
       );
       expect(adapter.count('/api/collections'), 2);
       expect(adapter.count('/api/auth/csrf'), 1);
@@ -326,14 +328,14 @@ void main() {
         if (request.path == '/api/auth/csrf') {
           return _fail(401, 'AUTH_REQUIRED', 'انتهت');
         }
-        return _fail(403, 'CSRF_INVALID', 'CSRF rejected');
+        return _fail(403, 'CSRF_REJECTED', 'رمز حماية الطلب غير صالح');
       });
       final layer = open(adapter, cookies);
       await layer.session.login(username: 'person', password: 'secret');
 
       await expectLater(
         layer.client.post('/api/collections', body: {'requestId': 'r1'}),
-        throwsA(isA<CsrfInvalidException>()),
+        throwsA(isA<CsrfRejectedException>()),
       );
       expect(adapter.count('/api/collections'), 1);
       expect(adapter.count('/api/auth/csrf'), 1);

@@ -190,7 +190,6 @@ void main() {
 
 Type _expected(String code, int status, {required bool authenticated}) {
   if (code == 'CSRF_REJECTED') return CsrfRejectedException;
-  if (code.toUpperCase().contains('CSRF')) return CsrfInvalidException;
   switch (code) {
     case 'MFA_REQUIRED':
       return MfaRequiredException;

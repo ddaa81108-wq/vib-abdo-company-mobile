@@ -88,7 +88,7 @@ class Phase7Transport implements HttpClientAdapter {
         call.path != ApiEndpoints.login &&
         csrfFailuresRemaining > 0) {
       csrfFailuresRemaining--;
-      return _fail(419, 'CSRF_INVALID', 'رمز CSRF غير مطابق');
+      return _fail(403, 'CSRF_REJECTED', 'رمز حماية الطلب غير صالح');
     }
     if (call.path != ApiEndpoints.login && failAuthenticatedStatus != null) {
       return _fail(
@@ -310,11 +310,11 @@ bool _isAccountCard(String path) {
 
 class RecordedCall {
   RecordedCall(RequestOptions options)
-    : method = options.method.toUpperCase(),
-      path = _pathOf(options),
-      query = Map<String, dynamic>.from(options.queryParameters),
-      headers = _headersOf(options),
-      jsonBody = _bodyOf(options);
+      : method = options.method.toUpperCase(),
+        path = _pathOf(options),
+        query = Map<String, dynamic>.from(options.queryParameters),
+        headers = _headersOf(options),
+        jsonBody = _bodyOf(options);
 
   /// Snapshotted at send time. A CSRF replay mutates the same [RequestOptions].
   final String method;
@@ -473,22 +473,22 @@ ResponseBody _fail(
 }
 
 String _defaultCode(int status) => switch (status) {
-  401 => 'AUTH_REQUIRED',
-  403 => 'FORBIDDEN',
-  404 => 'NOT_FOUND',
-  409 => 'VERSION_CONFLICT',
-  422 => 'VALIDATION_ERROR',
-  423 => 'ACCOUNT_LOCKED',
-  429 => 'RATE_LIMITED',
-  _ => 'SERVER_ERROR',
-};
+      401 => 'AUTH_REQUIRED',
+      403 => 'FORBIDDEN',
+      404 => 'NOT_FOUND',
+      409 => 'VERSION_CONFLICT',
+      422 => 'VALIDATION_ERROR',
+      423 => 'ACCOUNT_LOCKED',
+      429 => 'RATE_LIMITED',
+      _ => 'SERVER_ERROR',
+    };
 
 String _defaultMessage(int status) => switch (status) {
-  403 => 'لا تملك صلاحية لهذا الإجراء',
-  404 => 'العنصر غير موجود',
-  409 => 'تغيرت البيانات على الخادم، يرجى التحديث',
-  422 => 'البيانات المدخلة غير صحيحة',
-  423 => 'الحساب مقفل',
-  429 => 'طلبات كثيرة، حاول لاحقاً',
-  _ => 'خطأ في الخادم، حاول لاحقاً',
-};
+      403 => 'لا تملك صلاحية لهذا الإجراء',
+      404 => 'العنصر غير موجود',
+      409 => 'تغيرت البيانات على الخادم، يرجى التحديث',
+      422 => 'البيانات المدخلة غير صحيحة',
+      423 => 'الحساب مقفل',
+      429 => 'طلبات كثيرة، حاول لاحقاً',
+      _ => 'خطأ في الخادم، حاول لاحقاً',
+    };

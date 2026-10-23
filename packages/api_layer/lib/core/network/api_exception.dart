@@ -92,7 +92,9 @@ class SessionExpiredException extends ApiException {
       super.details});
 }
 
-/// CSRF token missing or invalid. The cookie strategy refetches once and replays.
+/// A CSRF-shaped failure that is not the catalog code.
+///
+/// Refresh-once is [CsrfRejectedException] only. This type does not refresh.
 class CsrfInvalidException extends ApiException {
   const CsrfInvalidException(
       {required super.code,
@@ -102,7 +104,7 @@ class CsrfInvalidException extends ApiException {
       super.details});
 }
 
-/// `403 CSRF_REJECTED`. Same refresh-once path as [CsrfInvalidException].
+/// `403 CSRF_REJECTED`. The cookie strategy refetches the token once and replays once.
 ///
 /// The write queue is P-10. This type is only the recognition signal.
 class CsrfRejectedException extends CsrfInvalidException {
@@ -114,10 +116,12 @@ class CsrfRejectedException extends CsrfInvalidException {
   }) : super(code: 'CSRF_REJECTED');
 }
 
-/// True when [error] is a CSRF rejection the auth strategy refreshes once.
+/// True only for the catalog code `CSRF_REJECTED`.
 ///
-/// P-10 should use this instead of matching the code text. It does not queue writes.
-bool isCsrfRejection(Object error) => error is CsrfInvalidException;
+/// A different code, or a message that mentions CSRF, is not a rejection.
+/// The cookie strategy refreshes once for this signal only. It does not queue writes.
+bool isCsrfRejection(Object error) =>
+    error is CsrfRejectedException && error.code == 'CSRF_REJECTED';
 
 /// `401 MFA_REQUIRED`. The app has no MFA flow.
 class MfaRequiredException extends ApiException {

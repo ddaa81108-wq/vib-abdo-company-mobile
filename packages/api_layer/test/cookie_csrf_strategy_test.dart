@@ -68,7 +68,7 @@ void main() {
           return _json(403, {
             'ok': false,
             'error': {
-              'code': 'CSRF_INVALID',
+              'code': 'CSRF_REJECTED',
               'message': 'csrf',
               'correlationId': 'c1'
             }
@@ -166,7 +166,7 @@ void main() {
           return _json(403, {
             'ok': false,
             'error': {
-              'code': 'CSRF_INVALID',
+              'code': 'CSRF_REJECTED',
               'message': 'csrf',
               'correlationId': 'c1'
             }
