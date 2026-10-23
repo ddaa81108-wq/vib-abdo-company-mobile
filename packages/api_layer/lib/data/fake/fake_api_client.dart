@@ -172,6 +172,13 @@ class FakeApiClient implements ApiClient {
   /// null when the request omitted them.
   final List<AccountListQuery> accountListQueries = [];
 
+  /// Financial-ledger reads, in call order (tests).
+  ///
+  /// [FinancialLedgerQuery.section] is the contract query name. It is null
+  /// when the request omitted it. [FinancialLedgerQuery.sectionKey] is set
+  /// only when a caller sent that query name; the repository sends `section`.
+  final List<FinancialLedgerQuery> financialLedgerQueries = [];
+
   /// When set, the first account-list page reports this `nextCursor` (tests).
   String? accountNextCursor;
 
@@ -498,6 +505,12 @@ class FakeApiClient implements ApiClient {
     if (!_access.fullAccess) _fail(403, 'FORBIDDEN', _adminOnly);
   }
 
+  /// `GET /api/financial-ledger` is admin-only. The contract code is
+  /// `PERMISSION_DENIED`, not the fake's generic `FORBIDDEN`.
+  void _requireFinancialLedger() {
+    if (!_access.fullAccess) _fail(403, 'PERMISSION_DENIED', _adminOnly);
+  }
+
   static const _notFound = 'العنصر غير موجود';
 
   /// 🔶 Query names the fake treats as an employee id. Own data is not read
@@ -594,8 +607,10 @@ class FakeApiClient implements ApiClient {
         _requireRead(SectionKey.reports);
         return;
       case 'statements':
-      case 'financial-ledger':
         _requireFullAccess();
+        return;
+      case 'financial-ledger':
+        _requireFinancialLedger();
         return;
       case 'account-requests':
       case 'users':
@@ -1358,11 +1373,19 @@ class FakeApiClient implements ApiClient {
           'contentBase64': 'JVBERi0xLjQK',
         });
       case 'financial-ledger':
-        _requireFullAccess();
-        return _ok({
-          'items': [],
-          'scopeTotals': {'LYD': 0, 'EGP': 0},
-        });
+        _requireFinancialLedger();
+        final section = _queryText(query, 'section');
+        financialLedgerQueries.add(
+          FinancialLedgerQuery(
+            section: section,
+            sectionKey: _queryText(query, 'sectionKey'),
+          ),
+        );
+        return _ok(
+          FakeFixtures.financialLedger(
+            sectionKey: section ?? _queryText(query, 'sectionKey'),
+          ),
+        );
       case 'notifications':
         return _notifications(method, seg, b, query);
       case 'notification-preferences':
@@ -2891,6 +2914,14 @@ String? _queryText(Map<String, dynamic>? query, String key) {
   final text = '$value';
   if (text.isEmpty) return null;
   return text;
+}
+
+/// One recorded `GET /api/financial-ledger` (tests).
+class FinancialLedgerQuery {
+  const FinancialLedgerQuery({this.section, this.sectionKey});
+
+  final String? section;
+  final String? sectionKey;
 }
 
 /// One recorded `GET /api/{section}` (tests).
