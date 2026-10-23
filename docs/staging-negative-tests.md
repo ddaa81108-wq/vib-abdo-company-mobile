@@ -56,6 +56,8 @@ skipped: write case, requires --allow-sandbox-writes
 
 The script logs in once per account and reuses that cookie and CSRF token for every case of the account. `cookie-after-logout` runs after the other cases so logout does not invalidate the session those cases reuse. Login itself is not a negative write case.
 
+Read-only mode does not log those accounts out. Logout is `POST /api/auth/logout`, so it is skipped unless `--allow-sandbox-writes` is set. A run with admin, employee, employee2, and the limited manager configured leaves those four staging sessions open. They stay open until the server expires them.
+
 `run.sh` accepts the same origins as `classify_origin` in PR #32's `tool/staging_negative_tests/preflight.py`. It is not a stricter check.
 
 - `https` only. No userinfo, path, query, or fragment. A non-default port is allowed.

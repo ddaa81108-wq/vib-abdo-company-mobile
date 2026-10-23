@@ -14,7 +14,9 @@
 // approval each time. It is not an environment variable. Login is not a
 // negative write case: each account is logged in once per run and the
 // session is reused. Logout runs after the other cases so it does not
-// invalidate that session early.
+// invalidate that session early. Read-only mode skips logout, so a run
+// with admin, employee, employee2, and the limited manager leaves those
+// four staging sessions open until the server expires them.
 // ignore_for_file: avoid_print
 
 import 'dart:async';
@@ -818,9 +820,6 @@ Future<List<CaseResult>> _selfTest() async {
     if (fake.writeCalls.isNotEmpty) {
       throw StateError('read-only run sent ${fake.writeCalls.join(', ')}');
     }
-    if (fake.writeCalls.any((call) => call.contains('unlinked-receipts'))) {
-      throw StateError('unlinked receipt write was sent');
-    }
     final byName = {for (final row in results) row.name: row};
     for (final name in const [
       'cookie-after-logout',
@@ -909,7 +908,7 @@ Future<List<CaseResult>> _runLive(
   bool announceSkips = true,
 }) async {
   final owned = client == null;
-  final probe = client ?? _IoProbeClient();
+  final probe = client ?? _IoProbeClient(config.base);
   final live = _Live(
     client: probe,
     config: config,
@@ -940,7 +939,6 @@ Future<CaseResult> _employeeManagement(_Live live) async {
       live.config.adminPassword,
     );
     final adminTotals = await live.client.send(
-      base: live.config.base,
       method: 'GET',
       path: '/api/admin/employee-totals',
       session: admin,
@@ -966,7 +964,6 @@ Future<CaseResult> _employeeManagement(_Live live) async {
         continue;
       }
       final probe = await live.client.send(
-        base: live.config.base,
         method: check.method,
         path: check.path,
         session: session,
@@ -995,7 +992,6 @@ Future<CaseResult> _foreignIds(_Live live) async {
       live.config.employee2Password,
     );
     final overview = await live.client.send(
-      base: live.config.base,
       method: 'GET',
       path: '/api/collections',
       session: other,
@@ -1009,7 +1005,6 @@ Future<CaseResult> _foreignIds(_Live live) async {
       live.config.employeePassword,
     );
     final own = await live.client.send(
-      base: live.config.base,
       method: 'GET',
       path: '/api/collections',
       session: employee,
@@ -1039,7 +1034,6 @@ Future<CaseResult> _foreignIds(_Live live) async {
     }
     for (final id in ids) {
       final probe = await live.client.send(
-        base: live.config.base,
         method: 'POST',
         path: id.path,
         session: employee,
@@ -1076,7 +1070,6 @@ Future<CaseResult> _afterLogout(_Live live) async {
       live.config.employeePassword,
     );
     final logout = await live.client.send(
-      base: live.config.base,
       method: 'POST',
       path: '/api/auth/logout',
       session: session,
@@ -1085,13 +1078,11 @@ Future<CaseResult> _afterLogout(_Live live) async {
       return CaseResult(name, 'FAIL', 'logout -> ${logout.status}');
     }
     final me = await live.client.send(
-      base: live.config.base,
       method: 'GET',
       path: '/api/me',
       session: session,
     );
     final write = await live.client.send(
-      base: live.config.base,
       method: 'POST',
       path: '/api/collections/unlinked-receipts',
       session: session,
@@ -1119,7 +1110,6 @@ Future<CaseResult> _csrf(_Live live) async {
       live.config.employeePassword,
     );
     final missing = await live.client.send(
-      base: live.config.base,
       method: 'POST',
       path: '/api/collections/unlinked-receipts',
       session: _Session(
@@ -1132,7 +1122,6 @@ Future<CaseResult> _csrf(_Live live) async {
       sendCsrf: false,
     );
     final invalid = await live.client.send(
-      base: live.config.base,
       method: 'POST',
       path: '/api/collections/unlinked-receipts',
       session: _Session(
@@ -1176,7 +1165,6 @@ Future<CaseResult> _limitedManager(_Live live) async {
       live.config.limitedPassword!,
     );
     final probe = await live.client.send(
-      base: live.config.base,
       method: 'GET',
       path: '/api/admin/employee-totals',
       session: session,
@@ -1264,7 +1252,6 @@ class _Live {
 /// [_FakeProbeClient] and must not construct an [HttpClient].
 abstract class _ProbeClient {
   Future<ProbeResult> send({
-    required Uri base,
     required String method,
     required String path,
     _Session? session,
@@ -1276,16 +1263,16 @@ abstract class _ProbeClient {
 }
 
 class _IoProbeClient implements _ProbeClient {
-  _IoProbeClient() {
+  _IoProbeClient(this._base) {
     _http.connectionTimeout = const Duration(seconds: 20);
     _http.findProxy = HttpClient.findProxyFromEnvironment;
   }
 
+  final Uri _base;
   final HttpClient _http = HttpClient();
 
   @override
   Future<ProbeResult> send({
-    required Uri base,
     required String method,
     required String path,
     _Session? session,
@@ -1294,7 +1281,7 @@ class _IoProbeClient implements _ProbeClient {
   }) {
     return _send(
       _http,
-      base,
+      _base,
       method: method,
       path: path,
       session: session,
@@ -1315,7 +1302,6 @@ class _FakeProbeClient implements _ProbeClient {
 
   @override
   Future<ProbeResult> send({
-    required Uri base,
     required String method,
     required String path,
     _Session? session,
@@ -1388,7 +1374,6 @@ class _FakeProbeClient implements _ProbeClient {
     if (session != null && session.csrf == 'staging-negative-invalid-csrf') {
       return ProbeResult(403, '{}');
     }
-    if (!isReadMethod(upper)) return ProbeResult(403, '{}');
     return ProbeResult(403, '{}');
   }
 
@@ -1439,7 +1424,6 @@ Future<_Session> _login(
   String password,
 ) async {
   final probe = await client.send(
-    base: config.base,
     method: 'POST',
     path: '/api/auth/login',
     jsonBody: {'username': username, 'password': password},
@@ -1462,7 +1446,6 @@ Future<_Session> _login(
   var csrf = token is String ? token : '';
   if (csrf.isEmpty) {
     final fetched = await client.send(
-      base: config.base,
       method: 'GET',
       path: '/api/auth/csrf',
       session: _Session(cookie, '', '', ''),

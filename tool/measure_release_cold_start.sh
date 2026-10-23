@@ -2,9 +2,12 @@
 # P7-23 and the release half of P7-26.
 # Real mode. USE_FAKE_API=false. API_BASE comes from STAGING_API_BASE.
 # Fails when that origin is unset or is not a staging host.
-# Login-to-home timing runs only when STAGING_ADMIN_USERNAME and
-# STAGING_ADMIN_PASSWORD are already in the local environment (the bot
-# machine). GitHub Actions does not set them. Does not print secret values.
+# Login-to-home timing runs only on the bot machine, when
+# STAGING_ADMIN_USERNAME and STAGING_ADMIN_PASSWORD are already in the
+# local environment and neither CI nor GITHUB_ACTIONS is set. Any
+# non-empty value of those two names refuses the login path. The
+# unauthenticated first-frame measurement (STAGING_API_BASE only) still
+# runs. Does not print secret values.
 # Does not upload the APK.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -31,12 +34,31 @@ print("P7-23 staging origin accepted. The value is not printed.")
 PY
 
 login_timing=0
-if [[ -n "${STAGING_ADMIN_USERNAME:-}" && -n "${STAGING_ADMIN_PASSWORD:-}" ]]; then
+# Any non-empty CI or GITHUB_ACTIONS value means this process is on GitHub.
+# ${VAR-} keeps `set -u` quiet when the variable is unset. Stripping
+# whitespace matches the staging negative runner: only empty or blank may
+# time a login. The first-frame path below does not use a username or password.
+ci_guard="${CI-}"
+actions_guard="${GITHUB_ACTIONS-}"
+ci_guard="${ci_guard//[[:space:]]/}"
+actions_guard="${actions_guard//[[:space:]]/}"
+if [[ -n "$ci_guard" || -n "$actions_guard" ]]; then
+  echo "P7-23 login timing refused. CI or GITHUB_ACTIONS is set to a non-empty value."
+  echo "Login-to-home timing uses staging usernames and passwords. GitHub does not store those."
+  echo "The unauthenticated release cold start still runs."
+elif [[ -n "${STAGING_ADMIN_USERNAME:-}" && -n "${STAGING_ADMIN_PASSWORD:-}" ]]; then
   login_timing=1
   echo "P7-23 login timing will use the local environment. Values are not printed."
 else
   echo "P7-23 login timing skipped. Set STAGING_ADMIN_USERNAME and STAGING_ADMIN_PASSWORD on the bot machine to time login through home."
   echo "GitHub Actions does not read those names. They are not stored as secrets or variables."
+fi
+
+# Offline tests stop here. The release job never passes this flag, so the
+# first-frame measurement below is unchanged.
+if [[ "${1:-}" == "--login-guard-only" ]]; then
+  echo "login_timing=$login_timing"
+  exit 0
 fi
 
 python3 - << 'PY'
