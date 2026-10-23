@@ -175,8 +175,9 @@ void main() {
     expect(find.byKey(ExportPdfButton.buttonKey), findsOneWidget);
     expect(find.text(AppStrings.reportsReadOnly), findsOneWidget);
     expect(find.text('51,000 د.ل'), findsWidgets);
-    expect(find.text('1,200 د.ل'), findsWidgets);
-    expect(find.textContaining('سبب تجريبي'), findsWidgets);
+    // netChangeUnits is not a column. The reason still shows its own change.
+    expect(find.text('1,200 د.ل'), findsNothing);
+    expect(find.textContaining('سبب تجريبي 1,200 د.ل'), findsWidgets);
     expect(find.byType(TextField), findsNothing);
     expect(find.byKey(const Key('cash-in')), findsNothing);
     expect(find.byIcon(Icons.edit), findsNothing);
