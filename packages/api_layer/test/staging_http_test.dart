@@ -183,12 +183,13 @@ void main() {
       expect(failed.message, 'رفض');
     });
 
-    test('a 419 that names CSRF is a CSRF failure', () {
+    test('a 419 that names CSRF only in the message wipes', () {
       final csrf = mapper.fromResponse(419, {
         'message': 'CSRF token mismatch.',
       });
-      expect(csrf, isA<CsrfInvalidException>());
-      expect(csrf.code, 'CSRF_INVALID');
+      expect(csrf, isA<SessionExpiredException>());
+      expect(csrf.code, 'PAGE_EXPIRED');
+      expect(isCsrfRejection(csrf), isFalse);
     });
   });
 

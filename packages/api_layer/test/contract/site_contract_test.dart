@@ -471,45 +471,34 @@ void main() {
     expect(auth.code, 'AUTH_REQUIRED');
   });
 
-  test(
-    'CLIENT_VERSION_MISMATCH is an upgrade, not a data conflict',
-    () {
-      final err = const ErrorMapper()
-          .fromResponse(409, _body(samples, 'versionHeaderError'), null);
-      expect(err, isA<UpgradeRequiredException>());
-      expect(err.code, 'CLIENT_VERSION_MISMATCH');
-    },
-    skip: 'G-07. Every non-VERSION_CONFLICT 409 becomes ConflictException, '
-        'including CLIENT_VERSION_MISMATCH.',
-  );
+  test('CLIENT_VERSION_MISMATCH is an upgrade, not a data conflict', () {
+    final err = const ErrorMapper()
+        .fromResponse(409, _body(samples, 'versionHeaderError'), null);
+    expect(err, isA<ClientVersionMismatchException>());
+    expect(err, isNot(isA<ConflictException>()));
+    expect(err.code, 'CLIENT_VERSION_MISMATCH');
+  });
 
   test(
-    'REQUEST_ID_REUSED and DUPLICATE_SAME_WORKDAY are not generic conflicts',
-    () {
-      const mapper = ErrorMapper();
-      final reused = mapper.fromResponse(409, _body(samples, 'reusedId'), null);
-      final duplicate =
-          mapper.fromResponse(409, _body(samples, 'duplicateWarning'), null);
-      expect(reused, isNot(isA<ConflictException>()));
-      expect(duplicate.code, 'DUPLICATE_SAME_WORKDAY');
-      expect(duplicate, isNot(isA<ConflictException>()));
-    },
-    skip: 'G-07. REQUEST_ID_REUSED and DUPLICATE_SAME_WORKDAY are both '
-        'ConflictException. The duplicate warning is not a distinct type.',
-  );
+      'REQUEST_ID_REUSED and DUPLICATE_SAME_WORKDAY are not generic conflicts',
+      () {
+    const mapper = ErrorMapper();
+    final reused = mapper.fromResponse(409, _body(samples, 'reusedId'), null);
+    final duplicate =
+        mapper.fromResponse(409, _body(samples, 'duplicateWarning'), null);
+    expect(reused, isA<RequestIdReusedException>());
+    expect(reused, isNot(isA<ConflictException>()));
+    expect(duplicate.code, 'DUPLICATE_SAME_WORKDAY');
+    expect(duplicate, isA<DuplicateSameWorkdayException>());
+    expect(duplicate, isNot(isA<ConflictException>()));
+  });
 
-  test(
-    'INVALID_AMOUNT details.field is the field name',
-    () {
-      final err = const ErrorMapper()
-          .fromResponse(400, _body(samples, 'invalidAmount'), null);
-      expect(err, isA<ValidationException>());
-      expect(
-          (err as ValidationException).fieldErrors.single.field, 'inputValue');
-    },
-    skip: 'G-07. details is {"field": "inputValue"}. The mapper treats the '
-        'key "field" as the field name.',
-  );
+  test('INVALID_AMOUNT details.field is the field name', () {
+    final err = const ErrorMapper()
+        .fromResponse(400, _body(samples, 'invalidAmount'), null);
+    expect(err, isA<ValidationException>());
+    expect((err as ValidationException).fieldErrors.single.field, 'inputValue');
+  });
 
   test(
     'MFA_REQUIRED is not shown as invalid credentials',

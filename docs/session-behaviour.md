@@ -12,7 +12,7 @@ A **login 401 is bad credentials**, including when the code is `AUTH_REQUIRED`. 
 
 ## CSRF
 
-Unsafe methods (`POST`, `PUT`, `PATCH`, `DELETE`) send `X-CSRF-Token` when the in-memory token is present. `GET` and `HEAD` do not. A `GET /api/auth/csrf` made through the main client takes the same write mutex as those methods and is the strategy's single-flight refresh, because that GET invalidates the previous token. Other GETs are not queued. A code **or a server message** containing `CSRF` refreshes `GET /api/auth/csrf` once (single-flight) and replays that request once, with the same body and the same `requestId`. The error catalog has no HTTP 419; `CSRF_REJECTED` is 403. A 419 whose code or message contains `CSRF` still refreshes, and any other 419 still wipes the session. If the refresh fails, or that one replay was already spent, `CookieCsrfAuthStrategy` passes the error through. A 401 or 419 from the CSRF refresh stays on that pass-through path. An authenticated 401, and a 419 that is not a CSRF error, are session expiry in the table below. That path is what wipes the session.
+Unsafe methods (`POST`, `PUT`, `PATCH`, `DELETE`) send `X-CSRF-Token` when the in-memory token is present. `GET` and `HEAD` do not. A `GET /api/auth/csrf` made through the main client takes the same write mutex as those methods and is the strategy's single-flight refresh, because that GET invalidates the previous token. Other GETs are not queued. Only HTTP 403 `CSRF_REJECTED` refreshes `GET /api/auth/csrf` once (single-flight) and replays that request once, with the same body and the same `requestId`. The error catalog has no HTTP 419; `CSRF_REJECTED` is 403. A 419 is never refreshed or replayed. If the refresh fails, or that one replay was already spent, `CookieCsrfAuthStrategy` passes the error through. A 401 or 419 from the CSRF refresh stays on that pass-through path. An authenticated 401, and a 419 whose code is not a CSRF code, are session expiry in the table below. That path is what wipes the session. A 419 whose code contains `CSRF` stays a CSRF error and does not wipe. A 419 with `CSRF` only in the message still wipes.
 
 ## Expiry
 
@@ -24,8 +24,9 @@ The implementation is open [PR #38](https://github.com/ddaa81108-wq/vib-abdo-com
 |---|---|
 | Authenticated 401, any code | Session expiry |
 | Public login 401, any code, including `AUTH_REQUIRED` | Invalid credentials |
-| 419 whose code or message contains `CSRF` | CSRF refresh, one replay |
-| Any other 419, including a non-JSON body | Session expiry (`PAGE_EXPIRED` when the server sends no code) |
+| Any 419 | Never refreshed or replayed |
+| 419 whose code contains `CSRF` | CSRF error, session stays |
+| 419 with `CSRF` only in the message, or any other 419, including a non-JSON body | Session expiry (`PAGE_EXPIRED` when the server sends no code) |
 | `AUTH_REQUIRED`, `SESSION_EXPIRED`, `SESSION_REVOKED`, or `PAGE_EXPIRED` on another status | Session expiry |
 
 Expiry calls `SessionManager.forceLogout`. Many 401s share one wipe. An explicit logout that overlaps those 401s keeps reason `logout`, so the login screen does not show the expiry notice. `signedOutNotice` shows "انتهت الجلسة، يرجى تسجيل الدخول" only when the reason is `session_expired`, and the router sends the user to `/login`.

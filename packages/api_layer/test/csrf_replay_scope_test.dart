@@ -37,12 +37,27 @@ void main() {
     expect(await harness.cookies.cookieHeader(), contains('abdo_session'));
   });
 
-  test('a 409 whose message contains CSRF is not refreshed', () async {
+  test('a 401 AUTH_REQUIRED whose message mentions CSRF wipes once', () async {
+    await _expectNoReplay(
+      status: 401,
+      code: 'AUTH_REQUIRED',
+      message: 'missing CSRF token',
+      wipes: true,
+    );
+  });
+
+  test('a 409 VERSION_CONFLICT whose message contains CSRF is not refreshed',
+      () async {
     await _expectNoReplay(
       status: 409,
       code: 'VERSION_CONFLICT',
       message: 'missing CSRF token',
       wipes: false,
+      kept: isA<ConflictException>().having(
+        (error) => error.isVersionConflict,
+        'isVersionConflict',
+        isTrue,
+      ),
     );
   });
 
@@ -52,6 +67,7 @@ void main() {
       code: 'SERVER_ERROR',
       message: 'CSRF token mismatch.',
       wipes: false,
+      kept: isA<ServerException>(),
     );
   });
 
@@ -64,13 +80,15 @@ void main() {
     );
   });
 
-  test('403 PERMISSION_DENIED with CSRF only in the message is not refreshed',
+  test(
+      '403 PERMISSION_DENIED with CSRF only in the message is not refreshed',
       () async {
     await _expectNoReplay(
       status: 403,
       code: 'PERMISSION_DENIED',
       message: 'CSRF check failed',
       wipes: false,
+      kept: isA<ForbiddenException>(),
     );
   });
 
@@ -83,12 +101,13 @@ void main() {
     );
   });
 
-  test('a 419 with CSRF only in the message is not replayed', () async {
+  test('a 419 with CSRF only in the message wipes and is not replayed',
+      () async {
     await _expectNoReplay(
       status: 419,
       code: 'PAGE_EXPIRED',
       message: 'missing CSRF token',
-      wipes: false,
+      wipes: true,
     );
   });
 
@@ -107,6 +126,7 @@ Future<void> _expectNoReplay({
   required String code,
   required String message,
   required bool wipes,
+  Matcher? kept,
 }) async {
   final harness = await _open();
   harness.fake.failNextResponse = (
@@ -141,7 +161,7 @@ Future<void> _expectNoReplay({
     );
     expect(await harness.cookies.isEmpty(), isTrue);
   } else {
-    expect(error, isA<CsrfInvalidException>());
+    expect(error, kept ?? isA<CsrfInvalidException>());
     expect(harness.layer.session.state, isA<SessionAuthenticated>());
     expect(await harness.cookies.isEmpty(), isFalse);
   }
