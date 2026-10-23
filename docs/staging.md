@@ -49,9 +49,9 @@ Session is a cookie plus `X-CSRF-Token` (see `CookieCsrfAuthStrategy`).
 - Login is expected to return `data.csrfToken` and a `Set-Cookie` session.
 - Later unsafe calls send the cookie and `X-CSRF-Token`.
 - `GET /api/auth/csrf` refreshes the token when it is missing (memory only; it is not stored).
-- A body whose code or message contains `CSRF` refreshes the token **once** and replays the request **once**. A second failure is not replayed.
+- Only HTTP 403 with code `CSRF_REJECTED` refreshes the token **once** and replays the request **once**. A second failure is not replayed. A 409, a 500, another 403 code, or a message that merely mentions CSRF is not refreshed.
 - If that refresh itself returns `401` or `419`, the session is cleared instead of looping.
-- An authenticated `401`, or a `419` that is not a CSRF failure, clears the cookie and the CSRF token and emits `session_expired`. The router sends the user to `/login` and shows "انتهت الجلسة، يرجى تسجيل الدخول". There is no refresh-token retry.
+- An authenticated `401`, or a `419` whose code and message do not mention CSRF, clears the cookie and the CSRF token and emits `session_expired`. A `419` is never refreshed or replayed. A `419` that mentions CSRF is surfaced as a CSRF error and does not wipe the session. The router sends the user to `/login` and shows "انتهت الجلسة، يرجى تسجيل الدخول". There is no refresh-token retry.
 - `GET`/`HEAD` may retry connection failures and `502`/`503`/`504` (at most twice). `401` and `419` are never in that set. Mutations are not retried by the transport layer.
 - SSE (`/api/events`) and polling (`/api/event-changes`) stop on `401`/`419` instead of reconnecting forever. Logout also stops them.
 
