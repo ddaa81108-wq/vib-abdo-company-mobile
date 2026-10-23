@@ -17,6 +17,12 @@ import 'error_mapper.dart';
 ///   while the write turn is still held; AUTH_REQUIRED -> forced logout
 ///   (no refresh flow on the cookie session). A 419 that is not a CSRF error
 ///   is session expiry and is not replayed.
+/// - The write turn is released before the forced-logout callback. Logout
+///   cleanups post through this same client (device unregister). Waiting for
+///   that post while the failed write still holds the mutex deadlocks every
+///   later write.
+/// - A 401 from GET /api/auth/csrf on this client uses that same wipe. The
+///   catalog has no 419; a non-CSRF 419 on a write still wipes.
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required AuthStrategy strategy,
@@ -40,12 +46,41 @@ class AuthInterceptor extends Interceptor {
     return path == ApiEndpoints.logout || request.path == ApiEndpoints.logout;
   }
 
+  bool _isCsrfGet(RequestOptions request) {
+    if (request.method.toUpperCase() != 'GET') return false;
+    final path = request.uri.path.isEmpty ? request.path : request.uri.path;
+    return path == ApiEndpoints.csrf ||
+        request.path == ApiEndpoints.csrf ||
+        path.endsWith(ApiEndpoints.csrf) ||
+        request.path.endsWith(ApiEndpoints.csrf);
+  }
+
+  /// Drops the write turn, then wipes. releaseWrite is idempotent, so the
+  /// `onError` finally may call it again.
+  Future<void> _releaseAndWipe(RequestOptions request) async {
+    _strategy.releaseWrite(request);
+    if (!_isLogout(request) && _authenticated(request)) {
+      await _onForcedLogout('session_expired');
+    }
+  }
+
   @override
   Future<void> onRequest(
       RequestOptions options, RequestInterceptorHandler handler) async {
     try {
       final adopted = await _strategy.adoptCsrfGet(options);
       if (adopted != null) {
+        if (_isCsrfGet(options) && adopted.statusCode == 401) {
+          await _releaseAndWipe(options);
+          handler.reject(
+            DioException(
+              requestOptions: options,
+              response: adopted,
+              type: DioExceptionType.badResponse,
+            ),
+          );
+          return;
+        }
         handler.resolve(adopted);
         return;
       }
@@ -53,6 +88,11 @@ class AuthInterceptor extends Interceptor {
       await _strategy.attach(options, authenticated: _authenticated(options));
       handler.next(options);
     } on DioException catch (error) {
+      if (_isCsrfGet(options) && error.response?.statusCode == 401) {
+        await _releaseAndWipe(options);
+        handler.reject(error);
+        return;
+      }
       _strategy.releaseWrite(options);
       handler.reject(error);
     } catch (error, stack) {
@@ -110,16 +150,15 @@ class AuthInterceptor extends Interceptor {
           return;
         case AuthErrorAction.forceLogout:
           // Logout's own 401 must not announce session_expired. SessionManager
-          // .logout() still wipes with reason 'logout'.
-          if (!_isLogout(req)) await _onForcedLogout('session_expired');
+          // .logout() still wipes with reason 'logout'. The turn is released
+          // before that wipe so its cleanup post can take the mutex.
+          await _releaseAndWipe(req);
           handler.next(err);
           return;
         case AuthErrorAction.retryOnce:
           // A dead session is never replayed, even if a strategy asks.
           if (mapped is SessionExpiredException) {
-            if (_authenticated(req) && !_isLogout(req)) {
-              await _onForcedLogout('session_expired');
-            }
+            await _releaseAndWipe(req);
             handler.next(err);
             return;
           }
