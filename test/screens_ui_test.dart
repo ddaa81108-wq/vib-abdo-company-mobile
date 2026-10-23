@@ -152,22 +152,11 @@ void main() {
     expect(find.byKey(const Key('financial-ledger')), findsOneWidget);
   });
 
-  testWidgets('a reader without write permission does not see write controls', (
+  testWidgets('a collector sees collection writes and no other sections', (
     tester,
   ) async {
     await pumpFakeApp(tester, size: const Size(800, 2400));
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
-
-    await go(tester, '/customers');
-    expect(find.byKey(const Key('screen-customers')), findsOneWidget);
-    expect(find.byKey(const Key('add-account')), findsNothing);
-    expect(find.byKey(const Key('assign-mode')), findsNothing);
-
-    await go(tester, '/customers/c_55');
-    expect(find.byKey(const Key('screen-ledger-customers')), findsOneWidget);
-    expect(find.byKey(const Key('add-debt')), findsNothing);
-    expect(find.byKey(const Key('add-payment')), findsNothing);
-    expect(find.byKey(const Key('cancel-tx_1')), findsNothing);
 
     await go(tester, '/collections');
     expect(find.byKey(const Key('screen-collections')), findsOneWidget);
@@ -177,6 +166,8 @@ void main() {
     expect(find.byKey(const Key('close-batch')), findsNothing);
 
     for (final path in [
+      '/customers',
+      '/customers/c_55',
       '/companies',
       '/companies/c_55',
       '/libyan-deposits',

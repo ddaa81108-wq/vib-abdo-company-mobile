@@ -243,7 +243,7 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
   /// retry of these same inputs after the same user signs in again.
   String _presentFailure(Object error) {
     final failure = ref.read(errorHandlerProvider).toFailure(error);
-    if (failure.code == 'FORBIDDEN') return AppStrings.forbidden;
+    if (failure.isForbidden) return AppStrings.forbidden;
     if (failure.code != 'VERSION_CONFLICT') return failure.message;
     _announceConflict();
     widget.onVersionConflict?.call();

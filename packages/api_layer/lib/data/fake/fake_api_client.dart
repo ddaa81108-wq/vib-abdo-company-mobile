@@ -764,7 +764,7 @@ class FakeApiClient implements ApiClient {
       role: user['role'] as String?,
       sectionAccess: section is Map
           ? section.map((key, value) => MapEntry('$key', '$value'))
-          : const {},
+          : null,
       fullAccess:
           user['fullAccess'] is bool ? user['fullAccess'] as bool : null,
     );
