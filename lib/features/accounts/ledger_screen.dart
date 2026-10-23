@@ -455,6 +455,16 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
     // An amount above the fresh balance is not refused: the warning is
     // display-only and the send still uses this form's requestId.
     if (widget.type == 'payment' && _mode == CalculationMode.direct) {
+      // An invalid balance already on screen is not a number. Refuse it
+      // before any send. It is not treated as 0.
+      final watched = ref
+          .read(accountCardProvider((widget.section, widget.id)))
+          .asData
+          ?.value
+          .balanceUnits;
+      if (watched != null && watched.isInvalid) {
+        return AppStrings.invalidAmount;
+      }
       // The same repository call accountCardProvider uses. Reading it here,
       // instead of refreshing that provider, leaves the form's watched
       // expectedVersion (and therefore its requestId) unchanged.
