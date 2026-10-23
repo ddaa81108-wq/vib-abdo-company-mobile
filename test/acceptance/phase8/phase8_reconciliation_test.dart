@@ -320,11 +320,14 @@ void main() {
     );
   }, tags: [tag]);
 
-  test('DEF-029 website display precision is unconfirmed', () {
-    markTestSkipped(
-      'DEF-029. moneyUnitScale 0 is unconfirmed and P0-04 is not run. '
-      'No website fraction is available to compare.',
+  test('DEF-029 money units are whole currency units', () {
+    expect(
+      const ApiConfig(baseUrl: 'https://fake.invalid').moneyUnitScale,
+      0,
     );
+    expect(money.format(1000, Currency.lyd), '1,000 د.ل');
+    expect(money.format(250, Currency.lyd), '250 د.ل');
+    expect(money.format(1000, Currency.lyd), isNot('10.00 د.ل'));
   }, tags: [tag]);
 
   test('DEF-030 summary scope under search and hidden rows is unknown', () {
@@ -362,11 +365,12 @@ void main() {
     expect(tester.takeException(), isNull);
   }, tags: [tag]);
 
-  test('DEF-033 Vodafone currency is an assumption', () {
-    markTestSkipped(
-      'DEF-033. The day line prints ج.م from vodafoneCurrencyAssumption. '
-      'The website currency is not confirmed.',
-    );
+  // main 84f012d is merged, including #66. #68 is still open, so this file
+  // had no conflict with it. DEF-029 assertions above are unchanged. DEF-033
+  // keeps vodafoneCurrency and 4,900 ج.م. Purchases citations still match.
+  test('DEF-033 Vodafone currency is EGP', () {
+    expect(vodafoneCurrencyAssumption, Currency.egp);
+    expect(money.format(4900, vodafoneCurrencyAssumption), '4,900 ج.م');
   }, tags: [tag]);
 
   test('DEF-034 purchase lifetime key names are unconfirmed', () {
@@ -376,10 +380,11 @@ void main() {
     );
   }, tags: [tag]);
 
-  test('DEF-035 collections currency is fixed to LYD in the client', () {
+  test('DEF-035 unlinked receipts are not linked to an Egyptian account', () {
     markTestSkipped(
-      'DEF-035. CollectionsOverviewDto.currency always returns LYD. '
-      'No server currency field is read. ${AppStrings.collected} stays on that symbol.',
+      'DEF-035. The linked collections currency is LYD and that part is '
+      'closed. Linking an unlinked receipt to egyptian_deposits is still '
+      'open (P-20). ${AppStrings.collected} is not a website value.',
     );
   }, tags: [tag]);
 

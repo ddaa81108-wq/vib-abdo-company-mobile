@@ -2,7 +2,7 @@
 
 التاريخ 2026-10-22. الشجرة `main` `54884d7e103102b1b9c3bb5bbedff1a2006666ff`. لا توقيع. لم يُمس `lib/` ولا مصدر `packages/` ولا `tool/` ولا `android/`.
 
-لا ملف OpenAPI ولا JSON Schema في المستودع. `packages/api_layer/README.md:4` يقول إن ملاحظات العقد تبقى خارج المستودع. `docs/api-contract-gaps.md` ليس على `main` (`docs/employee-totals-proposal.md:61`). `docs/staging.md:100` يقول إن الأسئلة المفتوحة مفترضة وليست مؤكدة. كل مسار وحقل أدناه **مستنتج وغير مؤكد** من كود التطبيق والـ fixtures. تعليق «per API contract» ملاحظة التطبيق، وليس عقدًا. سلوك `FakeApiClient` ليس دليلًا على الموقع.
+جرد 2026-10-22 سجّل أنه لا ملف OpenAPI في المستودع آنذاك. على `main` `9a59a8e` العقد في `docs/api/`. مقياس الوحدة لم يعد غير مؤكد: المبالغ وحدات عملة كاملة والمقياس 0، confirmed on staging per site handoff evidence (commit 537f073). `docs/staging.md:100` ما زال يصف أسئلة أقدم بأنها مفترضة. أرقام الجدول العشرة أدناه من `FakeApiClient` وموسومة `Fake`. سلوك الـ Fake ليس دليل الموقع.
 
 **قاعدة علي:** التطبيق غير مقبول إذا اختلف أي رقم معروض عن الموقع. التسامح = فرق صفر. عمود الموقع فارغ في هذه الخطوة لأن لا قيمة موقع مُدخلة، ولا تُخترع قيمة. كل رقم تطبيق أدناه من `FakeApiClient` وموسوم `Fake`. النتيجة لكل صف: **لم تُتحقّق**.
 
@@ -23,12 +23,12 @@
 
 ## سياسة التقريب والعملة
 
-مؤكَّد في الكود، وغير مؤكد أمام الموقع:
+مؤكَّد في الكود. مقياس الوحدة مؤكد من تسليم الموقع في البند الرابع. أرقام الجدول العشرة لم تُقارَن بالموقع:
 
 - المال الصحيح يُحفظ `MoneyValue.known`. النص أو الكسر أو `bool` أو الكائن أو `JsonNumberText` يصبح `MoneyValue.invalid` لذلك الحقل فقط، والشاشة ترسم `مبلغ غير صالح`، بلا قص ولا تقريب ولا `0` (`packages/api_layer/lib/data/models/common.dart:47-60`، `money_value.dart:17`). `null` يبقى `null` والشاشة ترسم `—` (`money_formatter.dart:52-59`، `lib/ui/strings.dart:70`). حاوية حاضرة ليست كائن JSON ما زالت تُسقط الاستجابة (`common.dart:68-72`). DEF-036 Closed على `main` `82a6807` (سكواش #62).
 - المفكك لا ينتج `double`. العدد غير الصحيح يبقى نصًا (`packages/api_layer/lib/core/network/precise_json.dart:24-26`).
-- `MoneyFormatter` يقطع سلسلة الأرقام: بلا قسمة ولا تقريب ولا جمع ولا تحويل عملة (`money_formatter.dart:7-13`). الافتراض `moneyUnitScale` = 0 (`api_config.dart:73-75`، `docs/staging.md:33` و`:109`). فاصل الآلاف `,` والعلامة العشرية `.`. لا `intl` `NumberFormat`.
-- دقة عرض الموقع **غير معروفة** لكل الحقول. P0-04 حالته Not run (`docs/acceptance/phase-0.md:49-58`). تعليق `maximumFractionDigits: 0` هو الملاحظة نفسها وليس قاعدة موقع. هذا DEF-029.
+- `MoneyFormatter` يقطع سلسلة الأرقام: بلا قسمة ولا تقريب ولا جمع ولا تحويل عملة (`money_formatter.dart:7-13`). الافتراض `moneyUnitScale` = 0 (`api_config.dart:66` و`:83-85`، `docs/staging.md:33` و`:117`). فاصل الآلاف `,` والعلامة العشرية `.`. لا `intl` `NumberFormat`.
+- المبالغ وحدات عملة كاملة، والمقياس 0 (DEF-029، 2026-10-23). confirmed on staging per site handoff evidence (commit 537f073): الالتزام مذكور في `MATCHING.ar.md:3`. `openapi.json:31254-31257` يصف `inputValue` بأنه integer و«Whole currency units, not minor units». `README.ar.md:45` ينفي ×100 و×1000. `api-samples.json` يضع 1000 (`:1620`) ثم 750 (`:1719`) ثم 0 (`:1818`)، ويطابق `MATCHING.ar.md:11-13`. `defect-decisions.ar.md` (DEF-029) يغلق القرار. `staging-readonly-check.ar.md` §3 لا يذكر المقياس. عمود الموقع في الجدول أدناه يبقى فارغًا، والنتيجة تبقى `لم تُتحقّق`.
 - `LYD` → `د.ل` و`EGP` → `ج.م`. التطبيق لا يجمع العملتين. بطاقة الرئيسية الاحتياطية حقلًا حقلًا بعملته (`home_fallback.dart:16-19` و`:48-64`). الخزينة تبقي مصدر المصري بالجنيه والمُحوَّل بالدينار على بلاطتين.
 - `parseUnits` يرفض `.` و`٫` (`lib/ui/widgets/common.dart:429-444`). `floorToDouble` في `treasury_screen.dart:304` عرض البلاطة لا مبلغ.
 
@@ -66,7 +66,7 @@
 - **المزوّد:** `accountCardProvider` و`ledgerProvider`.
 - **المسار:** `POST /api/customers/{id}/transactions` بجسم `paymentMode: partial` و`inputValue`. ثم `GET /api/customers/{id}` الحقل `balanceUnits`، و`GET /api/customers/{id}/ledger` الحقل `balanceAfterUnits`.
 - **المصدر على التطبيق:** إعادة جلب. الواجهة لا تطرح المبلغ من الرصيد (`lib/ui/strings.dart:93`).
-- **Fake:** `_applyMovement` يخزّن `previous - entered` في `balanceUnits` و`balanceAfterUnits` (`packages/api_layer/lib/data/fake/fake_api_client.dart:1559`). هذا سلوك الـ Fake فقط (DEF-028) وليس قاعدة الموقع. سقف الحوار يقارن المبلغ بالرصيد المخزَّن في المزوّد بلا جلب جديد (`ledger_screen.dart:417-430`). DEF-031. سيناريو الاختبار `P7-10` على `c_55` بإدخال `100` يرسم الرأس `220 د.ل` (`test/phase7_payments_test.dart:58`). 220 ليست قيمة موقع.
+- **Fake:** `_applyMovement` يخزّن `previous - entered` في `balanceUnits` و`balanceAfterUnits` (`packages/api_layer/lib/data/fake/fake_api_client.dart:1723`). هذا سلوك الـ Fake فقط (DEF-028) وليس قاعدة الموقع. سقف الحوار يقارن المبلغ بالرصيد المخزَّن في المزوّد بلا جلب جديد (`ledger_screen.dart:417-430`). DEF-031. سيناريو الاختبار `P7-10` على `c_55` بإدخال `100` يرسم الرأس `220 د.ل` (`test/phase7_payments_test.dart:58`). 220 ليست قيمة موقع.
 - **التنسيق:** `220 د.ل` في ذلك السيناريو فقط.
 
 ## 5 — سداد كلي (الرصيد بعده = 0)
@@ -75,7 +75,7 @@
 - **المزوّد:** بعد النجاح تُبطَل المزوّدات نفسها في `_full` (`ledger_screen.dart:255`). الرأس من `accountCardProvider`.
 - **المسار:** `POST /api/customers/{id}/transactions` عبر `AccountTransactionRequest.fullPayment()`. ثم `GET` الحقل `balanceUnits`.
 - **المصدر:** إعادة جلب. الزر لا يرسل مبلغًا ولا يحسب صفرًا.
-- **Fake:** `_applyFullPayment` يخزّن `balanceUnits: 0` بلا طرح (`fake_api_client.dart:1525`). على `c_55` بعد الزر يظهر `0 د.ل` (`test/phase7_payments_test.dart:63`).
+- **Fake:** `_applyFullPayment` يخزّن `balanceUnits: 0` بلا طرح (`fake_api_client.dart:1689`). على `c_55` بعد الزر يظهر `0 د.ل` (`test/phase7_payments_test.dart:63`).
 - **التنسيق:** `0 د.ل`.
 
 ## 6 — الأمانات الليبية
@@ -155,10 +155,10 @@
 **الدليل:**
 
 1. حوار السداد يرسل `inputValue` ثم يعيد جلب الكارت. لا طرح في `lib/` (`ledger_screen.dart:417` و`lib/ui/strings.dart:93`).
-2. `FakeApiClient._applyMovement` يخزّن `previous - entered` في `balanceUnits` و`balanceAfterUnits` عندما يكون السداد جزئيًا ومباشرًا (`fake_api_client.dart:1559`).
-3. `_accountsView` يجمع فرق الرصيد في `delta` (`fake_api_client.dart:1471`) ثم يضيفه إلى `summary.netBalance` و`summary.totalDebt` (`fake_api_client.dart:1478`). التعليق في `account_models.dart:148` يقول إن `totalDebt` مجموع الأرصدة الموجبة فقط و`netBalance` صافي القسم. إزاحة الحقلين معًا قد تخالف خادمًا يفرّق بينهما.
-4. السداد الكلي يخزّن 0 بلا طرح (`fake_api_client.dart:1525`). هذا الصف ليس الحساب محل العيب. العيب هو أن رقم «بعد السداد الجزئي» وأرقام الملخص بعد الكتابة، على Fake، ليسا قيمة مخزَّنة جاهزة.
-5. إلغاء حركة ينسخ آخر `balanceAfterUnits` مرحَّل إلى الكارت (`fake_api_client.dart:1581`). نفس الصنف: الرصيد على Fake يُشتق محليًا.
+2. `FakeApiClient._applyMovement` يخزّن `previous - entered` في `balanceUnits` و`balanceAfterUnits` عندما يكون السداد جزئيًا ومباشرًا (`fake_api_client.dart:1723`).
+3. `_accountsView` يجمع فرق الرصيد في `delta` (`fake_api_client.dart:1635`) ثم يضيفه إلى `summary.netBalance` و`summary.totalDebt` (`fake_api_client.dart:1642-1646`). التعليق في `account_models.dart:148` يقول إن `totalDebt` مجموع الأرصدة الموجبة فقط و`netBalance` صافي القسم. إزاحة الحقلين معًا قد تخالف خادمًا يفرّق بينهما.
+4. السداد الكلي يخزّن 0 بلا طرح (`fake_api_client.dart:1689`). هذا الصف ليس الحساب محل العيب. العيب هو أن رقم «بعد السداد الجزئي» وأرقام الملخص بعد الكتابة، على Fake، ليسا قيمة مخزَّنة جاهزة.
+5. إلغاء حركة ينسخ آخر `balanceAfterUnits` مرحَّل إلى الكارت (`fake_api_client.dart:1775`). نفس الصنف: الرصيد على Fake يُشتق محليًا.
 
 مقارنة Fake بالموقع لا تُغلق صفًا. إغلاق الصفوف على الخادم الحقيقي ما زال الخطوة ب، والتسامح صفر.
 
@@ -169,23 +169,24 @@
 | الخطر | الحكم بعد الفحص | المعرّف |
 |---|---|---|
 | لا عقد في المستودع | مؤكد. لا OpenAPI. الحقول مستنتجة | فجوة، لا معرّف |
-| مقياس الوحدة 0 غير مؤكد وP0-04 لم يُشغَّل | مؤكد في `api_config.dart:73-75` و`phase-0.md:49-58` | DEF-029 |
+| مقياس الوحدة | وحدات عملة كاملة، والمقياس 0. confirmed on staging per site handoff evidence (commit 537f073). `openapi.json:31254-31257`، `api-samples.json:1620` و`:1719` و`:1818` (1000 ثم 750 ثم 0)، `MATCHING.ar.md:11-13`، `README.ar.md:45`، `defect-decisions.ar.md` (DEF-029). جزء المال من P0-04 محسوم؛ بقية المعيار لم تُشغَّل | DEF-029 Closed |
 | نطاق `summary` مع `q` و`filter` والصفوف المخفية غير مكتوب | الطلب يرسلها (`accounts_repository.dart:53-56`) والشريط يعرض `summary` لا مجموع الصفحة | DEF-030 |
 | سقف السداد الجزئي من الرصيد المخزَّن | مؤكد `ledger_screen.dart:417-430`. الضرب والقسمة بلا مقارنة | DEF-031 |
 | غياب سعر المصري يخفي المبلغين | كان مؤكدًا. على `main` `82a6807` مصدر الجنيه يُرسم دائمًا، وصف التحويل فقط يُستبدل بـ `يلزم سعر تحويل معتمد` (`treasury_screen.dart:394-435`) | DEF-032 Closed |
-| عملة فودافون مفترضة `EGP` | مؤكد `purchase_models.dart:14-15` و`purchases_screen.dart:241-245` | DEF-033 |
+| عملة فودافون مفترضة `EGP` | مغلقة: EGP (`api-samples.json:331`، `MATCHING.ar.md:15`، `purchases_screen.dart:241-245`) | DEF-033 Closed |
 | مفاتيح الإجمالي الدائم غير مؤكدة | مؤكد `purchase_models.dart:238-239`. مفتاح غريب يبقى في `all` ولا يُرسم | DEF-034 |
-| عملة الاستلامات مثبّتة `LYD` | مؤكد `collection_models.dart:182`. لا حقل عملة من الخادم | DEF-035 |
+| عملة الاستلامات مثبّتة `LYD` | جزء LYD المرتبط مغلق (`MATCHING.ar.md:19`، `api-samples.json:518-524`، `collection_models.dart:198`). ربط الاستلام المستقل بالمصري ما زال مفتوحًا | DEF-035 LYD Closed |
 | كسر واحد يُسقط الاستجابة | كان مؤكدًا على `common.dart:31-36`. على `main` `82a6807` الحقل غير الصحيح يُرسم `مبلغ غير صالح` وبقية الصفحة تبقى (`common.dart:47-60`). حاوية حاضرة ليست كائن JSON ما زالت تُسقط الاستجابة (`common.dart:68-72`) | DEF-036 Closed |
-| الـ Fake يضيف الفرق إلى الملخصين | مؤكد `fake_api_client.dart:1471-1482`. ليس دليل الموقع | DEF-028 |
+| الـ Fake يضيف الفرق إلى الملخصين | مؤكد `fake_api_client.dart:1624-1646`. ليس دليل الموقع | DEF-028 |
 | لا جمع محلي للإجماليات ولا جمع LYD مع EGP | مؤكد في الشاشات والنماذج المذكورة أعلاه | ليس عيبًا |
 
-`GET /api/home` مقترح (`home_models.dart:3`، `docs/staging.md:109`). السداد الكلي يرسل `inputValue: 1` بلا مبلغ معروض (`account_models.dart:363-375`). الرقم التالي هو `balanceUnits` بعد إعادة الجلب. P2-01 ما زال Partially لأن العينة لم تُقارَن بالموقع (`docs/acceptance/phase-2.md:9`).
+`GET /api/home` مقترح (`home_models.dart:3`، `docs/staging.md:117`). السداد الكلي يرسل `inputValue: 1` بلا مبلغ معروض (`account_models.dart:363-375`). الرقم التالي هو `balanceUnits` بعد إعادة الجلب. P2-01 ما زال Partially لأن العينة لم تُقارَن بالموقع (`docs/acceptance/phase-2.md:9`).
 
 ## فجوات
 
 - عمود الموقع فارغ. لا رقم موقع في المستودع.
-- دقة العرض على الموقع غير معروفة (DEF-029).
+- مقياس الوحدة محسوم: وحدات عملة كاملة، والمقياس 0 (DEF-029). صفوف الجدول لم تُقارَن بالموقع بعد.
+- `409 DAY_FINALIZED` في `FakeApiClient` (`fake_api_client.dart:301`) بديل مؤقت. النص غير موجود في `error-catalog.json` ولا في `openapi.json`. الكتالوج يسمي `PURCHASE_DAY_FINALIZED` بحالة 409 (`error-catalog.json:942`).
 - الرئيسية لا تعرض إجمالي الشركات ولا الأمانات الليبية ولا المشتريات ولا `totalDebt` للعملاء. شاشات الأقسام تعرضها.
 - `pageOpeningBalanceUnits` بلا ودجت.
 - بطاقة «الاستلامات المعتمدة اليوم» تبقى سؤال العنوان السابق.
@@ -206,4 +207,4 @@
 5. النتيجة `تطابق` فقط إذا تطابق النصان تطابقًا تامًا. غير ذلك `فرق`. التسامح صفر. لا تقريب ولا تجاهل فاصلة ولا تحويل عملة.
 6. سجّل الشاشتين واسم الملفين والطابع في صف الجدول.
 
-التوقيع لعلي. هذه الوثيقة لا تُوقَّع من الجولة الآلية. DEF-029 يبقى مفتوحًا حتى يكتب علي مقياس الوحدة ودقة الموقع. صف فيه فرق لا يُغلق بتمرير اختبار الـ Fake.
+التوقيع لعلي. هذه الوثيقة لا تُوقَّع من الجولة الآلية. DEF-029 مغلق: وحدات عملة كاملة، والمقياس 0، confirmed on staging per site handoff evidence (commit 537f073). صف فيه فرق لا يُغلق بتمرير اختبار الـ Fake. عمود الموقع يبقى فارغًا.

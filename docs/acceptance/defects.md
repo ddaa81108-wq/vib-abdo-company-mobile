@@ -18,7 +18,8 @@
 | عيب بديل اختبار، بلا أثر إنتاج | DEF-021. Verified closed على `main` `c40e03d` بعد squash #54. الشاشة كانت تُبطل `collectionsProvider` وتعيد قراءة النظرة. الصف كان يغيب لأن `FakeApiClient` لا يخزّن الإرسال. فحص الخادم الحقيقي يبقى سؤال staging وليس عيبًا مفتوحًا |
 | Blocking على فرع وليس على `main` | لا يبقى. DEF-018 صار Verified closed على `main` `a5ca268` |
 | Non-blocking مفتوح | DEF-012. ما زال Fail على `main` `86324a4` لأن #27 لم يُدمج. البلاطات الثلاث نص بديل، والاختبار `DEF-012 admin settings replace the old unavailable sentence` يتوقع `employeesEmpty` و`auditEmpty` و`operationsEmpty`. خارج المرحلة 6 |
-| Non-blocking مفتوح — المرحلة 8 | DEF-028 وDEF-029 وDEF-030 وDEF-031 وDEF-033 وDEF-034 وDEF-035 ما زالت مفتوحة. DEF-028 سلوك Fake وليس دليل الموقع. DEF-029 مقياس الوحدة غير مؤكد. DEF-030 نطاق الملخص. DEF-031 سقف السداد من رصيد مخزَّن. DEF-033 عملة فودافون. DEF-034 مفاتيح المشتريات. DEF-035 عملة الاستلامات. التالي الحر DEF-037 |
+| Non-blocking مفتوح — المرحلة 8 | DEF-028 وDEF-030 وDEF-031 وDEF-034 ما زالت مفتوحة. DEF-035 مغلق لمسار LYD المرتبط، وربط الاستلام المستقل بحساب مصري ما زال مفتوحًا (P-20). DEF-028 سلوك Fake وليس دليل الموقع. DEF-030 نطاق الملخص. DEF-031 سقف السداد من رصيد مخزَّن. DEF-034 مفاتيح المشتريات. التالي الحر DEF-037 |
+| Closed على `main` `9a59a8e` بتاريخ 2026-10-23 | DEF-029 وDEF-033، وجزء LYD من DEF-035. القرار في `docs/api/defect-decisions.ar.md`. لا تغيير في كود الإنتاج |
 | Closed على `main` `82a6807` | DEF-032 وDEF-036. DEF-032 أُغلق بسكواش #61 `e326ac0`. DEF-036 أُغلق بسكواش #62 `82a6807`. أُعيد التحقق على `main` |
 | Verified closed على `main` `86324a4` | DEF-026 وDEF-027. DEF-026 أُغلق بإصلاح #59 (`6957df3`، الحبر `#5F6E69`). DEF-027 أُغلق بإصلاح #58 (`6b3e8e6`، squash على `main` هو `86324a4`). كانا غير مانعين |
 | Verified closed على `main` `2a45cfb` | DEF-023 وDEF-024 وDEF-025. squash #57 `213e04a`. اختبارات التباين الثلاثة نجحت داخل `tool/check.sh` **432/0**. `#7C6100` في سمة الوضع الفاتح |
@@ -470,7 +471,7 @@
 
 **إعادة الاختبار على PR #30 (`fe69157`، فوق `main`، ليس على `main` بعد):** verified on #30 fe69157, not yet on main. `bash tool/check.sh` خرج 0 (التطبيق 251/0، الحزمة 79/0).
 
-`DEF-014 finalized purchase day rejects entry create update and delete`: بعد الاعتماد الإصدار 4، الإضافة والتعديل والحذف كل منها 409 `DAY_FINALIZED`، وبصمة الدفتر لا تتغير. إعادة نفس `requestId` الذي نجح على المسودة لا تتجاوز الرفض (`DEF-014 a stored requestId does not bypass the finalized-day check`). الواجهة تخفي `add-purchase-12` و`edit-pe_1` و`delete-pe_1` وتبقي `open-correction-12` (`a finalized purchases day hides add edit and delete`). حفظ أو حذف بعد الاعتماد يعرض رسالة الخادم لا رسالة تعارض الإصدار. الموظف و`limited.admin.demo` و`guest.demo` يأخذون 403 قبل ذلك لأنهم بلا `purchases.write`. يوم `correction` يبقى قابلًا للكتابة.
+`DEF-014 finalized purchase day rejects entry create update and delete`: بعد الاعتماد الإصدار 4، الإضافة والتعديل والحذف كل منها 409 `DAY_FINALIZED`، وبصمة الدفتر لا تتغير. `DAY_FINALIZED` هنا رمز `FakeApiClient` فقط (`packages/api_layer/lib/data/fake/fake_api_client.dart:297-301`). هذا النص غير موجود في `docs/api/error-catalog.json` ولا في `docs/api/openapi.json`. الكتالوج يسمي الرفض `PURCHASE_DAY_FINALIZED` بحالة 409 (`error-catalog.json:942` و`:967` و`:1035`). الرمز في الـ Fake بديل مؤقت وليس رمزًا أكده الخادم. إعادة نفس `requestId` الذي نجح على المسودة لا تتجاوز الرفض (`DEF-014 a stored requestId does not bypass the finalized-day check`). الواجهة تخفي `add-purchase-12` و`edit-pe_1` و`delete-pe_1` وتبقي `open-correction-12` (`a finalized purchases day hides add edit and delete`). حفظ أو حذف بعد الاعتماد يعرض رسالة الخادم لا رسالة تعارض الإصدار. الموظف و`limited.admin.demo` و`guest.demo` يأخذون 403 قبل ذلك لأنهم بلا `purchases.write`. يوم `correction` يبقى قابلًا للكتابة.
 
 **على `main` (`451ec58`):** verified on main 451ec58. الدمج `#30` هو `52d12c2`. `a finalized purchases day hides add edit and delete` ناجح ضمن المجموعة.
 
@@ -975,23 +976,25 @@ CI [39815316603](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions
 | المالك المقترح | مهندس API (Fake). شاشة Flutter تعرض الحقل بعد إعادة الجلب |
 | الحالة | Open |
 
-**الدليل:** حوار السداد يرسل `inputValue` ثم يعيد جلب الكارت. لا طرح في `lib/` (`lib/features/accounts/ledger_screen.dart:417`). `FakeApiClient._applyMovement` يخزّن `previous - entered` في `balanceUnits` و`balanceAfterUnits` (`packages/api_layer/lib/data/fake/fake_api_client.dart:1559`). `_accountsView` يجمع الفرق (`fake_api_client.dart:1471`) ثم يضيفه إلى `summary.netBalance` و`summary.totalDebt` (`fake_api_client.dart:1478`). تعليق `AccountsSummaryDto` يقول إن `totalDebt` مجموع الأرصدة الموجبة و`netBalance` الصافي (`packages/api_layer/lib/data/models/account_models.dart:148`). السداد الكلي يخزّن 0 بلا طرح (`fake_api_client.dart:1525`). إلغاء حركة ينسخ آخر `balanceAfterUnits` مرحَّل (`fake_api_client.dart:1581`). سيناريو `test/phase7_payments_test.dart` على `c_55` بإدخال `100` يرسم `220 د.ل`. 220 ليست قيمة موقع.
+**الدليل:** حوار السداد يرسل `inputValue` ثم يعيد جلب الكارت. لا طرح في `lib/` (`lib/features/accounts/ledger_screen.dart:417`). `FakeApiClient._applyMovement` يخزّن `previous - entered` في `balanceUnits` و`balanceAfterUnits` (`packages/api_layer/lib/data/fake/fake_api_client.dart:1723` و`:1735`). `_accountsView` يجمع الفرق (`fake_api_client.dart:1635`) ثم يضيفه إلى `summary.netBalance` و`summary.totalDebt` (`fake_api_client.dart:1642-1646`). تعليق `AccountsSummaryDto` يقول إن `totalDebt` مجموع الأرصدة الموجبة و`netBalance` الصافي (`packages/api_layer/lib/data/models/account_models.dart:148`). السداد الكلي يخزّن 0 بلا طرح (`fake_api_client.dart:1689`). إلغاء حركة ينسخ آخر `balanceAfterUnits` مرحَّل (`fake_api_client.dart:1775`). سيناريو `test/phase7_payments_test.dart` على `c_55` بإدخال `100` يرسم `220 د.ل`. 220 ليست قيمة موقع.
 
 الحالات العشر في جدول المرحلة 8 لها شاشة ومسار. `MoneyFormatter` عند المقياس 0 لا يقرّب العدد الصحيح. سلوك Fake ليس دليل الموقع.
 
-### DEF-029 — مقياس وحدة المال غير مؤكد
+### DEF-029 — مقياس وحدة المال
 
-**الحالة:** Open (candidate) على `54884d7`. غير مانع لاختبارات الـ Fake. مانع لمطابقة الموقع حتى يُحسم. التالي الحر DEF-037.
+**الحالة:** Closed. التاريخ 2026-10-23. المبالغ وحدات عملة كاملة، والمقياس 0. confirmed on staging per site handoff evidence (commit 537f073). هذا الالتزام مذكور في `docs/api/evidence/MATCHING.ar.md:3` وليس التزامًا في مستودع التطبيق. لا تغيير في كود الحساب. عمود الموقع في جدول المرحلة 8 يبقى فارغًا. `docs/api/staging-readonly-check.ar.md` §3 يصف أسماء الحقول ولا يذكر المقياس.
 
 | الحقل | القيمة |
 |---|---|
 | المرحلة | 8 |
 | الشدة | عالية للمطابقة |
 | التصنيف | Non-blocking لاختبار Fake |
-| المالك المقترح | علي مع مالك الخادم |
-| الحالة | Open |
+| المالك المقترح | مهندس تكامل API + QA للتوثيق |
+| الحالة | Closed |
 
-**الدليل:** `ApiConfig.moneyUnitScale` افتراضه 0 وموسوم غير مؤكد (`packages/api_layer/lib/core/config/api_config.dart:73-75`، `docs/staging.md:33` و`:109`). P0-04 حالته Not run (`docs/acceptance/phase-0.md:49-58`). دقة الموقع غير معروفة. إن كانت `*Units` وحدات كسرية فكل شاشة تختلف عن الموقع.
+**الدليل:** `docs/api/openapi.json:31254-31257` يجعل `Transaction.inputValue` عددًا صحيحًا (`integer`) ووصفه «Whole currency units, not minor units». `docs/api/README.ar.md:45` يقول إن `amountUnits` و`balanceUnits` و`inputValue` و`egpValueUnits` و`paidUnits` وحدات عملة كاملة، وليست ×100 ولا ×1000، وإن 250 يعني 250 دينارًا. القرار في `docs/api/defect-decisions.ar.md` (DEF-029) يغلق المقياس على 0. عينة الموقع: `balanceUnits` 1000 (`api-samples.json:108` و`:1620`)، ثم 750 بعد دفع 250 (`:1719`)، ثم 0 بعد سداد 750 (`:1818`). جدول المطابقة يضع نفس التسلسل 1000 ثم 750 ثم 0 LYD (`MATCHING.ar.md:11-13`). اللقطات `03-customer-initial.png` و`04-customer-after-partial.png` و`05-customer-after-full.png` تعرض «1.000 د.ل» ثم «750 د.ل» ثم «0 د.ل». `ApiConfig.moneyUnitScale` يبقى 0 (`api_config.dart:66` و`:83-85`). وسم 🔶 في تعليق الإعداد لم يُحذف هنا لأن هذا الطلب لا يمس `lib/` ولا `packages/*/lib`. سطر `MONEY_UNIT_SCALE` في `docs/staging.md:33` و`:117` يسجّل المقياس 0 من الملفات نفسها: `openapi.json:31254-31257` و`README.ar.md:45` و`defect-decisions.ar.md` DEF-029 وتسليم الموقع 537f073 في `MATCHING.ar.md` و`api-samples.json`. لا يذكر فحص staging للأعداد الصحيحة؛ ذلك الادعاء ليس في `staging-readonly-check.ar.md`.
+
+**بعد دمج `main` `84f012d`:** #66 مدموج (`f38d766`). أرقام الأسطر التي زاحها هذا الدمج في `fake_api_client.dart` و`api_config.dart` و`docs/staging.md` حُدّثت أعلاه. #68 غير مدموج، فلم يقع تعارض في `phase8_reconciliation_test.dart`. إحالات المشتريات ما زالت تطابق الملفات: `purchases_screen.dart:241-245` و`purchase_models.dart:14-15` و`api-samples.json:331`. تأكيدات DEF-029 بقيت. DEF-033 يستخدم `vodafoneCurrency` ويبقي تأكيد `4,900 ج.م`. DEF-020 لم يُعد تصنيفه.
 
 ### DEF-030 — نطاق ملخص القسم مع البحث والفلتر غير مكتوب
 
@@ -1015,9 +1018,9 @@ CI [39815316603](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions
 
 ### DEF-033 — عملة فودافون مفترضة بالجنيه
 
-**الحالة:** Open (candidate). المالك المقترح: علي مع مالك الخادم.
+**الحالة:** Closed. التاريخ 2026-10-23. القرار في `docs/api/defect-decisions.ar.md` (DEF-033): EGP مؤكد. إزالة وسم 🔶 من الثابت تبقى لطلب المشتريات (P-04). هذا الطلب لا يغيّر كود الإنتاج.
 
-**الدليل:** `vodafoneCurrencyAssumption` موسوم 🔶 ومفترض `EGP` (`purchase_models.dart:14-15`). سطر اليوم يطبع `ج.م` (`purchases_screen.dart:241-245`). لا حقل عملة مؤكد.
+**الدليل:** عينة دفتر البيان `day.vodafoneRemainingUnits: 4900` (`docs/api/evidence/api-samples.json:331`). جدول المطابقة يضع صافي الأمانات المصرية شاملًا فودافون على EGP (`docs/api/evidence/MATCHING.ar.md:15`). الشاشة تطبع السطر بـ `Currency.egp` (`purchases_screen.dart:241-245`). `vodafoneCurrencyAssumption` هو `Currency.egp` (`purchase_models.dart:14-15`).
 
 ### DEF-034 — أسماء مفاتيح الإجمالي الدائم للمشتريات غير مؤكدة
 
@@ -1027,9 +1030,11 @@ CI [39815316603](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions
 
 ### DEF-035 — عملة استلامات الديون مثبّتة في العميل
 
-**الحالة:** Open (candidate). المالك المقترح: مهندس API.
+**الحالة:** Closed لمسار الاستلام المرتبط (LYD). التاريخ 2026-10-23. القرار في `docs/api/defect-decisions.ar.md` (DEF-035). ما زال مفتوحًا: ربط إيصال مستقل بحساب أو أمانة مصرية (`egyptian_deposits`). لا عملة ولا سعر ولا تقريب يُخترع هنا. الإيقاف في التطبيق هو P-20، وفرض الخادم يأتي بعد قرار الشركة.
 
-**الدليل:** `CollectionsOverviewDto.currency` يرجع `Currency.lyd` دائمًا (`collection_models.dart:182`). المقاييس والصفوف لا تقرأ عملة من الجسم (`collections_screen.dart:209` و`:374`).
+**الدليل على الجزء المغلق:** جدول المطابقة يضع الاستلامات المعتمدة 100 LYD على `metrics.collectedUnits` (`docs/api/evidence/MATCHING.ar.md:19`). جسم `/api/collections` في العينة بلا حقل `currency`، و`metrics.collectedUnits` عدد صحيح 100 (`docs/api/evidence/api-samples.json:518-524`). `CollectionsOverviewDto.currency` يرجع `Currency.lyd` (`collection_models.dart:198`).
+
+**ما يبقى مفتوحًا:** مرشح الربط ما زال يستطيع عرض القسم المصري، وترحيل الرقم نفسه إلى EGP لا يجري صرفًا. العينة فيها استلام مستقل `amountUnits: 75` و`linkedCustomerId: null` (`api-samples.json:500-509`). لا يُغلق هذا الجزء بتثبيت LYD على النظرة كلها.
 
 ### DEF-036 — قيمة مال كسرية تُسقط الاستجابة كلها
 
