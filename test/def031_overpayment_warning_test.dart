@@ -5,13 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/core/network/api_endpoints.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
-import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
-import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'package:vib_abdo_company_mobile/ui/theme.dart';
 import 'package:vib_abdo_company_mobile/ui/widgets/common.dart';
@@ -138,6 +135,39 @@ void main() {
     },
   );
 
+  testWidgets('DEF-031 the header shows the scripted acknowledgement balance', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(tester, size: const Size(430, 932));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    await _openPayment(tester, '400');
+    final fake = layer.client as FakeApiClient;
+    final gate = Completer<void>();
+    fake.pauseGets[_cardPath] = gate;
+    fake.scriptedMutationJson[_transactionPath] = jsonEncode({
+      'id': 'tx_script',
+      'version': 9,
+      'balanceUnits': -50,
+    });
+
+    await tester.tap(find.byKey(const Key('overpayment-continue')));
+    await _pumpUntilHeader(tester, '-50 د.ل');
+
+    expect(_header('-50 د.ل'), findsOneWidget);
+    expect(_header('-80 د.ل'), findsNothing);
+    expect(_header('320 د.ل'), findsNothing);
+    final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
+    expect(body['inputValue'], 400);
+
+    fake.scriptedGetJson[_cardPath] = _cardJson(-50);
+    gate.complete();
+    await settle(tester);
+    expect(_header('-50 د.ل'), findsOneWidget);
+    expect(_header('-80 د.ل'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('DEF-031 after a 200 the header shows the server balanceUnits', (
     tester,
   ) async {
@@ -174,24 +204,14 @@ void main() {
   testWidgets(
     'DEF-031 a missing acknowledgement balance is not the old balance',
     (tester) async {
-      final hold = _Hold();
-      final layer = await pumpFakeApp(
-        tester,
-        size: const Size(430, 932),
-        overrides: [_cardOverride(hold)],
-      );
+      final layer = await pumpFakeApp(tester, size: const Size(430, 932));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/customers/c_55');
-      final before = await tester.runAsync(
-        () => layer.accounts.get(AccountSection.customers, 'c_55'),
-      );
       await _openPayment(tester, '400');
-      hold.on = true;
-      (layer.client as FakeApiClient)
-          .scriptedMutationJson[ApiEndpoints.accountTransactions(
-        'customers',
-        'c_55',
-      )] = jsonEncode({
+      final fake = layer.client as FakeApiClient;
+      final gate = Completer<void>();
+      fake.pauseGets[_cardPath] = gate;
+      fake.scriptedMutationJson[_transactionPath] = jsonEncode({
         'id': 'tx_script',
         'version': 9,
       });
@@ -203,7 +223,8 @@ void main() {
       expect(_header('320 د.ل'), findsNothing);
       expect(_header('-80 د.ل'), findsNothing);
 
-      hold.gate.complete(_withBalance(before!, MoneyValue.known(50)));
+      fake.scriptedGetJson[_cardPath] = _cardJson(50);
+      gate.complete();
       await settle(tester);
       expect(_header('50 د.ل'), findsOneWidget);
       expect(_header('—'), findsNothing);
@@ -215,24 +236,14 @@ void main() {
   testWidgets(
     'DEF-031 an invalid acknowledgement balance is not the old balance',
     (tester) async {
-      final hold = _Hold();
-      final layer = await pumpFakeApp(
-        tester,
-        size: const Size(430, 932),
-        overrides: [_cardOverride(hold)],
-      );
+      final layer = await pumpFakeApp(tester, size: const Size(430, 932));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/customers/c_55');
-      final before = await tester.runAsync(
-        () => layer.accounts.get(AccountSection.customers, 'c_55'),
-      );
       await _openPayment(tester, '400');
-      hold.on = true;
-      (layer.client as FakeApiClient)
-          .scriptedMutationJson[ApiEndpoints.accountTransactions(
-        'customers',
-        'c_55',
-      )] = jsonEncode({
+      final fake = layer.client as FakeApiClient;
+      final gate = Completer<void>();
+      fake.pauseGets[_cardPath] = gate;
+      fake.scriptedMutationJson[_transactionPath] = jsonEncode({
         'id': 'tx_script',
         'version': 9,
         'balanceUnits': 'bad',
@@ -245,7 +256,8 @@ void main() {
       expect(_header('320 د.ل'), findsNothing);
       expect(_header('-80 د.ل'), findsNothing);
 
-      hold.gate.complete(_withBalance(before!, MoneyValue.known(50)));
+      fake.scriptedGetJson[_cardPath] = _cardJson(50);
+      gate.complete();
       await settle(tester);
       expect(_header('50 د.ل'), findsOneWidget);
       expect(_header(MoneyValue.invalidLabel), findsNothing);
@@ -257,19 +269,13 @@ void main() {
   testWidgets(
     'DEF-031 the acknowledgement balance is cleared when the card reloads',
     (tester) async {
-      final hold = _Hold();
-      final layer = await pumpFakeApp(
-        tester,
-        size: const Size(430, 932),
-        overrides: [_cardOverride(hold)],
-      );
+      final layer = await pumpFakeApp(tester, size: const Size(430, 932));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/customers/c_55');
-      final before = await tester.runAsync(
-        () => layer.accounts.get(AccountSection.customers, 'c_55'),
-      );
       await _openPayment(tester, '400');
-      hold.on = true;
+      final fake = layer.client as FakeApiClient;
+      final gate = Completer<void>();
+      fake.pauseGets[_cardPath] = gate;
 
       await tester.tap(find.byKey(const Key('overpayment-continue')));
       await _pumpUntilHeader(tester, '-80 د.ل');
@@ -277,7 +283,8 @@ void main() {
       expect(_header('-80 د.ل'), findsOneWidget);
       expect(_header('320 د.ل'), findsNothing);
 
-      hold.gate.complete(_withBalance(before!, MoneyValue.known(15)));
+      fake.scriptedGetJson[_cardPath] = _cardJson(15);
+      gate.complete();
       await settle(tester);
       expect(_header('15 د.ل'), findsOneWidget);
       expect(_header('-80 د.ل'), findsNothing);
@@ -318,42 +325,12 @@ void main() {
   );
 }
 
-class _Hold {
-  var on = false;
-  final gate = Completer<AccountCardDto>();
-}
+const _cardPath = '/api/customers/c_55';
 
-Override _cardOverride(_Hold hold) {
-  return accountCardProvider.overrideWith((ref, key) async {
-    if (hold.on && key == (AccountSection.customers, 'c_55')) {
-      return hold.gate.future;
-    }
-    return ref.read(apiLayerProvider).accounts.get(key.$1, key.$2);
-  });
-}
+final _transactionPath = ApiEndpoints.accountTransactions('customers', 'c_55');
 
-AccountCardDto _withBalance(AccountCardDto card, MoneyValue balance) {
-  return AccountCardDto(
-    id: card.id,
-    name: card.name,
-    phone: card.phone,
-    balanceUnits: balance,
-    currency: card.currency,
-    activeAssigneeName: card.activeAssigneeName,
-    lastActivityAt: card.lastActivityAt,
-    pinned: card.pinned,
-    version: card.version,
-    nextSequence: card.nextSequence,
-    debtAgeDays: card.debtAgeDays,
-    ageStatus: card.ageStatus,
-    ageStatusLabel: card.ageStatusLabel,
-    zeroReview: card.zeroReview,
-    allowedActions: card.allowedActions,
-    systemManaged: card.systemManaged,
-    systemLinkKey: card.systemLinkKey,
-    systemKind: card.systemKind,
-  );
-}
+String _cardJson(int balanceUnits) =>
+    '{"id":"c_55","name":"عميل تجريبي","balanceUnits":$balanceUnits,"currency":"LYD","version":5}';
 
 Future<void> _openPayment(WidgetTester tester, String amount) async {
   await tester.ensureVisible(find.byKey(const Key('add-payment')));

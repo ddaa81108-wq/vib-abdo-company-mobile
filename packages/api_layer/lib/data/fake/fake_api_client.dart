@@ -173,6 +173,10 @@ class FakeApiClient implements ApiClient {
   /// Authenticated calls still require a session. Tests only.
   final Map<String, String> scriptedGetJson = {};
 
+  /// GETs whose path is a key wait on that completer before [scriptedGetJson]
+  /// is read (tests). A path that is absent is not delayed.
+  final Map<String, Completer<void>> pauseGets = {};
+
   /// One-shot raw `data` JSON for a non-GET, decoded with [PreciseJson].
   ///
   /// The write is not applied. Tests use this to feed one invalid money field
@@ -943,6 +947,8 @@ class FakeApiClient implements ApiClient {
     if (path == '/api/auth/csrf') return _ok({'csrfToken': 'fake-csrf'});
     if (options.authenticated) _ensureSession(options);
     if (method == 'GET') {
+      final gate = pauseGets[path];
+      if (gate != null) await gate.future;
       final scripted = scriptedGetJson.remove(path);
       if (scripted != null) {
         return ApiResponse(
@@ -954,6 +960,9 @@ class FakeApiClient implements ApiClient {
     } else {
       final scripted = scriptedMutationJson.remove(path);
       if (scripted != null) {
+        // The stored rows are not changed. Keep the request text for tests
+        // that pause the follow-up GET, which replaces [lastWireBody].
+        if (lastWireBody != null) mutationBodies.add(lastWireBody!);
         return ApiResponse(
           statusCode: 200,
           data: PreciseJson.decode(scripted),
