@@ -13,6 +13,7 @@ import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
+import 'egyptian_link_pause.dart';
 import 'unlinked_receipt_actions.dart';
 
 class CollectionsScreen extends ConsumerWidget {
@@ -831,15 +832,46 @@ class _LinkForm extends ConsumerStatefulWidget {
 
 class _LinkFormState extends ConsumerState<_LinkForm> {
   final _customer = TextEditingController();
+  final Map<String, Json> _seen = {};
+  List<Json> _offered = const [];
+  var _query = '';
+  var _generation = 0;
 
   @override
   void initState() {
     super.initState();
-    _customer.addListener(() => setState(() {}));
+    _customer.addListener(_onQuery);
+  }
+
+  void _onQuery() {
+    final query = _customer.text.trim();
+    setState(() {});
+    if (query == _query) return;
+    _query = query;
+    if (query.length < 2) return;
+    _load(query);
+  }
+
+  Future<void> _load(String query) async {
+    final generation = ++_generation;
+    try {
+      final items = await ref
+          .read(apiLayerProvider)
+          .collections
+          .linkCandidates(query);
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        rememberLinkCandidates(_seen, items);
+        _offered = linkableCandidates(items);
+      });
+    } catch (_) {
+      // A failed search keeps the last list. Typing a LYD id still submits.
+    }
   }
 
   @override
   void dispose() {
+    _customer.removeListener(_onQuery);
     _customer.dispose();
     super.dispose();
   }
@@ -847,15 +879,30 @@ class _LinkFormState extends ConsumerState<_LinkForm> {
   @override
   Widget build(BuildContext context) {
     return Column(
+      key: const Key('link-form'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(AppStrings.link, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          AppStrings.egyptianLinkPaused,
+          key: const Key('egyptian-link-paused'),
+        ),
         const SizedBox(height: AppSpacing.md),
         TextField(
           key: const Key('link-customer'),
           controller: _customer,
           decoration: const InputDecoration(labelText: AppStrings.reference),
         ),
+        for (final item in _offered)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton(
+              key: Key('link-candidate-${item['id']}'),
+              onPressed: () => _customer.text = '${item['id']}',
+              child: Text('${item['name'] ?? item['id']}'),
+            ),
+          ),
         const SizedBox(height: AppSpacing.md),
         GuardedMutation(
           buttonKey: const Key('save-link'),
@@ -872,6 +919,9 @@ class _LinkFormState extends ConsumerState<_LinkForm> {
   Future<String?> _submit(MutationMeta meta) async {
     final customerId = _customer.text.trim();
     if (customerId.isEmpty) return AppStrings.enterReference;
+    if (isPausedEgyptianLink(_seen[customerId])) {
+      return AppStrings.egyptianLinkPaused;
+    }
     final ack = await ref
         .read(apiLayerProvider)
         .collections

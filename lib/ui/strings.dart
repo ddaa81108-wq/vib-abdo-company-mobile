@@ -331,6 +331,8 @@ abstract final class AppStrings {
   static const confirmDelete = 'تأكيد حذف هذا السطر';
   static const confirmPayroll = 'تأكيد حركة المرتب';
   static const link = 'ربط';
+  static const egyptianLinkPaused =
+      'ربط الأمانات المصرية متوقف مؤقتًا حتى تقرر الشركة.';
   static const batch = 'الدفعة';
   static const toneNeutral = 'محايد';
   static const correctTransaction = 'تصحيح الحركة';
