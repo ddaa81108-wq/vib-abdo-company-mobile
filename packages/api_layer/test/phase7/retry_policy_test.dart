@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_api_layer/core/config/api_config.dart';
 import 'package:flutter_api_layer/core/network/api_client.dart';
 import 'package:flutter_api_layer/core/network/api_exception.dart';
 import 'package:flutter_api_layer/core/network/dio_api_client.dart';
@@ -126,7 +127,7 @@ Dio _dio(_Script adapter, _Clock clock) {
       baseUrl: 'https://api.example.invalid',
       headers: const {
         'Accept': 'application/json',
-        'X-Client-Api-Version': '1',
+        ApiConfig.clientApiVersionHeader: ApiConfig.clientApiVersion,
       },
     ),
   );

@@ -36,12 +36,14 @@ void main() {
 
     const denied = ForbiddenException(
       code: 'PERMISSION_DENIED',
-      message: 'سر الخادم',
+      message: 'نص الخادم لا يُعرض',
       statusCode: 403,
     );
-    final permission = const ErrorHandler().toFailure(denied);
-    expect(permission.code, 'PERMISSION_DENIED');
-    expect(permission.isForbidden, isTrue);
+    final deniedFailure = const ErrorHandler().toFailure(denied);
+    expect(deniedFailure.code, 'PERMISSION_DENIED');
+    expect(deniedFailure.isForbidden, isTrue);
+    expect(failureText(deniedFailure), AppStrings.forbidden);
+    expect(presentFailure(deniedFailure), isA<ForbiddenPane>());
     expect(retryUnlessForbidden(0, denied), isNull);
   });
 

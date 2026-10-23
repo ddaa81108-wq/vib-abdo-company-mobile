@@ -20,8 +20,13 @@ void main() {
     expect(await tokens.readRefreshToken(), 'fake-refresh');
     expect(await tokens.readAccessExpiry(), isNotNull);
 
-    await stores.cookies.saveFromSetCookie(['session=fake-session']);
-    expect(await cookies.cookieHeader(), 'session=fake-session');
+    await stores.cookies.saveFromSetCookie([
+      '${ApiConfig.sessionCookieName}=fake-session; Path=/; HttpOnly',
+    ]);
+    expect(
+      await cookies.cookieHeader(),
+      '${ApiConfig.sessionCookieName}=fake-session',
+    );
 
     await stores.tokens.clear();
     await stores.cookies.clear();

@@ -15,11 +15,16 @@ import 'permission_codes.dart';
 /// - Precedence: (1) `fullAccess` if the server sends it (true or false);
 ///   (2) for an admin, an explicit non-empty `permissions[]` or `sectionAccess{}` applies
 ///   (same rules as an employee); (3) admin with both empty -> unrestricted (role flag).
+///   An absent `sectionAccess` counts as empty for that role flag.
 /// - Disallowed buttons/tiles/sections are HIDDEN, never shown disabled.
-/// - For sections in `sectionAccess` BOTH are required, per API contract:
+///   Hiding is not a security decision: the server still answers 403.
+/// - When `sectionAccess` is absent, `<section>.read` and `<section>.write`
+///   alone grant the section. This is the observed GET /api/me shape.
+/// - When `sectionAccess` is present, both are required:
 ///     read  = `<section>.read`  AND sectionAccess != none
 ///     write = `<section>.write` AND sectionAccess == manage
-///   Collections (not in `sectionAccess`) use the codes only. Missing/unknown entry = none.
+///   A missing or unknown entry is none. Collections (no access key) use the
+///   codes only, whether or not the map is present.
 class PermissionService extends ChangeNotifier {
   /// Exact role values of the real system. Matched ONLY in this class.
   static const adminRoleValue = 'admin';
@@ -28,6 +33,10 @@ class PermissionService extends ChangeNotifier {
   Set<Permission> _granted = const {};
   Set<String> _rawCodes = const {};
   Map<String, SectionAccessLevel> _sectionAccess = const {};
+
+  /// False when GET /api/me omitted `sectionAccess`. A present map, including
+  /// `{}`, keeps the fail-closed rule for a missing key.
+  bool _sectionAccessPresent = false;
   bool _fullAccess = false;
   AccountRole _role = AccountRole.unknown;
   String? _version;
@@ -42,7 +51,7 @@ class PermissionService extends ChangeNotifier {
   void applyFromServer(
     Iterable<String> codes, {
     required String? role,
-    Map<String, String> sectionAccess = const {},
+    Map<String, String>? sectionAccess,
     bool? fullAccess,
     String? version,
   }) {
@@ -53,19 +62,21 @@ class PermissionService extends ChangeNotifier {
             ? AccountRole.employee
             : AccountRole.unknown);
     final rawCodes = codes.where((c) => c.isNotEmpty).toSet();
+    final present = sectionAccess != null;
+    final access = sectionAccess ?? const <String, String>{};
 
     if (_role == AccountRole.unknown) {
       _setNothing();
     } else if (fullAccess != null) {
-      _setLists(rawCodes, sectionAccess,
-          full: fullAccess); // (1) explicit flag wins
+      _setLists(rawCodes, access,
+          full: fullAccess, present: present); // (1) explicit flag wins
     } else if (_role == AccountRole.admin &&
         rawCodes.isEmpty &&
-        sectionAccess.isEmpty) {
-      _setLists(const {}, const {}, full: true); // (3) role flag
+        access.isEmpty) {
+      _setLists(const {}, const {}, full: true, present: present); // (3)
     } else {
-      _setLists(rawCodes, sectionAccess,
-          full: false); // (2) explicit lists / employee
+      _setLists(rawCodes, access,
+          full: false, present: present); // (2) explicit lists / employee
     }
     notifyListeners();
   }
@@ -74,11 +85,12 @@ class PermissionService extends ChangeNotifier {
     _rawCodes = const {};
     _granted = const {};
     _sectionAccess = const {};
+    _sectionAccessPresent = false;
     _fullAccess = false;
   }
 
   void _setLists(Set<String> rawCodes, Map<String, String> sectionAccess,
-      {required bool full}) {
+      {required bool full, required bool present}) {
     _rawCodes = rawCodes;
     _granted =
         rawCodes.map(Permission.fromCode).whereType<Permission>().toSet();
@@ -86,6 +98,7 @@ class PermissionService extends ChangeNotifier {
       for (final e in sectionAccess.entries)
         e.key: SectionAccessLevel.parse(e.value)
     };
+    _sectionAccessPresent = present;
     _fullAccess = full;
   }
 
@@ -95,10 +108,14 @@ class PermissionService extends ChangeNotifier {
       _fullAccess || ps.any(_granted.contains);
   bool canRaw(String code) => _fullAccess || _rawCodes.contains(code);
 
-  /// Server-reported access level; sections outside `sectionAccess` return null.
-  SectionAccessLevel? accessLevel(SectionKey s) => s.accessKey == null
-      ? null
-      : (_sectionAccess[s.accessKey] ?? SectionAccessLevel.none);
+  /// Server-reported access level.
+  ///
+  /// Null when the section has no access key, or when `sectionAccess` itself
+  /// was absent. A present map maps a missing key to [SectionAccessLevel.none].
+  SectionAccessLevel? accessLevel(SectionKey s) {
+    if (s.accessKey == null || !_sectionAccessPresent) return null;
+    return _sectionAccess[s.accessKey] ?? SectionAccessLevel.none;
+  }
 
   bool canRead(SectionKey s) {
     if (_fullAccess) return true;
@@ -158,6 +175,7 @@ class PermissionService extends ChangeNotifier {
     _granted = const {};
     _rawCodes = const {};
     _sectionAccess = const {};
+    _sectionAccessPresent = false;
     _fullAccess = false;
     _role = AccountRole.unknown;
     _version = null;

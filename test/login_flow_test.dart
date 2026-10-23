@@ -30,7 +30,7 @@ void main() {
       );
       expect(
         find.byKey(HomeShell.sectionKey(SectionKey.customers)),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(HomeShell.writeKey(SectionKey.customers)),
@@ -51,9 +51,9 @@ void main() {
       final badge = tester.widget<Text>(find.byKey(UnreadBadge.badgeKey));
       expect(badge.data, '1');
       expect(find.text('2026-10-19'), findsOneWidget);
-      expect(find.textContaining('320 د.ل'), findsWidgets);
+      expect(find.textContaining('320 د.ل'), findsNothing);
       expect(find.text('0 د.ل'), findsOneWidget);
-      expect(find.textContaining('10,635 د.ل'), findsOneWidget);
+      expect(find.textContaining('10,635 د.ل'), findsNothing);
       expect(find.textContaining('ج.م'), findsNothing);
 
       await tester.tap(find.byKey(HomeShell.logoutKey));

@@ -13,8 +13,9 @@ class AppFailure {
   /// Safe log line: code and correlation id only.
   String get diagnostic => 'code=$code correlationId=${correlationId ?? '-'}';
 
-  /// Unified 403 (`FORBIDDEN` or catalog `PERMISSION_DENIED`). The screen
-  /// shows `AppStrings.forbidden`, the same sentence as `ForbiddenPane`, and
-  /// does not show the server envelope text.
+  /// Unified 403 (`FORBIDDEN` or catalog `PERMISSION_DENIED`).
+  /// The server sends `FORBIDDEN` or `PERMISSION_DENIED`.
+  /// The screen shows `AppStrings.forbidden`, the same sentence as
+  /// `ForbiddenPane`, and does not show the server envelope text.
   bool get isForbidden => code == 'FORBIDDEN' || code == 'PERMISSION_DENIED';
 }

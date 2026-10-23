@@ -45,7 +45,7 @@ packages/api_layer/    HTTP client, repositories, models, fake client, auth stra
 
 `packages/api_layer` is the client package this app started from. Screens call its repositories. They do not import the HTTP client.
 
-Secure storage is injected into that package. The real cookie-session path and the bearer-token stub write only through `flutter_secure_storage`. The fake server keeps its cookie sessions in memory and does not run a local expiry timer. When the app injects a cookie jar and a token store, login stores the session cookie (not a bearer token) and logout clears that jar, the token store, and the in-memory CSRF token.
+Secure storage is injected into that package. The real cookie-session path and the bearer-token stub write only through `flutter_secure_storage`. The fake server keeps its cookie sessions in memory and does not run a local expiry timer. When the app injects a cookie jar and a token store, login stores the `abdo_session` cookie (not a bearer token) and logout clears that jar, the token store, and the in-memory CSRF token.
 
 Errors thrown by the client are `ApiException` values. `ErrorHandler` is the only place that turns one into text for the UI. It shows the server message when there is one. Logs contain the error code and correlation id, never `details`, passwords, or cookies.
 
