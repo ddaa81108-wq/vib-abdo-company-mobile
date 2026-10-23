@@ -67,7 +67,7 @@ Android notification permission on emulators is a separate workflow, `Android no
 
 Phase 7 startup, scroll, APK size, and the API 29/33/34 runs are another separate workflow, `Android performance` (`.github/workflows/android-performance.yml`). It is `workflow_dispatch` plus a nightly schedule. It does not run on pull requests and it does not add steps to the three required checks. Budgets, the device protocol, and what Ali provides are in [testing/PHASE7_PERFORMANCE.md](testing/PHASE7_PERFORMANCE.md). The acceptance matrix itself is `docs/acceptance/phase-7.md` on [PR #48](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/48), not in this branch.
 
-`tool/staging_negative_tests/run.sh --dry-run` is an offline self-check. It does not read secrets and does not open a socket. The script is in this repo, so both CI jobs above run it and fail if it fails. No GitHub Actions job calls it without `--dry-run`. Live mode refuses `CI=true` and `GITHUB_ACTIONS=true`.
+`tool/staging_negative_tests/run.sh --dry-run` is an offline self-check. It does not read secrets and does not open a socket. The script is in this repo, so both CI jobs above run it and fail if it fails. No GitHub Actions job calls it without `--dry-run`. Live mode refuses any non-empty `CI` or `GITHUB_ACTIONS` value and exits 2. Empty and unset are the only values that may proceed. Live mode is read-only unless `--allow-sandbox-writes` is passed.
 
 ## Staging negative tests
 
@@ -80,7 +80,9 @@ Any permission check against the staging server runs locally on the bot machine 
 - `--dry-run` is an offline self-check. Regular CI always runs it. The script is in the repo, so the step is not skipped.
 - `--junit <file>` writes JUnit XML for a local run. GitHub does not collect a live report, because it does not run live mode.
 - Non-zero exit if any live case fails.
-- Live mode (no `--dry-run`) exits 2 when `CI=true` or `GITHUB_ACTIONS=true`, before it reads accounts or opens a socket.
+- Live mode (no `--dry-run`) exits 2 when `CI` or `GITHUB_ACTIONS` is set to any non-empty value, before it reads accounts or opens a socket. Empty and unset are allowed. `true`, `1`, `false`, and `yes` are refused.
+- Live mode sends only `GET` and `HEAD` probes unless `--allow-sandbox-writes` is passed. Write methods are skipped with `skipped: write case, requires --allow-sandbox-writes`. The flag is not an environment variable. It requires a clean sandbox, not shared staging data, and Ali's explicit approval each time.
+- Each account is logged in once per run. The session is reused. Logout runs after the other cases.
 - Live mode also exits 2 when a required local variable is missing. It prints the names, never the values. There is no default host.
 
 ### Local variables
@@ -137,7 +139,7 @@ Regular CI still runs the tagged fake-API tests. That coverage does not depend o
 
 Manual workflow: `.github/workflows/staging-smoke.yml`, name `Staging smoke`. It runs on `workflow_dispatch` only and is bound to the GitHub Environment `staging`. It is not one of the three required pull-request checks and does not call `tool/staging_negative_tests/run.sh`.
 
-`STAGING_API_BASE` is the only staging name stored for the smoke workflow. A variable of the same name is an unrecommended fallback. The intended value is `https://staging.vip2100.com` with no `/erp` suffix. Empty and `/erp` fail the job. The job only runs unauthenticated `GET /api/health` via curl with User-Agent `VibAbdoMobileSmoke/1.0 (+github-actions)`. It does not read staging usernames or passwords, and those names are not stored in GitHub, neither as secrets nor as variables. The login smoke and any negative permission check against staging run locally on the bot machine only. After a login failure, do not run that local check more than once within 15 minutes (the login limit is 8 attempts per account). Dispatch steps and the secret table are in [api/staging-smoke.ar.md](api/staging-smoke.ar.md).
+`STAGING_API_BASE` is the only staging name stored for the smoke workflow. A variable of the same name is an unrecommended fallback. The intended value is `https://staging.vip2100.com` with no `/erp` suffix. Empty and `/erp` fail the job. The job only runs unauthenticated `GET /api/health` via curl with User-Agent `VibAbdoMobileSmoke/1.0 (+github-actions)`. It does not read staging usernames or passwords, and those names are not stored in GitHub, neither as secrets nor as variables. The login smoke and any negative permission check against staging run locally on the bot machine only. After a login failure, do not run that local check more than once within 15 minutes (the login limit is 8 attempts per account every 15 minutes). Dispatch steps and the secret table are in [api/staging-smoke.ar.md](api/staging-smoke.ar.md).
 
 ## Release builds and the fake API
 
