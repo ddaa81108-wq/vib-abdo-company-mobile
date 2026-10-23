@@ -96,7 +96,7 @@ void _scriptPurchases(FakeApiClient fake, Map<String, Object?> body) {
 Map<String, Object?> _page({Map<String, Object?>? day}) {
   return {
     'merchant': {'key': 'al_bayan', 'name': 'البيان'},
-    if (day != null) 'day': day,
+    'day': ?day,
     'entries': <Object>[],
     'registerTotals': {
       'resultUnits': 0,
