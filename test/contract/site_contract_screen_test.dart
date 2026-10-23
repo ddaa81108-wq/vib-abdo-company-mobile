@@ -16,8 +16,7 @@ import '../support/pump_app.dart';
 
 void main() {
   final samples = PreciseJson.decode(
-    File('packages/api_layer/test/contract/fixtures/site-api-samples.json')
-        .readAsStringSync(),
+    File('docs/api/evidence/api-samples.json').readAsStringSync(),
   ) as Map;
 
   testWidgets('the customers screen shows the sample integers in LYD', (
@@ -26,7 +25,9 @@ void main() {
     final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    fake.scriptedGetJson['/api/customers'] = jsonEncode(_data(samples, 'GET /api/customers'));
+    fake.scriptedGetJson['/api/customers'] = jsonEncode(
+      _data(samples, 'GET /api/customers'),
+    );
     await go(tester, '/customers');
     expect(find.text('1,550 د.ل'), findsWidgets);
     expect(find.text('عميل تحصيل الاختبار'), findsWidgets);
@@ -40,7 +41,9 @@ void main() {
     final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    fake.scriptedGetJson['/api/treasury'] = jsonEncode(_data(samples, 'GET /api/treasury'));
+    fake.scriptedGetJson['/api/treasury'] = jsonEncode(
+      _data(samples, 'GET /api/treasury'),
+    );
     await go(tester, '/treasury');
     expect(find.text('5,160 د.ل'), findsWidgets);
     expect(find.text('14,900 ج.م'), findsWidgets);
@@ -58,16 +61,15 @@ void main() {
     },
   );
 
-  testWidgets(
-    'a payment above the stored balance is sent after a warning',
-    (tester) async {
-      markTestSkipped(
-        'G-13. The ledger dialog still refuses a partial payment above '
-        'the cached balanceUnits. The contract accepts it and stores a '
-        'negative balance (DEF-031).',
-      );
-    },
-  );
+  testWidgets('a payment above the stored balance is sent after a warning', (
+    tester,
+  ) async {
+    markTestSkipped(
+      'G-13. The ledger dialog still refuses a partial payment above '
+      'the cached balanceUnits. The contract accepts it and stores a '
+      'negative balance (DEF-031).',
+    );
+  });
 }
 
 Map<String, dynamic> _data(Map samples, String key) {

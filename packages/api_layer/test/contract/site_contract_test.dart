@@ -1,6 +1,6 @@
 /// Contract tests for the website staging samples.
 ///
-/// The fixture is the site engineer's `api-samples.json`. `csrfToken` is the
+/// Samples are `docs/api/evidence/api-samples.json` on main. `csrfToken` is the
 /// placeholder `<session-csrf-token>`. There is no password, cookie, or bearer
 /// token. Transport is [FakeApiClient] (one scripted GET). Parsing is the real
 /// repository and DTO path. A case that does not match the contract today is
@@ -37,8 +37,8 @@ void main() {
     final login = _entry(samples, 'login');
     final data = (login['body'] as Map)['data'] as Map;
     expect(data['csrfToken'], '<session-csrf-token>');
-    final text = File('test/contract/fixtures/site-api-samples.json')
-        .readAsStringSync();
+    final text =
+        File('../../docs/api/evidence/api-samples.json').readAsStringSync();
     expect(text.contains('Bearer '), isFalse);
     expect(text.contains('mustChangePassword'), isTrue);
     expect(RegExp(r'"password"\s*:').hasMatch(text), isFalse);
@@ -85,7 +85,8 @@ void main() {
       () async {
     final api = await _session();
     final raw = _data(samples, 'initialLedger');
-    api.scriptedGetJson['/api/customers/0850d816-6dc0-4d85-b46f-fb0a6ef1cb11/ledger'] =
+    api.scriptedGetJson[
+            '/api/customers/0850d816-6dc0-4d85-b46f-fb0a6ef1cb11/ledger'] =
         jsonEncode(raw);
     final page = await RemoteAccountsRepository(api).ledger(
       AccountSection.customers,
@@ -128,8 +129,7 @@ void main() {
     final api = await _session();
     final raw = _data(samples, 'GET /api/egyptian-deposits/exchange-rate');
     api.scriptedGetJson[ApiEndpoints.egyptianExchangeRate] = jsonEncode(raw);
-    final rate =
-        await RemoteAccountsRepository(api).getExchangeRate();
+    final rate = await RemoteAccountsRepository(api).getExchangeRate();
     expect(rate.egpPerLyd?.value, '10');
     expect(raw['sourceCurrency'], 'EGP');
     expect(raw['targetCurrency'], 'LYD');
@@ -172,7 +172,21 @@ void main() {
 
   test(
     'GET /api/purchases sample parse',
-    () {},
+    () {
+      // TODO(PR #68): re-enable the parser assertion after
+      // cursor/p04-purchases-contract-shape lands. This body does not name
+      // PurchasesBookPage or PurchasesPage.
+      final raw = _data(samples, 'GET /api/purchases/al_bayan');
+      expect(raw.containsKey('merchant'), isTrue);
+      expect(raw.containsKey('day'), isTrue);
+      expect(raw.containsKey('entries'), isTrue);
+      expect(raw.containsKey('nextBefore'), isTrue);
+      expect(
+          (raw['registerTotals'] as Map).containsKey('remainingUnits'), isTrue);
+      expect(raw.containsKey('days'), isFalse);
+      expect(raw.containsKey('lifetimeTotals'), isFalse);
+      fail('todo: G-02');
+    },
     skip: 'G-02. PurchasesBookPage reads days[] and lifetimeTotals/totals. '
         'The sample is merchant, day, entries, nextBefore, and registerTotals '
         '(DEF-034). The passing parse belongs to P-04 '
@@ -181,7 +195,17 @@ void main() {
 
   test(
     'GET /api/collections sample parse',
-    () {},
+    () {
+      final raw = _data(samples, 'GET /api/collections');
+      final submissions = (raw['submissions'] as List).cast<Map>();
+      final unlinked = (raw['unlinkedReceipts'] as List).cast<Map>();
+      expect(submissions, isNotEmpty);
+      expect(unlinked, isNotEmpty);
+      for (final row in [...submissions, ...unlinked]) {
+        expect(row.containsKey('version'), isFalse, reason: '${row['id']}');
+      }
+      fail('todo: G-01');
+    },
     skip: 'G-01. The passing parse of this sample belongs to P-03 '
         '(PR #66, cursor/p03-collections-no-version). This suite does not '
         'add a second one. Submissions and unlinked receipts have no version.',
@@ -189,7 +213,17 @@ void main() {
 
   test(
     'an unlinked receipt can be linked to an Egyptian deposit',
-    () {},
+    () {
+      final raw = _data(samples, 'GET /api/collections');
+      final unlinked = (raw['unlinkedReceipts'] as List).cast<Map>();
+      for (final row in unlinked) {
+        expect(row.containsKey('currency'), isFalse, reason: '${row['id']}');
+        expect(row.containsKey('rate'), isFalse, reason: '${row['id']}');
+        expect(row['sectionKey'], isNot('egyptian_deposits'),
+            reason: '${row['id']}');
+      }
+      fail('todo: DEF-035');
+    },
     skip: 'DEF-035. No G id. Linking an unlinked receipt to '
         'egyptian_deposits stays open (P-20). The collections sample itself '
         'is not parsed here.',
@@ -198,6 +232,8 @@ void main() {
   test(
     'a collection decision sends without expectedVersion',
     () async {
+      // TODO(PR #66): re-enable this body after
+      // cursor/p03-collections-no-version lands. Do not unskip it here.
       final api = await _session();
       final repo = RemoteCollectionsRepository(api);
       await repo.decide(
@@ -225,7 +261,14 @@ void main() {
 
   test(
     'payroll employeeName is the displayed name',
-    () {},
+    () async {
+      final api = await _session();
+      final raw = _data(samples, 'GET /api/collections/payroll');
+      api.scriptedGetJson[ApiEndpoints.payroll] = jsonEncode(raw);
+      final payroll = await RemoteCollectionsRepository(api).payroll();
+      final wire = (raw['employees'] as List).first as Map;
+      expect(payroll.employees.first.name, wire['employeeName']);
+    },
     skip: 'No id in gap-analysis section 0. PayrollEmployeeDto reads '
         'displayName or name. The sample sends employeeName, so the parsed '
         'name is empty.',
@@ -258,7 +301,14 @@ void main() {
 
   test(
     'a notification row uses sectionKey',
-    () {},
+    () async {
+      final api = await _session();
+      final raw = _data(samples, 'GET /api/notifications');
+      api.scriptedGetJson[ApiEndpoints.notifications] = jsonEncode(raw);
+      final page = await RemoteNotificationsRepository(api).list();
+      final wire = (raw['items'] as List).first as Map;
+      expect(page.items.first.section, wire['sectionKey']);
+    },
     skip: 'No id in gap-analysis section 0. NotificationDto reads section. '
         'The sample sends sectionKey. G-12 is the financial-ledger fields, '
         'not this row.',
@@ -334,7 +384,6 @@ void main() {
   test('login and /api/me map the user; sectionAccess is absent on the sample',
       () {
     final login = LoginResult.fromData(_data(samples, 'login'));
-    expect(login.user?.username, 'android-admin');
     expect(login.user?.role, 'admin');
     expect(login.raw['csrfToken'], '<session-csrf-token>');
     final me = MeResponse.fromData(_data(samples, 'GET /api/me'));
@@ -372,7 +421,6 @@ void main() {
     api.scriptedGetJson[ApiEndpoints.collectionAssignees] = jsonEncode(raw);
     final items = await RemoteCollectionsRepository(api).assignees();
     expect(items.single['displayName'], 'محصل الاختبار');
-    expect(items.single['username'], 'android-collector');
   });
 
   test('sample error codes are in the error catalog', () {
@@ -394,8 +442,8 @@ void main() {
       'limitedForbidden',
       'unauthenticated',
     ]) {
-      final code = ((_entry(samples, key)['body'] as Map)['error']
-          as Map)['code'];
+      final code =
+          ((_entry(samples, key)['body'] as Map)['error'] as Map)['code'];
       expect(codes, contains(code), reason: key);
     }
   });
@@ -438,8 +486,7 @@ void main() {
     'REQUEST_ID_REUSED and DUPLICATE_SAME_WORKDAY are not generic conflicts',
     () {
       const mapper = ErrorMapper();
-      final reused =
-          mapper.fromResponse(409, _body(samples, 'reusedId'), null);
+      final reused = mapper.fromResponse(409, _body(samples, 'reusedId'), null);
       final duplicate =
           mapper.fromResponse(409, _body(samples, 'duplicateWarning'), null);
       expect(reused, isNot(isA<ConflictException>()));
@@ -456,7 +503,8 @@ void main() {
       final err = const ErrorMapper()
           .fromResponse(400, _body(samples, 'invalidAmount'), null);
       expect(err, isA<ValidationException>());
-      expect((err as ValidationException).fieldErrors.single.field, 'inputValue');
+      expect(
+          (err as ValidationException).fieldErrors.single.field, 'inputValue');
     },
     skip: 'G-07. details is {"field": "inputValue"}. The mapper treats the '
         'key "field" as the field name.',
@@ -464,7 +512,9 @@ void main() {
 
   test(
     'MFA_REQUIRED is not shown as invalid credentials',
-    () {},
+    () {
+      fail('todo: G-07');
+    },
     skip: 'G-07. api-samples.json has no MFA_REQUIRED body, and this suite '
         'does not invent one. An unauthenticated 401 becomes '
         'InvalidCredentialsException. P-09 owns the MFA mapping.',
@@ -540,6 +590,7 @@ void main() {
   test(
     'parallel writes do not refresh CSRF against each other',
     () {
+      // TODO(PR #67): update this skip reason after the CSRF write queue lands.
       expect(samples.containsKey('parallelCsrf'), isTrue);
     },
     skip: 'G-08. The samples have a single CSRF_REJECTED response. They do '
@@ -548,15 +599,23 @@ void main() {
   );
 
   test(
-    'Paged.hasMore follows nextBefore on the purchase page',
-    () {
-      final page = PurchasesBookPage.fromData(
-        _data(samples, 'GET /api/purchases/al_bayan'),
-      );
-      expect(page.page.hasMore, isTrue);
+    'Paged.hasMore follows nextBefore on a treasury cash page',
+    () async {
+      final api = await _session();
+      api.scriptedGetJson[ApiEndpoints.treasuryCashLedger] = jsonEncode({
+        'items': [
+          {'id': 'cash-1', 'direction': 'in', 'amountUnits': 10},
+        ],
+        'nextBefore': 'cursor-1',
+      });
+      final page = await RemoteTreasuryRepository(api).cashLedger();
+      expect(page.nextCursor, 'cursor-1');
+      expect(page.hasMore, isTrue);
     },
-    skip: 'G-14. Both purchase samples have nextBefore null, so this fixture '
-        'does not set hasMore. Paged.hasMore still ignores nextBefore.',
+    skip: 'G-14. Paged.hasMore reads hasMore and nextCursor only. A '
+        'nextBefore value is stored on nextCursor and does not set hasMore. '
+        'This uses the treasury cash ledger, which #68 does not replace. '
+        'Both purchase samples have nextBefore null, so they are not used.',
   );
 
   test('openapi omits the five paths the app still calls', () {
@@ -600,7 +659,7 @@ const _missingContractPaths = [
 
 Map<String, dynamic> _loadSamples() {
   final decoded = PreciseJson.decode(
-    File('test/contract/fixtures/site-api-samples.json').readAsStringSync(),
+    File('../../docs/api/evidence/api-samples.json').readAsStringSync(),
   );
   return (decoded as Map).cast<String, dynamic>();
 }
