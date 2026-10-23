@@ -15,7 +15,8 @@ import '../../ui/widgets/mutation_form.dart';
 ///
 /// Buttons are omitted entirely when the signed-in user lacks the action.
 /// Reject follows a pending server status. Cash follows the server cash flag
-/// only — the same rule as a linked submission — including after a rejection.
+/// on a receipt that is not rejected. A rejected receipt never shows
+/// «تم استلام النقدية», even when `cashStatus` is pending.
 ///
 /// TODO(pending server answer): `cashStatus` / `cashPending` are proposed (🔶).
 /// Until the server sends `pending`, the cash button stays hidden. Do not
@@ -33,6 +34,7 @@ class UnlinkedReceiptActions extends ConsumerWidget {
         receipt.status == 'pending';
     final showCash =
         permissions.canDo(ManagementAction.collectionsCashReceived) &&
+        receipt.status != 'rejected' &&
         receipt.cashStatus == CashStatus.pending;
     if (!showReject && !showCash) return const SizedBox.shrink();
 

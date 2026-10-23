@@ -57,14 +57,7 @@ void main() {
       expect(find.byKey(const Key('unlinked-reject-ur_1')), findsOneWidget);
       expect(find.byKey(const Key('unlinked-cash-ur_1')), findsNothing);
       expect(find.byKey(const Key('unlinked-reject-ur_2')), findsNothing);
-      expect(find.byKey(const Key('unlinked-cash-ur_2')), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('unlinked-cash-ur_2')),
-          matching: find.text(AppStrings.cashReceived),
-        ),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
     },
   );
 
@@ -98,21 +91,26 @@ void main() {
     },
   );
 
-  testWidgets('confirming cash on a rejected receipt sends its version', (
-    tester,
-  ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(800, 2400));
-    final fake = layer.client as FakeApiClient;
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/collections');
+  testWidgets(
+    'a rejected receipt with pending cash shows no cash button and sends nothing',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(800, 2400));
+      final fake = layer.client as FakeApiClient;
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/collections');
+      final postsBefore = fake.mutationPaths.length;
 
-    final body = await hold(tester, fake, const Key('unlinked-cash-ur_2'));
-
-    expect(body['expectedVersion'], 4);
-    expect(body.containsKey('decision'), isFalse);
-    expect(body['requestId'], fake.mutationRequestIds.single);
-    expect(find.textContaining(AppStrings.serverReply), findsWidgets);
-  });
+      expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('unlinked-card-ur_2')),
+          matching: find.text(AppStrings.cashReceived),
+        ),
+        findsNothing,
+      );
+      expect(fake.mutationPaths, hasLength(postsBefore));
+    },
+  );
 
   testWidgets(
     'a version conflict refetches the overview and shows the message',
@@ -147,7 +145,7 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
     await reveal(tester, const Key('unlinked-reject-ur_1'));
-    await reveal(tester, const Key('unlinked-cash-ur_2'));
+    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
 
     expect(tester.takeException(), isNull);
     final reject = tester.element(
@@ -169,18 +167,14 @@ void main() {
       Brightness.dark,
     );
     await go(tester, '/collections');
-    await reveal(tester, const Key('unlinked-cash-ur_2'));
+    await reveal(tester, const Key('unlinked-reject-ur_1'));
 
-    final cash = tester.element(find.byKey(const Key('unlinked-cash-ur_2')));
-    expect(Theme.of(cash).brightness, Brightness.dark);
-    expect(Directionality.of(cash), TextDirection.rtl);
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('unlinked-cash-ur_2')),
-        matching: find.text(AppStrings.cashReceived),
-      ),
-      findsOneWidget,
+    final rejectDark = tester.element(
+      find.byKey(const Key('unlinked-reject-ur_1')),
     );
+    expect(Theme.of(rejectDark).brightness, Brightness.dark);
+    expect(Directionality.of(rejectDark), TextDirection.rtl);
+    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -191,13 +185,12 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
     await reveal(tester, const Key('unlinked-reject-ur_1'));
-    await reveal(tester, const Key('unlinked-cash-ur_2'));
     final list = find.byKey(CollectionsScreen.screenKey);
     await tester.fling(list, const Offset(0, -600), 1200);
     await settle(tester);
 
     expect(find.byKey(const Key('unlinked-reject-ur_1')), findsOneWidget);
-    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsOneWidget);
+    expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
