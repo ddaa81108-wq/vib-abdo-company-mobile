@@ -80,7 +80,7 @@ That runs `flutter analyze` and `flutter test` for the app and for `packages/api
 
 ## Permission checks against staging
 
-`tool/staging_negative_tests/run.sh` without `--dry-run` runs on the bot machine only. GitHub Actions calls that script only with `--dry-run`, which does not open a socket and does not read accounts. The required check `Negative permission tests` stays on the Fake API. No staging username or password is stored in GitHub as a secret or as a variable. The only staging name the smoke workflow reads is `STAGING_API_BASE`. See [TESTING.md](TESTING.md).
+`tool/staging_negative_tests/run.sh` without `--dry-run` runs on the bot machine only. GitHub Actions calls that script only with `--dry-run`, which does not open a socket and does not read accounts. Live mode is read-only unless `--allow-sandbox-writes` is passed. That flag is for a clean sandbox, not shared staging data, and needs Ali's explicit approval each time. The required check `Negative permission tests` stays on the Fake API. No staging username or password is stored in GitHub as a secret or as a variable. The only staging name the smoke workflow reads is `STAGING_API_BASE`. GitHub may reach staging without login, and only for the health check and the cold-start measurement. See [TESTING.md](TESTING.md).
 
 ## P7-01 staging smoke
 
@@ -97,9 +97,9 @@ flutter test packages/api_layer/test/phase7/staging_smoke_test.dart
 
 This login command runs on the bot machine only. GitHub Actions does not run it. The manual **Staging smoke** workflow (`.github/workflows/staging-smoke.yml`, `workflow_dispatch`, environment `staging`) only probes unauthenticated `GET /api/health`. `STAGING_API_BASE` for that job should be a secret. See [api/staging-smoke.ar.md](api/staging-smoke.ar.md).
 
-**After a login failure, do not run this local check more than once within 15 minutes.** The login limit is 8 attempts per account. `STAGING_SMOKE_ACCOUNT_ID` stays unset until P-07.
+**After a login failure, do not run this local check more than once within 15 minutes.** The login limit is 8 attempts per account every 15 minutes.
 
-The smoke signs in, reads `GET /api/me` (the client path; the phase-7 matrix text says `GET /api/auth/me`), reads one section (`STAGING_SMOKE_SECTION`, default `customers`), then `POST /api/auth/logout`. That logout is the write. Set `STAGING_SMOKE_ACCOUNT_ID` as well to send one `setPinned` of that card's current flag before logout. The smoke does not add a ledger line unless that id is set.
+The smoke signs in, reads `GET /api/me` (the client path; the phase-7 matrix text says `GET /api/auth/me`), reads one section (`STAGING_SMOKE_SECTION`, default `customers`), then `POST /api/auth/logout`. That logout is the only write, and it runs on the bot machine only. `STAGING_SMOKE_ACCOUNT_ID` is not read. The `setPinned` write was removed from this check. It does not keep the P-07 pin-body intent as a read, so it is deferred to P-07 pending Ali's decision. GitHub workflows do not run this login and do not send a write to staging.
 
 An on-device airplane-mode check (P7-19) is not this script. It is a manual pass on a release build.
 

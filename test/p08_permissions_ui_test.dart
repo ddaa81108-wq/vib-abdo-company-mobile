@@ -93,9 +93,25 @@ void main() {
       Key('save-masraweya'),
     ];
 
+    const renderedRows = <String, Key>{
+      '/customers/c_55': Key('ledger-amount-tx_1'),
+      '/companies/c_co_02': Key('ledger-amount-tx_1'),
+      '/libyan-deposits/c_55': Key('ledger-amount-tx_1'),
+      '/egyptian-deposits/c_55': Key('ledger-amount-tx_1'),
+      '/purchases': Key('purchase-day-12'),
+    };
+
     for (final entry in screens.entries) {
       await _go(tester, entry.key);
       expect(find.byKey(entry.value), findsOneWidget, reason: entry.key);
+      final row = renderedRows[entry.key];
+      if (row != null) {
+        expect(
+          find.byKey(row, skipOffstage: false),
+          findsOneWidget,
+          reason: '${entry.key} $row',
+        );
+      }
       for (final key in writeKeys) {
         expect(find.byKey(key), findsNothing, reason: '${entry.key} $key');
       }
