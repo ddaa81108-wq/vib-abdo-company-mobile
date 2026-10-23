@@ -97,7 +97,7 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
   Future<AuthErrorAction> handleAuthError(
       ApiException error, RequestOptions request,
       {required bool authenticated}) async {
-    if (error is CsrfInvalidException) {
+    if (isCsrfRejection(error)) {
       if (request.extra['authRetried'] == true) {
         return AuthErrorAction.passThrough;
       }

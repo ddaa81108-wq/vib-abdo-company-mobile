@@ -92,7 +92,7 @@ class SessionExpiredException extends ApiException {
       super.details});
 }
 
-/// CSRF token missing/invalid. AuthInterceptor refetches the token ONCE and retries.
+/// CSRF token missing or invalid. The cookie strategy refetches once and replays.
 class CsrfInvalidException extends ApiException {
   const CsrfInvalidException(
       {required super.code,
@@ -100,6 +100,103 @@ class CsrfInvalidException extends ApiException {
       super.statusCode,
       super.correlationId,
       super.details});
+}
+
+/// `403 CSRF_REJECTED`. Same refresh-once path as [CsrfInvalidException].
+///
+/// The write queue is P-10. This type is only the recognition signal.
+class CsrfRejectedException extends CsrfInvalidException {
+  const CsrfRejectedException({
+    super.message = 'رمز حماية الطلب غير صالح',
+    super.statusCode,
+    super.correlationId,
+    super.details,
+  }) : super(code: 'CSRF_REJECTED');
+}
+
+/// True when [error] is a CSRF rejection the auth strategy refreshes once.
+///
+/// P-10 should use this instead of matching the code text. It does not queue writes.
+bool isCsrfRejection(Object error) => error is CsrfInvalidException;
+
+/// `401 MFA_REQUIRED`. The app has no MFA flow.
+class MfaRequiredException extends ApiException {
+  const MfaRequiredException({
+    super.message = 'غير مدعوم في التطبيق',
+    super.statusCode,
+    super.correlationId,
+    super.details,
+  }) : super(code: 'MFA_REQUIRED');
+}
+
+/// `401 INVALID_CURRENT_PASSWORD` on change-password. Does not end the session.
+class InvalidCurrentPasswordException extends ApiException {
+  const InvalidCurrentPasswordException({
+    super.message = 'كلمة المرور الحالية غير صحيحة',
+    super.statusCode,
+    super.correlationId,
+    super.details,
+  }) : super(code: 'INVALID_CURRENT_PASSWORD');
+}
+
+/// `409 CLIENT_VERSION_MISMATCH`. Not a data conflict.
+class ClientVersionMismatchException extends ApiException {
+  const ClientVersionMismatchException({
+    super.message = 'حدّث التطبيق',
+    super.statusCode,
+    super.correlationId,
+    super.details,
+  }) : super(code: 'CLIENT_VERSION_MISMATCH');
+}
+
+/// `409 PENDING_SUBMISSION_EXISTS`.
+class PendingSubmissionExistsException extends ApiException {
+  const PendingSubmissionExistsException({
+    super.message = 'يوجد تقديم معلّق لهذا التكليف',
+    super.statusCode,
+    super.correlationId,
+    super.details,
+  }) : super(code: 'PENDING_SUBMISSION_EXISTS');
+}
+
+/// `409 FULL_AMOUNT_CHANGED`.
+class FullAmountChangedException extends ApiException {
+  const FullAmountChangedException({
+    super.message = 'تغيّر مبلغ السداد الكامل',
+    super.statusCode,
+    super.correlationId,
+    super.details,
+  }) : super(code: 'FULL_AMOUNT_CHANGED');
+}
+
+/// `409 NO_POSITIVE_DEBT`.
+class NoPositiveDebtException extends ApiException {
+  const NoPositiveDebtException({
+    super.message = 'لا يوجد دين موجب',
+    super.statusCode,
+    super.correlationId,
+    super.details,
+  }) : super(code: 'NO_POSITIVE_DEBT');
+}
+
+/// `409 DUPLICATE_SAME_WORKDAY`.
+class DuplicateSameWorkdayException extends ApiException {
+  const DuplicateSameWorkdayException({
+    super.message = 'توجد عملية مشابهة في يوم العمل',
+    super.statusCode,
+    super.correlationId,
+    super.details,
+  }) : super(code: 'DUPLICATE_SAME_WORKDAY');
+}
+
+/// `409 REQUEST_ID_REUSED`.
+class RequestIdReusedException extends ApiException {
+  const RequestIdReusedException({
+    super.message = 'استُخدم معرّف الطلب لمحتوى مختلف',
+    super.statusCode,
+    super.correlationId,
+    super.details,
+  }) : super(code: 'REQUEST_ID_REUSED');
 }
 
 class ForbiddenException extends ApiException {

@@ -24,8 +24,8 @@ class ErrorMapper {
     'PAGE_EXPIRED',
   };
 
-  /// 🔶 The real CSRF error code is NOT visible in the frontend code. Any code
-  /// containing "CSRF" (e.g. CSRF_INVALID, CSRF_TOKEN_INVALID) is treated as such.
+  /// `CSRF_REJECTED` is the catalog code. Any other code that contains "CSRF"
+  /// is still treated as a rejection so the refresh-once path can run.
   static bool isCsrfCode(String code) => code.toUpperCase().contains('CSRF');
 
   /// 🔶 A CSRF failure may be named only in the server message.
@@ -96,7 +96,11 @@ class ErrorMapper {
     }
     final code = (err['code'] as String?) ?? _defaultCode(status);
     final serverMessage = _serverMessage(err, body);
-    final message = (serverMessage == null || serverMessage.isEmpty)
+    // A server sentence that carries a phone, an amount, or a secret is dropped.
+    // The status default has none of those.
+    final message = (serverMessage == null ||
+            serverMessage.isEmpty ||
+            _looksSensitive(serverMessage))
         ? _defaultMessage(status)
         : serverMessage;
     final details = err['details'] ?? (body is Map ? body['details'] : null);
@@ -104,6 +108,10 @@ class ErrorMapper {
     // CSRF wins over 419. A bare 419 is session expiry, not a token refresh.
     // HTML and empty bodies stay on the client default (see [_serverMessage]).
     if (isCsrfCode(code) || isCsrfMessage(serverMessage)) {
+      if (code == 'CSRF_REJECTED') {
+        return CsrfRejectedException(
+            statusCode: status, correlationId: correlationId, details: details);
+      }
       return CsrfInvalidException(
           code: isCsrfCode(code) ? code : 'CSRF_INVALID',
           message: message,
@@ -111,6 +119,15 @@ class ErrorMapper {
           correlationId: correlationId,
           details: details);
     }
+    // Fixed copy. The server sentence is not shown: it can carry a version,
+    // an amount, or a name. Details stay on the exception and are not logged.
+    final known = _knownCode(
+      code,
+      status: status,
+      correlationId: correlationId,
+      details: details,
+    );
+    if (known != null) return known;
     // The login call is unauthenticated. Its 401 is rejected credentials,
     // including when the body says AUTH_REQUIRED.
     if (status == 401 && !authenticated) {
@@ -119,15 +136,18 @@ class ErrorMapper {
           code: serverCode is String && serverCode.isNotEmpty
               ? serverCode
               : 'INVALID_CREDENTIALS',
-          message: serverMessage == null || serverMessage.isEmpty
+          message: serverMessage == null ||
+                  serverMessage.isEmpty ||
+                  _looksSensitive(serverMessage)
               ? invalidCredentialsMessage
               : serverMessage,
           statusCode: status,
           correlationId: correlationId,
           details: details);
     }
-    // After login, any 401 and any non-CSRF 419 end the session, whatever
-    // the code is. Named session codes do the same on other statuses.
+    // After login, any other 401 and any non-CSRF 419 end the session.
+    // INVALID_CURRENT_PASSWORD and MFA_REQUIRED are handled above and do not.
+    // Named session codes do the same on other statuses.
     if (sessionExpiredCodes.contains(code) ||
         (authenticated && status == 401) ||
         status == 419) {
@@ -252,28 +272,123 @@ class ErrorMapper {
     }
   }
 
-  /// `details` is an object on the real server (shape unknown 🔶). Accept either
-  /// { "fields": { "name": "msg" } }, { "name": "msg" } or [ {field, code, message} ].
+  /// Codes with fixed Arabic copy. They are not version conflicts and they
+  /// do not end the session. Unknown codes return null and follow HTTP status.
+  ApiException? _knownCode(
+    String code, {
+    required int status,
+    required String? correlationId,
+    required Object? details,
+  }) {
+    switch (code) {
+      case 'MFA_REQUIRED':
+        return MfaRequiredException(
+            statusCode: status, correlationId: correlationId, details: details);
+      case 'INVALID_CURRENT_PASSWORD':
+        return InvalidCurrentPasswordException(
+            statusCode: status, correlationId: correlationId, details: details);
+      case 'CLIENT_VERSION_MISMATCH':
+        return ClientVersionMismatchException(
+            statusCode: status, correlationId: correlationId, details: details);
+      case 'PENDING_SUBMISSION_EXISTS':
+        return PendingSubmissionExistsException(
+            statusCode: status, correlationId: correlationId, details: details);
+      case 'FULL_AMOUNT_CHANGED':
+        return FullAmountChangedException(
+            statusCode: status, correlationId: correlationId, details: details);
+      case 'NO_POSITIVE_DEBT':
+        return NoPositiveDebtException(
+            statusCode: status, correlationId: correlationId, details: details);
+      case 'DUPLICATE_SAME_WORKDAY':
+        return DuplicateSameWorkdayException(
+            statusCode: status, correlationId: correlationId, details: details);
+      case 'REQUEST_ID_REUSED':
+        return RequestIdReusedException(
+            statusCode: status, correlationId: correlationId, details: details);
+      default:
+        return null;
+    }
+  }
+
+  /// `details.field` is the field name (`"inputValue"`), not a message.
+  /// Also accepts `{ "fields": { "name": "msg" } }` and `[ {field, code, message} ]`.
+  /// Secret keys are never copied into a message.
   List<FieldError> _fieldErrors(Object? details) {
     if (details is List) {
-      return details
-          .whereType<Map>()
-          .map((d) => FieldError(
-              field: '${d['field'] ?? ''}',
-              code: '${d['code'] ?? ''}',
-              message: '${d['message'] ?? ''}'))
-          .toList(growable: false);
+      return details.whereType<Map>().map((d) {
+        final message = d['message'];
+        return FieldError(
+          field: '${d['field'] ?? ''}',
+          code: '${d['code'] ?? ''}',
+          message: message is String ? message : '',
+        );
+      }).toList(growable: false);
     }
     if (details is Map) {
-      final fields =
-          details['fields'] is Map ? details['fields'] as Map : details;
+      final named = details['field'];
+      if (named is String && named.isNotEmpty) {
+        final fieldCode = details['code'];
+        final fieldMessage = details['message'];
+        return [
+          FieldError(
+            field: named,
+            code: fieldCode is String && fieldCode.isNotEmpty
+                ? fieldCode
+                : 'INVALID',
+            message: fieldMessage is String && !_looksSensitive(fieldMessage)
+                ? fieldMessage
+                : '',
+          ),
+        ];
+      }
+      final explicit = details['fields'] is Map;
+      final fields = explicit ? details['fields'] as Map : details;
       return fields.entries
           .where((e) => e.value is String)
+          .where((e) => explicit || !_secretDetailKey('${e.key}'))
+          .where((e) => !_looksSensitive(e.value as String))
           .map((e) => FieldError(
               field: '${e.key}', code: 'INVALID', message: e.value as String))
           .toList(growable: false);
     }
     return const [];
+  }
+
+  /// Loose `{key: value}` entries that must not become visible text.
+  /// An explicit `fields` map is display copy and is not filtered by key.
+  static const _secretDetailKeys = {
+    'password',
+    'currentpassword',
+    'newpassword',
+    'token',
+    'csrftoken',
+    'phone',
+    'mobile',
+    'authorization',
+    'cookie',
+    'secret',
+    'accesstoken',
+    'refreshtoken',
+    'name',
+    'username',
+    'displayname',
+  };
+
+  static bool _secretDetailKey(String key) =>
+      _secretDetailKeys.contains(key.toLowerCase().replaceAll('_', ''));
+
+  /// Amounts, phones, and secret spellings stay out of user-facing copy.
+  /// The word "token" alone is not enough: "CSRF token mismatch" is a status.
+  static bool _looksSensitive(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return false;
+    if (RegExp(r'^\d+$').hasMatch(trimmed)) return true;
+    if (RegExp(r'\d{3}-\d{4}').hasMatch(trimmed)) return true;
+    if (RegExp(r'\b\d{7,}\b').hasMatch(trimmed)) return true;
+    return RegExp(
+      r'(password|secret|bearer\s+\S+|token[=:]\s*\S+)',
+      caseSensitive: false,
+    ).hasMatch(trimmed);
   }
 
   /// Message the server actually sent. HTML and empty bodies stay null so the
