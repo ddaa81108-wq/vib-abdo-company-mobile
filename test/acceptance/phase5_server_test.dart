@@ -104,7 +104,7 @@ void main() {
   test('P5-32 employee writes are rejected and reads stay in scope', () async {
     final api = await _signedIn('employee.demo');
     expect(api.permissions.canDo(ManagementAction.collectionsDecide), isFalse);
-    expect(api.permissions.canRead(SectionKey.customers), isTrue);
+    expect(api.permissions.canRead(SectionKey.customers), isFalse);
     expect(api.permissions.canRead(SectionKey.collections), isTrue);
     expect(api.permissions.canRead(SectionKey.treasury), isFalse);
 
@@ -186,13 +186,12 @@ void main() {
       expect(error.message, 'هذا الإجراء للإدارة فقط', reason: path);
     }
 
-    final customers = await api.client.get('/api/customers/c_56');
-    expect(customers.statusCode, 200);
+    final customers = await _apiOf(() => api.client.get('/api/customers/c_56'));
+    expect(customers.statusCode, 403);
+    expect(customers.code, 'FORBIDDEN');
     final home = await api.client.get('/api/home');
-    expect(_sections(home.dataMap), ['customers', 'collections']);
-    final debts = home.dataMap['oldDebts'] as List;
-    expect(debts, hasLength(1));
-    expect((debts.single as Map)['id'], 'c_55');
+    expect(_sections(home.dataMap), ['collections']);
+    expect(home.dataMap['oldDebts'], isNull);
   });
 
   test('P5-36 payroll id and employeeId query do not select a row', () async {

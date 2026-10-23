@@ -246,7 +246,7 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
   /// retry of these same inputs after the same user signs in again.
   String _presentFailure(Object error) {
     final failure = ref.read(errorHandlerProvider).toFailure(error);
-    if (failure.code == 'FORBIDDEN') return AppStrings.forbidden;
+    if (failure.isForbidden) return AppStrings.forbidden;
     if (failure.code == 'SUBMISSION_ALREADY_DECIDED' ||
         failure.code == 'SUBMISSION_NOT_APPROVED') {
       _announce(failure.message);
