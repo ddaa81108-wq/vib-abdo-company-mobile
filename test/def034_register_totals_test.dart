@@ -108,17 +108,18 @@ void main() {
           ]) {
             expect(find.text(label), findsWidgets, reason: label);
           }
-          // The entry's own remaining is not the register figure.
-          expect(
-            _inside(
-              _totalsKey,
-              money.formatOrDash(
-                page.entries.single.remainingUnits,
-                Currency.lyd,
+          // Each row's own remaining is not the register figure.
+          expect(page.entries, isNotEmpty);
+          for (final entry in page.entries) {
+            expect(
+              _inside(
+                _totalsKey,
+                money.formatOrDash(entry.remainingUnits, Currency.lyd),
               ),
-            ),
-            findsNothing,
-          );
+              findsNothing,
+              reason: entry.id,
+            );
+          }
           expect(
             _inside(
               const Key('opening-card'),
