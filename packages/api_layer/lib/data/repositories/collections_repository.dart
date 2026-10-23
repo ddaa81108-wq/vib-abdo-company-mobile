@@ -69,12 +69,16 @@ class RemoteCollectionsRepository implements CollectionsRepository {
   RemoteCollectionsRepository(this._api);
   final ApiClient _api;
 
-  Future<MutationAck> _post(String path, Json body) async =>
-      MutationAck.fromData((await _api.post(path, body: body)).data);
+  Future<MutationAck> _post(String path, Json body) async {
+    final data = (await _api.post(path, body: body)).data;
+    return runWithMoneyEndpoint(path, () => MutationAck.fromData(data));
+  }
 
   /// Cash-received has no JSON body. A null body is omitted on the wire.
-  Future<MutationAck> _postEmpty(String path) async =>
-      MutationAck.fromData((await _api.post(path)).data);
+  Future<MutationAck> _postEmpty(String path) async {
+    final data = (await _api.post(path)).data;
+    return runWithMoneyEndpoint(path, () => MutationAck.fromData(data));
+  }
 
   @override
   Future<CollectionsOverviewDto> overview() async {

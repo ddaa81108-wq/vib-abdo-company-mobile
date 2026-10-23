@@ -17,7 +17,10 @@ void main() {
     final totals = collections.dataMap['employeeTotals'] as List;
     expect(totals, isNotEmpty);
     final payroll = await api.collections.payroll();
-    expect(payroll.employees.map((e) => e.userId), containsAll(['u_12', 'u_20']));
+    expect(
+      payroll.employees.map((e) => e.userId),
+      containsAll(['u_12', 'u_20']),
+    );
     expect(payroll.employees, hasLength(2));
   });
 
@@ -66,26 +69,20 @@ void main() {
       'approved',
     );
 
-    await _expectForbidden(
-      api,
-      const [
-        '/api/reports',
-        '/api/treasury',
-        '/api/companies',
-        '/api/masraweya/day',
-        '/api/purchases/al_bayan',
-      ],
-      message: 'لا تملك صلاحية لهذا الإجراء',
+    await _expectForbidden(api, const [
+      '/api/reports',
+      '/api/treasury',
+      '/api/companies',
+      '/api/masraweya/day',
+      '/api/purchases/al_bayan',
+    ], message: 'لا تملك صلاحية لهذا الإجراء');
+    await _expectLedgerDenied(api);
+    final statements = await _apiOf(
+      () => api.client.get('/api/statements/pdf'),
     );
-    for (final path in const [
-      '/api/financial-ledger',
-      '/api/statements/pdf',
-    ]) {
-      final error = await _apiOf(() => api.client.get(path));
-      expect(error.statusCode, 403, reason: path);
-      expect(error.code, 'FORBIDDEN', reason: path);
-      expect(error.message, 'هذا الإجراء للإدارة فقط', reason: path);
-    }
+    expect(statements.statusCode, 403);
+    expect(statements.code, 'FORBIDDEN');
+    expect(statements.message, 'هذا الإجراء للإدارة فقط');
 
     final salary = await _apiOf(
       () => api.collections.setBaseSalary(
@@ -161,30 +158,24 @@ void main() {
     final rawCollections = await api.client.get('/api/collections');
     expect(rawCollections.dataMap['employeeTotals'], isNotEmpty);
 
-    await _expectForbidden(
-      api,
-      const [
-        '/api/reports',
-        '/api/treasury',
-        '/api/companies',
-        '/api/companies/c_55',
-        '/api/masraweya/day',
-        '/api/purchases/al_bayan',
-        '/api/libyan-deposits',
-        '/api/egyptian-deposits',
-      ],
-      message: 'لا تملك صلاحية لهذا الإجراء',
-    );
+    await _expectForbidden(api, const [
+      '/api/reports',
+      '/api/treasury',
+      '/api/companies',
+      '/api/companies/c_55',
+      '/api/masraweya/day',
+      '/api/purchases/al_bayan',
+      '/api/libyan-deposits',
+      '/api/egyptian-deposits',
+    ], message: 'لا تملك صلاحية لهذا الإجراء');
 
-    for (final path in const [
-      '/api/financial-ledger',
-      '/api/statements/pdf',
-    ]) {
-      final error = await _apiOf(() => api.client.get(path));
-      expect(error.statusCode, 403, reason: path);
-      expect(error.code, 'FORBIDDEN', reason: path);
-      expect(error.message, 'هذا الإجراء للإدارة فقط', reason: path);
-    }
+    await _expectLedgerDenied(api);
+    final statements = await _apiOf(
+      () => api.client.get('/api/statements/pdf'),
+    );
+    expect(statements.statusCode, 403);
+    expect(statements.code, 'FORBIDDEN');
+    expect(statements.message, 'هذا الإجراء للإدارة فقط');
 
     final customers = await _apiOf(() => api.client.get('/api/customers/c_56'));
     expect(customers.statusCode, 403);
@@ -230,12 +221,12 @@ void main() {
       expect(_sections(home.dataMap), isEmpty, reason: username);
       expect(home.dataMap.containsKey('oldDebts'), isFalse, reason: username);
 
+      await _expectLedgerDenied(api);
       await _expectForbidden(api, const [
         '/api/customers',
         '/api/customers/c_55',
         '/api/collections',
         '/api/collections/payroll',
-        '/api/financial-ledger',
         '/api/statements/pdf',
         '/api/reports',
         '/api/treasury',
@@ -297,10 +288,7 @@ const _adminReads = [
 
 Future<ApiLayer> _signedIn(String username) async {
   final api = ApiLayer.create(
-    config: const ApiConfig(
-      baseUrl: 'https://fake.invalid',
-      useFakeApi: true,
-    ),
+    config: const ApiConfig(baseUrl: 'https://fake.invalid', useFakeApi: true),
     fakeLatency: Duration.zero,
   );
   addTearDown(api.dispose);
@@ -315,6 +303,13 @@ Future<ApiException> _apiOf(Future<Object?> Function() call) async {
     return error;
   }
   fail('expected an ApiException');
+}
+
+Future<void> _expectLedgerDenied(ApiLayer api) async {
+  final error = await _apiOf(() => api.client.get('/api/financial-ledger'));
+  expect(error.statusCode, 403);
+  expect(error.code, 'PERMISSION_DENIED');
+  expect(error.message, 'هذا الإجراء للإدارة فقط');
 }
 
 Future<void> _expectForbidden(
