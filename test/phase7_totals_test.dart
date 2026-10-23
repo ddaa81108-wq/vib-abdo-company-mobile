@@ -95,7 +95,13 @@ void main() {
 
     final purchases = await layer.purchases.list(PurchaseBook.alBayan);
     expect(purchases.registerTotals?.remainingUnits?.asInt, 2553);
-    expect(purchases.entries.single.remainingUnits?.asInt, 553);
+    expect(
+      purchases.entries
+          .firstWhere((entry) => entry.id == 'pe_1')
+          .remainingUnits
+          ?.asInt,
+      553,
+    );
   });
 
   testWidgets('P7-06 the zero card shows the server age label', (tester) async {

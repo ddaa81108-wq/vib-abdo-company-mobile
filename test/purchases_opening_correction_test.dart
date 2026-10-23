@@ -762,7 +762,7 @@ Future<void> exercisePhone(
     size: size,
     overrides: [
       purchasesProvider.overrideWith((ref) async {
-        return _openDay(id: '1', status: 'finalized');
+        return _openDay(id: '1', status: 'finalized', correctionOpen: true);
       }),
     ],
   );
@@ -796,13 +796,13 @@ Future<void> exercisePhone(
   Navigator.of(tester.element(find.byKey(const Key('save-opening')))).pop();
   await tester.pump(const Duration(milliseconds: 400));
 
-  await show(tester, find.byKey(const Key('open-correction-1')));
+  await show(tester, find.byKey(const Key('close-correction-1')));
   final colors = dark ? AppStatusColors.dark : AppStatusColors.light;
-  expect(chipColor(tester, '1'), colors.chipNormalBg);
-  await tester.tap(find.byKey(const Key('open-correction-1')));
+  expect(chipColor(tester, '1'), colors.chipReviewBg);
+  await tester.tap(find.byKey(const Key('close-correction-1')));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 300));
-  expect(find.text(AppStrings.openCorrectionConfirm), findsOneWidget);
+  expect(find.text(AppStrings.closeCorrectionConfirm), findsOneWidget);
   expect(tester.takeException(), isNull);
   await tester.tap(find.text(AppStrings.cancel));
   await tester.pump(const Duration(milliseconds: 400));

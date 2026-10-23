@@ -62,8 +62,8 @@ void main() {
     ))!;
     expect(page.day!.status, 'finalized');
     expect(page.day!.version, 4);
-    expect(page.entries.single.id, 'pe_1');
-    expect(page.entries.single.paidUnits?.asInt, 500);
+    final saved = page.entries.firstWhere((entry) => entry.id == 'pe_1');
+    expect(saved.paidUnits?.asInt, 500);
     expect(tester.takeException(), isNull);
   });
 
@@ -96,8 +96,8 @@ void main() {
     ))!;
     expect(page.day!.status, 'finalized');
     expect(page.day!.version, 4);
-    expect(page.entries, hasLength(1));
-    expect(page.entries.single.id, 'pe_1');
+    expect(page.entries.map((entry) => entry.id), contains('pe_1'));
+    expect(page.entries.map((entry) => entry.id), contains('pe_old'));
     expect(tester.takeException(), isNull);
   });
 }

@@ -27,7 +27,7 @@ void main() {
 
   String fingerprint(PurchasesPage page) {
     final day = page.day!;
-    final row = page.entries.single;
+    final row = page.entries.firstWhere((entry) => entry.id == 'pe_1');
     Object? units(MoneyValue? value) => value?.asInt;
     return [
       day.numberLabel,
@@ -97,7 +97,10 @@ void main() {
       expect(finalized.day!.status, 'finalized');
       expect(finalized.day!.correctionOpen, isFalse);
       expect(finalized.day!.version, 4);
-      expect(finalized.entries.single.id, 'pe_1');
+      expect(
+        finalized.entries.firstWhere((entry) => entry.id == 'pe_1').id,
+        'pe_1',
+      );
 
       await expectDayFinalized(
         () => api.purchases.create(
@@ -232,7 +235,10 @@ void main() {
       final reopened = await api.purchases.list(book);
       expect(reopened.day!.status, 'finalized');
       expect(reopened.day!.correctionOpen, isTrue);
-      expect(reopened.entries.single.id, 'pe_1');
+      expect(
+        reopened.entries.firstWhere((entry) => entry.id == 'pe_1').id,
+        'pe_1',
+      );
       expect(reopened.day!.version, 4);
     },
   );
@@ -262,7 +268,7 @@ void main() {
       final page = await api.purchases.list(book);
       expect(page.day!.status, 'finalized');
       expect(page.day!.correctionOpen, isTrue);
-      expect(page.entries.single.id, 'pe_1');
+      expect(page.entries.firstWhere((entry) => entry.id == 'pe_1').id, 'pe_1');
     },
   );
 
@@ -294,7 +300,7 @@ void main() {
     expect(after.day!.version, 4);
     expect(after.day!.previousDebtUnits?.asInt, 10);
     expect(after.day!.previousVodafoneUnits?.asInt, 20);
-    expect(after.entries.single.id, 'pe_1');
+    expect(after.entries.firstWhere((entry) => entry.id == 'pe_1').id, 'pe_1');
   });
 
   test('DEF-014 a profile without purchases.write still gets 403', () async {

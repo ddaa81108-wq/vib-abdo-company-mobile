@@ -328,8 +328,9 @@ class _DayCard extends ConsumerWidget {
                 entry: entry,
                 money: money,
                 book: book,
-                version: day.version,
-                canWrite: canWrite && editable,
+                // The write names this row's day, not the open day's version.
+                version: entry.dayVersion,
+                canWrite: canWrite && editable && entry.dayId == day.id,
                 online: online,
               ),
           ],
@@ -567,6 +568,13 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
   }
 }
 
+/// Opening is a write on an open day. A missing day, or a finalized day
+/// whose correction is closed, does not offer the button.
+bool _openingWritable(PurchaseDayDto? day) {
+  if (day == null) return false;
+  return day.status == 'draft' || day.correctionOpen;
+}
+
 class _OpeningCard extends StatelessWidget {
   const _OpeningCard({
     required this.book,
@@ -608,7 +616,7 @@ class _OpeningCard extends StatelessWidget {
               vodafoneCurrency,
               money,
             ),
-            if (canWrite)
+            if (canWrite && _openingWritable(day))
               GatedButton(
                 buttonKey: const Key('set-opening'),
                 allowed: true,

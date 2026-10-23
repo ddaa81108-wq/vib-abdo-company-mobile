@@ -2056,11 +2056,20 @@ class FakeApiClient implements ApiClient {
     if (entries is List) {
       body['entries'] = [
         for (final raw in entries)
-          if (raw is Map)
-            _paintPurchaseEntry(Map<String, dynamic>.from(raw), day),
+          if (raw is Map) _entryOnThisPage(Map<String, dynamic>.from(raw), day),
       ];
     }
     return body;
+  }
+
+  /// The open day's rows take that day's id and version. A row from another
+  /// day keeps the fixture `dayId` and `dayVersion`.
+  Map<String, dynamic> _entryOnThisPage(
+    Map<String, dynamic> entry,
+    Map<String, dynamic> day,
+  ) {
+    if ('${entry['dayId']}' != '${day['id']}') return entry;
+    return _paintPurchaseEntry(entry, day);
   }
 
   Map<String, dynamic> _paintPurchaseEntry(
