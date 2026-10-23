@@ -172,14 +172,16 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
     // a successful send clears it. Nothing sends it again on its own.
     final userId = _draftUserId;
     if (userId != null) {
-      ref.read(pendingMutationProvider.notifier).remember(
-        PendingMutation(
-          userId: userId,
-          inputs: sentInputs,
-          expectedVersion: meta.expectedVersion,
-          requestId: meta.requestId,
-        ),
-      );
+      ref
+          .read(pendingMutationProvider.notifier)
+          .remember(
+            PendingMutation(
+              userId: userId,
+              inputs: sentInputs,
+              expectedVersion: meta.expectedVersion,
+              requestId: meta.requestId,
+            ),
+          );
     }
     var accepted = false;
     try {
@@ -199,10 +201,9 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
       if (accepted) {
         _lock.succeed();
         if (mounted) {
-          ref.read(pendingMutationProvider.notifier).complete(
-            userId: _draftUserId,
-            requestId: meta.requestId,
-          );
+          ref
+              .read(pendingMutationProvider.notifier)
+              .complete(userId: _draftUserId, requestId: meta.requestId);
         }
       } else {
         _dropUnlessIdentical(sentInputs, meta.expectedVersion);

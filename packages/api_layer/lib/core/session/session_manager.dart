@@ -7,6 +7,7 @@ import '../../data/models/profile_models.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/profile_repository.dart';
 import '../auth/auth_strategy.dart';
+import '../network/api_exception.dart';
 import '../permissions/permission_service.dart';
 
 sealed class SessionState {
@@ -91,9 +92,15 @@ class SessionManager {
     try {
       await reloadProfileAndPermissions(); // AUTH_REQUIRED -> interceptor -> forceLogout
       await _strategy.onSessionResumed(); // GET /api/auth/csrf
-    } catch (_) {
+    } catch (error, stack) {
       if (state is! SessionUnauthenticated) {
         await _wipe(reason: 'restore_failed');
+      }
+      // 403 FORBIDDEN and PERMISSION_DENIED are the splash forbidden pane.
+      // Every other restore failure stays a local wipe with no error screen.
+      if (error is ForbiddenException &&
+          (error.code == 'FORBIDDEN' || error.code == 'PERMISSION_DENIED')) {
+        Error.throwWithStackTrace(error, stack);
       }
     }
   }

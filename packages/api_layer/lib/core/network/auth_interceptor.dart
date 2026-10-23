@@ -13,16 +13,19 @@ import 'error_mapper.dart';
 ///   (POST/PUT/PATCH/DELETE only), then attach (cookies + X-CSRF-Token, or
 ///   Bearer). Other GETs and HEADs are not queued.
 /// - onResponse/onError: strategy.capture (Set-Cookie) and releaseWrite.
-/// - onError: maps the error; CSRF invalid -> strategy refetches token -> replay ONCE
-///   while the write turn is still held; AUTH_REQUIRED -> forced logout
-///   (no refresh flow on the cookie session). A 419 that is not a CSRF error
-///   is session expiry and is not replayed.
+/// - onError: maps the error; 403 CSRF_REJECTED -> strategy refetches token
+///   -> replay ONCE while the write turn is still held. Any other status or
+///   code, including a 419, is not replayed. AUTH_REQUIRED -> forced logout
+///   (no refresh flow on the cookie session). A 419 whose code contains CSRF
+///   stays a CSRF error and does not wipe. A 419 with CSRF only in the
+///   message wipes and is not replayed.
 /// - The write turn is released before the forced-logout callback. Logout
 ///   cleanups post through this same client (device unregister). Waiting for
 ///   that post while the failed write still holds the mutex deadlocks every
 ///   later write.
 /// - A 401 from GET /api/auth/csrf on this client uses that same wipe. The
-///   catalog has no 419; a non-CSRF 419 on a write still wipes.
+///   catalog has no 419; a 419 is never replayed. A 419 whose code is not a
+///   CSRF code still wipes.
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required AuthStrategy strategy,
