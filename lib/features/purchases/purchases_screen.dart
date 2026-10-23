@@ -136,6 +136,8 @@ class _RegisterTotals extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Widget key kept from the old lifetime totals. The contract field is
+    // registerTotals; lifetimeTotals is not on this response.
     return Column(
       key: const Key('purchases-lifetime'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -164,6 +166,11 @@ class _RegisterTotals extends StatelessWidget {
           totals?.vodafoneRemainingUnits,
           vodafoneCurrency,
           money,
+        ),
+        Text(
+          AppStrings.remainingRunningBalance,
+          key: const Key('register-totals-note'),
+          style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
     );

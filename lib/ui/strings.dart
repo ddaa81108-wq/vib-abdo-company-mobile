@@ -221,6 +221,11 @@ abstract final class AppStrings {
   static const operation = 'العملية';
   static const vodafoneConsumed = 'مستهلك فودافون';
   static const registerTotals = 'إجماليات السجل';
+
+  /// `registerTotals.remainingUnits` and `vodafoneRemainingUnits`.
+  /// Both are the open day's carried balance. The screen does not add them.
+  static const remainingRunningBalance =
+      'المتبقي وباقي فودافون رصيد متراكم لليوم المفتوح، ويشمل الافتتاحي، وليس مجموع البطاقات.';
   static const kind = 'النوع';
   static const customerName = 'اسم العميل';
   static const modeFull = 'كلي';
