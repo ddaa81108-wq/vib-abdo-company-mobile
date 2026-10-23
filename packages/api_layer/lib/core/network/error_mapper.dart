@@ -19,8 +19,9 @@ class ErrorMapper {
   /// A 401 on the login request itself stays invalid credentials.
   ///
   /// `docs/api/error-catalog.json` has no 419. `CSRF_REJECTED` is HTTP 403.
-  /// A 419 whose code or message contains CSRF still refreshes; any other 419
-  /// still wipes the session.
+  /// Only that status and code is refreshed and replayed. A 419 is never
+  /// refreshed. A 419 whose code or message contains CSRF stays a CSRF error
+  /// and does not wipe. Any other 419 still wipes the session.
   static const sessionExpiredCodes = {
     'AUTH_REQUIRED',
     'SESSION_EXPIRED',
@@ -29,7 +30,8 @@ class ErrorMapper {
   };
 
   /// `CSRF_REJECTED` is the catalog code. Any other code that contains "CSRF"
-  /// is still treated as a rejection so the refresh-once path can run.
+  /// is still typed as a CSRF error. It does not refresh: [isCsrfRejection]
+  /// is only 403 `CSRF_REJECTED`.
   static bool isCsrfCode(String code) => code.toUpperCase().contains('CSRF');
 
   /// 🔶 A CSRF failure may be named only in the server message.
@@ -109,7 +111,8 @@ class ErrorMapper {
         : serverMessage;
     final details = err['details'] ?? (body is Map ? body['details'] : null);
 
-    // CSRF wins over 419. A bare 419 is session expiry, not a token refresh.
+    // CSRF wins over 419 for the exception type. It does not refresh a 419.
+    // A bare 419 is session expiry, not a token refresh.
     // HTML and empty bodies stay on the client default (see [_serverMessage]).
     if (isCsrfCode(code) || isCsrfMessage(serverMessage)) {
       if (code == 'CSRF_REJECTED') {
@@ -152,6 +155,7 @@ class ErrorMapper {
     // After login, any other 401 and any non-CSRF 419 end the session.
     // INVALID_CURRENT_PASSWORD and MFA_REQUIRED are handled above and do not.
     // Named session codes do the same on other statuses.
+    // Only 403 CSRF_REJECTED is refreshed. A 419 is not.
     if (sessionExpiredCodes.contains(code) ||
         (authenticated && status == 401) ||
         status == 419) {

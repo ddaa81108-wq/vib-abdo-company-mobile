@@ -31,7 +31,8 @@ class Phase7Transport implements HttpClientAdapter {
   int? failAuthenticatedStatus;
   String failAuthenticatedCode = 'AUTH_REQUIRED';
 
-  /// Remaining CSRF failures on unsafe calls. Each one is HTTP 419.
+  /// Remaining CSRF failures on unsafe calls. Each one is HTTP 403
+  /// `CSRF_REJECTED`, the only status and code that refreshes once.
   int csrfFailuresRemaining = 0;
 
   /// Throw a connection error instead of answering.
@@ -88,7 +89,7 @@ class Phase7Transport implements HttpClientAdapter {
         call.path != ApiEndpoints.login &&
         csrfFailuresRemaining > 0) {
       csrfFailuresRemaining--;
-      return _fail(419, 'CSRF_INVALID', 'رمز CSRF غير مطابق');
+      return _fail(403, 'CSRF_REJECTED', 'تم رفض طلب الحماية.');
     }
     if (call.path != ApiEndpoints.login && failAuthenticatedStatus != null) {
       return _fail(
