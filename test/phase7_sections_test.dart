@@ -128,7 +128,7 @@ void main() {
     },
   );
 
-  testWidgets('P7-06 the financial ledger is a real empty server page', (
+  testWidgets('P7-06 the financial ledger shows the server page totals', (
     tester,
   ) async {
     await pumpFakeApp(tester, size: const Size(800, 1600));
@@ -136,14 +136,14 @@ void main() {
     await go(tester, '/settings');
 
     expect(find.byKey(const Key('financial-ledger')), findsOneWidget);
-    expect(find.text(AppStrings.emptyLedger), findsWidgets);
+    expect(find.text(AppStrings.emptyLedger), findsNothing);
     expect(
       tester.widget<MoneyText>(find.byKey(const Key('ledger-total-LYD'))).text,
-      '0 د.ل',
+      '480 د.ل',
     );
     expect(
       tester.widget<MoneyText>(find.byKey(const Key('ledger-total-EGP'))).text,
-      '0 ج.م',
+      '10,000 ج.م',
     );
   });
 

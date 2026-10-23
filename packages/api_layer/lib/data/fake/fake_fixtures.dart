@@ -1113,30 +1113,156 @@ class FakeFixtures {
     };
   }
 
-  static Map<String, dynamic> reports() => {
-        'items': [
+  static Map<String, dynamic> _reportRow() => {
+        'sequence': 30,
+        'date': '2026-10-18',
+        'businessDate': '2026-10-18',
+        'receivablesUnits': 45000,
+        'liabilitiesUnits': 12000,
+        'activeCashUnits': 8000,
+        'egyptianSourceUnits': 95000,
+        'egyptianConvertedUnits': 10000,
+        'egyptianRate': 10,
+        'netUnits': 51000,
+        'netChangeUnits': 1200,
+        'daily': {
+          'receivablesAddedUnits': 1200,
+          'paymentsUnits': 0,
+          'liabilitiesEffectUnits': 0,
+          'cashInUnits': 0,
+          'cashOutUnits': 0,
+        },
+        'status': 'normal',
+        'summary': 'ملاحظة النظام',
+        'note': 'ملاحظة النظام',
+        'reasons': [
           {
-            'sequence': 30,
-            'date': '2026-10-18',
-            'receivablesUnits': 45000,
-            'activeCashUnits': 8000,
-            'egyptianSourceUnits': 95000,
-            'egyptianConvertedUnits': 10000,
-            'liabilitiesUnits': 12000,
-            'netUnits': 51000,
-            'netChangeUnits': 1200,
-            'status': 'normal',
-            'note': 'ملاحظة النظام',
-            'reasons': [
-              {'text': 'سبب تجريبي', 'changeUnits': 1200},
-            ],
+            'key': 'demo',
+            'label': 'سبب تجريبي',
+            'text': 'سبب تجريبي',
+            'changeUnits': 1200,
           },
         ],
+        'version': 1,
+        'generatedAt': '2026-10-18T02:00:00+02:00',
+        'updatedAt': '2026-10-18T02:00:00+02:00',
+        'isFinalized': false,
+        'finalizedAt': null,
+        'fiveAmClosing': {
+          'state': 'pending',
+          'scheduledAt': '2026-10-19T03:00:00+02:00',
+          'capturedAt': null,
+          'netUnits': null,
+        },
+      };
+
+  static Map<String, dynamic> reports() => {
+        'current': _reportRow(),
+        'items': [_reportRow()],
         'methodology': {
           'formula': 'ديون لنا + النشط + المصري − ديون علينا',
           'note': 'نص من الخادم',
+          'currency': 'LYD',
         },
       };
+
+  /// Contract financial-ledger rows. Newest first. `pageTotals` is the sum of
+  /// integer `effectUnits` on the returned page, which is what the server
+  /// sends. This is the fake standing in for that total.
+  static List<Map<String, dynamic>> financialLedgerItems() => [
+        {
+          'id': 4,
+          'sourceKind': 'debt_transaction',
+          'sourceId': 'src-cust',
+          'sectionKey': 'customer_debts',
+          'entryKind': 'payment',
+          'counterpartyName': 'عميل تجريبي',
+          'description': 'استلام تجريبي',
+          'referenceNo': 'CUST-1',
+          'currency': 'LYD',
+          'amountUnits': 100,
+          'effectUnits': -100,
+          'actorName': 'موظف استلام تجريبي',
+          'actorUsername': null,
+          'occurredAt': '2026-10-22T22:33:25.523Z',
+          'sourceStatus': 'posted',
+          'updatedAt': '2026-10-22T22:33:25.561Z',
+        },
+        {
+          'id': 3,
+          'sourceKind': 'treasury_cash',
+          'sourceId': 'src-cash',
+          'sectionKey': 'treasury',
+          'entryKind': 'in',
+          'counterpartyName': 'الخزينة',
+          'description': 'نقدية تجريبية',
+          'referenceNo': 'CASH-1',
+          'currency': 'LYD',
+          'amountUnits': 500,
+          'effectUnits': 500,
+          'actorName': 'مدير تجريبي',
+          'actorUsername': 'admin.demo',
+          'occurredAt': '2026-10-23T00:33:25.469+02:00',
+          'sourceStatus': 'posted',
+          'updatedAt': '2026-10-22T22:33:25.469Z',
+        },
+        {
+          'id': 2,
+          'sourceKind': 'purchase_entry',
+          'sourceId': 'src-buy',
+          'sectionKey': 'purchases',
+          'entryKind': 'purchase',
+          'counterpartyName': 'البيان',
+          'description': 'مشتريات تجريبية',
+          'referenceNo': 'PUR-1',
+          'currency': 'LYD',
+          'amountUnits': 100,
+          'effectUnits': 80,
+          'actorName': 'مدير تجريبي',
+          'actorUsername': 'admin.demo',
+          'occurredAt': '2026-10-22T22:33:25.399Z',
+          'sourceStatus': 'draft',
+          'updatedAt': '2026-10-22T22:33:25.399Z',
+        },
+        {
+          'id': 1,
+          'sourceKind': 'debt_transaction',
+          'sourceId': 'src-egp',
+          'sectionKey': 'egyptian_deposits',
+          'entryKind': 'debt',
+          'counterpartyName': 'أمانة مصرية تجريبية',
+          'description': 'رصيد افتتاحي',
+          'referenceNo': 'EDEP-1',
+          'currency': 'EGP',
+          'amountUnits': 10000,
+          'effectUnits': 10000,
+          'actorName': 'مدير تجريبي',
+          'actorUsername': 'admin.demo',
+          'occurredAt': '2026-10-22T22:33:25.214Z',
+          'sourceStatus': 'posted',
+          'updatedAt': '2026-10-22T22:33:25.214Z',
+        },
+      ];
+
+  static Map<String, dynamic> financialLedger({String? sectionKey}) {
+    final items = <Map<String, dynamic>>[
+      for (final row in financialLedgerItems())
+        if (sectionKey == null || row['sectionKey'] == sectionKey)
+          Map<String, dynamic>.from(row),
+    ];
+    final totals = <String, int>{};
+    for (final row in items) {
+      final currency = row['currency'];
+      final effect = row['effectUnits'];
+      if (currency is! String || effect is! int) continue;
+      totals[currency] = (totals[currency] ?? 0) + effect;
+    }
+    return {
+      'items': items,
+      'pageTotals': totals,
+      'nextBefore': null,
+    };
+  }
 
   /// Literal unread counts. The fake decrements these; it does not count rows.
   static const notificationUnreadCounts = <String, int>{
