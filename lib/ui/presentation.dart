@@ -221,20 +221,13 @@ String? reportStatusLabel(String? status) => switch (status) {
 /// PurchasesSection labels the Vodafone remainder by its sign.
 ///
 /// Positive is «باقي فودافون لصالحنا», negative is «استهلاك فودافون علينا»,
-/// and zero or a missing figure is «باقي فودافون كاش».
+/// and zero or a missing figure is «باقي فودافون كاش». The amount shown
+/// next to that label is the server value, with no sign change.
 String vodafoneRemainingLabel(MoneyValue? units) {
   final value = units?.asInt;
   if (value != null && value > 0) return AppStrings.vodafoneOurs;
   if (value != null && value < 0) return AppStrings.vodafoneOwed;
   return AppStrings.vodafoneCashRemaining;
-}
-
-/// The site prints that remainder as an absolute figure. The label carries
-/// the direction. Invalid and missing values stay as they are.
-MoneyValue? vodafoneRemainingFigure(MoneyValue? units) {
-  final value = units?.asInt;
-  if (value != null && value < 0) return MoneyValue.known(-value);
-  return units;
 }
 
 /// Visual band only. Not a financial status.

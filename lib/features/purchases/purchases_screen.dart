@@ -308,11 +308,7 @@ class _DayCard extends ConsumerWidget {
               day.totalDebtUnits,
               Currency.lyd,
             ),
-            _line(
-              vodafoneRemainingLabel(vodafone),
-              vodafoneRemainingFigure(vodafone),
-              vodafoneCurrency,
-            ),
+            _line(vodafoneRemainingLabel(vodafone), vodafone, vodafoneCurrency),
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

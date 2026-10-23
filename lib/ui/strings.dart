@@ -257,7 +257,7 @@ abstract final class AppStrings {
   /// `registerTotals.remainingUnits` and `vodafoneRemainingUnits`.
   /// Both are the open day's carried balance. The screen does not add them.
   static const remainingRunningBalance =
-      'الباقي الحالي وباقي فودافون كاش الحالي رصيد متراكم لليوم المفتوح، وليس مجموع البطاقات.';
+      'الباقي وفودافون المتبقي رصيد متراكم لليوم المفتوح، ويشمل مديونية سابقة، وليس مجموع البطاقات.';
   static const kind = 'النوع';
   static const customerName = 'اسم العميل';
   static const modeFull = 'كلي';

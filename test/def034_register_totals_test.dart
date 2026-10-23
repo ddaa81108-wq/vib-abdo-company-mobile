@@ -77,7 +77,7 @@ void main() {
           expect(find.byKey(const Key('register-totals-note')), findsOneWidget);
           expect(
             find.text(
-              'الباقي الحالي وباقي فودافون كاش الحالي رصيد متراكم لليوم المفتوح، وليس مجموع البطاقات.',
+              'الباقي وفودافون المتبقي رصيد متراكم لليوم المفتوح، ويشمل مديونية سابقة، وليس مجموع البطاقات.',
             ),
             findsOneWidget,
           );
@@ -222,7 +222,7 @@ void main() {
       );
       expect(
         find.text(
-          'الباقي الحالي وباقي فودافون كاش الحالي رصيد متراكم لليوم المفتوح، وليس مجموع البطاقات.',
+          'الباقي وفودافون المتبقي رصيد متراكم لليوم المفتوح، ويشمل مديونية سابقة، وليس مجموع البطاقات.',
         ),
         findsOneWidget,
       );
@@ -293,8 +293,8 @@ void main() {
     expect(find.byKey(const Key('close-correction-9')), findsOneWidget);
     expect(find.byKey(const Key('open-correction-9')), findsNothing);
     expect(find.text('استهلاك فودافون علينا'), findsOneWidget);
-    expect(find.text('40 ج.م'), findsWidgets);
-    expect(find.text('-40 ج.م'), findsNothing);
+    expect(find.text('-40 ج.م'), findsOneWidget);
+    expect(find.text('40 ج.م'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -321,7 +321,7 @@ void main() {
           await tester.pump();
           expect(
             find.text(
-              'الباقي الحالي وباقي فودافون كاش الحالي رصيد متراكم لليوم المفتوح، وليس مجموع البطاقات.',
+              'الباقي وفودافون المتبقي رصيد متراكم لليوم المفتوح، ويشمل مديونية سابقة، وليس مجموع البطاقات.',
             ),
             findsOneWidget,
           );
