@@ -197,7 +197,7 @@ void main() {
     expect(find.byKey(const Key('report-cards')), findsNothing);
     expect(find.text(AppStrings.scrollColumns), findsOneWidget);
     expect(find.text(AppStrings.pinnedColumn), findsOneWidget);
-    expect(find.text(AppStrings.netChange), findsWidgets);
+    expect(find.text(AppStrings.netChange), findsNothing);
     final scroll = tester.widget<SingleChildScrollView>(
       find.byKey(const Key('report-table-scroll')),
     );

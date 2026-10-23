@@ -72,6 +72,7 @@ abstract final class AppStrings {
   static const loadOlder = 'تحميل الأقدم';
   static const loadMore = 'تحميل المزيد';
   static const netDebt = 'صافي إجمالي الديون';
+  static const netBalance = 'صافي الرصيد';
   static const totalDebt = 'إجمالي الديون';
   static const lastActivity = 'آخر حركة';
   static const withEmployee = 'لدى';

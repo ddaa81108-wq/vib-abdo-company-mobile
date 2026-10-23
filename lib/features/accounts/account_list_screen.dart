@@ -124,6 +124,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                       : null,
                 ),
               _SummaryStrip(
+                section: section,
                 summary: data.summary,
                 currency: section.currency,
                 money: money,
@@ -582,19 +583,38 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
 
 class _SummaryStrip extends StatelessWidget {
   const _SummaryStrip({
+    required this.section,
     required this.summary,
     required this.currency,
     required this.money,
   });
 
+  final AccountSection section;
   final AccountsSummaryDto summary;
   final Currency currency;
   final MoneyFormatter money;
 
+  bool get _deposits =>
+      section == AccountSection.libyanDeposits ||
+      section == AccountSection.egyptianDeposits;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final headlineLabel = _deposits
+        ? AppStrings.netBalance
+        : AppStrings.totalDebt;
+    final headlineValue = _deposits
+        ? summary.netBalanceUnits
+        : summary.totalDebtUnits;
+    final secondaryLabel = _deposits
+        ? AppStrings.totalDebt
+        : AppStrings.netDebt;
+    final secondaryValue = _deposits
+        ? summary.totalDebtUnits
+        : summary.netBalanceUnits;
     return Card(
+      key: const Key('account-summary'),
       child: Padding(
         padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
         child: Wrap(
@@ -602,14 +622,16 @@ class _SummaryStrip extends StatelessWidget {
           runSpacing: AppSpacing.md,
           children: [
             _Metric(
-              label: AppStrings.netDebt,
-              value: money.formatOrDash(summary.netBalanceUnits, currency),
+              key: const Key('summary-headline'),
+              label: headlineLabel,
+              value: money.formatOrDash(headlineValue, currency),
               valueStyle: theme.textTheme.titleSmall,
               amountStyle: context.textExtras.amountLarge,
             ),
             _Metric(
-              label: AppStrings.totalDebt,
-              value: money.formatOrDash(summary.totalDebtUnits, currency),
+              key: const Key('summary-secondary'),
+              label: secondaryLabel,
+              value: money.formatOrDash(secondaryValue, currency),
               valueStyle: theme.textTheme.bodySmall,
               amountStyle: context.textExtras.amount,
             ),
@@ -1209,6 +1231,7 @@ class _StartAlignedText extends StatelessWidget {
 
 class _Metric extends StatelessWidget {
   const _Metric({
+    super.key,
     required this.label,
     required this.value,
     required this.valueStyle,
