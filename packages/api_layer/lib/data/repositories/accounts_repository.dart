@@ -102,28 +102,33 @@ class RemoteAccountsRepository implements AccountsRepository {
 
   @override
   Future<MutationAck> addTransaction(AccountSection s, String accountId,
-          AccountTransactionRequest r, MutationMeta meta) async =>
-      MutationAck.fromData((await _api.post(
-              ApiEndpoints.accountTransactions(s.path, accountId),
-              body: {...meta.toBody(), ...r.toJson()}))
-          .data);
+      AccountTransactionRequest r, MutationMeta meta) async {
+    final path = ApiEndpoints.accountTransactions(s.path, accountId);
+    final data = (await _api.post(path,
+            body: {...meta.toBody(), ...r.toJson()}))
+        .data;
+    return runWithMoneyEndpoint(path, () => MutationAck.fromData(data));
+  }
 
   @override
   Future<MutationAck> correctTransaction(AccountSection s, String accountId,
-          String txId, AccountTransactionRequest r, MutationMeta meta) async =>
-      MutationAck.fromData((await _api.post(
-              ApiEndpoints.accountTxCorrection(s.path, accountId, txId),
-              body: {...meta.toBody(), ...r.toJson()}))
-          .data);
+      String txId, AccountTransactionRequest r, MutationMeta meta) async {
+    final path = ApiEndpoints.accountTxCorrection(s.path, accountId, txId);
+    final data =
+        (await _api.post(path, body: {...meta.toBody(), ...r.toJson()})).data;
+    return runWithMoneyEndpoint(path, () => MutationAck.fromData(data));
+  }
 
   @override
   Future<MutationAck> cancelTransaction(
-          AccountSection s, String accountId, String txId, MutationMeta meta,
-          {String? reason}) async =>
-      MutationAck.fromData((await _api.post(
-              ApiEndpoints.accountTxCancel(s.path, accountId, txId),
-              body: {...meta.toBody(), if (reason != null) 'reason': reason}))
-          .data);
+      AccountSection s, String accountId, String txId, MutationMeta meta,
+      {String? reason}) async {
+    final path = ApiEndpoints.accountTxCancel(s.path, accountId, txId);
+    final data = (await _api.post(path,
+            body: {...meta.toBody(), if (reason != null) 'reason': reason}))
+        .data;
+    return runWithMoneyEndpoint(path, () => MutationAck.fromData(data));
+  }
 
   @override
   Future<MutationAck> setPinned(
