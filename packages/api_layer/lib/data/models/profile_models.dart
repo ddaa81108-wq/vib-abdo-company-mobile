@@ -1,8 +1,12 @@
 import 'common.dart';
 
-/// GET /api/me -> { ok:true, data: { user: { id?, username, displayName, role, permissions[],
-///   sectionAccess{ customerDebts: none|read|manage, ... }, mustChangePassword } } }
-/// sectionAccess was observed on GET /api/users (per API contract); presence on /api/me to confirm.
+/// GET /api/me -> { ok:true, data: { user: { id, username, displayName, role,
+///   isOwner, permissions[], mustChangePassword } } }
+///
+/// Observed `/api/me` omits `sectionAccess`. Null (missing key or JSON null)
+/// means absent, so permission codes alone grant a section. A present map,
+/// including `{}`, keeps the current rule: a missing entry is none. A
+/// non-object value is stored as `{}` and does not widen access.
 class UserProfile {
   const UserProfile({
     required this.id,
@@ -10,7 +14,7 @@ class UserProfile {
     required this.displayName,
     required this.role,
     required this.permissions,
-    this.sectionAccess = const {},
+    this.sectionAccess,
     this.fullAccess,
     required this.mustChangePassword,
   });
@@ -22,7 +26,9 @@ class UserProfile {
   /// Server role string, uninterpreted. Matched ONLY in PermissionService (exact value).
   final String? role;
   final List<String> permissions;
-  final Map<String, String> sectionAccess;
+
+  /// Null when the server omitted `sectionAccess`.
+  final Map<String, String>? sectionAccess;
   final bool mustChangePassword;
 
   /// 🔶 PROPOSED explicit server flag (`fullAccess`, alias `isSuperuser`). null = not sent.
@@ -35,10 +41,7 @@ class UserProfile {
         displayName: str(j['displayName'] ?? j['username']),
         role: j['role'] is String ? j['role'] as String : null,
         permissions: strList(j['permissions']),
-        sectionAccess: {
-          for (final e in asJson(j['sectionAccess']).entries)
-            e.key: '${e.value}'
-        },
+        sectionAccess: sectionAccessFromJson(j['sectionAccess']),
         fullAccess: _boolOrNull(j['fullAccess'] ?? j['isSuperuser']),
         mustChangePassword: boolOf(j['mustChangePassword']),
       );
@@ -55,3 +58,14 @@ class MeResponse {
 }
 
 bool? _boolOrNull(Object? v) => v is bool ? v : null;
+
+/// `sectionAccess` from `/api/me`.
+///
+/// A missing key or JSON null is absent: permission codes alone grant a section.
+/// A JSON object, including `{}`, is present. Any other value (string, list,
+/// number) is an empty map, so a missing section key stays `none`.
+Map<String, String>? sectionAccessFromJson(Object? raw) {
+  if (raw == null) return null;
+  if (raw is! Map) return const {};
+  return {for (final e in raw.entries) '${e.key}': '${e.value}'};
+}

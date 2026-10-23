@@ -11,6 +11,27 @@ class FakeFixtures {
   /// read someone else's records. 🔶 The id is fake, not a server value.
   static const otherEmployeeId = 'u_20';
 
+  /// Observed collector: collections codes only, and no `sectionAccess` key.
+  static const collectorPermissions = [
+    'collections.read',
+    'collections.write',
+  ];
+
+  /// Observed limited reader: eight `.read` codes, no writes, no `sectionAccess`.
+  /// Masraweya is not in the observed list.
+  static const limitedReaderPermissions = [
+    'debts.read',
+    'companies.read',
+    'libyan_deposits.read',
+    'egyptian_deposits.read',
+    'purchases.read',
+    'treasury.read',
+    'reports.read',
+    'collections.read',
+  ];
+
+  /// Employee who still receives an explicit `sectionAccess` map.
+  /// Used by `other.employee` and `mustchange`, not by the observed collector.
   static const employeePermissions = [
     'collections.read',
     'collections.write',
@@ -37,15 +58,16 @@ class FakeFixtures {
     'reports': 'none',
   };
 
-  /// Fixture picked by username (FAKE ONLY):
-  /// - `admin…`          -> like the real server today: role "admin", EMPTY permissions, no
-  ///                        sectionAccess, no fullAccess -> full access via the role flag.
-  /// - `limited.admin…`  -> role "admin" with an explicit list + sectionAccess -> lists apply.
-  /// - `flag.admin…`     -> role "admin", empty lists, explicit `fullAccess: false` -> nothing.
-  /// - `guest…`          -> unknown role -> nothing.
-  /// - `mustchange…`     -> collections employee with `mustChangePassword: true` until
-  ///                        `POST /api/auth/change-password` succeeds on this fake client.
-  /// - anything else     -> collections employee.
+  /// Fixture picked by username (FAKE ONLY). Names are structural, not real accounts.
+  /// - `admin…`           -> role "admin", empty permissions, no sectionAccess,
+  ///                         isOwner true -> unrestricted via the role flag.
+  /// - `limited.reader…`  -> employee, eight `.read` codes, no sectionAccess.
+  /// - `limited.admin…`   -> role "admin" with an explicit list + sectionAccess.
+  /// - `flag.admin…`      -> role "admin", empty lists, explicit `fullAccess: false`.
+  /// - `guest…`           -> unknown role -> nothing.
+  /// - `other.employee…`  -> employee with an explicit sectionAccess map.
+  /// - `mustchange…`      -> that employee with `mustChangePassword: true`.
+  /// - anything else      -> observed collector (collections codes, no sectionAccess).
   static Map<String, dynamic> meFor(String username) {
     if (username.startsWith('limited.admin')) {
       return _me(
@@ -55,6 +77,18 @@ class FakeFixtures {
         role: 'admin',
         permissions: limitedAdminPermissions,
         sectionAccess: const {'customerDebts': 'read'},
+        isOwner: false,
+      );
+    }
+    if (username.startsWith('limited.reader')) {
+      return _me(
+        id: 'u_5',
+        username: 'limited.reader@example.invalid',
+        name: 'قارئ محدود تجريبي',
+        role: 'employee',
+        permissions: limitedReaderPermissions,
+        sectionAccess: null,
+        isOwner: false,
       );
     }
     if (username.startsWith('flag.admin')) {
@@ -66,6 +100,7 @@ class FakeFixtures {
         permissions: const [],
         sectionAccess: const {},
         fullAccess: false,
+        isOwner: false,
       );
     }
     if (username.startsWith('guest')) {
@@ -76,6 +111,7 @@ class FakeFixtures {
         role: 'guest',
         permissions: employeePermissions,
         sectionAccess: const {'customerDebts': 'manage'},
+        isOwner: false,
       );
     }
     if (username.startsWith('other.employee')) {
@@ -87,6 +123,7 @@ class FakeFixtures {
         role: 'employee',
         permissions: employeePermissions,
         sectionAccess: employeeSectionAccess,
+        isOwner: false,
       );
     }
     if (username.startsWith('mustchange')) {
@@ -97,6 +134,7 @@ class FakeFixtures {
         role: 'employee',
         permissions: employeePermissions,
         sectionAccess: employeeSectionAccess,
+        isOwner: false,
         mustChangePassword: true,
       );
     }
@@ -111,14 +149,16 @@ class FakeFixtures {
           role: 'admin',
           permissions: const [],
           sectionAccess: null,
+          isOwner: true,
         )
       : _me(
           id: demoEmployeeId,
           username: 'employee@example.invalid',
           name: 'موظف استلام تجريبي',
           role: 'employee',
-          permissions: employeePermissions,
-          sectionAccess: employeeSectionAccess,
+          permissions: collectorPermissions,
+          sectionAccess: null,
+          isOwner: false,
         );
 
   static Map<String, dynamic> _me({
@@ -129,6 +169,7 @@ class FakeFixtures {
     required List<String> permissions,
     required Map<String, String>? sectionAccess,
     bool? fullAccess,
+    bool isOwner = false,
     bool mustChangePassword = false,
   }) =>
       {
@@ -137,6 +178,7 @@ class FakeFixtures {
           'username': username,
           'displayName': name,
           'role': role,
+          'isOwner': isOwner,
           'permissions': permissions,
           if (sectionAccess != null) 'sectionAccess': sectionAccess,
           if (fullAccess != null) 'fullAccess': fullAccess,
@@ -744,7 +786,6 @@ class FakeFixtures {
             'mode': 'partial',
             'amountUnits': 100,
             'status': 'pending',
-            'version': 1,
             'cashStatus': 'not_applicable',
             'submittedByName': 'موظف استلام تجريبي',
             'submittedByUserId': demoEmployeeId,
@@ -755,7 +796,6 @@ class FakeFixtures {
             'mode': 'full',
             'amountUnits': 250,
             'status': 'approved',
-            'version': 3,
             'cashStatus': 'pending',
             'cashPending': true,
             'cashReceivedAt': null,
@@ -768,7 +808,6 @@ class FakeFixtures {
             'mode': 'partial',
             'amountUnits': 900,
             'status': 'pending',
-            'version': 1,
             'cashStatus': 'not_applicable',
             'submittedByName': 'موظف آخر تجريبي',
             'submittedByUserId': otherEmployeeId,
@@ -781,7 +820,6 @@ class FakeFixtures {
             'customerName': 'اسم غير مربوط تجريبي',
             'amountUnits': 50,
             'status': 'pending',
-            'version': 1,
             'cashStatus': 'not_applicable',
             'submittedByUserId': demoEmployeeId,
           },
@@ -790,7 +828,6 @@ class FakeFixtures {
             'customerName': 'استلام مرفوض تجريبي',
             'amountUnits': 40,
             'status': 'rejected',
-            'version': 4,
             'cashStatus': 'pending',
             'cashPending': true,
             'submittedByUserId': demoEmployeeId,
@@ -800,7 +837,6 @@ class FakeFixtures {
             'customerName': 'إيصال موظف آخر',
             'amountUnits': 900,
             'status': 'pending',
-            'version': 1,
             'cashStatus': 'not_applicable',
             'submittedByUserId': otherEmployeeId,
           },

@@ -84,7 +84,8 @@ class CollectionSubmissionDto {
       cashStatus; // server-provided only (null until the server adds it)
   final DateTime?
       cashReceivedAt; // shown as a timestamp only; not used to derive status
-  /// Required from the server, per API contract: sent back as `expectedVersion` on decision / cash-received.
+  /// Omitted by the collections contract. A present integer is still parsed.
+  /// It is not sent as `expectedVersion` on decision or cash-received.
   final int? version;
   final String? submittedByName;
   final DateTime? createdAt;
@@ -107,7 +108,8 @@ class CollectionSubmissionDto {
       );
 }
 
-/// Unlinked receipt (استلام غير مربوط) — same server-only cash status + version rules.
+/// Unlinked receipt (استلام غير مربوط). `version` is optional and is not
+/// required by the decision or cash-received contract.
 class UnlinkedReceiptDto {
   const UnlinkedReceiptDto(
       {required this.id,

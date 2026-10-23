@@ -19,11 +19,14 @@ abstract interface class CollectionsRepository {
   Future<MutationAck> submit(String assignmentId,
       {required String mode, int? amountUnits, required MutationMeta meta});
 
-  /// [meta] MUST carry `expectedVersion` = the submission's `version`, per API contract.
+  /// Approve or reject. The contract body is `decision` and an optional `note`.
+  /// [meta] is not sent: these rows have no `version`, and the server does not
+  /// read `requestId` or `expectedVersion` here.
   Future<MutationAck> decide(String submissionId, CollectionDecision decision,
       {String? note, required MutationMeta meta});
 
-  /// [meta] MUST carry `expectedVersion`, per API contract.
+  /// Mark cash received. The contract has no request body.
+  /// [meta] is not sent.
   Future<MutationAck> markCashReceived(String submissionId, MutationMeta meta);
 
   Future<MutationAck> createUnlinkedReceipt(
@@ -32,7 +35,9 @@ abstract interface class CollectionsRepository {
       required MutationMeta meta});
   Future<List<Json>> linkCandidates(String q);
 
-  /// [meta] MUST carry `expectedVersion`, per API contract.
+  /// Approve or reject an unlinked receipt. The contract body is `decision`
+  /// plus optional `note`, `customerId`, `entryType`, and `newAccountKind`.
+  /// [meta] is not sent.
   Future<MutationAck> decideUnlinked(String receiptId,
       {required CollectionDecision decision,
       String? customerId,
@@ -41,7 +46,8 @@ abstract interface class CollectionsRepository {
       String? newAccountKind,
       required MutationMeta meta});
 
-  /// [meta] MUST carry `expectedVersion`, per API contract.
+  /// Mark an unlinked receipt's cash received. The contract has no request body.
+  /// [meta] is not sent.
   Future<MutationAck> markUnlinkedCashReceived(
       String receiptId, MutationMeta meta);
   Future<MutationAck> closeDay(
@@ -66,15 +72,9 @@ class RemoteCollectionsRepository implements CollectionsRepository {
   Future<MutationAck> _post(String path, Json body) async =>
       MutationAck.fromData((await _api.post(path, body: body)).data);
 
-  /// Approval / cash-receipt endpoints require optimistic locking, per API contract.
-  /// Refuse to send without a version so two concurrent decisions cannot both pass silently.
-  static Json _versioned(MutationMeta meta) {
-    if (meta.expectedVersion == null) {
-      throw ArgumentError(
-          'expectedVersion is required for approval / cash-receipt endpoints, per API contract');
-    }
-    return meta.toBody();
-  }
+  /// Cash-received has no JSON body. A null body is omitted on the wire.
+  Future<MutationAck> _postEmpty(String path) async =>
+      MutationAck.fromData((await _api.post(path)).data);
 
   @override
   Future<CollectionsOverviewDto> overview() async {
@@ -118,16 +118,14 @@ class RemoteCollectionsRepository implements CollectionsRepository {
   Future<MutationAck> decide(String submissionId, CollectionDecision decision,
           {String? note, required MutationMeta meta}) =>
       _post(ApiEndpoints.collectionSubmissionDecision(submissionId), {
-        ..._versioned(meta),
         'decision': decision.name,
-        if (note != null) 'note': note
+        if (note != null) 'note': note,
       });
 
   @override
   Future<MutationAck> markCashReceived(
           String submissionId, MutationMeta meta) =>
-      _post(ApiEndpoints.collectionSubmissionCashReceived(submissionId),
-          _versioned(meta));
+      _postEmpty(ApiEndpoints.collectionSubmissionCashReceived(submissionId));
 
   @override
   Future<MutationAck> createUnlinkedReceipt(
@@ -155,7 +153,6 @@ class RemoteCollectionsRepository implements CollectionsRepository {
           String? newAccountKind,
           required MutationMeta meta}) =>
       _post(ApiEndpoints.collectionUnlinkedDecision(receiptId), {
-        ..._versioned(meta),
         'decision': decision.name,
         if (customerId != null) 'customerId': customerId,
         if (entryType != null) 'entryType': entryType,
@@ -166,8 +163,7 @@ class RemoteCollectionsRepository implements CollectionsRepository {
   @override
   Future<MutationAck> markUnlinkedCashReceived(
           String receiptId, MutationMeta meta) =>
-      _post(ApiEndpoints.collectionUnlinkedCashReceived(receiptId),
-          _versioned(meta));
+      _postEmpty(ApiEndpoints.collectionUnlinkedCashReceived(receiptId));
 
   @override
   Future<MutationAck> closeDay(

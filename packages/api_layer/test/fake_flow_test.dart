@@ -17,25 +17,19 @@ void main() {
       );
       expect(api.session.state, isA<SessionAuthenticated>());
       expect(api.permissions.canRead(SectionKey.collections), isTrue);
+      expect(api.permissions.canRead(SectionKey.customers), isFalse);
       expect(api.permissions.canRead(SectionKey.treasury), isFalse);
 
-      final page = await api.accounts.list(AccountSection.customers);
-      expect(page.summary.totalDebtUnits?.units, 10635);
-      expect(page.summary.netBalanceUnits?.units, 10635);
-      expect(page.totalItems, 10);
-      final demo = page.page.items.firstWhere((card) => card.id == 'c_55');
-      expect(
-        api.money.format(demo.balanceUnits!.units!, demo.currency),
-        '320 د.ل',
+      await expectLater(
+        api.accounts.list(AccountSection.customers),
+        throwsA(isA<ForbiddenException>()),
       );
-
-      final meta = MutationMeta(expectedVersion: demo.version);
       await expectLater(
         api.accounts.addTransaction(
           AccountSection.customers,
           'c_55',
           AccountTransactionRequest.fullPayment(date: DateTime(2026, 10, 19)),
-          meta,
+          MutationMeta(expectedVersion: 1),
         ),
         throwsA(isA<ForbiddenException>()),
       );
@@ -89,24 +83,20 @@ void main() {
     expect(overview.submissions.first.cashStatus, CashStatus.notApplicable);
     final pendingUnlinked =
         overview.unlinkedReceipts.firstWhere((r) => r.id == 'ur_1');
-    expect(pendingUnlinked.version, 1);
+    expect(pendingUnlinked.version, isNull);
     expect(pendingUnlinked.cashStatus, CashStatus.notApplicable);
     final rejectedUnlinked =
         overview.unlinkedReceipts.firstWhere((r) => r.id == 'ur_2');
     expect(rejectedUnlinked.status, 'rejected');
-    expect(rejectedUnlinked.version, 4);
+    expect(rejectedUnlinked.version, isNull);
     expect(rejectedUnlinked.cashStatus, CashStatus.pending);
 
-    // Without expectedVersion the repository refuses to send, per API contract.
-    expect(
-      () => api.collections.markCashReceived('sb_2', MutationMeta()),
-      throwsArgumentError,
-    );
     final ack = await api.collections.markCashReceived(
       'sb_2',
-      MutationMeta(expectedVersion: approved.version),
+      MutationMeta(),
     );
-    expect(ack.version, 4);
+    expect(ack.version, isNull);
+    expect(ack.raw['cashReceivedAt'], '2026-10-22T22:00:00.000Z');
     final afterCash = await api.collections.overview();
     expect(
       afterCash.submissions.firstWhere((s) => s.id == 'sb_2').cashStatus,
@@ -129,6 +119,6 @@ void main() {
     expect(api.permissions.fullAccess, isFalse);
     expect(api.permissions.canDo(ManagementAction.collectionsDecide), isFalse);
     final home = await api.home.fetch();
-    expect(home.summaries.map((s) => s.section), ['customers', 'collections']);
+    expect(home.summaries.map((s) => s.section), ['collections']);
   });
 }

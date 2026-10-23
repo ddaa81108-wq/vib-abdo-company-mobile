@@ -98,7 +98,7 @@ void main() {
     tester,
   ) async {
     await pumpFakeApp(tester, size: const Size(800, 1400));
-    await signIn(tester, username: 'employee.demo', password: 'demo-only');
+    await signIn(tester, username: 'other.employee', password: 'demo-only');
     await go(tester, '/customers/c_55');
 
     expect(find.byKey(const Key('screen-ledger-customers')), findsOneWidget);
