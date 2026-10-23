@@ -172,11 +172,6 @@ class _RegisterTotals extends StatelessWidget {
           vodafoneCurrency,
           money,
         ),
-        Text(
-          AppStrings.remainingRunningBalance,
-          key: const Key('register-totals-note'),
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
       ],
     );
   }
@@ -308,7 +303,15 @@ class _DayCard extends ConsumerWidget {
               day.totalDebtUnits,
               Currency.lyd,
             ),
-            _line(vodafoneRemainingLabel(vodafone), vodafone, vodafoneCurrency),
+            // Day card only. `function me` prints
+            // `v.format(Math.abs(e.vodafoneRemainingUnits))`
+            // (docs/api/evidence/purchases-section-js-excerpt.md).
+            // The register row (`function xe`) keeps the raw server value.
+            _line(
+              vodafoneRemainingLabel(vodafone),
+              _dayCardVodafoneFigure(vodafone),
+              vodafoneCurrency,
+            ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -334,7 +337,10 @@ class _DayCard extends ConsumerWidget {
                     confirmText: AppStrings.finalizeConfirm,
                     onSubmit: (meta) => _finalize(context, ref, meta),
                   ),
-                if (canFinalize && day.status == 'finalized' && !correctionOpen)
+                if (canFinalize &&
+                    day.status == 'finalized' &&
+                    !correctionOpen &&
+                    day.version != null)
                   GuardedMutation(
                     buttonKey: Key('open-correction-$label'),
                     inputs: 'open-correction:$label:${day.version}',
@@ -345,7 +351,7 @@ class _DayCard extends ConsumerWidget {
                     onSubmit: (meta) =>
                         _correct(context, ref, meta, open: true),
                   ),
-                if (canFinalize && correctionOpen)
+                if (canFinalize && correctionOpen && day.version != null)
                   GuardedMutation(
                     buttonKey: Key('close-correction-$label'),
                     inputs: 'close-correction:$label:${day.version}',
@@ -607,6 +613,17 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
   }
 }
 
+/// Day-card Vodafone figure. `function me` prints
+/// `v.format(Math.abs(e.vodafoneRemainingUnits))`
+/// (docs/api/evidence/purchases-section-js-excerpt.md).
+/// Invalid and missing figures stay as they are. The register row does not
+/// use this.
+MoneyValue? _dayCardVodafoneFigure(MoneyValue? units) {
+  final value = units?.asInt;
+  if (value == null || value >= 0) return units;
+  return MoneyValue.known(value.abs());
+}
+
 /// Opening is a write on an open day that has a version. A missing day, a
 /// day with no version, or a finalized day whose correction is closed, does
 /// not offer the button.
@@ -661,7 +678,7 @@ class _OpeningCard extends StatelessWidget {
                 buttonKey: const Key('set-opening'),
                 allowed: true,
                 online: online,
-                label: AppStrings.purchaseOpening,
+                label: AppStrings.saveOpening,
                 onPressed: () => showAppForm<void>(
                   context,
                   _OpeningForm(book: book, day: day),

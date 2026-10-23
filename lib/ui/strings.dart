@@ -116,8 +116,12 @@ abstract final class AppStrings {
   static const finalizeDay = 'ترحيل اليوم';
   static const finalizeConfirm =
       'ترحيل اليوم سيحوّل معاملاته إلى قراءة فقط. هل تريد المتابعة؟';
-  static const purchaseOpening = 'الرصيد الافتتاحي';
-  static const saveOpening = 'حفظ الرصيد الافتتاحي';
+
+  /// Opening block title. PurchasesSection `purchase-opening` strong text.
+  static const purchaseOpening = 'ضبط البداية لأول تشغيل فقط';
+
+  /// Opening block button. PurchasesSection `purchase-opening` button text.
+  static const saveOpening = 'حفظ البداية';
   static const saveDayConfirm =
       'تأكيد حفظ اليوم؟ تُرسل القيم كما أدخلتها، وما يظهر بعد الحفظ هو رد الخادم.';
   static const openingConfirm =
@@ -253,11 +257,6 @@ abstract final class AppStrings {
   /// Opening editor. The day bar uses [previousValue] for the same amount.
   static const carriedVodafone = 'فودافون المرحّل';
   static const actions = 'الإجراءات';
-
-  /// `registerTotals.remainingUnits` and `vodafoneRemainingUnits`.
-  /// Both are the open day's carried balance. The screen does not add them.
-  static const remainingRunningBalance =
-      'الباقي وفودافون المتبقي رصيد متراكم لليوم المفتوح، ويشمل مديونية سابقة، وليس مجموع البطاقات.';
   static const kind = 'النوع';
   static const customerName = 'اسم العميل';
   static const modeFull = 'كلي';

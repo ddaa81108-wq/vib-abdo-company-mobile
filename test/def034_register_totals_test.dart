@@ -74,13 +74,6 @@ void main() {
             ),
             findsWidgets,
           );
-          expect(find.byKey(const Key('register-totals-note')), findsOneWidget);
-          expect(
-            find.text(
-              'الباقي وفودافون المتبقي رصيد متراكم لليوم المفتوح، ويشمل مديونية سابقة، وليس مجموع البطاقات.',
-            ),
-            findsOneWidget,
-          );
           for (final label in [
             'التسلسل',
             'النوع',
@@ -220,12 +213,6 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(
-        find.text(
-          'الباقي وفودافون المتبقي رصيد متراكم لليوم المفتوح، ويشمل مديونية سابقة، وليس مجموع البطاقات.',
-        ),
-        findsOneWidget,
-      );
       expect(find.text('باقي فودافون لصالحنا'), findsOneWidget);
       expect(find.text('4,900 ج.م'), findsWidgets);
       expect(tester.takeException(), isNull);
@@ -293,8 +280,8 @@ void main() {
     expect(find.byKey(const Key('close-correction-9')), findsOneWidget);
     expect(find.byKey(const Key('open-correction-9')), findsNothing);
     expect(find.text('استهلاك فودافون علينا'), findsOneWidget);
-    expect(find.text('-40 ج.م'), findsOneWidget);
-    expect(find.text('40 ج.م'), findsNothing);
+    expect(find.text('40 ج.م'), findsOneWidget);
+    expect(find.text('-40 ج.م'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -316,15 +303,9 @@ void main() {
           await signIn(tester, username: 'admin.demo', password: 'demo-only');
           await go(tester, '/purchases');
           await tester.ensureVisible(
-            find.byKey(const Key('register-totals-note')),
+            find.byKey(const Key('purchases-lifetime')),
           );
           await tester.pump();
-          expect(
-            find.text(
-              'الباقي وفودافون المتبقي رصيد متراكم لليوم المفتوح، ويشمل مديونية سابقة، وليس مجموع البطاقات.',
-            ),
-            findsOneWidget,
-          );
           final theme = dark ? 'dark' : 'light';
           await saveShot(tester, 'purchases-register-$theme-${width.toInt()}');
         }

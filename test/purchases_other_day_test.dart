@@ -97,6 +97,58 @@ void main() {
     expect(find.byKey(const Key('set-opening')), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('a finalized day with no version hides correction', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(tester, size: const Size(800, 1400));
+    _scriptPurchases(
+      layer.client as FakeApiClient,
+      _page(
+        day: {
+          'id': '12',
+          'dayNumber': 12,
+          'status': 'finalized',
+          'version': null,
+          'correctionOpen': false,
+        },
+      ),
+    );
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+
+    expect(find.byKey(const Key('purchase-day-12')), findsOneWidget);
+    expect(find.text(AppStrings.correctionClosed), findsOneWidget);
+    expect(find.byKey(const Key('open-correction-12')), findsNothing);
+    expect(find.byKey(const Key('close-correction-12')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a correction-open day with no version hides correction', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(tester, size: const Size(800, 1400));
+    _scriptPurchases(
+      layer.client as FakeApiClient,
+      _page(
+        day: {
+          'id': '12',
+          'dayNumber': 12,
+          'status': 'finalized',
+          'version': null,
+          'correctionOpen': true,
+        },
+      ),
+    );
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+
+    expect(find.byKey(const Key('purchase-day-12')), findsOneWidget);
+    expect(find.text(AppStrings.correctionOpen), findsOneWidget);
+    expect(find.byKey(const Key('open-correction-12')), findsNothing);
+    expect(find.byKey(const Key('close-correction-12')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 void _scriptPurchases(FakeApiClient fake, Map<String, Object?> body) {

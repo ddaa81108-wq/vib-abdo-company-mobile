@@ -218,11 +218,11 @@ String? reportStatusLabel(String? status) => switch (status) {
   };
 }
 
-/// PurchasesSection labels the Vodafone remainder by its sign.
+/// PurchasesSection `function me` labels the Vodafone remainder by its sign.
 ///
 /// Positive is «باقي فودافون لصالحنا», negative is «استهلاك فودافون علينا»,
-/// and zero or a missing figure is «باقي فودافون كاش». The amount shown
-/// next to that label is the server value, with no sign change.
+/// and zero or a missing figure is «باقي فودافون كاش». The day card prints
+/// the absolute figure; this label still sees the signed server value.
 String vodafoneRemainingLabel(MoneyValue? units) {
   final value = units?.asInt;
   if (value != null && value > 0) return AppStrings.vodafoneOurs;
