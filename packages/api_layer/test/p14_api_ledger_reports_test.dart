@@ -377,7 +377,7 @@ void main() {
       );
     });
 
-    test('a raw section string is a known wire value or is omitted', () async {
+    test('a raw section string is a known wire value or throws', () async {
       final api = ApiLayer.create(
         config:
             const ApiConfig(baseUrl: 'https://fake.invalid', useFakeApi: true),
@@ -391,11 +391,14 @@ void main() {
       final treasury = await api.reports.financialLedger(section: 'treasury');
       expect(treasury.page.items.single.sectionKey,
           FinancialLedgerSectionKey.treasury);
+      expect(treasury.pageTotals['LYD']?.units, 500);
+      expect(treasury.pageTotals.containsKey('EGP'), isFalse);
 
-      // ignore: deprecated_member_use_from_same_package
-      final unknown = await api.reports.financialLedger(section: 'no_such');
-      expect(unknown.page.items, hasLength(4));
-      expect(unknown.pageTotals['LYD']?.units, 480);
+      await expectLater(
+        // ignore: deprecated_member_use_from_same_package
+        api.reports.financialLedger(section: 'no_such'),
+        throwsArgumentError,
+      );
 
       // ignore: deprecated_member_use_from_same_package
       final preferred = await api.reports.financialLedger(
@@ -412,7 +415,7 @@ void main() {
 
       expect(
         fake.financialLedgerQueries.map((query) => query.section),
-        ['treasury', null, 'purchases', null],
+        ['treasury', 'purchases', null],
       );
     });
   });

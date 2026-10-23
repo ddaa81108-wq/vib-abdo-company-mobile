@@ -12,14 +12,15 @@ abstract interface class ReportsRepository {
   /// `GET /api/financial-ledger` documents. No other list operation in the
   /// contract documents a section filter. When both [sectionKey] and the
   /// legacy [section] string are set, [sectionKey] is sent. A string that is
-  /// not a [FinancialLedgerSectionKey] wire value is omitted.
+  /// not a [FinancialLedgerSectionKey] wire value throws [ArgumentError].
   ///
   /// P-14 api (G-12).
   Future<FinancialLedgerPage> financialLedger({
     String? before,
     @Deprecated(
       'Pass sectionKey (FinancialLedgerSectionKey?). '
-      'A raw string is mapped through that enum and dropped when unknown.',
+      'A raw string is mapped through that enum and throws ArgumentError '
+      'when unknown.',
     )
     String? section,
     FinancialLedgerSectionKey? sectionKey,
@@ -48,7 +49,8 @@ class RemoteReportsRepository implements ReportsRepository {
     String? before,
     @Deprecated(
       'Pass sectionKey (FinancialLedgerSectionKey?). '
-      'A raw string is mapped through that enum and dropped when unknown.',
+      'A raw string is mapped through that enum and throws ArgumentError '
+      'when unknown.',
     )
     String? section,
     FinancialLedgerSectionKey? sectionKey,
@@ -84,8 +86,8 @@ class RemoteReportsRepository implements ReportsRepository {
 /// Wire value for `GET /api/financial-ledger?section`. A known [sectionKey]
 /// wins. [FinancialLedgerSectionKey.unknown] is not a query the contract
 /// names. A raw [section] string is sent only when
-/// [FinancialLedgerSectionKey.fromWire] recognizes it; anything else is
-/// dropped and not sent.
+/// [FinancialLedgerSectionKey.fromWire] recognizes it. Any other string
+/// throws [ArgumentError] so the unfiltered ledger is not returned.
 String? _financialLedgerSection(
   FinancialLedgerSectionKey? sectionKey,
   String? section,
@@ -95,5 +97,14 @@ String? _financialLedgerSection(
       sectionKey.wire.isNotEmpty) {
     return sectionKey.wire;
   }
-  return FinancialLedgerSectionKey.fromWire(section)?.wire;
+  if (section == null) return null;
+  final parsed = FinancialLedgerSectionKey.fromWire(section);
+  if (parsed == null) {
+    throw ArgumentError.value(
+      section,
+      'section',
+      'Unknown ledger section. Pass FinancialLedgerSectionKey.',
+    );
+  }
+  return parsed.wire;
 }
