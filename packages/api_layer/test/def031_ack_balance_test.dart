@@ -217,23 +217,94 @@ void main() {
     expect(card.version, 4);
   });
 
-  test(
-    'an unlinked fixture approval without a customer keeps its amount',
-    () async {
-      final api = await _admin();
-      final ack = await api.collections.decide(
-        'sb_1',
-        CollectionDecision.approve,
-        meta: MutationMeta(requestId: 'sb1-approve'),
-      );
-      // sb_1 is not linked to a card. The ack still carries the stored amount
-      // and does not invent a customer balance or a zero.
-      expect(ack.balanceUnits?.units, 100);
-      expect(ack.raw['balanceUnits'], 100);
-      final card = await api.accounts.get(AccountSection.customers, 'c_55');
-      expect(card.balanceUnits?.units, 320);
-    },
-  );
+  test('an unlinked receipt with no customer omits balanceUnits', () async {
+    final api = await _admin();
+    final ack = await api.collections.decideUnlinked(
+      'ur_1',
+      decision: CollectionDecision.approve,
+      meta: MutationMeta(requestId: 'ur-no-customer'),
+    );
+    expect(ack.raw['status'], 'approved');
+    expect(ack.balanceUnits, isNull);
+    expect(ack.raw.containsKey('balanceUnits'), isFalse);
+    expect(ack.raw['balanceUnits'], isNot(50));
+    final customers = await api.accounts.get(AccountSection.customers, 'c_55');
+    expect(customers.balanceUnits?.units, 320);
+    expect(customers.version, 4);
+    final egyptian = await api.accounts.get(
+      AccountSection.egyptianDeposits,
+      'c_55',
+    );
+    expect(egyptian.balanceUnits?.units, 15000);
+  });
+
+  test('a submission with no customer omits balanceUnits', () async {
+    final api = await _admin();
+    final ack = await api.collections.decide(
+      'sb_1',
+      CollectionDecision.approve,
+      meta: MutationMeta(requestId: 'sb1-approve'),
+    );
+    expect(ack.balanceUnits, isNull);
+    expect(ack.raw.containsKey('balanceUnits'), isFalse);
+    final card = await api.accounts.get(AccountSection.customers, 'c_55');
+    expect(card.balanceUnits?.units, 320);
+  });
+
+  test('an Egyptian link does not post a LYD collection', () async {
+    final api = await _admin();
+    final assigned = await api.collections.assign(
+      customerIds: const ['c_eg_08'],
+      assigneeUserId: 'u_12',
+      section: 'egyptian-deposits',
+      meta: MutationMeta(requestId: 'as-eg'),
+    );
+    final assignmentId = (assigned.raw['assignmentIds'] as List).single;
+    final submitted = await api.collections.submit(
+      '$assignmentId',
+      mode: 'partial',
+      amountUnits: 400,
+      meta: MutationMeta(requestId: 'eg-submit'),
+    );
+    expect(submitted.balanceUnits, isNull);
+
+    final decided = await api.collections.decide(
+      submitted.id!,
+      CollectionDecision.approve,
+      meta: MutationMeta(requestId: 'eg-approve'),
+    );
+    expect(decided.raw['status'], 'approved');
+    expect(decided.balanceUnits, isNull);
+    expect(decided.raw.containsKey('balanceUnits'), isFalse);
+    final card = await api.accounts.get(
+      AccountSection.egyptianDeposits,
+      'c_eg_08',
+    );
+    expect(card.balanceUnits?.units, 300);
+    expect(card.version, 4);
+  });
+
+  test('a standalone receipt is not posted onto an Egyptian card', () async {
+    final api = await _admin();
+    final ack = await api.collections.decideUnlinked(
+      'ur_1',
+      decision: CollectionDecision.approve,
+      customerId: 'c_eg_08',
+      entryType: 'payment',
+      meta: MutationMeta(requestId: 'ur-eg'),
+    );
+    expect(ack.raw['status'], 'approved');
+    expect(ack.balanceUnits, isNull);
+    expect(ack.raw.containsKey('balanceUnits'), isFalse);
+    final card = await api.accounts.get(
+      AccountSection.egyptianDeposits,
+      'c_eg_08',
+    );
+    expect(card.balanceUnits?.units, 300);
+    expect(card.version, 4);
+    final customers = await api.accounts.get(AccountSection.customers, 'c_55');
+    expect(customers.balanceUnits?.units, 320);
+  });
 }
 
 Future<ApiLayer> _admin() async {
