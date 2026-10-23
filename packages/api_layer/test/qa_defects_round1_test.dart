@@ -1,4 +1,5 @@
 import 'package:flutter_api_layer/api_layer.dart';
+import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -23,12 +24,15 @@ void main() {
         CollectionDecision.approve,
         meta: MutationMeta(expectedVersion: 1),
       );
-      expect(ack.version, 2);
+      expect(ack.version, isNull);
+      expect(ack.raw['status'], 'approved');
+      expect(ack.raw.containsKey('version'), isFalse);
       final overview = await api.collections.overview();
       final submission = overview.submissions.firstWhere(
         (item) => item.id == 'sb_1',
       );
       expect(submission.status, 'approved');
+      expect(submission.version, isNull);
 
       await api.session.logout();
       await api.session.login(
@@ -141,7 +145,7 @@ void main() {
   );
 
   test(
-    'DEF-005 a second decision with the same version is a conflict',
+    'DEF-005 a second decision after the status changed is a conflict',
     () async {
       final api = await login('admin@example.invalid');
       final ack = await api.collections.decide(
@@ -149,9 +153,12 @@ void main() {
         CollectionDecision.approve,
         meta: MutationMeta(expectedVersion: 1, requestId: 'decide-1'),
       );
-      expect(ack.version, 2);
+      expect(ack.id, 'sb_1');
+      expect(ack.version, isNull);
+      expect(ack.raw['status'], 'approved');
+      expect(ack.raw.containsKey('transactionId'), isTrue);
+      expect(ack.raw.containsKey('version'), isFalse);
 
-      const message = 'تم تعديل البيانات من مستخدم آخر';
       await expectLater(
         api.collections.decide(
           'sb_1',
@@ -160,8 +167,12 @@ void main() {
         ),
         throwsA(
           isA<ConflictException>()
-              .having((e) => e.code, 'code', 'VERSION_CONFLICT')
-              .having((e) => e.message, 'message', message),
+              .having((e) => e.code, 'code', 'SUBMISSION_ALREADY_DECIDED')
+              .having(
+                (e) => e.message,
+                'message',
+                FakeApiClient.submissionAlreadyDecidedMessage,
+              ),
         ),
       );
       final overview = await api.collections.overview();
@@ -169,7 +180,7 @@ void main() {
         (item) => item.id == 'sb_1',
       );
       expect(submission.status, 'approved');
-      expect(submission.version, 2);
+      expect(submission.version, isNull);
       expect(submission.cashStatus, CashStatus.notApplicable);
     },
   );
@@ -372,139 +383,136 @@ void main() {
     },
   );
 
-  test(
-    'cash received stores the new version and rejects a stale one',
-    () async {
-      final api = await login('admin@example.invalid');
+  test('cash received follows approval and ignores a stale version', () async {
+    final api = await login('admin@example.invalid');
 
-      await expectLater(
-        api.collections.markCashReceived(
-          'sb_2',
-          MutationMeta(expectedVersion: 99, requestId: 'cash-stale'),
+    await expectLater(
+      api.collections.markCashReceived(
+        'sb_1',
+        MutationMeta(expectedVersion: 99, requestId: 'cash-pending'),
+      ),
+      throwsA(
+        isA<ConflictException>().having(
+          (e) => e.code,
+          'code',
+          'SUBMISSION_NOT_APPROVED',
         ),
-        throwsA(
-          isA<ConflictException>().having(
-            (e) => e.code,
-            'code',
-            'VERSION_CONFLICT',
-          ),
-        ),
-      );
-      var overview = await api.collections.overview();
-      var submission = overview.submissions.firstWhere(
-        (item) => item.id == 'sb_2',
-      );
-      expect(submission.cashStatus, CashStatus.pending);
-      expect(submission.version, 3);
-      expect(submission.status, 'approved');
+      ),
+    );
+    var overview = await api.collections.overview();
+    var pending = overview.submissions.firstWhere((item) => item.id == 'sb_1');
+    expect(pending.status, 'pending');
+    expect(pending.version, isNull);
+    expect(pending.cashStatus, CashStatus.notApplicable);
 
-      final ack = await api.collections.markCashReceived(
-        'sb_2',
-        MutationMeta(expectedVersion: 3, requestId: 'cash-1'),
-      );
-      expect(ack.version, 4);
-      overview = await api.collections.overview();
-      submission = overview.submissions.firstWhere((item) => item.id == 'sb_2');
-      expect(submission.cashStatus, CashStatus.received);
-      expect(submission.version, 4);
-      expect(submission.status, 'approved');
+    var submission =
+        overview.submissions.firstWhere((item) => item.id == 'sb_2');
+    expect(submission.cashStatus, CashStatus.pending);
+    expect(submission.version, isNull);
+    expect(submission.status, 'approved');
 
-      final unlinkedAck = await api.collections.markUnlinkedCashReceived(
+    final ack = await api.collections.markCashReceived(
+      'sb_2',
+      MutationMeta(expectedVersion: 3, requestId: 'cash-1'),
+    );
+    expect(ack.version, isNull);
+    expect(ack.raw['cashReceivedAt'], '2026-10-22T22:00:00.000Z');
+    expect(ack.raw.containsKey('version'), isFalse);
+    overview = await api.collections.overview();
+    submission = overview.submissions.firstWhere((item) => item.id == 'sb_2');
+    expect(submission.cashStatus, CashStatus.received);
+    expect(submission.version, isNull);
+    expect(submission.status, 'approved');
+
+    final again = await api.collections.markCashReceived(
+      'sb_2',
+      MutationMeta(requestId: 'cash-again'),
+    );
+    expect(again.raw['replayed'], true);
+    expect(again.raw['cashReceivedAt'], ack.raw['cashReceivedAt']);
+
+    await expectLater(
+      api.collections.markUnlinkedCashReceived(
         'ur_1',
         MutationMeta(expectedVersion: 1, requestId: 'ucash-1'),
-      );
-      expect(unlinkedAck.version, 2);
-      overview = await api.collections.overview();
-      final receipt = overview.unlinkedReceipts.firstWhere(
-        (item) => item.id == 'ur_1',
-      );
-      expect(receipt.cashStatus, CashStatus.received);
-      expect(receipt.version, 2);
-      expect(receipt.status, 'pending');
-
-      await expectLater(
-        api.collections.markUnlinkedCashReceived(
-          'ur_1',
-          MutationMeta(expectedVersion: 1, requestId: 'ucash-stale'),
+      ),
+      throwsA(
+        isA<ConflictException>().having(
+          (e) => e.code,
+          'code',
+          'SUBMISSION_NOT_APPROVED',
         ),
-        throwsA(
-          isA<ConflictException>().having(
-            (e) => e.code,
-            'code',
-            'VERSION_CONFLICT',
-          ),
-        ),
-      );
-      overview = await api.collections.overview();
-      final afterStaleCash = overview.unlinkedReceipts.firstWhere(
-        (item) => item.id == 'ur_1',
-      );
-      expect(afterStaleCash.version, 2);
-      expect(afterStaleCash.cashStatus, CashStatus.received);
-    },
-  );
+      ),
+    );
+    overview = await api.collections.overview();
+    final stillPending = overview.unlinkedReceipts.firstWhere(
+      (item) => item.id == 'ur_1',
+    );
+    expect(stillPending.status, 'pending');
+    expect(stillPending.version, isNull);
+    expect(stillPending.cashStatus, CashStatus.notApplicable);
 
-  test(
-    'unlinked decision stores status and version and rejects a stale one',
-    () async {
-      final api = await login('admin@example.invalid');
+    await api.collections.decideUnlinked(
+      'ur_1',
+      decision: CollectionDecision.approve,
+      meta: MutationMeta(requestId: 'ucash-approve'),
+    );
+    final unlinkedAck = await api.collections.markUnlinkedCashReceived(
+      'ur_1',
+      MutationMeta(requestId: 'ucash-received'),
+    );
+    expect(unlinkedAck.version, isNull);
+    expect(unlinkedAck.raw['cashReceivedAt'], '2026-10-22T22:00:00.000Z');
+    overview = await api.collections.overview();
+    final receipt = overview.unlinkedReceipts.firstWhere(
+      (item) => item.id == 'ur_1',
+    );
+    expect(receipt.cashStatus, CashStatus.received);
+    expect(receipt.version, isNull);
+    expect(receipt.status, 'approved');
+  });
 
-      await expectLater(
-        api.collections.decideUnlinked(
-          'ur_1',
-          decision: CollectionDecision.reject,
-          meta: MutationMeta(expectedVersion: 9, requestId: 'ulink-stale'),
-        ),
-        throwsA(
-          isA<ConflictException>().having(
-            (e) => e.code,
-            'code',
-            'VERSION_CONFLICT',
-          ),
-        ),
-      );
-      var overview = await api.collections.overview();
-      var receipt = overview.unlinkedReceipts.firstWhere(
-        (item) => item.id == 'ur_1',
-      );
-      expect(receipt.status, 'pending');
-      expect(receipt.version, 1);
+  test('unlinked decision stores status and rejects a changed status',
+      () async {
+    final api = await login('admin@example.invalid');
 
-      final ack = await api.collections.decideUnlinked(
+    final ack = await api.collections.decideUnlinked(
+      'ur_1',
+      decision: CollectionDecision.approve,
+      note: 'مطابقة اختبار',
+      meta: MutationMeta(expectedVersion: 9, requestId: 'ulink-1'),
+    );
+    expect(ack.version, isNull);
+    expect(ack.raw['status'], 'approved');
+    expect(ack.balanceUnits, isNull);
+    expect(ack.raw.containsKey('balanceUnits'), isFalse);
+    expect(ack.raw.containsKey('version'), isFalse);
+    var overview = await api.collections.overview();
+    var receipt = overview.unlinkedReceipts.firstWhere(
+      (item) => item.id == 'ur_1',
+    );
+    expect(receipt.status, 'approved');
+    expect(receipt.version, isNull);
+
+    await expectLater(
+      api.collections.decideUnlinked(
         'ur_1',
-        decision: CollectionDecision.approve,
-        meta: MutationMeta(expectedVersion: 1, requestId: 'ulink-1'),
-      );
-      expect(ack.version, 2);
-      overview = await api.collections.overview();
-      receipt = overview.unlinkedReceipts.firstWhere(
-        (item) => item.id == 'ur_1',
-      );
-      expect(receipt.status, 'approved');
-      expect(receipt.version, 2);
-
-      await expectLater(
-        api.collections.decideUnlinked(
-          'ur_1',
-          decision: CollectionDecision.reject,
-          meta: MutationMeta(expectedVersion: 1, requestId: 'ulink-2'),
+        decision: CollectionDecision.reject,
+        meta: MutationMeta(expectedVersion: 1, requestId: 'ulink-2'),
+      ),
+      throwsA(
+        isA<ConflictException>().having(
+          (e) => e.code,
+          'code',
+          'SUBMISSION_ALREADY_DECIDED',
         ),
-        throwsA(
-          isA<ConflictException>().having(
-            (e) => e.code,
-            'code',
-            'VERSION_CONFLICT',
-          ),
-        ),
-      );
-      overview = await api.collections.overview();
-      receipt = overview.unlinkedReceipts.firstWhere(
-        (item) => item.id == 'ur_1',
-      );
-      expect(receipt.status, 'approved');
-      expect(receipt.version, 2);
-    },
-  );
+      ),
+    );
+    overview = await api.collections.overview();
+    receipt = overview.unlinkedReceipts.firstWhere((item) => item.id == 'ur_1');
+    expect(receipt.status, 'approved');
+    expect(receipt.version, isNull);
+  });
 
   test(
     'close day compares the stored batch version through the repository',

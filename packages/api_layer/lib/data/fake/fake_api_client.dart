@@ -13,6 +13,7 @@ import '../../core/network/error_mapper.dart';
 import '../../core/network/reachability.dart';
 import '../../core/permissions/permission_codes.dart';
 import '../../core/permissions/permission_service.dart';
+import '../models/profile_models.dart';
 import '../models/purchase_models.dart';
 import 'fake_fixtures.dart';
 import 'fake_large_catalog.dart';
@@ -22,8 +23,18 @@ import 'fake_large_catalog.dart';
 /// Fake-only fixture switch by USERNAME (see FakeFixtures.meFor): `admin…` = admin like the real
 /// server today (empty permission list), `limited.admin…`, `flag.admin…`, `guest…`,
 /// `mustchange…`, else employee.
-/// Password "wrong" -> 401 invalid credentials. A successful login sets a
-/// session cookie. There is no bearer token and no refresh token. Session
+/// Password "wrong" -> 401 invalid credentials. A successful login sets an
+/// `abdo_session` cookie and returns `csrfToken`.
+///
+/// Header checks live only on [serveHttp], the HTTP boundary the Dio adapter
+/// uses. An authenticated write that arrives there without
+/// `X-Client-Api-Version: 1` returns 409 `CLIENT_VERSION_MISMATCH`. An
+/// authenticated write whose `X-CSRF-Token` is missing or stale returns 403
+/// `CSRF_REJECTED`. `GET /api/auth/csrf` rotates the token and rejects the
+/// previous one. Direct in-process calls (`get`, `post`, and the other
+/// [ApiClient] methods when no gateway is bound) skip those header checks so
+/// repository tests can call this client without a Dio stack.
+/// There is no bearer token and no refresh token. Session
 /// lifetime is not known (🔶): this client does not run a local timer. Call
 /// [expireSession] to make the current cookie fail the next request.
 /// POST /api/auth/logout revokes that cookie. A missing, revoked, or expired
@@ -112,8 +123,13 @@ class FakeApiClient implements ApiClient {
   /// Notification writes that changed state. A requestId replay is not counted.
   int notificationMutationApplies = 0;
 
-  /// The next N versioned collection mutations fail with VERSION_CONFLICT (tests).
-  int versionConflictRemaining = 0;
+  /// `POST .../decision` when the row is no longer pending.
+  static const submissionAlreadyDecidedMessage =
+      'تمت مراجعة هذا الاستلام من قبل.';
+
+  /// `POST .../cash-received` when the row is not approved.
+  static const submissionNotApprovedMessage =
+      'استلام النقدية متاح للاستلام المعتمد فقط.';
 
   /// When set, a purchase day without a stored finalize or correction uses this
   /// status on the next GET (tests). `correction` is the contract flag
@@ -156,6 +172,13 @@ class FakeApiClient implements ApiClient {
   /// null when the request omitted them.
   final List<AccountListQuery> accountListQueries = [];
 
+  /// Financial-ledger reads, in call order (tests).
+  ///
+  /// [FinancialLedgerQuery.section] is the contract query name. It is null
+  /// when the request omitted it. [FinancialLedgerQuery.sectionKey] is set
+  /// only when a caller sent that query name; the repository sends `section`.
+  final List<FinancialLedgerQuery> financialLedgerQueries = [];
+
   /// When set, the first account-list page reports this `nextCursor` (tests).
   String? accountNextCursor;
 
@@ -167,6 +190,17 @@ class FakeApiClient implements ApiClient {
   /// Fractions and oversized integers stay non-integers. The body is not logged.
   /// Authenticated calls still require a session. Tests only.
   final Map<String, String> scriptedGetJson = {};
+
+  /// GETs whose path is a key wait on that completer before [scriptedGetJson]
+  /// is read (tests). A path that is absent is not delayed.
+  final Map<String, Completer<void>> pauseGets = {};
+
+  /// One-shot raw `data` JSON for a non-GET, decoded with [PreciseJson].
+  ///
+  /// The write is not applied. Tests use this to feed one invalid money field
+  /// through the repository parser. The text is not logged. Authenticated
+  /// calls still require a session.
+  final Map<String, String> scriptedMutationJson = {};
 
   /// Overlay for `GET /api/treasury` totals (tests).
   ///
@@ -194,9 +228,10 @@ class FakeApiClient implements ApiClient {
   /// Headers of the latest request, as the fake server saw them (tests).
   Map<String, String> lastRequestHeaders = const {};
 
-  /// Server-side cookie sessions. The id is the `session` cookie value.
+  /// Server-side cookie sessions. The id is the `abdo_session` cookie value.
   final Map<String, _FakeSession> _sessions = {};
   int _sessionSeq = 0;
+  int _csrfSeq = 0;
   String? _jarId;
   String? _latestSessionId;
 
@@ -246,6 +281,7 @@ class FakeApiClient implements ApiClient {
   /// Overview metrics stay the stored literals; these rows are not summed.
   final List<Map<String, dynamic>> _extraSubmissions = [];
   final List<Map<String, dynamic>> _extraUnlinked = [];
+  final List<Map<String, dynamic>> _extraAssignments = [];
 
   /// Purchase day fields changed by finalize or correction. Keyed by book|day.
   final Map<String, Map<String, dynamic>> _purchaseDays = {};
@@ -285,16 +321,15 @@ class FakeApiClient implements ApiClient {
   static const dayFinalizedMessage =
       'اليوم مرحّل. لا يمكن إضافة أو تعديل أو حذف بند.';
 
-  /// Direct partial payment larger than the stored card balance.
-  ///
-  /// Whether the real server rejects this is an open question for the
-  /// backend owner. This fake refuses the write so the stored balance cannot
-  /// change, using the same HTTP 400 `VALIDATION_ERROR` envelope as its other
-  /// rejected inputs. That code is not a confirmed server contract.
-  static const amountAboveRemainingMessage = 'المبلغ أكبر من المتبقي المسجّل.';
-
   /// Routes later public calls through [gateway] (the auth interceptor).
   void bindGateway(ApiClient gateway) => _gateway = gateway;
+
+  /// Client installed by [bindGateway]. The fake stack sets the Dio client.
+  ///
+  /// A test that observes a call has to wrap this client. Replacing it with
+  /// a direct [serveHttp] call skips `X-Client-Api-Version`, the cookie, and
+  /// `X-CSRF-Token`, which the HTTP boundary now requires.
+  ApiClient? get boundGateway => _gateway;
 
   /// Drops the in-process cookie jar. The server session is left as it is.
   void dropHeldCookie() => _jarId = null;
@@ -313,7 +348,8 @@ class FakeApiClient implements ApiClient {
     String path, {
     Map<String, dynamic>? query,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _send('GET', path, null, options, query: query);
+  }) =>
+      _send('GET', path, null, options, query: query);
 
   @override
   Future<ApiResponse> post(
@@ -321,28 +357,32 @@ class FakeApiClient implements ApiClient {
     Object? body,
     Map<String, dynamic>? query,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _send('POST', path, body, options, query: query);
+  }) =>
+      _send('POST', path, body, options, query: query);
 
   @override
   Future<ApiResponse> put(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _send('PUT', path, body, options);
+  }) =>
+      _send('PUT', path, body, options);
 
   @override
   Future<ApiResponse> patch(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _send('PATCH', path, body, options);
+  }) =>
+      _send('PATCH', path, body, options);
 
   @override
   Future<ApiResponse> delete(
     String path, {
     Object? body,
     ApiRequestOptions options = const ApiRequestOptions(),
-  }) => _send('DELETE', path, body, options);
+  }) =>
+      _send('DELETE', path, body, options);
 
   /// One HTTP exchange for the interceptor's adapter. Does not call [bindGateway].
   Future<FakeHttpResult> serveHttp({
@@ -362,6 +402,7 @@ class FakeApiClient implements ApiClient {
         ApiRequestOptions(authenticated: authenticated, headers: headers),
         query: query,
         setCookie: setCookie,
+        enforceTransportContract: true,
       );
       return FakeHttpResult(
         status: response.statusCode,
@@ -425,6 +466,7 @@ class FakeApiClient implements ApiClient {
     String code,
     String message, {
     bool authenticated = true,
+    Map<String, Object?>? details,
   }) {
     if (code == 'NETWORK_UNAVAILABLE' || code == 'TIMEOUT') {
       ApiReachability.instance.recordTransportFailure();
@@ -436,7 +478,7 @@ class FakeApiClient implements ApiClient {
         'error': {
           'code': code,
           'message': message,
-          'details': {},
+          'details': details ?? <String, Object?>{},
           'correlationId': 'fake',
         },
       },
@@ -465,6 +507,12 @@ class FakeApiClient implements ApiClient {
 
   void _requireFullAccess() {
     if (!_access.fullAccess) _fail(403, 'FORBIDDEN', _adminOnly);
+  }
+
+  /// `GET /api/financial-ledger` is admin-only. The contract code is
+  /// `PERMISSION_DENIED`, not the fake's generic `FORBIDDEN`.
+  void _requireFinancialLedger() {
+    if (!_access.fullAccess) _fail(403, 'PERMISSION_DENIED', _adminOnly);
   }
 
   static const _notFound = 'العنصر غير موجود';
@@ -559,8 +607,10 @@ class FakeApiClient implements ApiClient {
         _requireRead(SectionKey.reports);
         return;
       case 'statements':
-      case 'financial-ledger':
         _requireFullAccess();
+        return;
+      case 'financial-ledger':
+        _requireFinancialLedger();
         return;
       case 'account-requests':
       case 'users':
@@ -755,12 +805,9 @@ class FakeApiClient implements ApiClient {
     _access.applyFromServer(
       (user['permissions'] as List).map((code) => '$code'),
       role: user['role'] as String?,
-      sectionAccess: section is Map
-          ? section.map((key, value) => MapEntry('$key', '$value'))
-          : const {},
-      fullAccess: user['fullAccess'] is bool
-          ? user['fullAccess'] as bool
-          : null,
+      sectionAccess: sectionAccessFromJson(section),
+      fullAccess:
+          user['fullAccess'] is bool ? user['fullAccess'] as bool : null,
     );
   }
 
@@ -888,6 +935,7 @@ class FakeApiClient implements ApiClient {
     ApiRequestOptions options, {
     Map<String, dynamic>? query,
     List<String>? setCookie,
+    bool enforceTransportContract = false,
   }) async {
     await Future<void>.delayed(latency);
     lastRequestHeaders = Map<String, String>.from(options.headers);
@@ -896,9 +944,8 @@ class FakeApiClient implements ApiClient {
     if (body is String) {
       lastWireBody = body;
     } else {
-      lastWireBody = body == null
-          ? null
-          : WireJson.encode(body, rateWireFormat);
+      lastWireBody =
+          body == null ? null : WireJson.encode(body, rateWireFormat);
     }
     final decoded = lastWireBody == null ? null : jsonDecode(lastWireBody!);
     final b = decoded is Map ? decoded : const {};
@@ -908,8 +955,10 @@ class FakeApiClient implements ApiClient {
         .skip(1)
         .toList(); // drop "api"
     final head = seg.isEmpty ? '' : seg.first;
+    final unsafe = method != 'GET' && method != 'HEAD';
 
     if (method == 'POST' && path == '/api/auth/login') {
+      if (enforceTransportContract) _requireClientApiVersion(options);
       if (b['password'] == 'wrong') {
         _fail(
           401,
@@ -924,17 +973,43 @@ class FakeApiClient implements ApiClient {
       }
       _activate(FakeFixtures.meFor('${b['username']}'));
       final id = 'fake-session-${++_sessionSeq}';
-      _sessions[id] = _FakeSession(id: id, me: _me);
+      final csrfToken = _allocateCsrf();
+      _sessions[id] = _FakeSession(id: id, me: _me, csrfToken: csrfToken);
       _latestSessionId = id;
       _jarId = id;
-      setCookie?.add('session=$id; Path=/; HttpOnly');
-      return _ok({..._me, 'csrfToken': 'fake-csrf'});
+      setCookie?.add(
+        '${ApiConfig.sessionCookieName}=$id; Path=/; HttpOnly; Secure; SameSite=Strict',
+      );
+      return _ok({..._me, 'csrfToken': csrfToken});
     }
-    if (path == '/api/auth/csrf') return _ok({'csrfToken': 'fake-csrf'});
+    if (path == '/api/auth/csrf') {
+      return _rotateCsrf(options);
+    }
     if (options.authenticated) _ensureSession(options);
+    // 401 from the session check stays ahead of 409 and 403.
+    if (enforceTransportContract && unsafe) {
+      _requireClientApiVersion(options);
+    }
+    if (enforceTransportContract && unsafe && options.authenticated) {
+      _requireCurrentCsrf(options);
+    }
     if (method == 'GET') {
+      final gate = pauseGets[path];
+      if (gate != null) await gate.future;
       final scripted = scriptedGetJson.remove(path);
       if (scripted != null) {
+        return ApiResponse(
+          statusCode: 200,
+          data: PreciseJson.decode(scripted),
+          correlationId: 'fake',
+        );
+      }
+    } else {
+      final scripted = scriptedMutationJson.remove(path);
+      if (scripted != null) {
+        // The stored rows are not changed. Keep the request text for tests
+        // that pause the follow-up GET, which replaces [lastWireBody].
+        if (lastWireBody != null) mutationBodies.add(lastWireBody!);
         return ApiResponse(
           statusCode: 200,
           data: PreciseJson.decode(scripted),
@@ -972,6 +1047,19 @@ class FakeApiClient implements ApiClient {
     if (method != 'GET' &&
         head != 'notifications' &&
         head != 'notification-preferences') {
+      // Decision and cash-received have no requestId. A shared null replay
+      // key would collapse distinct calls onto one stored success.
+      if (_collectionStatusPath(seg)) {
+        return _mutateWithoutRequestId(
+          method,
+          path,
+          seg,
+          head,
+          query,
+          () => _route(method, b, seg, head, query),
+          () => _ensureSession(options),
+        );
+      }
       return _mutate(
         b,
         method,
@@ -1024,12 +1112,15 @@ class FakeApiClient implements ApiClient {
     return _jarId;
   }
 
-  bool _hasHeader(ApiRequestOptions options, String name) =>
-      options.headers.keys.any((key) => key.toLowerCase() == name);
+  bool _hasHeader(ApiRequestOptions options, String name) {
+    final wanted = name.toLowerCase();
+    return options.headers.keys.any((key) => key.toLowerCase() == wanted);
+  }
 
   String? _header(ApiRequestOptions options, String name) {
+    final wanted = name.toLowerCase();
     for (final entry in options.headers.entries) {
-      if (entry.key.toLowerCase() == name) {
+      if (entry.key.toLowerCase() == wanted) {
         final value = entry.value.trim();
         return value.isEmpty ? null : value;
       }
@@ -1044,9 +1135,61 @@ class FakeApiClient implements ApiClient {
       final eq = piece.indexOf('=');
       if (eq <= 0) continue;
       final name = piece.substring(0, eq).trim().toLowerCase();
-      if (name == 'session') return piece.substring(eq + 1).trim();
+      if (name == ApiConfig.sessionCookieName) {
+        return piece.substring(eq + 1).trim();
+      }
     }
     return null;
+  }
+
+  /// First issued token stays `fake-csrf` so existing header assertions hold.
+  /// Later issues, including a CSRF rotation, are distinct and the previous
+  /// value is no longer accepted.
+  String _allocateCsrf() {
+    final token = _csrfSeq == 0 ? 'fake-csrf' : 'fake-csrf-$_csrfSeq';
+    _csrfSeq++;
+    return token;
+  }
+
+  void _requireClientApiVersion(ApiRequestOptions options) {
+    final version = _header(options, ApiConfig.clientApiVersionHeader);
+    if (version == ApiConfig.clientApiVersion) return;
+    _fail(
+      409,
+      'CLIENT_VERSION_MISMATCH',
+      'إصدار العميل غير مدعوم.',
+      details: const <String, Object?>{
+        'requiredApiVersion': ApiConfig.clientApiVersion,
+      },
+    );
+  }
+
+  _FakeSession? _liveSession(ApiRequestOptions options) {
+    final id = _presentedSessionId(options);
+    if (id == null) return null;
+    final session = _sessions[id];
+    if (session == null || session.expired) return null;
+    return session;
+  }
+
+  ApiResponse _rotateCsrf(ApiRequestOptions options) {
+    final session = _liveSession(options);
+    if (session == null) {
+      _fail(401, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
+    }
+    session.csrfToken = _allocateCsrf();
+    return _ok({'csrfToken': session.csrfToken});
+  }
+
+  void _requireCurrentCsrf(ApiRequestOptions options) {
+    final session = _liveSession(options);
+    if (session == null) {
+      _fail(401, 'AUTH_REQUIRED', 'يجب تسجيل الدخول أولًا.');
+    }
+    final sent = _header(options, 'x-csrf-token');
+    if (sent == null || sent != session.csrfToken) {
+      _fail(403, 'CSRF_REJECTED', 'تم رفض طلب الحماية.');
+    }
   }
 
   /// A repeated [requestId] for this user returns the original success and
@@ -1108,6 +1251,42 @@ class FakeApiClient implements ApiClient {
     }
   }
 
+  /// Collection decision and cash-received. The contract has no `requestId`
+  /// and no `expectedVersion`. Session, permission, and the test failure gate
+  /// still run. A second call is not a stored replay; the row status decides.
+  Future<ApiResponse> _mutateWithoutRequestId(
+    String method,
+    String path,
+    List<String> seg,
+    String head,
+    Map<String, dynamic>? query,
+    Future<ApiResponse> Function() send,
+    void Function() ensureSession,
+  ) async {
+    ensureSession();
+    _authorize(method, seg, head, query);
+    mutationPaths.add(path);
+    if (lastWireBody != null) mutationBodies.add(lastWireBody!);
+    final paused = pauseMutations;
+    if (paused != null) await paused.future;
+    ensureSession();
+    _authorize(method, seg, head, query);
+    if (failMutationsRemaining > 0) {
+      failMutationsRemaining--;
+      _fail(400, 'MUTATION_FAILED', 'تعذر تنفيذ الطلب.');
+    }
+    return send();
+  }
+
+  /// `POST /api/collections/{submissions|unlinked-receipts}/{id}/{decision|cash-received}`.
+  bool _collectionStatusPath(List<String> seg) {
+    if (seg.length != 4 || seg.first != 'collections') return false;
+    final kind = seg[1];
+    final action = seg[3];
+    if (kind != 'submissions' && kind != 'unlinked-receipts') return false;
+    return action == 'decision' || action == 'cash-received';
+  }
+
   Future<ApiResponse> _route(
     String method,
     Map b,
@@ -1158,8 +1337,7 @@ class FakeApiClient implements ApiClient {
         if (_isPurchaseEntryWrite(method, seg)) {
           _rejectIfPurchaseDayFinalized(seg);
         }
-        final entryWrite =
-            (method == 'POST' && seg.length == 2) ||
+        final entryWrite = (method == 'POST' && seg.length == 2) ||
             ((method == 'POST' || method == 'PATCH') &&
                 seg.length > 3 &&
                 seg[2] == 'entries');
@@ -1202,11 +1380,19 @@ class FakeApiClient implements ApiClient {
           'contentBase64': 'JVBERi0xLjQK',
         });
       case 'financial-ledger':
-        _requireFullAccess();
-        return _ok({
-          'items': [],
-          'scopeTotals': {'LYD': 0, 'EGP': 0},
-        });
+        _requireFinancialLedger();
+        final section = _queryText(query, 'section');
+        financialLedgerQueries.add(
+          FinancialLedgerQuery(
+            section: section,
+            sectionKey: _queryText(query, 'sectionKey'),
+          ),
+        );
+        return _ok(
+          FakeFixtures.financialLedger(
+            sectionKey: section ?? _queryText(query, 'sectionKey'),
+          ),
+        );
       case 'notifications':
         return _notifications(method, seg, b, query);
       case 'notification-preferences':
@@ -1387,23 +1573,13 @@ class FakeApiClient implements ApiClient {
       return _ok({'items': []});
     }
     _requireCollectionMutation(seg);
-    final needsVersion =
-        seg.isNotEmpty &&
-        (seg.last == 'decision' || seg.last == 'cash-received');
-    if (needsVersion && b['expectedVersion'] == null) {
-      _fail(400, 'VALIDATION_ERROR', 'expectedVersion مطلوب');
-    }
-    if (needsVersion && versionConflictRemaining > 0) {
-      versionConflictRemaining--;
-      _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
-    }
     if (seg.length == 4 && seg[1] == 'submissions' && seg[3] == 'decision') {
       return _applyDecision(seg[2], b);
     }
     if (seg.length == 4 &&
         seg[1] == 'submissions' &&
         seg[3] == 'cash-received') {
-      return _applyCash(seg[2], b, unlinked: false);
+      return _applyCash(seg[2], unlinked: false);
     }
     if (seg.length == 4 &&
         seg[1] == 'unlinked-receipts' &&
@@ -1413,11 +1589,14 @@ class FakeApiClient implements ApiClient {
     if (seg.length == 4 &&
         seg[1] == 'unlinked-receipts' &&
         seg[3] == 'cash-received') {
-      return _applyCash(seg[2], b, unlinked: true);
+      return _applyCash(seg[2], unlinked: true);
     }
     // CollectionsRepository.closeDay posts /api/collections/days/close.
     if (seg.length == 3 && seg[1] == 'days' && seg[2] == 'close') {
       return _applyClose(b);
+    }
+    if (method == 'POST' && seg.length == 2 && seg[1] == 'assignments') {
+      return _applyAssignment(b);
     }
     if (seg.length == 4 && seg[1] == 'assignments' && seg[3] == 'submissions') {
       return _applyAssignmentSubmission(seg[2], b);
@@ -1547,43 +1726,49 @@ class FakeApiClient implements ApiClient {
   ApiResponse _applyFullPayment(String section, String id, Map b) {
     final card = _cardView(section, id);
     _requireVersion(b['expectedVersion'], card['version']);
+    final previous = card['balanceUnits'];
     final version = (card['version'] as int) + 1;
     _cardState['$section|${card['id']}'] = {
       'balanceUnits': 0,
       'version': version,
     };
-    return _ok({'id': 'tx_new', 'version': version});
+    return _ok(
+      _ledgerWriteData(
+        version: version,
+        section: section,
+        request: b,
+        balanceUnits: 0,
+        amountUnits: previous is int && previous > 0 ? previous : 0,
+      ),
+    );
   }
 
   /// Debt or partial payment. The version is the card's stored version.
   ///
-  /// A direct partial payment stores the previous card balance with the
-  /// received `inputValue` applied when that integer is not larger than the
-  /// stored balance. A larger integer is refused and the stored balance is
-  /// left as it was. The app does not calculate the new balance. A rate-based
-  /// movement only bumps the version; this fake does not turn a factor into
-  /// an amount, and it does not compare that factor with the balance.
+  /// A direct partial payment stores `previous - inputValue` and returns that
+  /// integer as `balanceUnits`. A larger integer is accepted (DEF-031): the
+  /// contract does not reject it and does not use an `OVERPAYMENT` code. The
+  /// stored balance may be negative. The app does not calculate it. A
+  /// rate-based movement only bumps the version; this fake does not turn a
+  /// factor into an amount, and it does not compare that factor with the
+  /// balance. The ack then echoes the balance still stored on the card.
   ApiResponse _applyMovement(String section, String id, Map b) {
     final card = _cardView(section, id);
     _requireVersion(b['expectedVersion'], card['version']);
     final previous = card['balanceUnits'];
     final entered = b['inputValue'];
-    if (b['type'] == 'payment' &&
-        b['paymentMode'] == 'partial' &&
-        b['calculationMode'] == 'direct' &&
-        previous is int &&
-        entered is int &&
-        entered > previous) {
-      _fail(400, 'VALIDATION_ERROR', amountAboveRemainingMessage);
-    }
     final version = (card['version'] as int) + 1;
     final state = <String, dynamic>{'version': version};
+    Object? balance = previous is int ? previous : null;
+    Object? amount;
     if (b['type'] == 'payment' &&
         b['paymentMode'] == 'partial' &&
         b['calculationMode'] == 'direct' &&
         previous is int &&
         entered is int) {
       final stored = previous - entered;
+      balance = stored;
+      amount = entered;
       state['balanceUnits'] = stored;
       _extraLedger.putIfAbsent(section, () => []).add({
         'id': 'tx_partial_$version',
@@ -1601,7 +1786,53 @@ class FakeApiClient implements ApiClient {
       });
     }
     _cardState['$section|${card['id']}'] = state;
-    return _ok({'id': 'tx_new', 'version': version});
+    return _ok(
+      _ledgerWriteData(
+        version: version,
+        section: section,
+        request: b,
+        balanceUnits: balance,
+        amountUnits: amount,
+      ),
+    );
+  }
+
+  /// Contract ledger-write `data`, plus the top-level `id` and `version` this
+  /// fake already returned. [balanceUnits] is written only when it is an int.
+  /// A missing balance is omitted, not sent as 0.
+  Map<String, dynamic> _ledgerWriteData({
+    required int version,
+    required String section,
+    required Map request,
+    required Object? balanceUnits,
+    Object? amountUnits,
+    String id = 'tx_new',
+  }) {
+    final data = <String, dynamic>{
+      'id': id,
+      'version': version,
+      'customerVersion': version,
+      'transaction': <String, dynamic>{
+        'id': id,
+        'type': request['type'],
+        if (amountUnits is int) 'amountUnits': amountUnits,
+        'currency': section == 'egyptian-deposits' ? 'EGP' : 'LYD',
+        if (request['paymentMode'] != null)
+          'paymentMode': request['paymentMode'],
+        if (request['calculationMode'] != null)
+          'calculationMode': request['calculationMode'],
+        if (request['inputValue'] is int) 'inputValue': request['inputValue'],
+        'factorMicros': null,
+        if (request['date'] != null) 'transactionDate': request['date'],
+        if (request['note'] != null) 'note': request['note'],
+        'actorName': 'مدير تجريبي',
+        'sequence': version,
+        'status': 'posted',
+        'correctsTransactionId': null,
+      },
+    };
+    if (balanceUnits is int) data['balanceUnits'] = balanceUnits;
+    return data;
   }
 
   /// Copies balanceAfterUnits already stored on the latest remaining posted line.
@@ -1634,11 +1865,19 @@ class FakeApiClient implements ApiClient {
     _txVersion[key] = (entry['version'] as int) + 1;
     final card = _cardView(section, accountId);
     final version = (card['version'] as int) + 1;
+    final stored = _latestPostedBalance(section);
     _cardState['$section|${card['id']}'] = {
-      'balanceUnits': _latestPostedBalance(section),
+      'balanceUnits': stored,
       'version': version,
     };
-    return _ok({'id': 'tx_new', 'version': version});
+    return _ok({
+      'id': 'tx_new',
+      'version': version,
+      'transactionId': txId,
+      'status': 'reversed',
+      'customerVersion': version,
+      'balanceUnits': stored,
+    });
   }
 
   Map<String, dynamic> _collectionsView() {
@@ -1648,26 +1887,36 @@ class FakeApiClient implements ApiClient {
       final item = Map<String, dynamic>.from(raw as Map);
       final state = _submissionState['${item['id']}'];
       if (state != null) item.addAll(state);
+      item.remove('version');
       items.add(item);
     }
     for (final extra in _extraSubmissions) {
       final item = Map<String, dynamic>.from(extra);
       final state = _submissionState['${item['id']}'];
       if (state != null) item.addAll(state);
+      item.remove('version');
       items.add(item);
     }
     body['submissions'] = items;
+    final assignments = <Map<String, dynamic>>[
+      for (final raw in body['assignments'] as List)
+        Map<String, dynamic>.from(raw as Map),
+      for (final extra in _extraAssignments) Map<String, dynamic>.from(extra),
+    ];
+    body['assignments'] = assignments;
     final receipts = <Map<String, dynamic>>[];
     for (final raw in body['unlinkedReceipts'] as List) {
       final item = Map<String, dynamic>.from(raw as Map);
       final state = _unlinkedState['${item['id']}'];
       if (state != null) item.addAll(state);
+      item.remove('version');
       receipts.add(item);
     }
     for (final extra in _extraUnlinked) {
       final item = Map<String, dynamic>.from(extra);
       final state = _unlinkedState['${item['id']}'];
       if (state != null) item.addAll(state);
+      item.remove('version');
       receipts.add(item);
     }
     body['unlinkedReceipts'] = receipts;
@@ -1697,15 +1946,19 @@ class FakeApiClient implements ApiClient {
     }
     final id = 'sb_posted_${_extraSubmissions.length + 1}';
     final name = _displayName();
+    final assignment = _assignmentRecord(assignmentId);
     _extraSubmissions.add({
       'id': id,
       'mode': mode,
       if (amount != null) 'amountUnits': amount,
       'status': 'pending',
-      'version': 1,
+      if (assignment?['customerId'] != null)
+        'customerId': assignment!['customerId'],
+      if (assignment?['section'] != null) 'section': assignment!['section'],
       if (_userId != null) 'submittedByUserId': _userId,
       if (name != null) 'submittedByName': name,
     });
+    // Pending does not change the balance, so the ack has no balanceUnits.
     return _ok({'id': id, 'version': 1});
   }
 
@@ -1723,7 +1976,6 @@ class FakeApiClient implements ApiClient {
       'customerName': name,
       'amountUnits': amount,
       'status': 'pending',
-      'version': 1,
       if (_userId != null) 'submittedByUserId': _userId,
     });
     return _ok({'id': id, 'version': 1});
@@ -1764,24 +2016,18 @@ class FakeApiClient implements ApiClient {
       if (item['id'] == id) submission = item;
     }
     if (submission == null) _fail(404, 'NOT_FOUND', 'الاستلام غير موجود');
-    _requireVersion(b['expectedVersion'], submission['version']);
-    final decision = b['decision'];
-    final status = switch (decision) {
-      'approve' => 'approved',
-      'reject' => 'rejected',
-      _ => null,
-    };
-    if (status == null) _fail(400, 'VALIDATION_ERROR', 'قرار غير معروف');
-    final version = (submission['version'] as int) + 1;
-    _submissionState[id] = {
-      ...?_submissionState[id],
-      'status': status,
-      'version': version,
-    };
-    return _ok({'id': 'ok', 'version': version});
+    if (submission['status'] != 'pending') {
+      _fail(409, 'SUBMISSION_ALREADY_DECIDED', submissionAlreadyDecidedMessage);
+    }
+    final status = _decisionStatus(b['decision']);
+    final posted = status == 'approved' ? _postLinkedBalance(submission) : null;
+    final next = {...?_submissionState[id], 'status': status};
+    next.remove('version');
+    _submissionState[id] = next;
+    return _decisionAck(id, status, postedBalance: posted);
   }
 
-  ApiResponse _applyCash(String id, Map b, {required bool unlinked}) {
+  ApiResponse _applyCash(String id, {required bool unlinked}) {
     final view = _collectionsView();
     final items =
         (unlinked ? view['unlinkedReceipts'] : view['submissions']) as List;
@@ -1790,16 +2036,34 @@ class FakeApiClient implements ApiClient {
       id,
       unlinked ? 'الإيصال غير موجود' : 'الاستلام غير موجود',
     );
-    _requireVersion(b['expectedVersion'], current['version']);
-    final version = (current['version'] as int) + 1;
+    if (current['status'] != 'approved') {
+      _fail(409, 'SUBMISSION_NOT_APPROVED', submissionNotApprovedMessage);
+    }
     final store = unlinked ? _unlinkedState : _submissionState;
-    store[id] = {
+    final receivedAt = current['cashReceivedAt'];
+    if (current['cashStatus'] == 'received' ||
+        (receivedAt is String && receivedAt.isNotEmpty)) {
+      return _ok({
+        'id': id,
+        'cashReceivedAt': receivedAt,
+        'eventSequences': <int>[4],
+        'replayed': true,
+      });
+    }
+    const at = '2026-10-22T22:00:00.000Z';
+    final next = {
       ...?store[id],
       'cashStatus': 'received',
       'cashPending': false,
-      'version': version,
+      'cashReceivedAt': at,
     };
-    return _ok({'id': 'ok', 'version': version});
+    next.remove('version');
+    store[id] = next;
+    return _ok({
+      'id': id,
+      'cashReceivedAt': at,
+      'eventSequences': <int>[4],
+    });
   }
 
   ApiResponse _applyUnlinkedDecision(String id, Map b) {
@@ -1808,23 +2072,74 @@ class FakeApiClient implements ApiClient {
       id,
       'الإيصال غير موجود',
     );
-    _requireVersion(b['expectedVersion'], current['version']);
-    final decision = b['decision'];
+    if (current['status'] != 'pending') {
+      _fail(409, 'SUBMISSION_ALREADY_DECIDED', submissionAlreadyDecidedMessage);
+    }
+    final status = _decisionStatus(b['decision']);
+    final customerId = b['customerId'];
+    int? posted;
+    if (status == 'approved' &&
+        b['entryType'] == 'payment' &&
+        customerId is String &&
+        current['amountUnits'] is int) {
+      final section = _unlinkedLinkSection(customerId);
+      if (section != null) {
+        // Standalone receipts are LYD until the company decides otherwise.
+        posted = _postLinkedBalance({
+          'section': section,
+          'customerId': customerId,
+          'mode': 'partial',
+          'amountUnits': current['amountUnits'],
+          'currency': 'LYD',
+        });
+      }
+    }
+    final next = {
+      ...?_unlinkedState[id],
+      'status': status,
+      if (customerId != null) 'customerId': customerId,
+    };
+    next.remove('version');
+    _unlinkedState[id] = next;
+    return _decisionAck(id, status, postedBalance: posted);
+  }
+
+  String _decisionStatus(Object? decision) {
     final status = switch (decision) {
       'approve' => 'approved',
       'reject' => 'rejected',
       _ => null,
     };
     if (status == null) _fail(400, 'VALIDATION_ERROR', 'قرار غير معروف');
-    final version = (current['version'] as int) + 1;
-    final customerId = b['customerId'];
-    _unlinkedState[id] = {
-      ...?_unlinkedState[id],
+    return status;
+  }
+
+  /// Approve returns the contract decision shape. Reject is id, status, and
+  /// events only: no `transactionId` and no `balanceUnits`.
+  ///
+  /// [postedBalance] is the balance stored on the linked card, and may be
+  /// negative. A missing link is not a balance: the receipt amount is not
+  /// copied into `balanceUnits`, and the field is omitted rather than sent
+  /// as 0.
+  ApiResponse _decisionAck(
+    String id,
+    String status, {
+    int? postedBalance,
+  }) {
+    if (status != 'approved') {
+      return _ok({
+        'id': id,
+        'status': status,
+        'eventSequences': <int>[3],
+      });
+    }
+    return _ok({
+      'id': id,
       'status': status,
-      'version': version,
-      if (customerId != null) 'customerId': customerId,
-    };
-    return _ok({'id': 'ok', 'version': version});
+      'transactionId': 'collection-$id',
+      if (postedBalance != null) 'balanceUnits': postedBalance,
+      'eventSequences': <int>[3],
+    });
   }
 
   /// Open day after stored finalize, correction, fixture status, and opening.
@@ -1858,6 +2173,113 @@ class FakeApiClient implements ApiClient {
     day['correctionOpen'] = false;
   }
 
+  /// LYD card first. An id that exists only on Egyptian deposits is returned
+  /// so the currency check can refuse it. DEF-035: a standalone receipt is
+  /// not posted onto an Egyptian account.
+  String? _unlinkedLinkSection(String customerId) {
+    if (FakeFixtures.cardById('customers', customerId).isNotEmpty) {
+      return 'customers';
+    }
+    if (FakeFixtures.cardById('egyptian-deposits', customerId).isNotEmpty) {
+      return 'egyptian-deposits';
+    }
+    return null;
+  }
+
+  /// Stores one assignment the caller named. The ack keeps `id` and `version`
+  /// and also returns the contract `assignmentIds`.
+  ApiResponse _applyAssignment(Map b) {
+    final ids = b['customerIds'];
+    final section = b['section'];
+    final assignee = b['assigneeUserId'];
+    if (ids is! List || section is! String || assignee is! String) {
+      _fail(400, 'VALIDATION_ERROR', 'بيانات التوجيه ناقصة');
+    }
+    final created = <String>[];
+    for (final raw in ids) {
+      if (raw is! String || raw.isEmpty) {
+        _fail(400, 'VALIDATION_ERROR', 'customerId مطلوب');
+      }
+      if (FakeFixtures.cardById(section, raw).isEmpty) {
+        _fail(404, 'NOT_FOUND', 'الحساب غير موجود');
+      }
+      final id = 'as_posted_${_extraAssignments.length + 1}';
+      final card = FakeFixtures.cardById(section, raw);
+      _extraAssignments.add({
+        'id': id,
+        'customerId': raw,
+        'customerName': card['name'],
+        'section': section,
+        'balanceUnits': card['balanceUnits'],
+        'status': 'open',
+        'assigneeUserId': assignee,
+      });
+      created.add(id);
+    }
+    return _ok({
+      'id': 'ok',
+      'version': 1,
+      'assignmentIds': created,
+      'eventSequences': <int>[1],
+    });
+  }
+
+  /// Stores the balance after an approved collection and returns it.
+  ///
+  /// Partial subtracts the stored amount and may go negative. Full stores 0,
+  /// the same result as a full card payment. No link, or a balance that is
+  /// not an int, returns null and does not write the card.
+  ///
+  /// The receipt currency must match the linked account. Collections are LYD
+  /// unless the row itself carries `currency`. Egyptian deposits are EGP.
+  /// `error-catalog.json` has no code for this mismatch.
+  /// `INVALID_LEDGER_CURRENCY` belongs to the financial-ledger query, not to
+  /// a collection post, so it is not used. The card is left unchanged and
+  /// the caller omits `balanceUnits`.
+  int? _postLinkedBalance(Map submission) {
+    final section = submission['section'];
+    final customerId = submission['customerId'];
+    if (section is! String || customerId is! String) return null;
+    if (section.isEmpty || customerId.isEmpty) return null;
+    if (FakeFixtures.cardById(section, customerId).isEmpty) return null;
+    final card = _cardView(section, customerId);
+    final previous = card['balanceUnits'];
+    if (previous is! int) return null;
+    final paymentCurrency = submission['currency'] is String
+        ? submission['currency'] as String
+        : 'LYD';
+    final accountCurrency = section == 'egyptian-deposits' ? 'EGP' : 'LYD';
+    if (paymentCurrency != accountCurrency) return null;
+    final mode = submission['mode'];
+    final int stored;
+    if (mode == 'full') {
+      stored = 0;
+    } else if (mode == 'partial') {
+      final amount = submission['amountUnits'];
+      if (amount is! int) return null;
+      stored = previous - amount;
+    } else {
+      return null;
+    }
+    final version = card['version'];
+    _cardState['$section|$customerId'] = {
+      'balanceUnits': stored,
+      'version': version is int ? version + 1 : 1,
+    };
+    return stored;
+  }
+
+  Map<String, dynamic>? _assignmentRecord(String id) {
+    final assignments = _collectionsView()['assignments'];
+    if (assignments is! List) return null;
+    for (final raw in assignments) {
+      if (raw is Map && raw['id'] == id) {
+        return Map<String, dynamic>.from(raw);
+      }
+    }
+    return null;
+  }
+
   Map<String, dynamic> _purchasesView(String book) {
     final body = _copy(FakeFixtures.purchases());
     final merchant = body['merchant'];
@@ -1874,11 +2296,20 @@ class FakeApiClient implements ApiClient {
     if (entries is List) {
       body['entries'] = [
         for (final raw in entries)
-          if (raw is Map)
-            _paintPurchaseEntry(Map<String, dynamic>.from(raw), day),
+          if (raw is Map) _entryOnThisPage(Map<String, dynamic>.from(raw), day),
       ];
     }
     return body;
+  }
+
+  /// The open day's rows take that day's id and version. A row from another
+  /// day keeps the fixture `dayId` and `dayVersion`.
+  Map<String, dynamic> _entryOnThisPage(
+    Map<String, dynamic> entry,
+    Map<String, dynamic> day,
+  ) {
+    if ('${entry['dayId']}' != '${day['id']}') return entry;
+    return _paintPurchaseEntry(entry, day);
   }
 
   Map<String, dynamic> _paintPurchaseEntry(
@@ -1971,11 +2402,8 @@ class FakeApiClient implements ApiClient {
   /// Idempotent replay enters here with the path only. [_mutate] is used for
   /// non-GET calls, so an entry-shaped path is a create, update, or delete.
   void _rejectFinalizedPurchaseEntry(String path) {
-    final seg = path
-        .split('/')
-        .where((part) => part.isNotEmpty)
-        .skip(1)
-        .toList();
+    final seg =
+        path.split('/').where((part) => part.isNotEmpty).skip(1).toList();
     if (seg.length < 2 || seg.first != 'purchases') return;
     final entryPath =
         seg.length == 2 || (seg.length >= 4 && seg[2] == 'entries');
@@ -2487,10 +2915,15 @@ class FakeApiClient implements ApiClient {
 
 /// One in-memory cookie session. Lifetime is not counted down locally.
 class _FakeSession {
-  _FakeSession({required this.id, required this.me});
+  _FakeSession({
+    required this.id,
+    required this.me,
+    required this.csrfToken,
+  });
 
   final String id;
   final Map<String, dynamic> me;
+  String csrfToken;
   bool expired = false;
 }
 
@@ -2513,6 +2946,14 @@ String? _queryText(Map<String, dynamic>? query, String key) {
   final text = '$value';
   if (text.isEmpty) return null;
   return text;
+}
+
+/// One recorded `GET /api/financial-ledger` (tests).
+class FinancialLedgerQuery {
+  const FinancialLedgerQuery({this.section, this.sectionKey});
+
+  final String? section;
+  final String? sectionKey;
 }
 
 /// One recorded `GET /api/{section}` (tests).

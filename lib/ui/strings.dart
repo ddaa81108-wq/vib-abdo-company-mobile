@@ -93,9 +93,16 @@ abstract final class AppStrings {
   static const integerOnly = 'أدخل عددًا صحيحًا كما هو، بلا كسور.';
   static const invalidAmount = MoneyValue.invalidLabel;
 
-  /// Direct partial payment compared with the card balance the server sent.
-  /// The app does not subtract or store a new balance.
+  /// The fake used to reject a direct partial payment above the stored
+  /// balance with this sentence. It now accepts that payment. The ledger
+  /// does not show this sentence and does not block on it.
   static const amountAboveRemaining = 'المبلغ أكبر من المتبقي المسجّل.';
+
+  /// Overpayment warning. Names the balance the server just returned and the
+  /// amount the user typed. It does not state a difference or a new balance.
+  static const overpaymentCurrent = 'الرصيد الحالي';
+  static const overpaymentEntered = 'والمبلغ المدخل';
+  static const overpaymentAsk = 'هل تريد المتابعة؟';
   static const dateInvalid = 'أدخل التاريخ بصيغة سنة-شهر-يوم.';
   static const unitsHint =
       'عدد صحيح بالوحدة الصغرى التي يخزّنها الخادم. بلا فواصل وبلا كسور. التطبيق لا يحوّل هذا الرقم ولا يحسبه.';
@@ -361,6 +368,8 @@ abstract final class AppStrings {
   static const confirmDelete = 'تأكيد حذف هذا السطر';
   static const confirmPayroll = 'تأكيد حركة المرتب';
   static const link = 'ربط';
+  static const egyptianLinkPaused =
+      'ربط الأمانات المصرية متوقف مؤقتًا حتى تقرر الشركة.';
   static const batch = 'الدفعة';
   static const toneNeutral = 'محايد';
   static const correctTransaction = 'تصحيح الحركة';

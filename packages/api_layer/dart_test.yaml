@@ -9,3 +9,5 @@ tags:
   pending-decision:
   # Current production or fake behaviour that is asserted, not treated as a pass.
   known-bug:
+  # Site contract samples. Included in the default run. Select with --tags contract.
+  contract:

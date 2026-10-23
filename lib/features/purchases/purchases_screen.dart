@@ -316,7 +316,7 @@ class _DayCard extends ConsumerWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (canWrite && editable)
+                if (canWrite && editable && day.version != null)
                   GatedButton(
                     buttonKey: ValueKey('add-purchase-$label'),
                     allowed: true,
@@ -329,7 +329,7 @@ class _DayCard extends ConsumerWidget {
                       _PurchaseForm(book: book, version: day.version),
                     ),
                   ),
-                if (canFinalize && day.status == 'draft')
+                if (canFinalize && day.status == 'draft' && day.version != null)
                   GuardedMutation(
                     buttonKey: ValueKey('finalize-day-$label'),
                     inputs: 'finalize:$label:${day.version}',
@@ -367,8 +367,13 @@ class _DayCard extends ConsumerWidget {
                 entry: entry,
                 money: money,
                 book: book,
-                version: day.version,
-                canWrite: canWrite && editable,
+                // The write names this row's day, not the open day's version.
+                version: entry.dayVersion,
+                canWrite:
+                    canWrite &&
+                    editable &&
+                    entry.dayId == day.id &&
+                    entry.dayVersion != null,
                 online: online,
               ),
           ],
@@ -606,6 +611,14 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
   }
 }
 
+/// Opening is a write on an open day that has a version. A missing day, a
+/// day with no version, or a finalized day whose correction is closed, does
+/// not offer the button.
+bool _openingWritable(PurchaseDayDto? day) {
+  if (day == null || day.version == null) return false;
+  return day.status == 'draft' || day.correctionOpen;
+}
+
 class _OpeningCard extends StatelessWidget {
   const _OpeningCard({
     required this.book,
@@ -647,7 +660,7 @@ class _OpeningCard extends StatelessWidget {
               vodafoneCurrency,
               money,
             ),
-            if (canWrite)
+            if (canWrite && _openingWritable(day))
               GatedButton(
                 buttonKey: const Key('set-opening'),
                 allowed: true,

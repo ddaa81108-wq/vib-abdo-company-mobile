@@ -85,9 +85,9 @@ flutter build apk --release \
   --dart-define=API_BASE="$STAGING_API_BASE"
 ```
 
-`tool/measure_release_cold_start.sh` reads `STAGING_API_BASE`, `STAGING_ADMIN_USERNAME`, and `STAGING_ADMIN_PASSWORD` from the environment. If any name is unset, or `classify_origin` in `tool/staging_negative_tests/preflight.py` is not `ok`, the script exits 1 and says which name is missing. It does not print the values. It does not skip.
+`tool/measure_release_cold_start.sh` reads `STAGING_API_BASE` from the environment. If that name is unset, or `classify_origin` in `tool/staging_negative_tests/preflight.py` is not `ok`, the script exits 1. It does not print the value. It does not skip the first-frame measurement for a missing login.
 
-The GitHub job uses the `staging` environment so those secrets are the ones already used by the staging permission workflow. The APK that logs in also receives the admin name and password as dart-defines. That binary is deleted at the end of the script and is not uploaded. Do not attach it to an issue or a Test Lab run.
+The GitHub job uses the `staging` environment only for `STAGING_API_BASE`. It does not read a staging username or password. Login-to-home timing runs when `STAGING_ADMIN_USERNAME` and `STAGING_ADMIN_PASSWORD` are already set in the local shell on the bot machine. Those names are not GitHub secrets and are not GitHub variables. The APK that logs in receives them as dart-defines only on that machine. That binary is deleted at the end of the script and is not uploaded. Do not attach it to an issue or a Test Lab run. When the names are unset, the script records `p7_23_login_timing=local-only` and still reports `am start -W`.
 
 The size job builds with `https://staging.example.com`. Preflight refuses that host. The size APK is not the protocol install.
 
@@ -199,7 +199,7 @@ That example is the fake profile history, not the release protocol. A release Te
 ## What Ali provides
 
 1. Device A, B, C, and D (D can be one of the others if it is the weak one), with free space for a clean install.
-2. The `staging` GitHub environment secrets already named for the permission workflow: `STAGING_API_BASE`, `STAGING_ADMIN_USERNAME`, `STAGING_ADMIN_PASSWORD`, plus the employee pairs if step 25 is run. The performance job fails, on purpose, when the admin names are unset.
+2. `STAGING_API_BASE` as a secret on the GitHub Environment `staging`. That is the only staging secret. Usernames and passwords are not stored in GitHub. For a local login-to-home timing, and for step 25, export the account names on the bot machine. The performance job does not fail when those names are unset; it skips the login drive.
 3. The numeric threshold for P7-23 (seconds to interactive home) and P7-24 (scroll) before anyone writes Pass.
 4. Either a tester who fills the template, or a Firebase project on Blaze with `FIREBASE_TEST_LAB_SERVICE_ACCOUNT_JSON` and a budget alert. Spark's 15 runs per day will not cover three API levels plus retries. Budget alerts do not cap the bill.
 5. A decision on Test Lab versus a phone, given the 2027-09-30 shutdown.

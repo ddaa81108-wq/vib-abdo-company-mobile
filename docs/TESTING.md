@@ -1,6 +1,6 @@
 # Testing
 
-Negative permission tests are a required CI gate. Release builds cannot include the fake API or its demo profiles. Staging checks are a separate manual workflow and do not run on pull requests.
+Negative permission tests are a required CI gate. Release builds cannot include the fake API or its demo profiles. The staging smoke check is a separate manual workflow and does not run on pull requests. A permission check against the staging server runs on the bot machine only. GitHub does not store staging usernames or passwords, neither as secrets nor as variables.
 
 `tool/check.sh` runs analyze, the full test suites, the negative-permission gate, the staging preflight self-check, and the release compile probe. The release APK byte scan runs in GitHub Actions because it needs an Android SDK. Nothing here changes the application id or Android signing.
 
@@ -67,46 +67,55 @@ Android notification permission on emulators is a separate workflow, `Android no
 
 Phase 7 startup, scroll, APK size, and the API 29/33/34 runs are another separate workflow, `Android performance` (`.github/workflows/android-performance.yml`). It is `workflow_dispatch` plus a nightly schedule. It does not run on pull requests and it does not add steps to the three required checks. Budgets, the device protocol, and what Ali provides are in [testing/PHASE7_PERFORMANCE.md](testing/PHASE7_PERFORMANCE.md). The acceptance matrix itself is `docs/acceptance/phase-7.md` on [PR #48](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/pull/48), not in this branch.
 
-`tool/staging_negative_tests/run.sh --dry-run` is an offline self-check. It does not read secrets and does not open a socket. The script is in this repo, so both CI jobs above run it and fail if it fails. The manual staging workflow is the only job that calls it without `--dry-run`. This repository does not add a second staging runner.
+`tool/staging_negative_tests/run.sh --dry-run` is an offline self-check. It does not read secrets and does not open a socket. The script is in this repo, so both CI jobs above run it and fail if it fails. No GitHub Actions job calls it without `--dry-run`. Live mode refuses any non-empty `CI` or `GITHUB_ACTIONS` value and exits 2. Empty and unset are the only values that may proceed. Live mode is read-only unless `--allow-sandbox-writes` is passed.
 
 ## Staging negative tests
 
-Manual workflow: `.github/workflows/staging-negative-permissions.yml`, name `Staging negative permission tests`. It runs on `workflow_dispatch` only. The job is bound to the GitHub Environment `staging`, so it cannot be pointed at a production environment's secrets.
+Any permission check against the staging server runs locally on the bot machine only. GitHub Actions does not run it. Nothing under `.github/workflows` logs in as admin, employee, a second employee, or the limited manager. No staging username or password is stored in GitHub, neither as a secret nor as a variable.
 
-Create that environment (Settings → Environments → `staging`) and store the secrets there. Do not put production credentials in it. Optional protection rules (required reviewers) are a good idea and are not configured by this repo.
+`tool/staging_negative_tests/run.sh` stays for that local run. The required check `Negative permission tests` still runs the Fake API cases (`flutter test --tags permissions-negative --dart-define=USE_FAKE_API=true`) and then `run.sh --dry-run`. The dry-run does not read credentials and does not open a socket. Do not add another live entrypoint under a different name.
 
-The workflow calls `tool/staging_negative_tests/run.sh` when that file is on the branch. **If the script is not in the checkout, the job skips with a notice and does not talk to a server.** Do not add another script under a different name. The integration engineer owns `run.sh`. This repo only supplies a thin preflight (`tool/staging_negative_tests/preflight.py`) that decides whether the workflow may invoke it.
-
-`run.sh` contract, from the integration engineer:
+`run.sh` contract:
 
 - `--dry-run` is an offline self-check. Regular CI always runs it. The script is in the repo, so the step is not skipped.
-- `--junit <file>` writes JUnit XML. The manual workflow passes `staging-permissions-junit.xml` and uploads that file as the artifact `staging-permissions-junit` (missing file warns; a test failure still fails the job).
-- Non-zero exit if any test fails.
-- The script refuses to run when its config is missing. The workflow does not call it in that case: missing required secrets **skip** the job with the secret names (never the values), so a button press before accounts exist is not a red build.
+- `--junit <file>` writes JUnit XML for a local run. GitHub does not collect a live report, because it does not run live mode.
+- Non-zero exit if any live case fails.
+- Live mode (no `--dry-run`) exits 2 when `CI` or `GITHUB_ACTIONS` is set to any non-empty value, before it reads accounts or opens a socket. Empty and unset are allowed. `true`, `1`, `false`, and `yes` are refused.
+- Live mode sends only `GET` and `HEAD` probes unless `--allow-sandbox-writes` is passed. Write methods are skipped with `skipped: write case, requires --allow-sandbox-writes`. The flag is not an environment variable. It requires a clean sandbox, not shared staging data, and Ali's explicit approval each time.
+- Each account is logged in once per run. The session is reused. Logout runs after the other cases.
+- Live mode also exits 2 when a required local variable is missing. It prints the names, never the values. There is no default host.
 
-### Secret names
+### Local variables
 
-Set these on the `staging` environment. The workflow masks each value (`::add-mask::`) and never prints it. GitHub also masks `secrets.*` in later log lines.
+Set these in the shell on the bot machine. Do not commit them. Do not add them to a GitHub environment, secret, or variable.
 
-| Secret | Required | Role |
+| Variable | Required | Role |
 | --- | --- | --- |
-| `STAGING_API_BASE` | yes | Staging origin only (`https://host`, no path). Same name as the dart-define `API_BASE`. |
-| `STAGING_ADMIN_USERNAME` | yes | Server role `admin`. |
-| `STAGING_ADMIN_PASSWORD` | yes | Password for that admin. |
-| `STAGING_EMPLOYEE_USERNAME` | yes | Server role `employee`. |
-| `STAGING_EMPLOYEE_PASSWORD` | yes | Password for that employee. |
-| `STAGING_EMPLOYEE2_USERNAME` | yes | A second `employee`, for cross-user cases. |
-| `STAGING_EMPLOYEE2_PASSWORD` | yes | Password for the second employee. |
-| `STAGING_LIMITED_MANAGER_USERNAME` | no | Limited manager. Pending DEF-002. |
-| `STAGING_LIMITED_MANAGER_PASSWORD` | no | Password for that account. |
+| `STAGING_API_BASE` | yes | Staging origin only (`https://host`, no path). Same shape as the dart-define `API_BASE`. |
+| `STAGING_ADMIN_USERNAME` | yes | Server role `admin`. Local only. |
+| `STAGING_ADMIN_PASSWORD` | yes | Password for that admin. Local only. |
+| `STAGING_EMPLOYEE_USERNAME` | yes | Server role `employee`. Local only. |
+| `STAGING_EMPLOYEE_PASSWORD` | yes | Password for that employee. Local only. |
+| `STAGING_EMPLOYEE2_USERNAME` | yes | A second `employee`, for cross-user cases. Local only. |
+| `STAGING_EMPLOYEE2_PASSWORD` | yes | Password for the second employee. Local only. |
+| `STAGING_LIMITED_MANAGER_USERNAME` | no | Limited manager. Pending DEF-002. Local only. |
+| `STAGING_LIMITED_MANAGER_PASSWORD` | no | Password for that account. Local only. |
 
-The optional pair is both or neither. One of the two set and the other empty **fails** the job (misconfiguration) and does not print the value. When both are absent, preflight reports `limited_manager=absent` and `run.sh` is expected to skip those cases.
+The optional pair is both or neither. One of the two set and the other empty fails the local run and does not print the value. When both are absent, the limited-manager case is skipped.
 
-Pass the variables through to `run.sh` as environment variables with these exact names. Do not commit them, and do not write them into a file in the repo.
+### GitHub secret names
+
+The staging smoke workflow's secret table has one name. Dispatch steps are in [api/staging-smoke.ar.md](api/staging-smoke.ar.md). The Android performance job reads that same origin and does not read a username or a password.
+
+| Name | Where | Required for that workflow |
+| --- | --- | --- |
+| `STAGING_API_BASE` | Secret on the GitHub Environment `staging`. A same-named variable is an unrecommended fallback in the smoke workflow only. | Yes. Empty fails the smoke job. |
+
+No other name belongs in that table. Usernames and passwords for admin, employee, employee2, and the limited manager are not GitHub secrets and are not GitHub variables.
 
 ### Origin check
 
-Before `run.sh` is started, preflight refuses (exit 1, value not printed) unless `STAGING_API_BASE` is a staging or test origin:
+Before a local live run, `run.sh` refuses (exit 2, value not printed) unless `STAGING_API_BASE` is a staging or test origin:
 
 - `https` only. No userinfo, path, query, or fragment. A non-default port is allowed.
 - Placeholder hosts are not a staging origin: `*.invalid`, `*.example`, `example.com`, `localhost`, or a host containing `placeholder`, `changeme`, or `replace-me`. `https://staging.example.invalid` is refused.
@@ -117,14 +126,20 @@ If the real staging host does not match that shape, update `classify_origin` in 
 
 ### Adding role accounts
 
-Accounts are created on the staging server, outside this repository.
+Accounts are created on the staging server, outside this repository. They stay on the bot machine.
 
 1. Ask the server owner for one `admin`, two distinct `employee` users, and (when DEF-002 has a staging user) one limited manager. The app matches `role` only inside `PermissionService`, exactly `admin` or `employee`. Any other role grants nothing.
-2. A repo admin adds the nine names above to the `staging` environment. The limited-manager pair can wait.
+2. Export the local variables above in a shell that is not committed and is not a GitHub secret or variable. The limited-manager pair can wait.
 3. Confirm the host is the staging origin, not production, and that it matches the label rules above.
-4. Run the workflow from the Actions tab once `tool/staging_negative_tests/run.sh` is on the branch you select. Download `staging-permissions-junit` from the run.
+4. On the bot machine, run `tool/staging_negative_tests/run.sh`. Pass `--junit` if you want a local report. Do not dispatch this from Actions.
 
-Until `run.sh` lands, the workflow skips. Regular CI still runs the tagged fake-API tests.
+Regular CI still runs the tagged fake-API tests. That coverage does not depend on these accounts.
+
+## Staging smoke (P-01)
+
+Manual workflow: `.github/workflows/staging-smoke.yml`, name `Staging smoke`. It runs on `workflow_dispatch` only and is bound to the GitHub Environment `staging`. It is not one of the three required pull-request checks and does not call `tool/staging_negative_tests/run.sh`.
+
+`STAGING_API_BASE` is the only staging name stored for the smoke workflow. A variable of the same name is an unrecommended fallback. The intended value is `https://staging.vip2100.com` with no `/erp` suffix. Empty and `/erp` fail the job. The job only runs unauthenticated `GET /api/health` via curl with User-Agent `VibAbdoMobileSmoke/1.0 (+github-actions)`. It does not read staging usernames or passwords, and those names are not stored in GitHub, neither as secrets nor as variables. The login smoke and any negative permission check against staging run locally on the bot machine only. After a login failure, do not run that local check more than once within 15 minutes (the login limit is 8 attempts per account every 15 minutes). Dispatch steps and the secret table are in [api/staging-smoke.ar.md](api/staging-smoke.ar.md).
 
 ## Release builds and the fake API
 

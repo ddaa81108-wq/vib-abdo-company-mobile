@@ -15,7 +15,7 @@ void main() {
     for (final call in _forbidden) {
       await expectLater(
         _send(employee, call),
-        throwsA(_forbiddenMatcher(call.message)),
+        throwsA(_forbiddenMatcher(call.message, code: call.code)),
         reason: '${call.method} ${call.path}',
       );
     }
@@ -58,8 +58,10 @@ void main() {
     final me = await employee.get('/api/me');
     expect((me.data as Map)['user']['id'], FakeFixtures.demoEmployeeId);
 
-    final ledger = await employee.get('/api/customers/c_55/ledger');
-    expect(ledger.statusCode, 200);
+    await expectLater(
+      employee.get('/api/customers/c_55/ledger'),
+      throwsA(_forbiddenMatcher(deniedMessage)),
+    );
 
     for (final call in _notFound) {
       await expectLater(
@@ -99,8 +101,8 @@ void main() {
     final overview = await employee.get('/api/collections');
     final pending = (overview.data as Map)['submissions'] as List;
     final submission = pending.cast<Map>().firstWhere(
-      (row) => row['id'] == 'sb_1',
-    );
+          (row) => row['id'] == 'sb_1',
+        );
     expect(submission['status'], 'pending');
     expect(employee.mutationRequestIds, [requestId]);
 
@@ -164,10 +166,12 @@ void main() {
     expect(audit.statusCode, 200);
     expect((audit.data as Map)['items'], isNotEmpty);
     final payroll = await admin.get('/api/collections/payroll');
-    expect(_ids((payroll.data as Map)['employees']), containsAll([
-      FakeFixtures.demoEmployeeId,
-      FakeFixtures.otherEmployeeId,
-    ]));
+    expect(
+        _ids((payroll.data as Map)['employees']),
+        containsAll([
+          FakeFixtures.demoEmployeeId,
+          FakeFixtures.otherEmployeeId,
+        ]));
   });
 }
 
@@ -179,29 +183,38 @@ final _notFoundMatcher = isA<NotFoundException>()
     .having((error) => error.statusCode, 'status', 404)
     .having((error) => error.code, 'code', 'NOT_FOUND');
 
-Matcher _forbiddenMatcher(String message) => isA<ForbiddenException>()
-    .having((error) => error.statusCode, 'status', 403)
-    .having((error) => error.code, 'code', 'FORBIDDEN')
-    .having((error) => error.message, 'message', message);
+Matcher _forbiddenMatcher(String message, {String code = 'FORBIDDEN'}) =>
+    isA<ForbiddenException>()
+        .having((error) => error.statusCode, 'status', 403)
+        .having((error) => error.code, 'code', code)
+        .having((error) => error.message, 'message', message);
 
 class _Call {
-  const _Call(this.method, this.path, {this.body, this.query, this.message = adminOnlyMessage});
+  const _Call(
+    this.method,
+    this.path, {
+    this.body,
+    this.query,
+    this.message = adminOnlyMessage,
+    this.code = 'FORBIDDEN',
+  });
 
   final String method;
   final String path;
   final Map<String, Object?>? body;
   final Map<String, dynamic>? query;
   final String message;
+  final String code;
 }
 
 const adminOnlyMessage = 'هذا الإجراء للإدارة فقط';
 const deniedMessage = 'لا تملك صلاحية لهذا الإجراء';
 
 Map<String, Object?> _mutation(String id, {int? version, String? decision}) => {
-  'requestId': id,
-  if (version != null) 'expectedVersion': version,
-  if (decision != null) 'decision': decision,
-};
+      'requestId': id,
+      if (version != null) 'expectedVersion': version,
+      if (decision != null) 'decision': decision,
+    };
 
 final _forbidden = <_Call>[
   // Section reads the ordinary employee cannot open.
@@ -221,7 +234,12 @@ final _forbidden = <_Call>[
   const _Call('GET', '/api/treasury', message: deniedMessage),
   const _Call('GET', '/api/treasury/cash-ledger', message: deniedMessage),
   const _Call('GET', '/api/reports', message: deniedMessage),
-  const _Call('GET', '/api/financial-ledger', message: adminOnlyMessage),
+  const _Call(
+    'GET',
+    '/api/financial-ledger',
+    message: adminOnlyMessage,
+    code: 'PERMISSION_DENIED',
+  ),
   const _Call('GET', '/api/statements/pdf', message: adminOnlyMessage),
   // Section writes and movement cancels the employee cannot perform.
   _Call(
@@ -290,7 +308,8 @@ final _forbidden = <_Call>[
     body: _mutation('cash', version: 7),
     message: deniedMessage,
   ),
-  _Call('POST', '/api/reports', body: _mutation('report'), message: deniedMessage),
+  _Call('POST', '/api/reports',
+      body: _mutation('report'), message: deniedMessage),
   // Approve, reject, confirm, and other management routes.
   _Call('POST', '/api/collections/assignments', body: _mutation('assign')),
   _Call(
@@ -318,8 +337,10 @@ final _forbidden = <_Call>[
     '/api/collections/unlinked-receipts/ur_2/cash-received',
     body: _mutation('ucash', version: 4),
   ),
-  _Call('POST', '/api/collections/days/close', body: _mutation('close', version: 1)),
-  _Call('POST', '/api/collections/payroll/entries', body: _mutation('payroll-entry')),
+  _Call('POST', '/api/collections/days/close',
+      body: _mutation('close', version: 1)),
+  _Call('POST', '/api/collections/payroll/entries',
+      body: _mutation('payroll-entry')),
   _Call(
     'PUT',
     '/api/collections/payroll/employees/${FakeFixtures.demoEmployeeId}/salary',
@@ -417,8 +438,8 @@ Future<ApiResponse> _send(FakeApiClient api, _Call call) {
 }
 
 List<Object?> _ids(Object? raw, {String field = 'userId'}) => [
-  for (final row in raw as List) (row as Map)[field],
-];
+      for (final row in raw as List) (row as Map)[field],
+    ];
 
 Future<ApiResponse> _login(FakeApiClient api, String username) {
   return api.post(

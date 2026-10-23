@@ -41,7 +41,7 @@ class DioApiClient implements ApiClient {
         responseType: ResponseType.json,
         headers: const {
           'Accept': 'application/json',
-          'X-Client-Api-Version': '1',
+          ApiConfig.clientApiVersionHeader: ApiConfig.clientApiVersion,
         },
       );
 

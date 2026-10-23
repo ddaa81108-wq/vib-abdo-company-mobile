@@ -11,6 +11,27 @@ class FakeFixtures {
   /// read someone else's records. 🔶 The id is fake, not a server value.
   static const otherEmployeeId = 'u_20';
 
+  /// Observed collector: collections codes only, and no `sectionAccess` key.
+  static const collectorPermissions = [
+    'collections.read',
+    'collections.write',
+  ];
+
+  /// Observed limited reader: eight `.read` codes, no writes, no `sectionAccess`.
+  /// Masraweya is not in the observed list.
+  static const limitedReaderPermissions = [
+    'debts.read',
+    'companies.read',
+    'libyan_deposits.read',
+    'egyptian_deposits.read',
+    'purchases.read',
+    'treasury.read',
+    'reports.read',
+    'collections.read',
+  ];
+
+  /// Employee who still receives an explicit `sectionAccess` map.
+  /// Used by `other.employee` and `mustchange`, not by the observed collector.
   static const employeePermissions = [
     'collections.read',
     'collections.write',
@@ -37,15 +58,16 @@ class FakeFixtures {
     'reports': 'none',
   };
 
-  /// Fixture picked by username (FAKE ONLY):
-  /// - `admin…`          -> like the real server today: role "admin", EMPTY permissions, no
-  ///                        sectionAccess, no fullAccess -> full access via the role flag.
-  /// - `limited.admin…`  -> role "admin" with an explicit list + sectionAccess -> lists apply.
-  /// - `flag.admin…`     -> role "admin", empty lists, explicit `fullAccess: false` -> nothing.
-  /// - `guest…`          -> unknown role -> nothing.
-  /// - `mustchange…`     -> collections employee with `mustChangePassword: true` until
-  ///                        `POST /api/auth/change-password` succeeds on this fake client.
-  /// - anything else     -> collections employee.
+  /// Fixture picked by username (FAKE ONLY). Names are structural, not real accounts.
+  /// - `admin…`           -> role "admin", empty permissions, no sectionAccess,
+  ///                         isOwner true -> unrestricted via the role flag.
+  /// - `limited.reader…`  -> employee, eight `.read` codes, no sectionAccess.
+  /// - `limited.admin…`   -> role "admin" with an explicit list + sectionAccess.
+  /// - `flag.admin…`      -> role "admin", empty lists, explicit `fullAccess: false`.
+  /// - `guest…`           -> unknown role -> nothing.
+  /// - `other.employee…`  -> employee with an explicit sectionAccess map.
+  /// - `mustchange…`      -> that employee with `mustChangePassword: true`.
+  /// - anything else      -> observed collector (collections codes, no sectionAccess).
   static Map<String, dynamic> meFor(String username) {
     if (username.startsWith('limited.admin')) {
       return _me(
@@ -55,6 +77,18 @@ class FakeFixtures {
         role: 'admin',
         permissions: limitedAdminPermissions,
         sectionAccess: const {'customerDebts': 'read'},
+        isOwner: false,
+      );
+    }
+    if (username.startsWith('limited.reader')) {
+      return _me(
+        id: 'u_5',
+        username: 'limited.reader@example.invalid',
+        name: 'قارئ محدود تجريبي',
+        role: 'employee',
+        permissions: limitedReaderPermissions,
+        sectionAccess: null,
+        isOwner: false,
       );
     }
     if (username.startsWith('flag.admin')) {
@@ -66,6 +100,7 @@ class FakeFixtures {
         permissions: const [],
         sectionAccess: const {},
         fullAccess: false,
+        isOwner: false,
       );
     }
     if (username.startsWith('guest')) {
@@ -76,6 +111,7 @@ class FakeFixtures {
         role: 'guest',
         permissions: employeePermissions,
         sectionAccess: const {'customerDebts': 'manage'},
+        isOwner: false,
       );
     }
     if (username.startsWith('other.employee')) {
@@ -87,6 +123,7 @@ class FakeFixtures {
         role: 'employee',
         permissions: employeePermissions,
         sectionAccess: employeeSectionAccess,
+        isOwner: false,
       );
     }
     if (username.startsWith('mustchange')) {
@@ -97,6 +134,7 @@ class FakeFixtures {
         role: 'employee',
         permissions: employeePermissions,
         sectionAccess: employeeSectionAccess,
+        isOwner: false,
         mustChangePassword: true,
       );
     }
@@ -111,14 +149,16 @@ class FakeFixtures {
           role: 'admin',
           permissions: const [],
           sectionAccess: null,
+          isOwner: true,
         )
       : _me(
           id: demoEmployeeId,
           username: 'employee@example.invalid',
           name: 'موظف استلام تجريبي',
           role: 'employee',
-          permissions: employeePermissions,
-          sectionAccess: employeeSectionAccess,
+          permissions: collectorPermissions,
+          sectionAccess: null,
+          isOwner: false,
         );
 
   static Map<String, dynamic> _me({
@@ -129,30 +169,33 @@ class FakeFixtures {
     required List<String> permissions,
     required Map<String, String>? sectionAccess,
     bool? fullAccess,
+    bool isOwner = false,
     bool mustChangePassword = false,
-  }) => {
-    'user': {
-      'id': id,
-      'username': username,
-      'displayName': name,
-      'role': role,
-      'permissions': permissions,
-      if (sectionAccess != null) 'sectionAccess': sectionAccess,
-      if (fullAccess != null) 'fullAccess': fullAccess,
-      'mustChangePassword': mustChangePassword,
-    },
-  };
+  }) =>
+      {
+        'user': {
+          'id': id,
+          'username': username,
+          'displayName': name,
+          'role': role,
+          'isOwner': isOwner,
+          'permissions': permissions,
+          if (sectionAccess != null) 'sectionAccess': sectionAccess,
+          if (fullAccess != null) 'fullAccess': fullAccess,
+          'mustChangePassword': mustChangePassword,
+        },
+      };
 
   /// Ten cards per account section so QA can open a list (P2-01).
   /// `c_55` keeps the original demo balance. Customers include one system card (P2-07).
   ///
   /// `summary` figures are literals. This fixture does not add card balances.
   static Map<String, dynamic> accountsFor(String section) => switch (section) {
-    'companies' => _companies(),
-    'libyan-deposits' => _libyanDeposits(),
-    'egyptian-deposits' => _egyptianDeposits(),
-    _ => _customers(),
-  };
+        'companies' => _companies(),
+        'libyan-deposits' => _libyanDeposits(),
+        'egyptian-deposits' => _egyptianDeposits(),
+        _ => _customers(),
+      };
 
   /// Same card list the fake used when every section shared one shape.
   /// Egyptian deposits keep the EGP balance of `c_55`.
@@ -168,375 +211,376 @@ class FakeFixtures {
   }
 
   static Map<String, dynamic> _customers() => _page(
-    [
-      _card(
-        id: 'c_55',
-        name: 'عميل تجريبي',
-        phone: '0910000000',
-        balanceUnits: 320,
-        debtAgeDays: 4,
-        ageStatus: 'warning',
-      ),
-      _card(
-        id: 'c_56',
-        name: 'عميل تجريبي ٢',
-        phone: '0910000002',
-        balanceUnits: 150,
-        debtAgeDays: 1,
-        ageStatus: 'new',
-      ),
-      _card(
-        id: 'c_57',
-        name: 'عميل تجريبي ٣',
-        phone: '0910000003',
-        balanceUnits: 0,
-        debtAgeDays: 0,
-        ageStatus: 'zero',
-      ),
-      _card(
-        id: 'c_58',
-        name: 'عميل تجريبي ٤',
-        phone: '0910000004',
-        balanceUnits: 900,
-        debtAgeDays: 12,
-        ageStatus: 'overdue',
-      ),
-      _card(
-        id: 'c_59',
-        name: 'عميل تجريبي ٥',
-        phone: '0910000005',
-        balanceUnits: 40,
-        debtAgeDays: 5,
-        ageStatus: 'warning',
-      ),
-      _card(
-        id: 'c_60',
-        name: 'عميل تجريبي ٦',
-        phone: '0910000006',
-        balanceUnits: 25,
-        debtAgeDays: 2,
-        ageStatus: 'new',
-      ),
-      _card(
-        id: 'c_61',
-        name: 'عميل تجريبي ٧',
-        phone: '0910000007',
-        balanceUnits: 80,
-        debtAgeDays: 9,
-        ageStatus: 'overdue',
-      ),
-      _card(
-        id: 'c_62',
-        name: 'عميل تجريبي ٨',
-        phone: '0910000008',
-        balanceUnits: 60,
-        debtAgeDays: 6,
-        ageStatus: 'warning',
-      ),
-      _card(
-        id: 'c_63',
-        name: 'عميل تجريبي ٩',
-        phone: '0910000009',
-        balanceUnits: 110,
-        debtAgeDays: 3,
-        ageStatus: 'credit',
-      ),
-      _card(
-        id: 'c_masraweya_remainder',
-        name: 'متبقي المصراوية تجريبي',
-        phone: '0910000010',
-        balanceUnits: 8950,
-        debtAgeDays: 4,
-        ageStatus: 'warning',
-        systemManaged: true,
-        systemLinkKey: 'masraweya_remainder',
-      ),
-    ],
-    netBalance: 10635,
-    totalDebt: 10635,
-    activeCards: 10,
-  );
+        [
+          _card(
+            id: 'c_55',
+            name: 'عميل تجريبي',
+            phone: '0910000000',
+            balanceUnits: 320,
+            debtAgeDays: 4,
+            ageStatus: 'warning',
+          ),
+          _card(
+            id: 'c_56',
+            name: 'عميل تجريبي ٢',
+            phone: '0910000002',
+            balanceUnits: 150,
+            debtAgeDays: 1,
+            ageStatus: 'new',
+          ),
+          _card(
+            id: 'c_57',
+            name: 'عميل تجريبي ٣',
+            phone: '0910000003',
+            balanceUnits: 0,
+            debtAgeDays: 0,
+            ageStatus: 'zero',
+          ),
+          _card(
+            id: 'c_58',
+            name: 'عميل تجريبي ٤',
+            phone: '0910000004',
+            balanceUnits: 900,
+            debtAgeDays: 12,
+            ageStatus: 'overdue',
+          ),
+          _card(
+            id: 'c_59',
+            name: 'عميل تجريبي ٥',
+            phone: '0910000005',
+            balanceUnits: 40,
+            debtAgeDays: 5,
+            ageStatus: 'warning',
+          ),
+          _card(
+            id: 'c_60',
+            name: 'عميل تجريبي ٦',
+            phone: '0910000006',
+            balanceUnits: 25,
+            debtAgeDays: 2,
+            ageStatus: 'new',
+          ),
+          _card(
+            id: 'c_61',
+            name: 'عميل تجريبي ٧',
+            phone: '0910000007',
+            balanceUnits: 80,
+            debtAgeDays: 9,
+            ageStatus: 'overdue',
+          ),
+          _card(
+            id: 'c_62',
+            name: 'عميل تجريبي ٨',
+            phone: '0910000008',
+            balanceUnits: 60,
+            debtAgeDays: 6,
+            ageStatus: 'warning',
+          ),
+          _card(
+            id: 'c_63',
+            name: 'عميل تجريبي ٩',
+            phone: '0910000009',
+            balanceUnits: 110,
+            debtAgeDays: 3,
+            ageStatus: 'credit',
+          ),
+          _card(
+            id: 'c_masraweya_remainder',
+            name: 'متبقي المصراوية تجريبي',
+            phone: '0910000010',
+            balanceUnits: 8950,
+            debtAgeDays: 4,
+            ageStatus: 'warning',
+            systemManaged: true,
+            systemLinkKey: 'masraweya_remainder',
+          ),
+        ],
+        netBalance: 10635,
+        totalDebt: 10635,
+        activeCards: 10,
+      );
 
   static Map<String, dynamic> _companies() => _page(
-    [
-      _card(
-        id: 'c_55',
-        name: 'عميل تجريبي',
-        phone: '0910000000',
-        balanceUnits: 320,
-        debtAgeDays: 4,
-        ageStatus: 'warning',
-      ),
-      _card(
-        id: 'c_co_02',
-        name: 'شركة تجريبية ٢',
-        phone: '0920000002',
-        balanceUnits: 100,
-        debtAgeDays: 1,
-        ageStatus: 'new',
-      ),
-      _card(
-        id: 'c_co_03',
-        name: 'شركة تجريبية ٣',
-        phone: '0920000003',
-        balanceUnits: 200,
-        debtAgeDays: 8,
-        ageStatus: 'overdue',
-      ),
-      _card(
-        id: 'c_co_04',
-        name: 'شركة تجريبية ٤',
-        phone: '0920000004',
-        balanceUnits: 0,
-        debtAgeDays: 0,
-        ageStatus: 'zero',
-      ),
-      _card(
-        id: 'c_co_05',
-        name: 'شركة تجريبية ٥',
-        phone: '0920000005',
-        balanceUnits: 50,
-        debtAgeDays: 3,
-        ageStatus: 'warning',
-      ),
-      _card(
-        id: 'c_co_06',
-        name: 'شركة تجريبية ٦',
-        phone: '0920000006',
-        balanceUnits: 75,
-        debtAgeDays: 2,
-        ageStatus: 'new',
-      ),
-      _card(
-        id: 'c_co_07',
-        name: 'شركة تجريبية ٧',
-        phone: '0920000007',
-        balanceUnits: 125,
-        debtAgeDays: 11,
-        ageStatus: 'overdue',
-      ),
-      _card(
-        id: 'c_co_08',
-        name: 'شركة تجريبية ٨',
-        phone: '0920000008',
-        balanceUnits: 30,
-        debtAgeDays: 4,
-        ageStatus: 'warning',
-      ),
-      _card(
-        id: 'c_co_09',
-        name: 'شركة تجريبية ٩',
-        phone: '0920000009',
-        balanceUnits: 45,
-        debtAgeDays: 6,
-        ageStatus: 'credit',
-      ),
-      _card(
-        id: 'c_co_10',
-        name: 'شركة تجريبية ١٠',
-        phone: '0920000010',
-        balanceUnits: 90,
-        debtAgeDays: 7,
-        ageStatus: 'warning',
-      ),
-    ],
-    netBalance: 1035,
-    totalDebt: 1035,
-    activeCards: 10,
-  );
+        [
+          _card(
+            id: 'c_55',
+            name: 'عميل تجريبي',
+            phone: '0910000000',
+            balanceUnits: 320,
+            debtAgeDays: 4,
+            ageStatus: 'warning',
+          ),
+          _card(
+            id: 'c_co_02',
+            name: 'شركة تجريبية ٢',
+            phone: '0920000002',
+            balanceUnits: 100,
+            debtAgeDays: 1,
+            ageStatus: 'new',
+          ),
+          _card(
+            id: 'c_co_03',
+            name: 'شركة تجريبية ٣',
+            phone: '0920000003',
+            balanceUnits: 200,
+            debtAgeDays: 8,
+            ageStatus: 'overdue',
+          ),
+          _card(
+            id: 'c_co_04',
+            name: 'شركة تجريبية ٤',
+            phone: '0920000004',
+            balanceUnits: 0,
+            debtAgeDays: 0,
+            ageStatus: 'zero',
+          ),
+          _card(
+            id: 'c_co_05',
+            name: 'شركة تجريبية ٥',
+            phone: '0920000005',
+            balanceUnits: 50,
+            debtAgeDays: 3,
+            ageStatus: 'warning',
+          ),
+          _card(
+            id: 'c_co_06',
+            name: 'شركة تجريبية ٦',
+            phone: '0920000006',
+            balanceUnits: 75,
+            debtAgeDays: 2,
+            ageStatus: 'new',
+          ),
+          _card(
+            id: 'c_co_07',
+            name: 'شركة تجريبية ٧',
+            phone: '0920000007',
+            balanceUnits: 125,
+            debtAgeDays: 11,
+            ageStatus: 'overdue',
+          ),
+          _card(
+            id: 'c_co_08',
+            name: 'شركة تجريبية ٨',
+            phone: '0920000008',
+            balanceUnits: 30,
+            debtAgeDays: 4,
+            ageStatus: 'warning',
+          ),
+          _card(
+            id: 'c_co_09',
+            name: 'شركة تجريبية ٩',
+            phone: '0920000009',
+            balanceUnits: 45,
+            debtAgeDays: 6,
+            ageStatus: 'credit',
+          ),
+          _card(
+            id: 'c_co_10',
+            name: 'شركة تجريبية ١٠',
+            phone: '0920000010',
+            balanceUnits: 90,
+            debtAgeDays: 7,
+            ageStatus: 'warning',
+          ),
+        ],
+        netBalance: 1035,
+        totalDebt: 1035,
+        activeCards: 10,
+      );
 
   static Map<String, dynamic> _libyanDeposits() => _page(
-    [
-      _card(
-        id: 'c_55',
-        name: 'عميل تجريبي',
-        phone: '0910000000',
-        balanceUnits: 320,
-        debtAgeDays: 4,
-        ageStatus: 'warning',
-      ),
-      _card(
-        id: 'c_ly_02',
-        name: 'أمانة ليبية تجريبية ٢',
-        phone: '0930000002',
-        balanceUnits: 10,
-        debtAgeDays: 1,
-        ageStatus: 'new',
-      ),
-      _card(
-        id: 'c_ly_03',
-        name: 'أمانة ليبية تجريبية ٣',
-        phone: '0930000003',
-        balanceUnits: 20,
-        debtAgeDays: 2,
-        ageStatus: 'new',
-      ),
-      _card(
-        id: 'c_ly_04',
-        name: 'أمانة ليبية تجريبية ٤',
-        phone: '0930000004',
-        balanceUnits: 30,
-        debtAgeDays: 3,
-        ageStatus: 'warning',
-      ),
-      _card(
-        id: 'c_ly_05',
-        name: 'أمانة ليبية تجريبية ٥',
-        phone: '0930000005',
-        balanceUnits: 40,
-        debtAgeDays: 0,
-        ageStatus: 'zero',
-      ),
-      _card(
-        id: 'c_ly_06',
-        name: 'أمانة ليبية تجريبية ٦',
-        phone: '0930000006',
-        balanceUnits: 50,
-        debtAgeDays: 5,
-        ageStatus: 'warning',
-      ),
-      _card(
-        id: 'c_ly_07',
-        name: 'أمانة ليبية تجريبية ٧',
-        phone: '0930000007',
-        balanceUnits: 60,
-        debtAgeDays: 9,
-        ageStatus: 'overdue',
-      ),
-      _card(
-        id: 'c_ly_08',
-        name: 'أمانة ليبية تجريبية ٨',
-        phone: '0930000008',
-        balanceUnits: 70,
-        debtAgeDays: 6,
-        ageStatus: 'credit',
-      ),
-      _card(
-        id: 'c_ly_09',
-        name: 'أمانة ليبية تجريبية ٩',
-        phone: '0930000009',
-        balanceUnits: 80,
-        debtAgeDays: 8,
-        ageStatus: 'overdue',
-      ),
-      _card(
-        id: 'c_ly_10',
-        name: 'أمانة ليبية تجريبية ١٠',
-        phone: '0930000010',
-        balanceUnits: 15,
-        debtAgeDays: 4,
-        ageStatus: 'warning',
-      ),
-    ],
-    netBalance: 695,
-    totalDebt: 695,
-    activeCards: 10,
-  );
+        [
+          _card(
+            id: 'c_55',
+            name: 'عميل تجريبي',
+            phone: '0910000000',
+            balanceUnits: 320,
+            debtAgeDays: 4,
+            ageStatus: 'warning',
+          ),
+          _card(
+            id: 'c_ly_02',
+            name: 'أمانة ليبية تجريبية ٢',
+            phone: '0930000002',
+            balanceUnits: 10,
+            debtAgeDays: 1,
+            ageStatus: 'new',
+          ),
+          _card(
+            id: 'c_ly_03',
+            name: 'أمانة ليبية تجريبية ٣',
+            phone: '0930000003',
+            balanceUnits: 20,
+            debtAgeDays: 2,
+            ageStatus: 'new',
+          ),
+          _card(
+            id: 'c_ly_04',
+            name: 'أمانة ليبية تجريبية ٤',
+            phone: '0930000004',
+            balanceUnits: 30,
+            debtAgeDays: 3,
+            ageStatus: 'warning',
+          ),
+          _card(
+            id: 'c_ly_05',
+            name: 'أمانة ليبية تجريبية ٥',
+            phone: '0930000005',
+            balanceUnits: 40,
+            debtAgeDays: 0,
+            ageStatus: 'zero',
+          ),
+          _card(
+            id: 'c_ly_06',
+            name: 'أمانة ليبية تجريبية ٦',
+            phone: '0930000006',
+            balanceUnits: 50,
+            debtAgeDays: 5,
+            ageStatus: 'warning',
+          ),
+          _card(
+            id: 'c_ly_07',
+            name: 'أمانة ليبية تجريبية ٧',
+            phone: '0930000007',
+            balanceUnits: 60,
+            debtAgeDays: 9,
+            ageStatus: 'overdue',
+          ),
+          _card(
+            id: 'c_ly_08',
+            name: 'أمانة ليبية تجريبية ٨',
+            phone: '0930000008',
+            balanceUnits: 70,
+            debtAgeDays: 6,
+            ageStatus: 'credit',
+          ),
+          _card(
+            id: 'c_ly_09',
+            name: 'أمانة ليبية تجريبية ٩',
+            phone: '0930000009',
+            balanceUnits: 80,
+            debtAgeDays: 8,
+            ageStatus: 'overdue',
+          ),
+          _card(
+            id: 'c_ly_10',
+            name: 'أمانة ليبية تجريبية ١٠',
+            phone: '0930000010',
+            balanceUnits: 15,
+            debtAgeDays: 4,
+            ageStatus: 'warning',
+          ),
+        ],
+        netBalance: 695,
+        totalDebt: 695,
+        activeCards: 10,
+      );
 
   static Map<String, dynamic> _egyptianDeposits() => _page(
-    [
-      _card(
-        id: 'c_55',
-        name: 'عميل تجريبي',
-        phone: '0910000000',
-        balanceUnits: 15000,
-        debtAgeDays: 4,
-        ageStatus: 'warning',
-      ),
-      _card(
-        id: 'c_eg_02',
-        name: 'أمانة مصرية تجريبية ٢',
-        phone: '0940000002',
-        balanceUnits: 1000,
-        debtAgeDays: 1,
-        ageStatus: 'new',
-      ),
-      _card(
-        id: 'c_eg_03',
-        name: 'أمانة مصرية تجريبية ٣',
-        phone: '0940000003',
-        balanceUnits: 2500,
-        debtAgeDays: 10,
-        ageStatus: 'overdue',
-      ),
-      _card(
-        id: 'c_eg_04',
-        name: 'أمانة مصرية تجريبية ٤',
-        phone: '0940000004',
-        balanceUnits: 0,
-        debtAgeDays: 0,
-        ageStatus: 'zero',
-      ),
-      _card(
-        id: 'c_eg_05',
-        name: 'أمانة مصرية تجريبية ٥',
-        phone: '0940000005',
-        balanceUnits: 750,
-        debtAgeDays: 3,
-        ageStatus: 'warning',
-      ),
-      _card(
-        id: 'c_eg_06',
-        name: 'أمانة مصرية تجريبية ٦',
-        phone: '0940000006',
-        balanceUnits: 500,
-        debtAgeDays: 2,
-        ageStatus: 'new',
-      ),
-      _card(
-        id: 'c_eg_07',
-        name: 'أمانة مصرية تجريبية ٧',
-        phone: '0940000007',
-        balanceUnits: 1250,
-        debtAgeDays: 7,
-        ageStatus: 'credit',
-      ),
-      _card(
-        id: 'c_eg_08',
-        name: 'أمانة مصرية تجريبية ٨',
-        phone: '0940000008',
-        balanceUnits: 300,
-        debtAgeDays: 4,
-        ageStatus: 'warning',
-      ),
-      _card(
-        id: 'c_eg_09',
-        name: 'أمانة مصرية تجريبية ٩',
-        phone: '0940000009',
-        balanceUnits: 450,
-        debtAgeDays: 6,
-        ageStatus: 'warning',
-      ),
-      _card(
-        id: 'c_eg_10',
-        name: 'أمانة مصرية تجريبية ١٠',
-        phone: '0940000010',
-        balanceUnits: 2000,
-        debtAgeDays: 12,
-        ageStatus: 'overdue',
-      ),
-    ],
-    netBalance: 23750,
-    totalDebt: 23750,
-    activeCards: 10,
-  );
+        [
+          _card(
+            id: 'c_55',
+            name: 'عميل تجريبي',
+            phone: '0910000000',
+            balanceUnits: 15000,
+            debtAgeDays: 4,
+            ageStatus: 'warning',
+          ),
+          _card(
+            id: 'c_eg_02',
+            name: 'أمانة مصرية تجريبية ٢',
+            phone: '0940000002',
+            balanceUnits: 1000,
+            debtAgeDays: 1,
+            ageStatus: 'new',
+          ),
+          _card(
+            id: 'c_eg_03',
+            name: 'أمانة مصرية تجريبية ٣',
+            phone: '0940000003',
+            balanceUnits: 2500,
+            debtAgeDays: 10,
+            ageStatus: 'overdue',
+          ),
+          _card(
+            id: 'c_eg_04',
+            name: 'أمانة مصرية تجريبية ٤',
+            phone: '0940000004',
+            balanceUnits: 0,
+            debtAgeDays: 0,
+            ageStatus: 'zero',
+          ),
+          _card(
+            id: 'c_eg_05',
+            name: 'أمانة مصرية تجريبية ٥',
+            phone: '0940000005',
+            balanceUnits: 750,
+            debtAgeDays: 3,
+            ageStatus: 'warning',
+          ),
+          _card(
+            id: 'c_eg_06',
+            name: 'أمانة مصرية تجريبية ٦',
+            phone: '0940000006',
+            balanceUnits: 500,
+            debtAgeDays: 2,
+            ageStatus: 'new',
+          ),
+          _card(
+            id: 'c_eg_07',
+            name: 'أمانة مصرية تجريبية ٧',
+            phone: '0940000007',
+            balanceUnits: 1250,
+            debtAgeDays: 7,
+            ageStatus: 'credit',
+          ),
+          _card(
+            id: 'c_eg_08',
+            name: 'أمانة مصرية تجريبية ٨',
+            phone: '0940000008',
+            balanceUnits: 300,
+            debtAgeDays: 4,
+            ageStatus: 'warning',
+          ),
+          _card(
+            id: 'c_eg_09',
+            name: 'أمانة مصرية تجريبية ٩',
+            phone: '0940000009',
+            balanceUnits: 450,
+            debtAgeDays: 6,
+            ageStatus: 'warning',
+          ),
+          _card(
+            id: 'c_eg_10',
+            name: 'أمانة مصرية تجريبية ١٠',
+            phone: '0940000010',
+            balanceUnits: 2000,
+            debtAgeDays: 12,
+            ageStatus: 'overdue',
+          ),
+        ],
+        netBalance: 23750,
+        totalDebt: 23750,
+        activeCards: 10,
+      );
 
   static Map<String, dynamic> _page(
     List<Map<String, dynamic>> items, {
     required int netBalance,
     required int totalDebt,
     required int activeCards,
-  }) => {
-    'items': items,
-    'nextCursor': null,
-    'totalItems': items.length,
-    'summary': {
-      'netBalance': netBalance,
-      'totalDebt': totalDebt,
-      'activeCards': activeCards,
-      'pendingReviewCount': 0,
-    },
-  };
+  }) =>
+      {
+        'items': items,
+        'nextCursor': null,
+        'totalItems': items.length,
+        'summary': {
+          'netBalance': netBalance,
+          'totalDebt': totalDebt,
+          'activeCards': activeCards,
+          'pendingReviewCount': 0,
+        },
+      };
 
   /// [ageStatusLabel] names [debtAgeDays] (`منذ N أيام`). One card, one age.
   /// `systemKind` is omitted: that field is still pending server confirmation.
@@ -549,36 +593,37 @@ class FakeFixtures {
     required String ageStatus,
     bool systemManaged = false,
     String? systemLinkKey,
-  }) => {
-    'id': id,
-    'name': name,
-    'phone': phone,
-    'balanceUnits': balanceUnits,
-    'activeAssigneeName': 'موظف استلام تجريبي',
-    'lastActivityAt': '2026-10-18T14:03:00+02:00',
-    'pinned': false,
-    'version': 4,
-    'nextSequence': 3,
-    'debtAgeDays': debtAgeDays,
-    'ageStatus': ageStatus,
-    'ageStatusLabel': _ageLabel(debtAgeDays),
-    if (systemManaged) 'systemManaged': true,
-    if (systemLinkKey != null) 'systemLinkKey': systemLinkKey,
-  };
+  }) =>
+      {
+        'id': id,
+        'name': name,
+        'phone': phone,
+        'balanceUnits': balanceUnits,
+        'activeAssigneeName': 'موظف استلام تجريبي',
+        'lastActivityAt': '2026-10-18T14:03:00+02:00',
+        'pinned': false,
+        'version': 4,
+        'nextSequence': 3,
+        'debtAgeDays': debtAgeDays,
+        'ageStatus': ageStatus,
+        'ageStatusLabel': _ageLabel(debtAgeDays),
+        if (systemManaged) 'systemManaged': true,
+        if (systemLinkKey != null) 'systemLinkKey': systemLinkKey,
+      };
 
   static String _ageLabel(int debtAgeDays) => 'منذ $debtAgeDays أيام';
 
   /// Home bulletin for one card. Age fields are the card's own fields.
   static Map<String, dynamic> _oldDebt(Map<String, dynamic> card) => {
-    'id': card['id'],
-    'section': 'customers',
-    'name': card['name'],
-    'balanceUnits': card['balanceUnits'],
-    'currency': 'LYD',
-    'debtAgeDays': card['debtAgeDays'],
-    'ageStatus': card['ageStatus'],
-    'ageStatusLabel': card['ageStatusLabel'],
-  };
+        'id': card['id'],
+        'section': 'customers',
+        'name': card['name'],
+        'balanceUnits': card['balanceUnits'],
+        'currency': 'LYD',
+        'debtAgeDays': card['debtAgeDays'],
+        'ageStatus': card['ageStatus'],
+        'ageStatusLabel': card['ageStatusLabel'],
+      };
 
   static Map<String, dynamic> ledger({String? before}) {
     if (before != null && before.isNotEmpty) {
@@ -712,124 +757,118 @@ class FakeFixtures {
       Map<String, dynamic>.from(accountsFor(section)['summary'] as Map);
 
   static Map<String, dynamic> collections() => {
-    'assignments': [
-      {
-        'id': 'as_1',
-        'customerId': 'c_55',
-        'customerName': 'عميل تجريبي',
-        'section': 'customers',
-        'phone': '0910000000',
-        'balanceUnits': 320,
-        'status': 'open',
-        // 🔶 Owner id so the fake can scope a list to the caller.
-        'assigneeUserId': demoEmployeeId,
-      },
-      {
-        'id': 'as_9',
-        'customerId': 'c_58',
-        'customerName': 'عميل موظف آخر',
-        'section': 'customers',
-        'phone': '0910000004',
-        'balanceUnits': 900,
-        'status': 'open',
-        'assigneeUserId': otherEmployeeId,
-      },
-    ],
-    'submissions': [
-      {
-        'id': 'sb_1',
-        'mode': 'partial',
-        'amountUnits': 100,
-        'status': 'pending',
+        'assignments': [
+          {
+            'id': 'as_1',
+            'customerId': 'c_55',
+            'customerName': 'عميل تجريبي',
+            'section': 'customers',
+            'phone': '0910000000',
+            'balanceUnits': 320,
+            'status': 'open',
+            // 🔶 Owner id so the fake can scope a list to the caller.
+            'assigneeUserId': demoEmployeeId,
+          },
+          {
+            'id': 'as_9',
+            'customerId': 'c_58',
+            'customerName': 'عميل موظف آخر',
+            'section': 'customers',
+            'phone': '0910000004',
+            'balanceUnits': 900,
+            'status': 'open',
+            'assigneeUserId': otherEmployeeId,
+          },
+        ],
+        'submissions': [
+          {
+            'id': 'sb_1',
+            'mode': 'partial',
+            'amountUnits': 100,
+            'status': 'pending',
+            'cashStatus': 'not_applicable',
+            'submittedByName': 'موظف استلام تجريبي',
+            'submittedByUserId': demoEmployeeId,
+            'createdAt': '2026-10-18T12:00:00+02:00',
+          },
+          {
+            'id': 'sb_2',
+            'mode': 'full',
+            'amountUnits': 250,
+            'status': 'approved',
+            'cashStatus': 'pending',
+            'cashPending': true,
+            'cashReceivedAt': null,
+            'submittedByName': 'موظف استلام تجريبي',
+            'submittedByUserId': demoEmployeeId,
+            'createdAt': '2026-10-18T09:30:00+02:00',
+          },
+          {
+            'id': 'sb_9',
+            'mode': 'partial',
+            'amountUnits': 900,
+            'status': 'pending',
+            'cashStatus': 'not_applicable',
+            'submittedByName': 'موظف آخر تجريبي',
+            'submittedByUserId': otherEmployeeId,
+            'createdAt': '2026-10-18T15:00:00+02:00',
+          },
+        ],
+        'unlinkedReceipts': [
+          {
+            'id': 'ur_1',
+            'customerName': 'اسم غير مربوط تجريبي',
+            'amountUnits': 50,
+            'status': 'pending',
+            'cashStatus': 'not_applicable',
+            'submittedByUserId': demoEmployeeId,
+          },
+          {
+            'id': 'ur_2',
+            'customerName': 'استلام مرفوض تجريبي',
+            'amountUnits': 40,
+            'status': 'rejected',
+            'cashStatus': 'pending',
+            'cashPending': true,
+            'submittedByUserId': demoEmployeeId,
+          },
+          {
+            'id': 'ur_9',
+            'customerName': 'إيصال موظف آخر',
+            'amountUnits': 900,
+            'status': 'pending',
+            'cashStatus': 'not_applicable',
+            'submittedByUserId': otherEmployeeId,
+          },
+        ],
+        'employeeTotals': [
+          {
+            // 🔶 userId is not a confirmed employeeTotals field.
+            'userId': demoEmployeeId,
+            'employeeName': 'موظف استلام تجريبي',
+            'collectedUnits': 0,
+            'approvedCount': 0,
+            'pendingCount': 1,
+          },
+          {
+            'userId': otherEmployeeId,
+            'employeeName': 'موظف آخر تجريبي',
+            'collectedUnits': 900,
+            'approvedCount': 4,
+            'pendingCount': 2,
+          },
+        ],
+        'metrics': {
+          'collectedUnits': 0,
+          'dayTotalUnits': 100,
+          'pendingCount': 1,
+          'unlinkedPendingCount': 1,
+          'cashOutstandingUnits': 250,
+        },
+        'assignedCount': 1,
+        'batchId': 'b_1',
         'version': 1,
-        'cashStatus': 'not_applicable',
-        'submittedByName': 'موظف استلام تجريبي',
-        'submittedByUserId': demoEmployeeId,
-        'createdAt': '2026-10-18T12:00:00+02:00',
-      },
-      {
-        'id': 'sb_2',
-        'mode': 'full',
-        'amountUnits': 250,
-        'status': 'approved',
-        'version': 3,
-        'cashStatus': 'pending',
-        'cashPending': true,
-        'cashReceivedAt': null,
-        'submittedByName': 'موظف استلام تجريبي',
-        'submittedByUserId': demoEmployeeId,
-        'createdAt': '2026-10-18T09:30:00+02:00',
-      },
-      {
-        'id': 'sb_9',
-        'mode': 'partial',
-        'amountUnits': 900,
-        'status': 'pending',
-        'version': 1,
-        'cashStatus': 'not_applicable',
-        'submittedByName': 'موظف آخر تجريبي',
-        'submittedByUserId': otherEmployeeId,
-        'createdAt': '2026-10-18T15:00:00+02:00',
-      },
-    ],
-    'unlinkedReceipts': [
-      {
-        'id': 'ur_1',
-        'customerName': 'اسم غير مربوط تجريبي',
-        'amountUnits': 50,
-        'status': 'pending',
-        'version': 1,
-        'cashStatus': 'not_applicable',
-        'submittedByUserId': demoEmployeeId,
-      },
-      {
-        'id': 'ur_2',
-        'customerName': 'استلام مرفوض تجريبي',
-        'amountUnits': 40,
-        'status': 'rejected',
-        'version': 4,
-        'cashStatus': 'pending',
-        'cashPending': true,
-        'submittedByUserId': demoEmployeeId,
-      },
-      {
-        'id': 'ur_9',
-        'customerName': 'إيصال موظف آخر',
-        'amountUnits': 900,
-        'status': 'pending',
-        'version': 1,
-        'cashStatus': 'not_applicable',
-        'submittedByUserId': otherEmployeeId,
-      },
-    ],
-    'employeeTotals': [
-      {
-        // 🔶 userId is not a confirmed employeeTotals field.
-        'userId': demoEmployeeId,
-        'employeeName': 'موظف استلام تجريبي',
-        'collectedUnits': 0,
-        'approvedCount': 0,
-        'pendingCount': 1,
-      },
-      {
-        'userId': otherEmployeeId,
-        'employeeName': 'موظف آخر تجريبي',
-        'collectedUnits': 900,
-        'approvedCount': 4,
-        'pendingCount': 2,
-      },
-    ],
-    'metrics': {
-      'collectedUnits': 0,
-      'dayTotalUnits': 100,
-      'pendingCount': 1,
-      'unlinkedPendingCount': 1,
-      'cashOutstandingUnits': 250,
-    },
-    'assignedCount': 1,
-    'batchId': 'b_1',
-    'version': 1,
-  };
+      };
 
   /// 🔶 Canned `GET /api/admin/employee-totals`.
   ///
@@ -892,30 +931,30 @@ class FakeFixtures {
   };
 
   static Map<String, dynamic> payroll() => {
-    'period': '2026-10',
-    'employees': [
-      {
-        'userId': demoEmployeeId,
-        'displayName': 'موظف استلام تجريبي',
-        'baseSalaryUnits': 1500,
-        'openingCarryUnits': 0,
-        'commissionsUnits': 50,
-        'withdrawalsUnits': 300,
-        'remainingUnits': 1250,
-        'entries': [],
-      },
-      {
-        'userId': otherEmployeeId,
-        'displayName': 'موظف آخر تجريبي',
-        'baseSalaryUnits': 2400,
-        'openingCarryUnits': 100,
-        'commissionsUnits': 80,
-        'withdrawalsUnits': 0,
-        'remainingUnits': 2580,
-        'entries': [],
-      },
-    ],
-  };
+        'period': '2026-10',
+        'employees': [
+          {
+            'userId': demoEmployeeId,
+            'displayName': 'موظف استلام تجريبي',
+            'baseSalaryUnits': 1500,
+            'openingCarryUnits': 0,
+            'commissionsUnits': 50,
+            'withdrawalsUnits': 300,
+            'remainingUnits': 1250,
+            'entries': [],
+          },
+          {
+            'userId': otherEmployeeId,
+            'displayName': 'موظف آخر تجريبي',
+            'baseSalaryUnits': 2400,
+            'openingCarryUnits': 100,
+            'commissionsUnits': 80,
+            'withdrawalsUnits': 0,
+            'remainingUnits': 2580,
+            'entries': [],
+          },
+        ],
+      };
 
   /// 🔶 Stored own-overview literals for [demoEmployeeId]. Not a sum of rows.
   /// Company metrics stay on [collections]. The fake substitutes this map when
@@ -931,88 +970,113 @@ class FakeFixtures {
   static const ownAssignedCount = 1;
 
   static Map<String, dynamic> masraweyaDay() => {
-    'businessDate': '2026-10-19',
-    'version': 2,
-    'previousValueUnits': 10000,
-    'purchasesUnits': 2000,
-    'entries': [
-      {'valueUnits': 3000, 'commissionUnits': 50},
-    ],
-    'workTotalUnits': 3050,
-    'remainingUnits': 8950,
-    'historicalAdjustmentUnits': 0,
-    'status': 'open',
-  };
+        'businessDate': '2026-10-19',
+        'version': 2,
+        'previousValueUnits': 10000,
+        'purchasesUnits': 2000,
+        'entries': [
+          {'valueUnits': 3000, 'commissionUnits': 50},
+        ],
+        'workTotalUnits': 3050,
+        'remainingUnits': 8950,
+        'historicalAdjustmentUnits': 0,
+        'status': 'open',
+      };
 
   /// Contract shape for GET /api/purchases/{merchant}. The view stamps the
   /// requested merchant key. Demo day id `12` keeps the correction path the
   /// screen already sends. Amounts are stored literals, not a local sum.
   static Map<String, dynamic> purchases() => {
-    'merchant': {'key': 'al_bayan', 'name': 'البيان'},
-    'day': {
-      'id': '12',
-      'dayNumber': 12,
-      'businessDate': '2026-10-19',
-      'status': 'draft',
-      'previousDebtUnits': 2000,
-      'previousVodafoneUnits': 80,
-      'todayResultUnits': 1053,
-      'todayPaidUnits': 500,
-      'totalDebtUnits': 2553,
-      'vodafoneRemainingUnits': 0,
-      'version': 3,
-      'correctionOpen': false,
-    },
-    'entries': [
-      {
-        'id': 'pe_1',
-        'dayId': '12',
-        'sequence': 1,
-        'dayNumber': 12,
-        'businessDate': '2026-10-19',
-        'dayStatus': 'draft',
-        'dayClosingDebtUnits': 2553,
-        'itemCode': 'vodafone_cash',
-        'itemLabel': 'فودافون كاش',
-        'egpValueUnits': 10000,
-        'calculationMode': 'divide',
-        'exchangeRate': '9.5',
-        'resultUnits': 1053,
-        'paidUnits': 500,
-        'remainingUnits': 553,
-        'vodafoneConsumedUnits': 0,
-        'actorName': 'مدير تجريبي',
-        'actorIsOwner': true,
-        'version': 1,
-        'dayVersion': 3,
-        'correctionOpen': false,
-        'createdAt': '2026-10-19T09:00:00+02:00',
-        'updatedAt': '2026-10-19T09:00:00+02:00',
-      },
-    ],
-    'nextBefore': null,
-    'registerTotals': {
-      'resultUnits': 50000,
-      'paidUnits': 47447,
-      'remainingUnits': 2553,
-      'vodafoneConsumedUnits': 0,
-      'vodafoneRemainingUnits': 0,
-    },
-  };
+        'merchant': {'key': 'al_bayan', 'name': 'البيان'},
+        'day': {
+          'id': '12',
+          'dayNumber': 12,
+          'businessDate': '2026-10-19',
+          'status': 'draft',
+          'previousDebtUnits': 2000,
+          'previousVodafoneUnits': 80,
+          'todayResultUnits': 1053,
+          'todayPaidUnits': 500,
+          'totalDebtUnits': 2553,
+          'vodafoneRemainingUnits': 0,
+          'version': 3,
+          'correctionOpen': false,
+        },
+        'entries': [
+          {
+            'id': 'pe_1',
+            'dayId': '12',
+            'sequence': 1,
+            'dayNumber': 12,
+            'businessDate': '2026-10-19',
+            'dayStatus': 'draft',
+            'dayClosingDebtUnits': 2553,
+            'itemCode': 'vodafone_cash',
+            'itemLabel': 'فودافون كاش',
+            'egpValueUnits': 10000,
+            'calculationMode': 'divide',
+            'exchangeRate': '9.5',
+            'resultUnits': 1053,
+            'paidUnits': 500,
+            'remainingUnits': 553,
+            'vodafoneConsumedUnits': 0,
+            'actorName': 'مدير تجريبي',
+            'actorIsOwner': true,
+            'version': 1,
+            'dayVersion': 3,
+            'correctionOpen': false,
+            'createdAt': '2026-10-19T09:00:00+02:00',
+            'updatedAt': '2026-10-19T09:00:00+02:00',
+          },
+          {
+            'id': 'pe_old',
+            'dayId': '11',
+            'sequence': 1,
+            'dayNumber': 11,
+            'businessDate': '2026-10-18',
+            'dayStatus': 'finalized',
+            'dayClosingDebtUnits': 2000,
+            'itemCode': 'fawry',
+            'itemLabel': 'فوري أمس',
+            'egpValueUnits': 1000,
+            'calculationMode': 'divide',
+            'exchangeRate': '10',
+            'resultUnits': 100,
+            'paidUnits': 100,
+            'remainingUnits': 0,
+            'vodafoneConsumedUnits': 0,
+            'actorName': 'مدير تجريبي',
+            'actorIsOwner': true,
+            'version': 1,
+            'dayVersion': 1,
+            'correctionOpen': false,
+            'createdAt': '2026-10-18T09:00:00+02:00',
+            'updatedAt': '2026-10-18T09:00:00+02:00',
+          },
+        ],
+        'nextBefore': null,
+        'registerTotals': {
+          'resultUnits': 50000,
+          'paidUnits': 47447,
+          'remainingUnits': 2553,
+          'vodafoneConsumedUnits': 0,
+          'vodafoneRemainingUnits': 0,
+        },
+      };
 
   static Map<String, dynamic> treasury() => {
-    'version': 7,
-    'totals': {
-      'receivablesUnits': 45000,
-      'liabilitiesUnits': 12000,
-      'activeCashUnits': 8000,
-      'egyptianSourceUnits': 95000,
-      'egyptianRate': '9.5',
-      'egyptianConvertedUnits': 10000,
-      'netUnits': 51000,
-      'activeCashTone': 'positive',
-    },
-  };
+        'version': 7,
+        'totals': {
+          'receivablesUnits': 45000,
+          'liabilitiesUnits': 12000,
+          'activeCashUnits': 8000,
+          'egyptianSourceUnits': 95000,
+          'egyptianRate': '9.5',
+          'egyptianConvertedUnits': 10000,
+          'netUnits': 51000,
+          'activeCashTone': 'positive',
+        },
+      };
 
   static Map<String, dynamic> cashLedger({String? before}) {
     if (before != null && before.isNotEmpty) {
@@ -1049,30 +1113,156 @@ class FakeFixtures {
     };
   }
 
-  static Map<String, dynamic> reports() => {
-    'items': [
-      {
+  static Map<String, dynamic> _reportRow() => {
         'sequence': 30,
         'date': '2026-10-18',
+        'businessDate': '2026-10-18',
         'receivablesUnits': 45000,
+        'liabilitiesUnits': 12000,
         'activeCashUnits': 8000,
         'egyptianSourceUnits': 95000,
         'egyptianConvertedUnits': 10000,
-        'liabilitiesUnits': 12000,
+        'egyptianRate': 10,
         'netUnits': 51000,
         'netChangeUnits': 1200,
+        'daily': {
+          'receivablesAddedUnits': 1200,
+          'paymentsUnits': 0,
+          'liabilitiesEffectUnits': 0,
+          'cashInUnits': 0,
+          'cashOutUnits': 0,
+        },
         'status': 'normal',
+        'summary': 'ملاحظة النظام',
         'note': 'ملاحظة النظام',
         'reasons': [
-          {'text': 'سبب تجريبي', 'changeUnits': 1200},
+          {
+            'key': 'demo',
+            'label': 'سبب تجريبي',
+            'text': 'سبب تجريبي',
+            'changeUnits': 1200,
+          },
         ],
-      },
-    ],
-    'methodology': {
-      'formula': 'ديون لنا + النشط + المصري − ديون علينا',
-      'note': 'نص من الخادم',
-    },
-  };
+        'version': 1,
+        'generatedAt': '2026-10-18T02:00:00+02:00',
+        'updatedAt': '2026-10-18T02:00:00+02:00',
+        'isFinalized': false,
+        'finalizedAt': null,
+        'fiveAmClosing': {
+          'state': 'pending',
+          'scheduledAt': '2026-10-19T03:00:00+02:00',
+          'capturedAt': null,
+          'netUnits': null,
+        },
+      };
+
+  static Map<String, dynamic> reports() => {
+        'current': _reportRow(),
+        'items': [_reportRow()],
+        'methodology': {
+          'formula': 'ديون لنا + النشط + المصري − ديون علينا',
+          'note': 'نص من الخادم',
+          'currency': 'LYD',
+        },
+      };
+
+  /// Contract financial-ledger rows. Newest first. `pageTotals` is the sum of
+  /// integer `effectUnits` on the returned page, which is what the server
+  /// sends. This is the fake standing in for that total.
+  static List<Map<String, dynamic>> financialLedgerItems() => [
+        {
+          'id': 4,
+          'sourceKind': 'debt_transaction',
+          'sourceId': 'src-cust',
+          'sectionKey': 'customer_debts',
+          'entryKind': 'payment',
+          'counterpartyName': 'عميل تجريبي',
+          'description': 'استلام تجريبي',
+          'referenceNo': 'CUST-1',
+          'currency': 'LYD',
+          'amountUnits': 100,
+          'effectUnits': -100,
+          'actorName': 'موظف استلام تجريبي',
+          'actorUsername': null,
+          'occurredAt': '2026-10-22T22:33:25.523Z',
+          'sourceStatus': 'posted',
+          'updatedAt': '2026-10-22T22:33:25.561Z',
+        },
+        {
+          'id': 3,
+          'sourceKind': 'treasury_cash',
+          'sourceId': 'src-cash',
+          'sectionKey': 'treasury',
+          'entryKind': 'in',
+          'counterpartyName': 'الخزينة',
+          'description': 'نقدية تجريبية',
+          'referenceNo': 'CASH-1',
+          'currency': 'LYD',
+          'amountUnits': 500,
+          'effectUnits': 500,
+          'actorName': 'مدير تجريبي',
+          'actorUsername': 'admin.demo',
+          'occurredAt': '2026-10-23T00:33:25.469+02:00',
+          'sourceStatus': 'posted',
+          'updatedAt': '2026-10-22T22:33:25.469Z',
+        },
+        {
+          'id': 2,
+          'sourceKind': 'purchase_entry',
+          'sourceId': 'src-buy',
+          'sectionKey': 'purchases',
+          'entryKind': 'purchase',
+          'counterpartyName': 'البيان',
+          'description': 'مشتريات تجريبية',
+          'referenceNo': 'PUR-1',
+          'currency': 'LYD',
+          'amountUnits': 100,
+          'effectUnits': 80,
+          'actorName': 'مدير تجريبي',
+          'actorUsername': 'admin.demo',
+          'occurredAt': '2026-10-22T22:33:25.399Z',
+          'sourceStatus': 'draft',
+          'updatedAt': '2026-10-22T22:33:25.399Z',
+        },
+        {
+          'id': 1,
+          'sourceKind': 'debt_transaction',
+          'sourceId': 'src-egp',
+          'sectionKey': 'egyptian_deposits',
+          'entryKind': 'debt',
+          'counterpartyName': 'أمانة مصرية تجريبية',
+          'description': 'رصيد افتتاحي',
+          'referenceNo': 'EDEP-1',
+          'currency': 'EGP',
+          'amountUnits': 10000,
+          'effectUnits': 10000,
+          'actorName': 'مدير تجريبي',
+          'actorUsername': 'admin.demo',
+          'occurredAt': '2026-10-22T22:33:25.214Z',
+          'sourceStatus': 'posted',
+          'updatedAt': '2026-10-22T22:33:25.214Z',
+        },
+      ];
+
+  static Map<String, dynamic> financialLedger({String? sectionKey}) {
+    final items = <Map<String, dynamic>>[
+      for (final row in financialLedgerItems())
+        if (sectionKey == null || row['sectionKey'] == sectionKey)
+          Map<String, dynamic>.from(row),
+    ];
+    final totals = <String, int>{};
+    for (final row in items) {
+      final currency = row['currency'];
+      final effect = row['effectUnits'];
+      if (currency is! String || effect is! int) continue;
+      totals[currency] = (totals[currency] ?? 0) + effect;
+    }
+    return {
+      'items': items,
+      'pageTotals': totals,
+      'nextBefore': null,
+    };
+  }
 
   /// Literal unread counts. The fake decrements these; it does not count rows.
   static const notificationUnreadCounts = <String, int>{
@@ -1085,57 +1275,57 @@ class FakeFixtures {
   /// and `employeeName` are not confirmed notification fields. `id` 77 stays
   /// the demo employee's row so the current screen can open it.
   static List<Map<String, dynamic>> notificationCatalog() => [
-    {
-      'id': '77',
-      'action': 'collection.submit',
-      'title': 'استلام جديد بانتظار المراجعة',
-      'body': 'افتح قسم الاستلامات',
-      'section': 'collections',
-      'entityId': 'sb_1',
-      'readAt': null,
-      'createdAt': '2026-10-18T12:00:00+02:00',
-      'systemName': 'الاستلامات',
-      'employeeName': 'موظف استلام تجريبي',
-      'recipientUserId': demoEmployeeId,
-    },
-    {
-      'id': '88',
-      'action': 'collection.submit',
-      'title': 'إشعار موظف آخر',
-      'body': 'لا يظهر لموظف غيره',
-      'section': 'collections',
-      'entityId': 'sb_9',
-      'readAt': null,
-      'createdAt': '2026-10-18T16:00:00+02:00',
-      'systemName': 'الاستلامات',
-      'employeeName': 'موظف آخر تجريبي',
-      'recipientUserId': otherEmployeeId,
-    },
-    {
-      'id': 'n_20',
-      'action': 'approve',
-      'title': 'إشعار ثان لموظف آخر',
-      'body': 'صف خاص',
-      'section': 'collections',
-      'entityId': 'sb_8',
-      'readAt': null,
-      'createdAt': '2026-10-18T10:00:00+02:00',
-      'systemName': 'الاستلامات',
-      'employeeName': 'موظف آخر تجريبي',
-      'recipientUserId': otherEmployeeId,
-    },
-    {
-      'id': 'n_1',
-      'action': 'cash_received',
-      'title': 'إشعار المدير',
-      'body': 'صف المدير',
-      'section': 'collections',
-      'entityId': 'sb_1',
-      'readAt': null,
-      'createdAt': '2026-10-18T09:00:00+02:00',
-      'systemName': 'الاستلامات',
-      'employeeName': 'مدير تجريبي',
-      'recipientUserId': 'u_1',
-    },
-  ];
+        {
+          'id': '77',
+          'action': 'collection.submit',
+          'title': 'استلام جديد بانتظار المراجعة',
+          'body': 'افتح قسم الاستلامات',
+          'section': 'collections',
+          'entityId': 'sb_1',
+          'readAt': null,
+          'createdAt': '2026-10-18T12:00:00+02:00',
+          'systemName': 'الاستلامات',
+          'employeeName': 'موظف استلام تجريبي',
+          'recipientUserId': demoEmployeeId,
+        },
+        {
+          'id': '88',
+          'action': 'collection.submit',
+          'title': 'إشعار موظف آخر',
+          'body': 'لا يظهر لموظف غيره',
+          'section': 'collections',
+          'entityId': 'sb_9',
+          'readAt': null,
+          'createdAt': '2026-10-18T16:00:00+02:00',
+          'systemName': 'الاستلامات',
+          'employeeName': 'موظف آخر تجريبي',
+          'recipientUserId': otherEmployeeId,
+        },
+        {
+          'id': 'n_20',
+          'action': 'approve',
+          'title': 'إشعار ثان لموظف آخر',
+          'body': 'صف خاص',
+          'section': 'collections',
+          'entityId': 'sb_8',
+          'readAt': null,
+          'createdAt': '2026-10-18T10:00:00+02:00',
+          'systemName': 'الاستلامات',
+          'employeeName': 'موظف آخر تجريبي',
+          'recipientUserId': otherEmployeeId,
+        },
+        {
+          'id': 'n_1',
+          'action': 'cash_received',
+          'title': 'إشعار المدير',
+          'body': 'صف المدير',
+          'section': 'collections',
+          'entityId': 'sb_1',
+          'readAt': null,
+          'createdAt': '2026-10-18T09:00:00+02:00',
+          'systemName': 'الاستلامات',
+          'employeeName': 'مدير تجريبي',
+          'recipientUserId': 'u_1',
+        },
+      ];
 }

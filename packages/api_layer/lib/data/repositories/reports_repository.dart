@@ -6,8 +6,27 @@ import '../models/report_models.dart';
 /// Read-only: daily smart reports, admin financial ledger, statement PDF.
 abstract interface class ReportsRepository {
   Future<ReportsDto> daily({int limit = 30});
-  Future<FinancialLedgerPage> financialLedger(
-      {String? before, String? section, String? currency, String? q});
+
+  /// [sectionKey] is the contract ledger section (`customer_debts`, …).
+  /// It is sent as the query `section`, which is the name
+  /// `GET /api/financial-ledger` documents. No other list operation in the
+  /// contract documents a section filter. When both [sectionKey] and the
+  /// legacy [section] string are set, [sectionKey] is sent. A string that is
+  /// not a [FinancialLedgerSectionKey] wire value throws [ArgumentError].
+  ///
+  /// P-14 api (G-12).
+  Future<FinancialLedgerPage> financialLedger({
+    String? before,
+    @Deprecated(
+      'Pass sectionKey (FinancialLedgerSectionKey?). '
+      'A raw string is mapped through that enum and throws ArgumentError '
+      'when unknown.',
+    )
+    String? section,
+    FinancialLedgerSectionKey? sectionKey,
+    String? currency,
+    String? q,
+  });
 
   /// Proposed GET /api/statements/pdf. The server has no PDF export.
   /// Callers must use this only when the client is the fake API.
@@ -26,17 +45,24 @@ class RemoteReportsRepository implements ReportsRepository {
   }
 
   @override
-  Future<FinancialLedgerPage> financialLedger(
-      {String? before,
-      String? section,
-      String? currency,
-      String? q}) async {
+  Future<FinancialLedgerPage> financialLedger({
+    String? before,
+    @Deprecated(
+      'Pass sectionKey (FinancialLedgerSectionKey?). '
+      'A raw string is mapped through that enum and throws ArgumentError '
+      'when unknown.',
+    )
+    String? section,
+    FinancialLedgerSectionKey? sectionKey,
+    String? currency,
+    String? q,
+  }) async {
     const path = ApiEndpoints.financialLedger;
     final data = (await _api.get(path, query: {
       'before': before,
-      'section': section,
+      'section': _financialLedgerSection(sectionKey, section),
       'currency': currency,
-      'q': q
+      'q': q,
     }))
         .data;
     return runWithMoneyEndpoint(
@@ -46,7 +72,8 @@ class RemoteReportsRepository implements ReportsRepository {
   }
 
   @override
-  Future<StatementFile> statementPdf({String? section, String? accountId}) async {
+  Future<StatementFile> statementPdf(
+      {String? section, String? accountId}) async {
     final data = (await _api.get(ApiEndpoints.statementPdf, query: {
       if (section != null) 'section': section,
       if (accountId != null) 'accountId': accountId,
@@ -54,4 +81,30 @@ class RemoteReportsRepository implements ReportsRepository {
         .data;
     return StatementFile.fromData(data);
   }
+}
+
+/// Wire value for `GET /api/financial-ledger?section`. A known [sectionKey]
+/// wins. [FinancialLedgerSectionKey.unknown] is not a query the contract
+/// names. A raw [section] string is sent only when
+/// [FinancialLedgerSectionKey.fromWire] recognizes it. Any other string
+/// throws [ArgumentError] so the unfiltered ledger is not returned.
+String? _financialLedgerSection(
+  FinancialLedgerSectionKey? sectionKey,
+  String? section,
+) {
+  if (sectionKey != null &&
+      sectionKey != FinancialLedgerSectionKey.unknown &&
+      sectionKey.wire.isNotEmpty) {
+    return sectionKey.wire;
+  }
+  if (section == null) return null;
+  final parsed = FinancialLedgerSectionKey.fromWire(section);
+  if (parsed == null) {
+    throw ArgumentError.value(
+      section,
+      'section',
+      'Unknown ledger section. Pass FinancialLedgerSectionKey.',
+    );
+  }
+  return parsed.wire;
 }
