@@ -90,4 +90,4 @@
 
 ## إعادة التشغيل
 
-يمكن إعادة الفحص بالأسرار في CI (`STAGING_API_BASE` و`STAGING_ADMIN_USERNAME` و`STAGING_ADMIN_PASSWORD`، ومثلها للدورين الآخرين)، أو عبر `staging_smoke_test.dart` بعد إصلاح G-05. انظر `integration-plan.ar.md`.
+إعادة الفحص الذي يسجّل الدخول تتم على جهاز البوت فقط. GitHub لا يخزّن أسماء المستخدمين ولا كلمات المرور، لا كأسرار ولا كمتغيرات. السر الوحيد لوظيفة الدخان هو `STAGING_API_BASE`. انظر `staging-smoke.ar.md` و`integration-plan.ar.md`.

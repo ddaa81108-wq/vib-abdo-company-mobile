@@ -38,7 +38,8 @@ void main() {
     expect(p.canRead(SectionKey.companies), isTrue);
     expect(p.canWrite(SectionKey.companies), isFalse);
     expect(p.canRead(SectionKey.treasury), isFalse);
-    expect(p.canWrite(SectionKey.masraweya), isFalse); // write code without the read code, per API contract
+    expect(p.canWrite(SectionKey.masraweya),
+        isFalse); // write code without the read code, per API contract
     expect(p.canRead(SectionKey.masraweya), isFalse);
     expect(p.canRead(SectionKey.reports), isFalse);
     expect(p.canWrite(SectionKey.collections),
@@ -129,13 +130,45 @@ void main() {
     }
   });
 
-  test(
-      'employee with codes but no sectionAccess fails closed (except collections)',
+  test('absent sectionAccess: read and write codes alone grant the section',
       () {
     final p = PermissionService()
       ..applyFromServer(['debts.read', 'debts.write', 'collections.read'],
           role: 'employee');
+    expect(p.canRead(SectionKey.customers), isTrue);
+    expect(p.canWrite(SectionKey.customers), isTrue);
+    expect(p.canRead(SectionKey.collections), isTrue);
+    expect(p.canWrite(SectionKey.collections), isFalse);
+    expect(p.canRead(SectionKey.treasury), isFalse);
+    expect(p.canViewFinancialLedger, isFalse);
+  });
+
+  test('a present sectionAccess map still fails closed for a missing key', () {
+    final p = PermissionService()
+      ..applyFromServer(
+        [
+          'debts.read',
+          'debts.write',
+          'collections.read',
+          'collections.write',
+        ],
+        role: 'employee',
+        sectionAccess: const {},
+      );
+    expect(p.canRead(SectionKey.customers), isFalse);
+    expect(p.canWrite(SectionKey.customers), isFalse);
     expect(p.visibleSections, [SectionKey.collections]);
+    expect(p.canWrite(SectionKey.collections), isTrue);
+  });
+
+  test('admin with codes and no sectionAccess is limited to those codes', () {
+    final p = PermissionService()
+      ..applyFromServer(const ['debts.read'], role: 'admin');
+    expect(p.fullAccess, isFalse);
+    expect(p.canRead(SectionKey.customers), isTrue);
+    expect(p.canWrite(SectionKey.customers), isFalse);
+    expect(p.canRead(SectionKey.treasury), isFalse);
+    expect(p.canViewFinancialLedger, isFalse);
   });
 
   test(

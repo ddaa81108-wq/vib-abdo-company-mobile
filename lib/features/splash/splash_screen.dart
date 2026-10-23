@@ -19,7 +19,7 @@ class SplashScreen extends ConsumerWidget {
     if (startup.hasError) {
       final theme = Theme.of(context);
       final failure = ref.watch(errorHandlerProvider).toFailure(startup.error!);
-      if (failure.code == 'FORBIDDEN') {
+      if (failure.isForbidden) {
         return const Scaffold(key: screenKey, body: ForbiddenPane());
       }
       final message = failureText(failure);

@@ -216,7 +216,9 @@ class _ScreenTransport implements HttpClientAdapter {
       Headers.contentTypeHeader: ['application/json'],
     };
     if (path == ApiEndpoints.login) {
-      headers['set-cookie'] = ['session=phase7-session; Path=/; HttpOnly'];
+      headers['set-cookie'] = [
+        '${ApiConfig.sessionCookieName}=phase7-session; Path=/; HttpOnly; Secure; SameSite=Strict',
+      ];
     }
     return ResponseBody.fromString(
       jsonEncode({'ok': true, 'data': _data(path, options.method)}),
