@@ -130,7 +130,10 @@ class CookieNotificationPollFetcher {
     try {
       final request = await http.getUrl(Uri.parse('$baseUrl$path'));
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      request.headers.set('X-Client-Api-Version', '1');
+      request.headers.set(
+        ApiConfig.clientApiVersionHeader,
+        ApiConfig.clientApiVersion,
+      );
       request.headers.set(HttpHeaders.cookieHeader, cookieHeader);
       final response = await request.close().timeout(
         const Duration(seconds: 20),

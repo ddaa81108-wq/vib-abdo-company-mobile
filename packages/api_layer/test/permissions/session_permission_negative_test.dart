@@ -334,4 +334,10 @@ class _LogoutOnExpiry implements AuthStrategy {
 
   @override
   Future<void> onSessionResumed() async {}
+
+  @override
+  Future<void> acquireWrite(RequestOptions options) async {}
+
+  @override
+  void releaseWrite(RequestOptions options) {}
 }

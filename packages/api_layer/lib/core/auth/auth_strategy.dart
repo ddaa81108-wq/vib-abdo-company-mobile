@@ -23,6 +23,16 @@ abstract interface class AuthStrategy {
   /// Attach credentials. [authenticated] is false for public endpoints (login, csrf).
   Future<void> attach(RequestOptions options, {required bool authenticated});
 
+  /// Serializes POST, PUT, PATCH, and DELETE when a strategy must not overlap
+  /// a CSRF refresh. GET and HEAD return immediately. A replay of the same
+  /// [options] must not take a second turn.
+  ///
+  /// Only [CookieCsrfAuthStrategy] queues. Other strategies return immediately.
+  Future<void> acquireWrite(RequestOptions options);
+
+  /// Releases a turn taken by [acquireWrite]. Safe to call more than once.
+  void releaseWrite(RequestOptions options);
+
   /// Inspect every response (success or error), e.g. persist Set-Cookie.
   Future<void> capture(Response<dynamic> response);
 

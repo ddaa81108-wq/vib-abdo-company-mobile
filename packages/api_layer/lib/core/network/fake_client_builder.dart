@@ -5,9 +5,11 @@ import 'package:dio/dio.dart';
 
 import '../../data/fake/fake_api_client.dart';
 import '../auth/auth_strategy.dart';
+import '../auth/cookie_csrf_auth_strategy.dart';
 import '../auth/cookie_store.dart';
 import '../config/api_config.dart';
 import '../session/token_storage.dart';
+import 'api_endpoints.dart';
 import 'api_exception.dart';
 import 'auth_interceptor.dart';
 import 'dio_api_client.dart';
@@ -115,12 +117,22 @@ class _FakeCookieStrategy implements AuthStrategy {
     if (setCookie != null && setCookie.isNotEmpty) {
       await _cookies.saveFromSetCookie(setCookie);
     }
+    final path = response.requestOptions.uri.path;
+    final raw = response.requestOptions.path;
+    final publishes = path == ApiEndpoints.login ||
+        raw == ApiEndpoints.login ||
+        path == ApiEndpoints.csrf ||
+        raw == ApiEndpoints.csrf;
+    if (!publishes) return;
+    final status = response.statusCode ?? 0;
+    if (status < 200 || status >= 300) return;
+    final token = csrfTokenFromPayload(response.data);
+    if (token != null) _csrfToken = token;
   }
 
   @override
   Future<void> onLoginSucceeded(Map<String, dynamic> loginData) async {
-    final token = loginData['csrfToken'];
-    _csrfToken = token is String && token.isNotEmpty ? token : null;
+    _csrfToken = csrfTokenFromPayload(loginData);
   }
 
   @override
@@ -148,6 +160,12 @@ class _FakeCookieStrategy implements AuthStrategy {
     await _cookies.clear();
     await _tokens.clear();
   }
+
+  @override
+  Future<void> acquireWrite(RequestOptions options) async {}
+
+  @override
+  void releaseWrite(RequestOptions options) {}
 }
 
 /// Speaks HTTP to [FakeApiClient] on this isolate. No socket.

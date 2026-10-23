@@ -50,7 +50,9 @@ class BearerTokenAuthStrategy implements AuthStrategy {
       await _tokens.saveTokens(
         accessToken: access,
         refreshToken: refresh,
-        expiresInSeconds: (loginData['expiresIn'] is int ? loginData['expiresIn'] as int : null),
+        expiresInSeconds: (loginData['expiresIn'] is int
+            ? loginData['expiresIn'] as int
+            : null),
       );
     }
   }
@@ -75,4 +77,10 @@ class BearerTokenAuthStrategy implements AuthStrategy {
 
   @override
   Future<void> clear() => _tokens.clear();
+
+  @override
+  Future<void> acquireWrite(RequestOptions options) async {}
+
+  @override
+  void releaseWrite(RequestOptions options) {}
 }
