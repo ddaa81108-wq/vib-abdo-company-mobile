@@ -671,11 +671,11 @@ void main() {
     expect(find.byKey(const Key('ledger-total-EGP')), findsOneWidget);
     expect(
       tester.widget<MoneyText>(find.byKey(const Key('ledger-total-LYD'))).text,
-      '0 د.ل',
+      '480 د.ل',
     );
     expect(
       tester.widget<MoneyText>(find.byKey(const Key('ledger-total-EGP'))).text,
-      '0 ج.م',
+      '10,000 ج.م',
     );
 
     await go(tester, '/settings/employees');

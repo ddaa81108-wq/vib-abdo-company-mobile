@@ -329,24 +329,29 @@ void main() {
     expect(reports.formula, isNotNull);
   });
 
-  test(
-    'reports expose current.daily and current.summary',
-    () async {
-      final api = await _session();
-      final raw = _data(samples, 'GET /api/reports');
-      api.scriptedGetJson[ApiEndpoints.reports] = jsonEncode(raw);
-      final reports = await RemoteReportsRepository(api).daily();
-      expect(reports.rows.single.netChangeUnits, isNull);
-      expect(
-        reports.methodologyNote,
-        raw['current']['summary'],
-      );
-    },
-    skip: 'No id in gap-analysis section 0. ReportsDto reads items[] and '
-        'methodology.note. It does not read current, current.daily, or '
-        'current.summary. G-12 is only sectionKey, sourceStatus, and '
-        'occurredAt.',
-  );
+  test('reports expose current.daily and current.summary', () async {
+    final api = await _session();
+    final raw = _data(samples, 'GET /api/reports');
+    api.scriptedGetJson[ApiEndpoints.reports] = jsonEncode(raw);
+    final reports = await RemoteReportsRepository(api).daily();
+    final wire = (raw['current'] as Map).cast<String, dynamic>();
+    final daily = (wire['daily'] as Map).cast<String, dynamic>();
+    final current = reports.current!;
+    expect(current.summary, wire['summary']);
+    expect(
+      current.daily!.receivablesAddedUnits?.asInt,
+      daily['receivablesAddedUnits'],
+    );
+    expect(current.daily!.paymentsUnits?.asInt, daily['paymentsUnits']);
+    expect(
+      current.daily!.liabilitiesEffectUnits?.asInt,
+      daily['liabilitiesEffectUnits'],
+    );
+    expect(current.daily!.cashInUnits?.asInt, daily['cashInUnits']);
+    expect(current.daily!.cashOutUnits?.asInt, daily['cashOutUnits']);
+    final item = ((raw['items'] as List).single as Map).cast<String, dynamic>();
+    expect(reports.rows.single.summary, item['summary']);
+  });
 
   test('the financial ledger keeps integer page totals and row amounts',
       () async {
@@ -364,22 +369,18 @@ void main() {
     );
   });
 
-  test(
-    'a financial ledger row uses sectionKey, sourceStatus, and occurredAt',
-    () async {
-      final api = await _session();
-      final raw = _data(samples, 'GET /api/financial-ledger');
-      api.scriptedGetJson[ApiEndpoints.financialLedger] = jsonEncode(raw);
-      final page = await RemoteReportsRepository(api).financialLedger();
-      final wire = (raw['items'] as List).first as Map;
-      final row = page.page.items.first;
-      expect(row.section, wire['sectionKey']);
-      expect(row.status, wire['sourceStatus']);
-      expect(row.createdAt, isNotNull);
-    },
-    skip: 'G-12. FinancialLedgerEntryDto reads section, status, and createdAt. '
-        'The sample sends sectionKey, sourceStatus, and occurredAt.',
-  );
+  test('a financial ledger row uses sectionKey, sourceStatus, and occurredAt',
+      () async {
+    final api = await _session();
+    final raw = _data(samples, 'GET /api/financial-ledger');
+    api.scriptedGetJson[ApiEndpoints.financialLedger] = jsonEncode(raw);
+    final page = await RemoteReportsRepository(api).financialLedger();
+    final wire = (raw['items'] as List).first as Map;
+    final row = page.page.items.first;
+    expect(row.section, wire['sectionKey']);
+    expect(row.status, wire['sourceStatus']);
+    expect(row.createdAt, isNotNull);
+  });
 
   test('login and /api/me map the user; sectionAccess is absent on the sample',
       () {
