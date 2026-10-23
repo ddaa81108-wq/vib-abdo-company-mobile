@@ -471,7 +471,7 @@
 
 **إعادة الاختبار على PR #30 (`fe69157`، فوق `main`، ليس على `main` بعد):** verified on #30 fe69157, not yet on main. `bash tool/check.sh` خرج 0 (التطبيق 251/0، الحزمة 79/0).
 
-`DEF-014 finalized purchase day rejects entry create update and delete`: بعد الاعتماد الإصدار 4، الإضافة والتعديل والحذف كل منها 409 `DAY_FINALIZED`، وبصمة الدفتر لا تتغير. إعادة نفس `requestId` الذي نجح على المسودة لا تتجاوز الرفض (`DEF-014 a stored requestId does not bypass the finalized-day check`). الواجهة تخفي `add-purchase-12` و`edit-pe_1` و`delete-pe_1` وتبقي `open-correction-12` (`a finalized purchases day hides add edit and delete`). حفظ أو حذف بعد الاعتماد يعرض رسالة الخادم لا رسالة تعارض الإصدار. الموظف و`limited.admin.demo` و`guest.demo` يأخذون 403 قبل ذلك لأنهم بلا `purchases.write`. يوم `correction` يبقى قابلًا للكتابة.
+`DEF-014 finalized purchase day rejects entry create update and delete`: بعد الاعتماد الإصدار 4، الإضافة والتعديل والحذف كل منها 409 `DAY_FINALIZED`، وبصمة الدفتر لا تتغير. `DAY_FINALIZED` هنا رمز `FakeApiClient` فقط (`packages/api_layer/lib/data/fake/fake_api_client.dart:280-284`). هذا النص غير موجود في `docs/api/error-catalog.json` ولا في `docs/api/openapi.json`. الكتالوج يسمي الرفض `PURCHASE_DAY_FINALIZED` بحالة 409 (`error-catalog.json:942` و`:967` و`:1035`). الرمز في الـ Fake بديل مؤقت وليس رمزًا أكده الخادم. إعادة نفس `requestId` الذي نجح على المسودة لا تتجاوز الرفض (`DEF-014 a stored requestId does not bypass the finalized-day check`). الواجهة تخفي `add-purchase-12` و`edit-pe_1` و`delete-pe_1` وتبقي `open-correction-12` (`a finalized purchases day hides add edit and delete`). حفظ أو حذف بعد الاعتماد يعرض رسالة الخادم لا رسالة تعارض الإصدار. الموظف و`limited.admin.demo` و`guest.demo` يأخذون 403 قبل ذلك لأنهم بلا `purchases.write`. يوم `correction` يبقى قابلًا للكتابة.
 
 **على `main` (`451ec58`):** verified on main 451ec58. الدمج `#30` هو `52d12c2`. `a finalized purchases day hides add edit and delete` ناجح ضمن المجموعة.
 
@@ -980,9 +980,9 @@ CI [39815316603](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions
 
 الحالات العشر في جدول المرحلة 8 لها شاشة ومسار. `MoneyFormatter` عند المقياس 0 لا يقرّب العدد الصحيح. سلوك Fake ليس دليل الموقع.
 
-### DEF-029 — مقياس وحدة المال غير مؤكد
+### DEF-029 — مقياس وحدة المال
 
-**الحالة:** Closed. التاريخ 2026-10-23. القرار في `docs/api/defect-decisions.ar.md` (DEF-029): وحدة عملة كاملة، والمقياس 0 صحيح. لا تغيير في كود الحساب. عمود الموقع في جدول المرحلة 8 يبقى فارغًا.
+**الحالة:** Closed. التاريخ 2026-10-23. المبالغ وحدات عملة كاملة، والمقياس 0. confirmed on staging per site handoff evidence (commit 537f073). هذا الالتزام مذكور في `docs/api/evidence/MATCHING.ar.md:3` وليس التزامًا في مستودع التطبيق. لا تغيير في كود الحساب. عمود الموقع في جدول المرحلة 8 يبقى فارغًا. `docs/api/staging-readonly-check.ar.md` §3 يصف أسماء الحقول ولا يذكر المقياس.
 
 | الحقل | القيمة |
 |---|---|
@@ -992,7 +992,7 @@ CI [39815316603](https://github.com/ddaa81108-wq/vib-abdo-company-mobile/actions
 | المالك المقترح | مهندس تكامل API + QA للتوثيق |
 | الحالة | Closed |
 
-**الدليل:** `openapi.json` `components.schemas.Transaction.inputValue` يقول «Whole currency units, not minor units» (`docs/api/openapi.json:31254-31257`). عينة الموقع `balanceUnits: 1000` مع `currency: LYD` (`docs/api/evidence/api-samples.json:108-109`). جدول المطابقة يضع 1000 LYD مقابل `ledger.customer.balanceUnits` (`docs/api/evidence/MATCHING.ar.md:11`). `ApiConfig.moneyUnitScale` يبقى 0 (`api_config.dart:73-75`). وسم 🔶 في تعليق الإعداد لم يُحذف هنا لأن هذا الطلب لا يمس `lib/` ولا `packages/*/lib`.
+**الدليل:** `docs/api/openapi.json:31254-31257` يجعل `Transaction.inputValue` عددًا صحيحًا (`integer`) ووصفه «Whole currency units, not minor units». `docs/api/README.ar.md:45` يقول إن `amountUnits` و`balanceUnits` و`inputValue` و`egpValueUnits` و`paidUnits` وحدات عملة كاملة، وليست ×100 ولا ×1000، وإن 250 يعني 250 دينارًا. القرار في `docs/api/defect-decisions.ar.md` (DEF-029) يغلق المقياس على 0. عينة الموقع: `balanceUnits` 1000 (`api-samples.json:108` و`:1620`)، ثم 750 بعد دفع 250 (`:1719`)، ثم 0 بعد سداد 750 (`:1818`). جدول المطابقة يضع نفس التسلسل 1000 ثم 750 ثم 0 LYD (`MATCHING.ar.md:11-13`). اللقطات `03-customer-initial.png` و`04-customer-after-partial.png` و`05-customer-after-full.png` تعرض «1.000 د.ل» ثم «750 د.ل» ثم «0 د.ل». `ApiConfig.moneyUnitScale` يبقى 0 (`api_config.dart:73-75`). وسم 🔶 في تعليق الإعداد لم يُحذف هنا لأن هذا الطلب لا يمس `lib/` ولا `packages/*/lib`. سطر `MONEY_UNIT_SCALE` في `docs/staging.md:33` و`:109` ما زال يقول Unconfirmed؛ هذا الملف لم يُعدَّل هنا.
 
 ### DEF-030 — نطاق ملخص القسم مع البحث والفلتر غير مكتوب
 
