@@ -58,8 +58,10 @@ void main() {
     final me = await employee.get('/api/me');
     expect((me.data as Map)['user']['id'], FakeFixtures.demoEmployeeId);
 
-    final ledger = await employee.get('/api/customers/c_55/ledger');
-    expect(ledger.statusCode, 200);
+    await expectLater(
+      employee.get('/api/customers/c_55/ledger'),
+      throwsA(_forbiddenMatcher(deniedMessage)),
+    );
 
     for (final call in _notFound) {
       await expectLater(

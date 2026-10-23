@@ -20,7 +20,7 @@ void main() {
       expect(layer.permissions.canRead(SectionKey.treasury), isFalse);
       expect(layer.permissions.canWrite(SectionKey.treasury), isFalse);
       expect(
-        find.byKey(HomeShell.sectionKey(SectionKey.customers)),
+        find.byKey(HomeShell.sectionKey(SectionKey.collections)),
         findsOneWidget,
       );
       expect(
