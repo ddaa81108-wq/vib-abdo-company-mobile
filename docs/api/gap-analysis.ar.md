@@ -30,10 +30,10 @@
 | G-10 | `checkDuplicate`/`allowDuplicate` لا يُرسلان أبدًا، فلا يظهر تحذير «معاملة مماثلة اليوم» الذي يعرضه الموقع | متوسط | §7 |
 | G-11 | شريط الإجمالي يعرض `netBalance` عنوانًا رئيسيًا لكل الأقسام. العقد يقول إن العملاء والشركات يعرضون `totalDebt` والأمانات تعرض `netBalance` | متوسط | §2 |
 | G-12 | حقول دفتر المالية: التطبيق يقرأ `section` و`status` و`createdAt`، والخادم يعيد `sectionKey` و`sourceStatus` و`occurredAt` **[staging ✔]**. كائنات التقرير في G-18 | متوسط | §2 |
-| G-13 | سقف السداد المحلي (#53) يمنع مبلغًا أكبر من الرصيد. الخادم يقبله وينشئ رصيدًا سالبًا (DEF-031) | متوسط (قرار PM) | §2 |
-| G-16 | رواتب التحصيل: العقد يعيد `employeeName`، والتطبيق لا يقرؤه ولا يعرضه. `PayrollEmployeeDto` يقرأ `displayName` أو `name` (`collection_models.dart:268`) فيبقى الاسم فارغًا. المالك UI+API. اختبار QA المتخطى «payroll employeeName is the displayed name» في PR #72 عند `packages/api_layer/test/contract/site_contract_test.dart:262-275` | متوسط | §2 |
-| G-17 | إشعار `sectionKey`: لا يُقرأ ولا يُستخدم لتوجيه الإشعار أو تصفيته. `NotificationDto` يقرأ `section` (`notification_models.dart:40`). المالك API+UI. اختبار QA المتخطى «a notification row uses sectionKey» في PR #72 عند `packages/api_layer/test/contract/site_contract_test.dart:302-315` | متوسط | §2 |
-| G-18 | التقارير `current` و`daily` و`summary`: لا تُقرأ ولا تُعرض على `main`. جزء api_layer في PR #77 (P-13) وجزء الواجهة في P-14. انظر صف «التقارير» في §2. اختبار QA المتخطى «reports expose current.daily and current.summary» في PR #72 عند `packages/api_layer/test/contract/site_contract_test.dart:332-349` | متوسط | §2 |
+| G-13 | سقف السداد المحلي (#53) يمنع مبلغًا أكبر من الرصيد. الخادم يقبله وينشئ رصيدًا سالبًا (DEF-031). حسب العقد، يُتحقق في P-19 | متوسط | §2 |
+| G-16 | رواتب التحصيل: العقد يعيد `employeeName`، والتطبيق لا يقرؤه ولا يعرضه. `PayrollEmployeeDto` يقرأ `displayName` أو `name` (`collection_models.dart:268`) فيبقى الاسم فارغًا. المالك UI+API. اختبار QA المتخطى «payroll employeeName is the displayed name» على main عند `packages/api_layer/test/contract/site_contract_test.dart:262-275` | متوسط | §2 |
+| G-17 | إشعار `sectionKey`: لا يُقرأ ولا يُستخدم لتوجيه الإشعار أو تصفيته. `NotificationDto` يقرأ `section` (`notification_models.dart:40`). المالك API+UI. اختبار QA المتخطى «a notification row uses sectionKey» على main عند `packages/api_layer/test/contract/site_contract_test.dart:302-315` | متوسط | §2 |
+| G-18 | التقارير `current` و`daily` و`summary`: لا تُقرأ ولا تُعرض على `main`. PR #77 هو P-14 (G-12). G-18 يتبع P-14 فقط. انظر صف «التقارير» في §2. اختبار QA المتخطى «reports expose current.daily and current.summary» على main عند `packages/api_layer/test/contract/site_contract_test.dart:332-349` | متوسط | §2 |
 | G-14 | `Paged.hasMore` يتجاهل `nextBefore`. الأثر يقتصر على من يقرأ `hasMore`، والتطبيق حاليًا لا يقرؤه | منخفض | §4 |
 
 ---
@@ -123,11 +123,11 @@
 | `employeeTotals` | يُقرأ `userId` ثم `employeeId` | `employeeId` و`employeeName` و`collectedUnits` و`approvedCount` و`pendingCount`. للمدير فقط **[staging ✔]** | يطابق عند ضبط المصدر على `collections` | — |
 | عملة الاستلامات | `Currency.lyd` ثابت (`collection_models.dart:198`) | LYD (`README.ar.md:59`). لا حقل `currency` في الرد **[staging ✔]** | يطابق (DEF-035) | — |
 | **دفتر المالية** | `section` و`status` و`createdAt` و`description`، و`scopeTotals` ثم `pageTotals` (`report_models.dart:122-170`) | `sectionKey` و`sourceStatus` و`occurredAt` و`entryKind` و`effectUnits` و`counterpartyName`. `pageTotals.{LYD,EGP}` **إجمالي الصفحة فقط** **[staging ✔]** | القسم والحالة والتاريخ فارغة. يجب أن تقول التسمية «إجمالي الصفحة» | متوسط |
-| **التقارير** | `items` ثم `rows`، و`egyptianUnits` و`netChangeUnits` و`note`/`systemNote` (`report_models.dart:40-120`) | `current` و`items[]{...,daily,reasons,fiveAmClosing,summary}` و`methodology` **[staging ✔]** | **G-18:** `current` و`daily` و`summary` لا تُقرأ على `main`. جزء api_layer في PR #77 (P-13) والعرض في P-14. `netChangeUnits` غير موجود | متوسط |
+| **التقارير** | `items` ثم `rows`، و`egyptianUnits` و`netChangeUnits` و`note`/`systemNote` (`report_models.dart:40-120`) | `current` و`items[]{...,daily,reasons,fiveAmClosing,summary}` و`methodology` **[staging ✔]** | **G-18:** `current` و`daily` و`summary` لا تُقرأ على `main`. PR #77 هو P-14 (G-12)، وG-18 يتبع P-14 فقط. `netChangeUnits` غير موجود | متوسط |
 | الإشعار | `items` و`unreadCount` و`nextBefore` | يطابق **[staging ✔]**. `details` كائن حر وقد يحمل `amountUnits` و`subjectName` | لا تُعرض مبالغ ولا أسماء في الإشعار المحلي (قاعدة الأمان) | منخفض |
 | `/api/me` | `role` و`permissions` و`sectionAccess` و`mustChangePassword` (`profile_models.dart`) | `user.{id,username,displayName,role,isOwner,permissions,mustChangePassword}`. **`sectionAccess` غير موجود في `/api/me`** **[staging ✔]**. `role=admin` يتجاوز القائمة، و`permissions` للمدير `[]` | انظر §3.3 | عالٍ |
 | سعر الصرف | `DecimalString` | `egpPerLyd` عدد JSON، و`factorMicros` في الكشف | يطابق | — |
-| سداد يتجاوز الرصيد | الحوار يرفض المبلغ الأكبر من الرصيد المخزَّن (`lib/features/accounts/ledger_screen.dart:431-443`، #53) | الخادم **لا يرفض** وينشئ رصيدًا سالبًا. لا كود `OVERPAYMENT` (`README.ar.md:66`) | سلوك مختلف عن الموقع (DEF-031) | متوسط |
+| سداد يتجاوز الرصيد | الحوار يرفض المبلغ الأكبر من الرصيد المخزَّن (`lib/features/accounts/ledger_screen.dart:431-443`، #53) | الخادم **لا يرفض** وينشئ رصيدًا سالبًا. لا كود `OVERPAYMENT` (`README.ar.md:66`) | سلوك مختلف عن الموقع (DEF-031). حسب العقد، يُتحقق في P-19 | متوسط |
 
 ---
 
@@ -150,7 +150,7 @@
 | البند | التطبيق اليوم | العقد | الفجوة | الشدة |
 |---|---|---|---|---|
 | انتهاء الجلسة | كل 401 مصادَق عليه، وكل 419 غير CSRF، يمسحان الجلسة مرة واحدة (single-flight `_wipeInFlight`، `core/session/session_manager.dart:146-176`، `error_mapper.dart:124-135`) | `401 AUTH_REQUIRED`. **لا يوجد 419 في الكتالوج** (`error-catalog.json`) | المنطق آمن، وفرع 419 دفاعي فقط. **استثناء:** `401 INVALID_CURRENT_PASSWORD` على تغيير كلمة المرور يمسح الجلسة خطأً | عالٍ |
-| خطأ CSRF | أي كود يحوي «CSRF» يصبح `CsrfInvalidException` (`error_mapper.dart:29,106`)، ثم تجديد مرة واحدة single-flight، ثم إعادة الطلب مرة واحدة (`cookie_csrf_auth_strategy.dart:100-111`، `auth_interceptor.dart:76-91`) | `403 CSRF_REJECTED` (`evidence/api-samples.json` `csrfError`) | الكود يُلتقط صحيحًا | — |
+| خطأ CSRF | أي كود أو رسالة تحوي «CSRF» يصبح `CsrfInvalidException` (`error_mapper.dart:110`، `isCsrfCode` أو `isCsrfMessage`)، ثم تجديد مرة واحدة single-flight، ثم إعادة الطلب مرة واحدة (`cookie_csrf_auth_strategy.dart:100-111`، `auth_interceptor.dart:76-91`) | `403 CSRF_REJECTED` (`evidence/api-samples.json` `csrfError`) | الكود يُلتقط صحيحًا. isCsrfRejection لـ P-09 / #73: قرّره علي بكلماته للمنسق في 2026-10-23: «أبقِ المطابقة الواسعة الحالية لـ CSRF» | — |
 | **تجديد يلغي الرمز السابق** | التجديد single-flight، لكن الكتابات غير مُسلسلة. السيناريو: الطلبان A وB يرسلان بالرمز T1، ثم A يفشل، ثم التجديد يصدر T2 ويلغي T1، ثم B (بـ T1) يفشل، ثم تجديد ثانٍ يصدر T3 ويلغي T2 الذي يستخدمه replay A. كل طلب لا يُعاد إلا مرة، فقد يفشل الاثنان | «يلغي الرمز السابق لنفس الجلسة. لا تنفذه بالتوازي مع كتابة» (`README.ar.md:29`) | يلزم تسلسل الكتابات (طابور واحد للطرق غير الآمنة)، والتجديد فقط حين لا تكون كتابة جارية. ويُعاد الطلب برمز أحدث إن تغيّر أثناء انتظاره | عالٍ |
 | الاستئناف البارد | `onSessionResumed` يجدد CSRF (`cookie_csrf_auth_strategy.dart:89-91`) | الموقع يجلبه عند bootstrap | يطابق. العامل الخلفي يرسل GET فقط، فلا يتأثر | — |
 | جلسة لكل تثبيت | جلسة لكل تثبيت | «لا تشارك كوكي جلسة بين الموقع والتطبيق أو أجهزة متعددة» | يطابق | — |
