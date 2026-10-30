@@ -173,7 +173,7 @@ flutter build appbundle --release \
   --dart-define=API_BASE=https://staging.example
 ```
 
-Real mode has no placeholder host. Omitting `API_BASE`, or passing a relative URL, a non-http(s) scheme, userinfo, a path, a query, or a fragment, throws `ApiConfigException` before a client is created. Fake mode ignores `API_BASE` and stores an empty `baseUrl`. Application id stays `com.example.vib_abdo_company_mobile`. Signing stays whatever `android/app/build.gradle.kts` already does (debug keystore until the release-signing work lands). This change does not edit either.
+Real mode has no placeholder host. Omitting `API_BASE`, or passing a relative URL, a non-http(s) scheme, userinfo, a path, a query, or a fragment, throws `ApiConfigException` before a client is created. Fake mode ignores `API_BASE` and stores an empty `baseUrl`. Application id is `com.vip2100.vib` (Phase 9). Release signing is described in `docs/release/BUILD.ar.md`; CI has no release key and signs release with the debug key.
 
 When a release workflow is added, it must pass `--dart-define=USE_FAKE_API=false`. Without that, the const assert fails the Dart compile.
 

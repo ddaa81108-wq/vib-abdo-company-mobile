@@ -23,7 +23,7 @@ void main() {
     expect(NotificationChannels.smallIcon, 'ic_stat_notification');
     expect(
       NotificationChannels.applicationId,
-      'com.example.vib_abdo_company_mobile',
+      'com.vip2100.vib',
     );
     expect(NotificationChannels.minSdkCeiling, 29);
     expect(NotificationChannels.runtimePermissionSdk, 33);
@@ -90,7 +90,7 @@ void main() {
     );
   });
 
-  test('minSdk stays <= 29 and the application id is unchanged', () {
+  test('minSdk stays <= 29 and the application id is the release id', () {
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
     expect(
       gradle,

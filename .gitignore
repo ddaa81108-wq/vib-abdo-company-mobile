@@ -54,6 +54,9 @@ staging-permissions-junit.xml
 .env.*
 *.jks
 *.keystore
+*.p12
+# Release signing properties. Only key.properties.example is tracked.
+key.properties
 
 # Push credentials and API keys. Never commit these.
 # Firebase Android config is per environment and is not committed.

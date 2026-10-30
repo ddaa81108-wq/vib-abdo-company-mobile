@@ -117,7 +117,7 @@ if [[ ! -f "$APK" ]]; then
   exit 1
 fi
 
-PKG=com.example.vib_abdo_company_mobile
+PKG=com.vip2100.vib
 adb -s "$DEVICE" install -r "$APK" >/dev/null
 
 times=()
