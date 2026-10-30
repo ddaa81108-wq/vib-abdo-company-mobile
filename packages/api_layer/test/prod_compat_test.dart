@@ -2,6 +2,8 @@
 //
 // Response bodies below copy the SHAPE of production JSON only. Ids, names,
 // and amounts are invented. No production value is stored here.
+import 'dart:io';
+
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/core/network/api_client.dart';
 import 'package:flutter_api_layer/data/repositories/accounts_repository.dart';
@@ -100,12 +102,45 @@ void main() {
   group('1 ledger dates', () {
     test('reads transactionDate and converts it to local time', () {
       final line = LedgerEntryDto.fromJson(_prodLine());
-      final expected = DateTime.utc(2026, 10, 30, 22).toLocal();
-      expect(line.date, expected);
+      final instant = DateTime.utc(2026, 10, 30, 22);
+      // Holds in every zone: same instant, local (not UTC), and the wall
+      // clock is the UTC time plus this machine's offset for that instant.
+      // A UTC-only parser fails on isUtc in any zone.
       expect(line.date!.isUtc, isFalse);
-      // The calendar day is the local one (2026-10-31 in Africa/Tripoli).
-      expect(line.date!.day, expected.day);
+      expect(line.date!.isAtSameMomentAs(instant), isTrue);
+      final offset = instant.toLocal().timeZoneOffset;
+      final wall = instant.add(offset);
+      expect(line.date!.timeZoneOffset, offset);
+      expect([line.date!.year, line.date!.month, line.date!.day, line.date!.hour],
+          [wall.year, wall.month, wall.day, wall.hour]);
       expect(line.recordedAt!.isUtc, isFalse);
+    });
+
+    test('keeps the instant in any zone, whatever the wire offset', () {
+      // Same wall clock, different offsets: a parser that drops the offset
+      // (wall clock read as local) maps both to one moment and fails here,
+      // even on a UTC machine. A UTC-only parser fails on isUtc.
+      final z = LedgerEntryDto.fromJson(_prodLine()).date!;
+      final plus5 = LedgerEntryDto.fromJson(
+              _prodLine()..['transactionDate'] = '2026-10-30T22:00:00.000+05:00')
+          .date!;
+      expect(z.isUtc, isFalse);
+      expect(plus5.isUtc, isFalse);
+      expect(z.difference(plus5), const Duration(hours: 5));
+      expect(plus5, DateTime.utc(2026, 10, 30, 17).toLocal());
+    });
+
+    // tool/check.sh also runs this group with TZ=Africa/Tripoli (UTC+2), and
+    // the box zone is Africa/Tripoli too. Elsewhere this test is skipped.
+    test('Africa/Tripoli shows the local calendar day', () {
+      final line = LedgerEntryDto.fromJson(_prodLine());
+      if (Platform.environment['TZ'] != 'Africa/Tripoli') {
+        markTestSkipped('runs under TZ=Africa/Tripoli');
+        return;
+      }
+      expect(line.date!.timeZoneOffset, const Duration(hours: 2));
+      expect([line.date!.year, line.date!.month, line.date!.day, line.date!.hour],
+          [2026, 10, 31, 0]);
     });
 
     test('falls back to date for older bodies', () {
@@ -375,6 +410,53 @@ void main() {
       await expectLater(RemoteNotificationsRepository(stub).serverUnreadCount(),
           throwsA(isA<InvalidServerResponseException>()));
     });
+  });
+
+  group('6/7 real errors are not swallowed', () {
+    final errors = <String, Exception>{
+      '401 session': const SessionExpiredException(statusCode: 401),
+      '401 other': const UnauthorizedException(
+          code: 'UNAUTHORIZED', message: 'x', statusCode: 401),
+      '403': const ForbiddenException(
+          code: 'FORBIDDEN', message: 'x', statusCode: 403),
+      '500': const ServerException(
+          code: 'INTERNAL_ERROR', message: 'x', statusCode: 500),
+      '503': const ServerException(
+          code: 'SERVICE_UNAVAILABLE', message: 'x', statusCode: 503),
+    };
+    for (final entry in errors.entries) {
+      test('unread count rethrows ${entry.key} without reading the list',
+          () async {
+        final stub = _StubClient({
+          'GET /api/notifications/unread-count': entry.value,
+          'GET /api/notifications': {
+            'items': [],
+            'unreadCount': 9,
+            'nextBefore': null
+          },
+        });
+        await expectLater(
+            RemoteNotificationsRepository(stub).serverUnreadCount(),
+            throwsA(same(entry.value)));
+        expect(stub.calls.map((c) => c.path),
+            ['/api/notifications/unread-count']);
+      });
+
+      test('employee totals rethrows ${entry.key} without collections',
+          () async {
+        final stub = _StubClient({
+          'GET /api/admin/employee-totals': entry.value,
+          'GET /api/collections': {'employeeTotals': []},
+        });
+        final permissions = PermissionService()
+          ..applyFromServer(const [], role: 'admin');
+        final repo = RemoteEmployeeTotalsRepository(stub,
+            permissions: permissions,
+            source: EmployeeTotalsSource.standalone);
+        await expectLater(repo.fetch(), throwsA(same(entry.value)));
+        expect(stub.calls.map((c) => c.path), ['/api/admin/employee-totals']);
+      });
+    }
   });
 
   group('7 employee totals', () {
