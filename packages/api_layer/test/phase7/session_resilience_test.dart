@@ -138,7 +138,7 @@ void main() {
     }
   });
 
-  test('P7-02 CSRF mismatch refreshes once and replays once', () async {
+  test('P7-02 403 CSRF_REJECTED refreshes once and replays once', () async {
     final harness = await Phase7Harness.open();
     try {
       await harness.login();
@@ -163,7 +163,7 @@ void main() {
     }
   });
 
-  test('P7-02 a second CSRF failure does not loop', () async {
+  test('P7-02 a second 403 CSRF_REJECTED does not loop', () async {
     final harness = await Phase7Harness.open();
     try {
       await harness.login();

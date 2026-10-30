@@ -25,20 +25,20 @@ void main() {
     return api;
   }
 
-  String fingerprint(PurchasesBookPage page) {
-    final day = page.page.items.single;
-    final row = day.entries.single;
-    Object? units(MoneyValue? value) => value?.units;
+  String fingerprint(PurchasesPage page) {
+    final day = page.day!;
+    final row = page.entries.firstWhere((entry) => entry.id == 'pe_1');
+    Object? units(MoneyValue? value) => value?.asInt;
     return [
-      day.day,
+      day.numberLabel,
       day.status,
+      day.correctionOpen,
       day.version,
       units(day.previousDebtUnits),
       units(day.todayResultUnits),
       units(day.todayPaidUnits),
       units(day.totalDebtUnits),
       units(day.vodafoneRemainingUnits),
-      units(day.dayClosingDebtUnits),
       row.id,
       row.itemCode,
       row.itemLabel,
@@ -47,12 +47,14 @@ void main() {
       units(row.paidUnits),
       units(row.remainingUnits),
       units(row.vodafoneConsumedUnits),
+      units(row.dayClosingDebtUnits),
       row.version,
-      units(page.lifetimeTotals?.resultUnits),
-      units(page.lifetimeTotals?.paidUnits),
-      units(page.lifetimeTotals?.remainingUnits),
-      units(page.opening?.previousDebtUnits),
-      units(page.opening?.previousVodafoneUnits),
+      row.dayVersion,
+      units(page.registerTotals?.resultUnits),
+      units(page.registerTotals?.paidUnits),
+      units(page.registerTotals?.remainingUnits),
+      units(day.previousDebtUnits),
+      units(day.previousVodafoneUnits),
     ].join('|');
   }
 
@@ -82,8 +84,8 @@ void main() {
     () async {
       final api = await login('admin.demo');
       final beforeFinalize = await api.purchases.list(book);
-      expect(beforeFinalize.page.items.single.status, 'draft');
-      expect(beforeFinalize.page.items.single.version, 3);
+      expect(beforeFinalize.day!.status, 'draft');
+      expect(beforeFinalize.day!.version, 3);
 
       final ack = await api.purchases.finalizeDay(
         book,
@@ -92,9 +94,13 @@ void main() {
       expect(ack.version, 4);
       final finalized = await api.purchases.list(book);
       final frozen = fingerprint(finalized);
-      expect(finalized.page.items.single.status, 'finalized');
-      expect(finalized.page.items.single.version, 4);
-      expect(finalized.page.items.single.entries.single.id, 'pe_1');
+      expect(finalized.day!.status, 'finalized');
+      expect(finalized.day!.correctionOpen, isFalse);
+      expect(finalized.day!.version, 4);
+      expect(
+        finalized.entries.firstWhere((entry) => entry.id == 'pe_1').id,
+        'pe_1',
+      );
 
       await expectDayFinalized(
         () => api.purchases.create(
@@ -144,7 +150,8 @@ void main() {
       expect(fingerprint(await api.purchases.list(book)), frozen);
 
       final other = await api.purchases.list(PurchaseBook.simsim);
-      expect(other.page.items.single.status, 'draft');
+      expect(other.day!.status, 'draft');
+      expect(other.merchant?.key, 'simsim');
       final otherAck = await api.purchases.create(
         PurchaseBook.simsim,
         entry,
@@ -226,9 +233,13 @@ void main() {
       expect(afterOpen.id, created.id);
       expect(afterOpen.version, created.version);
       final reopened = await api.purchases.list(book);
-      expect(reopened.page.items.single.status, 'correction');
-      expect(reopened.page.items.single.entries.single.id, 'pe_1');
-      expect(reopened.page.items.single.version, 4);
+      expect(reopened.day!.status, 'finalized');
+      expect(reopened.day!.correctionOpen, isTrue);
+      expect(
+        reopened.entries.firstWhere((entry) => entry.id == 'pe_1').id,
+        'pe_1',
+      );
+      expect(reopened.day!.version, 4);
     },
   );
 
@@ -255,8 +266,9 @@ void main() {
       final ack = await api.purchases.create(book, entry, meta);
       expect(ack.id, 'pe_new');
       final page = await api.purchases.list(book);
-      expect(page.page.items.single.status, 'correction');
-      expect(page.page.items.single.entries.single.id, 'pe_1');
+      expect(page.day!.status, 'finalized');
+      expect(page.day!.correctionOpen, isTrue);
+      expect(page.entries.firstWhere((entry) => entry.id == 'pe_1').id, 'pe_1');
     },
   );
 
@@ -269,8 +281,8 @@ void main() {
     );
     expect(created.id, 'pe_new');
     final page = await api.purchases.list(book);
-    expect(page.page.items.single.status, 'draft');
-    expect(page.page.items.single.version, 3);
+    expect(page.day!.status, 'draft');
+    expect(page.day!.version, 3);
 
     await api.purchases.finalizeDay(
       book,
@@ -284,11 +296,11 @@ void main() {
     );
     expect(opening.id, 'opening');
     final after = await api.purchases.list(book);
-    expect(after.page.items.single.status, 'finalized');
-    expect(after.page.items.single.version, 4);
-    expect(after.opening?.previousDebtUnits?.units, 10);
-    expect(after.opening?.previousVodafoneUnits?.units, 20);
-    expect(after.page.items.single.entries.single.id, 'pe_1');
+    expect(after.day!.status, 'finalized');
+    expect(after.day!.version, 4);
+    expect(after.day!.previousDebtUnits?.asInt, 10);
+    expect(after.day!.previousVodafoneUnits?.asInt, 20);
+    expect(after.entries.firstWhere((entry) => entry.id == 'pe_1').id, 'pe_1');
   });
 
   test('DEF-014 a profile without purchases.write still gets 403', () async {

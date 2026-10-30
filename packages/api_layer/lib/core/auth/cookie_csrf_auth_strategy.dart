@@ -35,13 +35,13 @@ String? csrfTokenFromPayload(Object? body) {
 ///   takes one mutex, and so does that GET when it arrives through the main
 ///   client. It is not a second request: [adoptCsrfGet] runs the single-flight
 ///   refresh. The refresh waits until the mutex is free, then holds it.
-///   A rejected write is replayed once.
+///   A rejected write is replayed once, and only for HTTP 403 `CSRF_REJECTED`.
 /// - Other GET and HEAD requests are not queued.
 /// - No refresh flow: AUTH_REQUIRED -> forced logout.
-/// - A 419 that is not a CSRF error is session expiry (see [ErrorMapper]).
+/// - A 419 is never refreshed or replayed (see [ErrorMapper]).
 ///   `docs/api/error-catalog.json` has no 419. `CSRF_REJECTED` is HTTP 403.
-///   A 419 whose code or message contains CSRF still refreshes; any other 419
-///   still wipes the session.
+///   A 419 whose code contains CSRF stays a CSRF error and does not wipe.
+///   A 419 with CSRF only in the message still wipes. Any other 419 wipes.
 class CookieCsrfAuthStrategy implements AuthStrategy {
   CookieCsrfAuthStrategy(
       {required CookieStore cookieStore, required Dio bareDio})
@@ -257,7 +257,7 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
   Future<AuthErrorAction> handleAuthError(
       ApiException error, RequestOptions request,
       {required bool authenticated}) async {
-    if (error is CsrfInvalidException) {
+    if (isCsrfRejection(error)) {
       if (request.extra['authRetried'] == true) {
         return AuthErrorAction.passThrough;
       }

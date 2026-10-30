@@ -131,6 +131,26 @@ void main() {
     expect(find.text(AppStrings.versionConflict), findsNothing);
   });
 
+  testWidgets('PERMISSION_DENIED uses the same forbidden notice', (
+    tester,
+  ) async {
+    final host = await _pump(tester);
+
+    await _fail(
+      tester,
+      host,
+      const ForbiddenException(
+        code: 'PERMISSION_DENIED',
+        message: 'سر الخادم',
+        statusCode: 403,
+      ),
+    );
+
+    expect(host.conflicts, 0);
+    expect(find.text('سر الخادم'), findsNothing);
+    expect(find.text(AppStrings.forbidden), findsOneWidget);
+  });
+
   testWidgets('a confirmed send uses the same conflict handling', (
     tester,
   ) async {
