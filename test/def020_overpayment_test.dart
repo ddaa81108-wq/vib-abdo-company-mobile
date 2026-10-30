@@ -11,7 +11,7 @@ import 'support/pump_app.dart';
 /// The payment dialog and the ledger stay real. Only [FakeApiClient] stands in.
 void main() {
   testWidgets(
-    'DEF-020 the payment dialog refuses an amount above the server balance',
+    'DEF-031 cancelling the overpayment warning sends nothing and keeps 320',
     (tester) async {
       final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
@@ -31,20 +31,22 @@ void main() {
         '400',
       );
       await tester.tap(find.byKey(const Key('save-movement')));
-      await settle(tester);
+      await pumpUntil(tester, find.byKey(const Key('overpayment-warning')));
 
-      expect(find.text(AppStrings.amountAboveRemaining), findsOneWidget);
+      expect(find.byKey(const Key('overpayment-warning')), findsOneWidget);
+      expect(find.text(AppStrings.amountAboveRemaining), findsNothing);
       expect(find.byKey(const Key('save-movement')), findsOneWidget);
+      expect(fake.mutationPaths, hasLength(postsBefore));
+      expect(_header('320 د.ل'), findsOneWidget);
+      expect(_header('-80 د.ل'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('overpayment-cancel')));
+      await settle(tester);
       expect(fake.mutationPaths, hasLength(postsBefore));
       expect(
         fake.mutationPaths.where((path) => path.contains('/transactions')),
         isEmpty,
       );
-      expect(_header('320 د.ل'), findsOneWidget);
-      expect(_header('-80 د.ل'), findsNothing);
-
-      Navigator.of(tester.element(find.byType(Dialog))).pop();
-      await settle(tester);
       final stored = await tester.runAsync(
         () => layer.accounts.get(AccountSection.customers, 'c_55'),
       );
@@ -64,6 +66,13 @@ Finder _header(String text) {
     of: find.byKey(const Key('ledger-header-balance')),
     matching: find.text(text),
   );
+}
+
+Future<void> pumpUntil(WidgetTester tester, Finder finder) async {
+  for (var i = 0; i < 30; i++) {
+    if (finder.evaluate().isNotEmpty) return;
+    await tester.pump(const Duration(milliseconds: 50));
+  }
 }
 
 Future<void> settle(WidgetTester tester) async {
