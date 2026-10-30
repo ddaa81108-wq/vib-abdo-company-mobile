@@ -212,7 +212,7 @@ void main() {
     expect(find.text('tx_1'), findsWidgets);
   });
 
-  testWidgets('a version conflict refreshes the ledger and explains it', (
+  testWidgets('a version conflict refetches the card and resends with it', (
     tester,
   ) async {
     var ledgerReads = 0;
@@ -224,21 +224,17 @@ void main() {
           ledgerReads++;
           return LedgerPage.fromData(FakeFixtures.ledger(), key.$1);
         }),
-        // A stale card version: the correction is checked against it.
-        accountCardProvider.overrideWith((ref, key) async {
-          final res = await ref
-              .read(apiLayerProvider)
-              .client
-              .get('/api/customers/${key.$2}');
-          final raw = Map<String, dynamic>.from(res.data as Map);
-          raw['version'] = -1;
-          return AccountCardDto.fromJson(raw, key.$1);
-        }),
       ],
     );
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    // The next card read is stale: version -1. The server copy stays at 4.
+    fake.scriptedGetJson['/api/customers/c_55'] = jsonEncode({
+      ...FakeFixtures.cardById('customers', 'c_55'),
+      'version': -1,
+    });
     await go(tester, '/customers/c_55');
+    expect(fake.scriptedGetJson, isEmpty);
     final before = ledgerReads;
 
     await tester.tap(find.byKey(const Key('correct-tx_1')));
@@ -253,9 +249,25 @@ void main() {
       fake.mutationPaths.single,
       '/api/customers/c_55/transactions/tx_1/corrections',
     );
-    final body = jsonDecode(fake.mutationBodies.single) as Map;
-    expect(body['expectedVersion'], -1);
+    final stale = jsonDecode(fake.mutationBodies.single) as Map;
+    expect(stale['expectedVersion'], -1);
     expect(find.textContaining('400'), findsNothing);
+
+    // The conflict refetched the card, so the next send uses version 4.
+    await openConfirm(tester);
+    await confirmSend(tester, fake);
+
+    expect(fake.mutationPaths, [
+      '/api/customers/c_55/transactions/tx_1/corrections',
+      '/api/customers/c_55/transactions/tx_1/corrections',
+    ]);
+    final resent = jsonDecode(fake.mutationBodies[1]) as Map;
+    expect(resent['expectedVersion'], 4);
+    expect(find.byKey(const Key('correction-form')), findsNothing);
+    expect(
+      find.textContaining('${AppStrings.serverReply} tx_new'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('multiply and divide prefill the rate without grouping', (
