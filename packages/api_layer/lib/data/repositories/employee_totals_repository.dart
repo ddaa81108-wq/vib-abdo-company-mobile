@@ -40,8 +40,8 @@ class RemoteEmployeeTotalsRepository implements EmployeeTotalsRepository {
     this._api, {
     required PermissionService permissions,
     required EmployeeTotalsSource source,
-  })  : _permissions = permissions,
-        _source = source;
+  }) : _permissions = permissions,
+       _source = source;
 
   final ApiClient _api;
   final PermissionService _permissions;
@@ -58,8 +58,7 @@ class RemoteEmployeeTotalsRepository implements EmployeeTotalsRepository {
       data = (await _api.get(
         ApiEndpoints.employeeTotals,
         query: _range(from, to),
-      ))
-          .data;
+      )).data;
     } on NotFoundException catch (error) {
       // Production has no standalone route (404 ROUTE_NOT_FOUND). A full
       // admin then reads the collections array, as with the define. Any other

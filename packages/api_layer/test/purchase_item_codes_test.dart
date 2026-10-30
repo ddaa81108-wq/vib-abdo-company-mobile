@@ -12,8 +12,7 @@ void main() {
     expect(allowed, isNot(contains('other')));
   });
 
-  test('the fake client rejects an item code outside the contract list',
-      () async {
+  test('the fake client rejects an item code outside the contract list', () async {
     final api = FakeApiClient(latency: Duration.zero);
     await api.post('/api/auth/login', body: {
       'username': 'admin.demo',
@@ -29,8 +28,7 @@ void main() {
           if (label != null) 'itemLabel': label,
         }),
         throwsA(
-          isA<BadRequestException>()
-              .having((e) => e.code, 'code', 'VALIDATION_ERROR'),
+          isA<BadRequestException>().having((e) => e.code, 'code', 'VALIDATION_ERROR'),
         ),
       );
     }

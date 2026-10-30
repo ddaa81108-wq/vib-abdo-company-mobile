@@ -104,8 +104,9 @@ class RemoteAccountsRepository implements AccountsRepository {
   Future<MutationAck> addTransaction(AccountSection s, String accountId,
       AccountTransactionRequest r, MutationMeta meta) async {
     final path = ApiEndpoints.accountTransactions(s.path, accountId);
-    final data =
-        (await _api.post(path, body: {...meta.toBody(), ...r.toJson()})).data;
+    final data = (await _api.post(path,
+            body: {...meta.toBody(), ...r.toJson()}))
+        .data;
     return runWithMoneyEndpoint(path, () => MutationAck.fromData(data));
   }
 
