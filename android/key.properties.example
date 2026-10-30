@@ -1,0 +1,10 @@
+# Release signing template. Placeholders only; never commit real values.
+# Copy outside the repo (preferred) and point ANDROID_KEY_PROPERTIES at it,
+# or copy to android/key.properties (git-ignored). Each field can also come
+# from ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
+# ANDROID_KEY_PASSWORD. keyPassword may be omitted for PKCS12 (uses storePassword).
+# See docs/release/BUILD.ar.md.
+storeFile=/absolute/path/to/release-keystore.p12
+storePassword=CHANGE_ME
+keyAlias=CHANGE_ME
+keyPassword=CHANGE_ME
