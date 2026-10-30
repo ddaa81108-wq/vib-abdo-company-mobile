@@ -8,14 +8,16 @@
 
 | الحقل في `key.properties` | متغير البيئة البديل |
 |---|---|
-| `storeFile` (مسار مطلق يُفضَّل) | `ANDROID_KEYSTORE_PATH` |
+| `storeFile` (مسار مطلق يُفضَّل؛ المسار النسبي يُحسب من `android/app`، لا من جذر المستودع ولا من مكان `key.properties`) | `ANDROID_KEYSTORE_PATH` (القاعدة نفسها) |
 | `storePassword` | `ANDROID_KEYSTORE_PASSWORD` |
 | `keyAlias` | `ANDROID_KEY_ALIAS` |
 | `keyPassword` (اختياري لـ PKCS12؛ يُستعمل `storePassword` عند غيابه) | `ANDROID_KEY_PASSWORD` |
 
 - **مكان `key.properties`:** المسار في `ANDROID_KEY_PROPERTIES` إن وُجد (المفضَّل: خارج المستودع)، وإلا `android/key.properties` (مستثنى في `.gitignore`). القالب: `android/key.properties.example` (قيم وهمية فقط).
-- **بلا أي مادة توقيع** (حالة CI): يُوقَّع Release بمفتاح debug، ويطبع Gradle تحذيرًا واضحًا. هذا البناء **غير صالح للتوزيع**.
-- **مادة ناقصة** (مثل مسار بلا كلمة مرور، أو ملف غير موجود): يفشل البناء ويذكر الحقل الناقص دون أي قيمة.
+- **بلا أي مادة توقيع** (حالة CI: لا `ANDROID_KEY_PROPERTIES`، ولا `android/key.properties`، ولا متغيرات `ANDROID_KEYSTORE_*`): يُوقَّع Release بمفتاح debug، ويطبع Gradle تحذيرًا واضحًا. هذا البناء **غير صالح للتوزيع**.
+- **مادة ناقصة**: يفشل بناء Release ويذكر الحقول الناقصة بأسمائها دون أي قيمة. يُعدّ التوقيع مطلوبًا متى ضُبط `ANDROID_KEY_PROPERTIES` أو وُجد `android/key.properties` أو ضُبط أي حقل، فيفشل البناء مع: مسار بلا كلمة مرور، أو ملف غير موجود، أو ملف `key.properties` فارغ، أو أسماء مفاتيح خاطئة (تُذكر الأسماء غير المعروفة).
+- **متى يعمل الفحص:** فقط عند طلب مهمة Release (`assemble`/`bundle`/`package`/`sign...Release`). بناء debug و`flutter run` لا يتأثران حتى مع `ANDROID_REQUIRE_RELEASE_SIGNING=true` وبلا مادة.
+- **فحص السلوك:** `tool/check_release_signing_gradle.sh` يشغّل Gradle dry-run (`-m`) بمفتاح مؤقت في `/tmp` فقط، ويتحقق من الحالات السابقة. يعمل ضمن `tool/check.sh` محليًا، وليس في CI الإلزامي.
 - **`ANDROID_REQUIRE_RELEASE_SIGNING=true`** أو `-PrequireReleaseSigning=true`: غياب المادة خطأ. **استعمله دائمًا في بناء الإصدار** حتى لا يخرج APK موقّع بمفتاح debug خطأً.
 - `API_BASE` يُمرَّر عند البناء فقط بـ `--dart-define`، ولا قيمة افتراضية له في الكود. نسخة Release الحالية **تجريبية على staging**.
 
@@ -36,18 +38,19 @@ flutter clean && flutter pub get
 
 ```bash
 export ANDROID_KEY_PROPERTIES=/workspace/phase9/secrets/key.properties
+# إلزامي في كل بناء إصدار: بدونه قد يخرج APK موقّع بمفتاح debug.
 export ANDROID_REQUIRE_RELEASE_SIGNING=true
 
 # Debug APK (Fake API)
 flutter build apk --debug --dart-define=USE_FAKE_API=true
 
 # Release APK (staging، نسخة تجريبية)
-flutter build apk --release \
+ANDROID_REQUIRE_RELEASE_SIGNING=true flutter build apk --release \
   --dart-define=USE_FAKE_API=false \
   --dart-define=API_BASE=https://staging.vip2100.com
 
 # AAB للنشر
-flutter build appbundle --release \
+ANDROID_REQUIRE_RELEASE_SIGNING=true flutter build appbundle --release \
   --dart-define=USE_FAKE_API=false \
   --dart-define=API_BASE=https://staging.vip2100.com
 ```

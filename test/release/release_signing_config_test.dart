@@ -22,9 +22,29 @@ void main() {
     expect(RegExp(r'keyPassword\s*=\s*"').hasMatch(gradle), isFalse);
   });
 
+  test(
+    'signing checks run only for release tasks and have a behaviour check',
+    () {
+      final gradle = File('android/app/build.gradle.kts').readAsStringSync();
+      expect(gradle, contains('gradle.taskGraph.whenReady'));
+      expect(gradle, contains('unknown key names'));
+      expect(gradle, contains('keyPropertiesOverride != null ||'));
+      final script = File('tool/check_release_signing_gradle.sh');
+      expect(script.existsSync(), isTrue);
+      expect(script.readAsStringSync(), contains('./gradlew -q -m'));
+      expect(
+        File('tool/check.sh').readAsStringSync(),
+        contains('tool/check_release_signing_gradle.sh'),
+      );
+    },
+  );
+
   test('signing material is git-ignored and only the example is tracked', () {
     final root = File('.gitignore').readAsLinesSync();
-    expect(root, containsAll(['*.jks', '*.keystore', '*.p12', 'key.properties']));
+    expect(
+      root,
+      containsAll(['*.jks', '*.keystore', '*.p12', 'key.properties']),
+    );
     final android = File('android/.gitignore').readAsLinesSync();
     expect(
       android,

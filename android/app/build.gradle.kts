@@ -13,22 +13,33 @@ plugins {
 // storePassword (PKCS12 uses one password for both).
 // - No material at all: release is signed with the debug key and a warning is
 //   printed (CI only; never upload such a build).
-// - Partial material: configuration fails.
+// - Signing requested but incomplete: the release build fails and names the
+//   missing fields (never a value). Signing counts as requested when
+//   ANDROID_KEY_PROPERTIES is set, android/key.properties exists, or any
+//   signing field is set. An empty file or wrong key names therefore fail.
 // - ANDROID_REQUIRE_RELEASE_SIGNING=true or -PrequireReleaseSigning=true:
-//   missing material fails configuration.
-// See docs/release/BUILD.ar.md.
+//   missing material fails the release build.
+// These checks run only when a release task (assemble/bundle/package/sign
+// ...Release) is in the task graph, so debug builds and `flutter run` work
+// without any signing material. See docs/release/BUILD.ar.md and
+// tool/check_release_signing_gradle.sh.
 val keyPropertiesOverride = System.getenv("ANDROID_KEY_PROPERTIES")?.trim()?.takeIf { it.isNotEmpty() }
 val keystorePropertiesFile =
     if (keyPropertiesOverride != null) file(keyPropertiesOverride) else rootProject.file("key.properties")
-if (keyPropertiesOverride != null && !keystorePropertiesFile.isFile) {
-    throw GradleException(
-        "ANDROID_KEY_PROPERTIES points to '$keyPropertiesOverride', which is not a file.",
-    )
-}
+val keyPropertiesFileProblem =
+    if (keyPropertiesOverride != null && !keystorePropertiesFile.isFile) {
+        "ANDROID_KEY_PROPERTIES points to '$keyPropertiesOverride', which is not a file"
+    } else {
+        null
+    }
 val keystoreProperties = Properties()
 if (keystorePropertiesFile.isFile) {
     keystorePropertiesFile.reader(Charsets.UTF_8).use { keystoreProperties.load(it) }
 }
+val knownKeyPropertyNames = setOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+// Names only; values are never read into messages.
+val unknownKeyPropertyNames =
+    keystoreProperties.stringPropertyNames().filterNot { it in knownKeyPropertyNames }.sorted()
 
 fun releaseCredential(envName: String, propertyName: String): String? {
     val fromEnv = System.getenv(envName)?.trim()?.takeIf { it.isNotEmpty() }
@@ -47,6 +58,9 @@ val releaseKeyPassword = releaseKeyPasswordExplicit ?: releaseStorePassword
 val releaseStoreFile = releaseStoreFilePath?.let { path -> file(path) }
 
 val releaseSigningMissing = buildList {
+    if (keyPropertiesFileProblem != null) {
+        add(keyPropertiesFileProblem)
+    }
     if (releaseStoreFilePath == null) {
         add("keystore path (ANDROID_KEYSTORE_PATH or storeFile)")
     } else if (releaseStoreFile == null || !releaseStoreFile.isFile) {
@@ -61,26 +75,26 @@ val releaseSigningMissing = buildList {
     if (releaseKeyPassword == null) {
         add("key password (ANDROID_KEY_PASSWORD or keyPassword, or storePassword)")
     }
+    if (unknownKeyPropertyNames.isNotEmpty()) {
+        add(
+            "unknown key names in ${keystorePropertiesFile.name}: " +
+                "${unknownKeyPropertyNames.joinToString(", ")} " +
+                "(expected ${knownKeyPropertyNames.joinToString(", ")})",
+        )
+    }
 }
 
 val releaseSigningReady = releaseSigningMissing.isEmpty()
 val releaseSigningRequested =
-    releaseStoreFilePath != null ||
+    keyPropertiesOverride != null ||
+        keystorePropertiesFile.isFile ||
+        releaseStoreFilePath != null ||
         releaseStorePassword != null ||
         releaseKeyAlias != null ||
         releaseKeyPasswordExplicit != null
 val requireReleaseSigning =
     System.getenv("ANDROID_REQUIRE_RELEASE_SIGNING")?.trim()?.equals("true", ignoreCase = true) == true ||
         providers.gradleProperty("requireReleaseSigning").orNull?.trim()?.equals("true", ignoreCase = true) == true
-
-if (!releaseSigningReady && (releaseSigningRequested || requireReleaseSigning)) {
-    // Names what is missing. Never prints a password value.
-    throw GradleException(
-        "Release signing is incomplete: ${releaseSigningMissing.joinToString("; ")}. " +
-            "Set ANDROID_KEY_PROPERTIES or the ANDROID_KEYSTORE_* variables. " +
-            "See docs/release/BUILD.ar.md.",
-    )
-}
 
 android {
     namespace = "com.vip2100.vib"
@@ -94,7 +108,8 @@ android {
     }
 
     defaultConfig {
-        // Final application id chosen by Ali. Keep namespace on the same value.
+        // Final application id com.vip2100.vib, approved by Ali on 2026-10-30
+        // (card t205s824 in the coordinator chat). Keep namespace on the same value.
         applicationId = "com.vip2100.vib"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -140,7 +155,8 @@ gradle.taskGraph.whenReady(
         override fun execute(graph: org.gradle.api.execution.TaskExecutionGraph) {
             val buildingRelease = graph.allTasks.any { task ->
                 val name = task.name
-                name.contains("Release") &&
+                task.project == project &&
+                    name.contains("Release") &&
                     (
                         name.startsWith("assemble") ||
                             name.startsWith("bundle") ||
@@ -148,18 +164,27 @@ gradle.taskGraph.whenReady(
                             name.startsWith("package")
                         )
             }
-            if (buildingRelease && !releaseSigningReady) {
-                // println stays visible when Flutter invokes Gradle with -q.
-                val banner = "=".repeat(72)
-                println(banner)
-                println(
-                    "WARNING: Release signing is not configured. This release build is signed " +
-                        "with the DEBUG keystore. Do not distribute or upload it. " +
+            if (!buildingRelease || releaseSigningReady) {
+                return
+            }
+            if (releaseSigningRequested || requireReleaseSigning) {
+                // Names what is missing. Never prints a password value.
+                throw GradleException(
+                    "Release signing is incomplete: ${releaseSigningMissing.joinToString("; ")}. " +
+                        "Set ANDROID_KEY_PROPERTIES or the ANDROID_KEYSTORE_* variables. " +
                         "See docs/release/BUILD.ar.md.",
                 )
-                println(banner)
-                logger.warn("WARNING: release build signed with the debug keystore.")
             }
+            // println stays visible when Flutter invokes Gradle with -q.
+            val banner = "=".repeat(72)
+            println(banner)
+            println(
+                "WARNING: Release signing is not configured. This release build is signed " +
+                    "with the DEBUG keystore. Do not distribute or upload it. " +
+                    "See docs/release/BUILD.ar.md.",
+            )
+            println(banner)
+            logger.warn("WARNING: release build signed with the debug keystore.")
         }
     },
 )
