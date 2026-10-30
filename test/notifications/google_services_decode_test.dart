@@ -33,7 +33,7 @@ void main() {
         {
           'client_info': {
             'android_client_info': {
-              'package_name': 'com.example.vib_abdo_company_mobile',
+              'package_name': 'com.vip2100.vib',
             },
           },
           'api_key': [
@@ -50,14 +50,14 @@ void main() {
     );
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
     final output = '${result.stdout}${result.stderr}';
-    expect(output, contains('com.example.vib_abdo_company_mobile'));
+    expect(output, contains('com.vip2100.vib'));
     expect(output.contains(marker), isFalse);
     expect(output.contains(encoded), isFalse);
     final written = jsonDecode(File(dest).readAsStringSync()) as Map;
     expect(
       (written['client'] as List)
           .first['client_info']['android_client_info']['package_name'],
-      'com.example.vib_abdo_company_mobile',
+      'com.vip2100.vib',
     );
   });
 

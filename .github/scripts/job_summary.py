@@ -136,7 +136,7 @@ def write_apk(args: argparse.Namespace) -> None:
                 f"- File: `{apk.as_posix()}`",
                 f"- Size: {mebibytes:.1f} MiB ({size} bytes)",
                 "- Build: `flutter build apk --debug --dart-define=USE_FAKE_API=true`",
-                "- Signing: debug keystore (unchanged). Application id: `com.example.vib_abdo_company_mobile`.",
+                "- Signing: debug keystore (CI never holds the release key). Application id: `com.vip2100.vib`.",
                 "- Artifact name: `app-debug-apk`. On the workflow run, open **Artifacts** and download that zip. It contains this APK.",
                 "",
             ]

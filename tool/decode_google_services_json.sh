@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 dest = Path(sys.argv[1])
-expected = "com.example.vib_abdo_company_mobile"
+expected = "com.vip2100.vib"
 
 
 def fail(message: str) -> None:

@@ -35,7 +35,7 @@ Foreground refresh exists (section b). It is an in-app signal while the process 
 | Gradle plugins | `com.android.application`, Kotlin, Flutter (`android/settings.gradle.kts:20-24`, `android/app/build.gradle.kts:1-5`). No Google Services plugin. |
 | `android/app/google-services.json`, `GoogleService-Info.plist`, `ios/` | Not in the tree. |
 | Manifest permissions | `INTERNET` and `ACCESS_NETWORK_STATE` only (`android/app/src/main/AndroidManifest.xml:2-3`). No `POST_NOTIFICATIONS`, no FCM service, no boot receiver. |
-| Application id | `com.example.vib_abdo_company_mobile` (`android/app/build.gradle.kts:18-19`). |
+| Application id | `com.vip2100.vib` (`namespace` and `applicationId` in `android/app/build.gradle.kts`; was `com.example.vib_abdo_company_mobile` before Phase 9). |
 | Token registration call | `proposedMobilePushDevices` is defined at `api_endpoints.dart:119` and has no other reference. `deleteToken` on logout calls the no-op (`packages/api_layer/lib/api_layer.dart:158`). |
 | Push payload type | `PushMessage` is `type` plus optional `entityId` (`push_service.dart:6-9`). The rule in the same file: a push is a signal, never numbers to display. |
 

@@ -101,6 +101,6 @@ Other defines are listed in `packages/api_layer/README.md`. Negative permission 
 
 ## Android
 
-The debug application id is `com.example.vib_abdo_company_mobile`. Replace it before any store listing. Debug builds are signed with the debug key only.
+The application id and namespace are `com.vip2100.vib` (Phase 9; previously `com.example.vib_abdo_company_mobile`, so uninstall the old build first). Debug builds use the debug key. Release builds use the release key from `ANDROID_KEY_PROPERTIES`, `android/key.properties`, or `ANDROID_KEYSTORE_*` variables, and fall back to the debug key with a warning only when no release material exists. See [docs/release/BUILD.ar.md](docs/release/BUILD.ar.md).
 
-Notification channels, the Android 13 notification permission, and optional Firebase config are described in [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md). The application id above is unchanged.
+Notification channels, the Android 13 notification permission, and optional Firebase config are described in [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md).

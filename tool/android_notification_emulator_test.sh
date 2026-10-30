@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PKG=com.example.vib_abdo_company_mobile
+PKG=com.vip2100.vib
 PERM=android.permission.POST_NOTIFICATIONS
 
 python3 - << 'PY'
