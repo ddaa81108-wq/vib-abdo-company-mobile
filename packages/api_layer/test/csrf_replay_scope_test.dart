@@ -1,4 +1,5 @@
 // Replay is only HTTP 403 CSRF_REJECTED. A 419 never refreshes or replays.
+// An authenticated 401 wipes once, even with a CSRF code.
 // The cookie strategy and the interceptor are real. The server is
 // FakeApiClient, reached through the Dio transport. No socket.
 import 'dart:typed_data';
@@ -119,6 +120,35 @@ void main() {
       wipes: true,
     );
   });
+  test('an authenticated 401 CSRF_REJECTED wipes once and is not replayed',
+      () async {
+    await _expectNoReplay(
+      status: 401,
+      code: 'CSRF_REJECTED',
+      message: 'رمز غير صالح',
+      wipes: true,
+    );
+  });
+
+  test('an authenticated 401 CSRF_MISSING wipes once and is not replayed',
+      () async {
+    await _expectNoReplay(
+      status: 401,
+      code: 'CSRF_MISSING',
+      message: 'الرمز غير موجود',
+      wipes: true,
+    );
+  });
+
+  test('a 419 SESSION_EXPIRED whose message mentions CSRF wipes once',
+      () async {
+    await _expectNoReplay(
+      status: 419,
+      code: 'SESSION_EXPIRED',
+      message: 'CSRF token mismatch.',
+      wipes: true,
+    );
+  });
 }
 
 Future<void> _expectNoReplay({
@@ -135,6 +165,11 @@ Future<void> _expectNoReplay({
     message: message,
   );
   harness.transport.calls.clear();
+  var wipeCount = 0;
+  final sub = harness.layer.session.states.listen((state) {
+    if (state is SessionUnauthenticated) wipeCount++;
+  });
+  addTearDown(sub.cancel);
 
   final error = await _capture(
     harness.layer.client.post(
@@ -149,6 +184,9 @@ Future<void> _expectNoReplay({
     ApiEndpoints.changePassword,
   );
   expect(harness.transport.matching('GET', ApiEndpoints.csrf), isEmpty);
+  // Let the session stream deliver before counting wipes.
+  await Future<void>.delayed(Duration.zero);
+  expect(wipeCount, wipes ? 1 : 0);
   if (wipes) {
     expect(error, isA<SessionExpiredException>());
     expect(
