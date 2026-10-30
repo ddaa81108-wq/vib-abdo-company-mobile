@@ -33,6 +33,7 @@ void main() {
       PurchaseBook.alBayan,
       current.id,
       MutationMeta(expectedVersion: current.dayVersion, requestId: 'del-pe-1'),
+      entryVersion: current.version,
     );
     final fake = api.client as FakeApiClient;
     final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;

@@ -118,7 +118,7 @@ void main() {
     expect(find.text(AppStrings.noPreview), findsWidgets);
   });
 
-  testWidgets('confirmation keeps one request id and sends the line version', (
+  testWidgets('confirmation keeps one request id and sends the card version', (
     tester,
   ) async {
     var ledgerReads = 0;
@@ -176,7 +176,9 @@ void main() {
       '/api/customers/c_55/transactions/tx_1/corrections',
     );
     final failed = jsonDecode(fake.mutationBodies.single) as Map;
-    expect(failed['expectedVersion'], 1);
+    // The server checks corrections against the card version (c_55 is 4),
+    // not a line version. Production ledger lines carry no `version`.
+    expect(failed['expectedVersion'], 4);
     expect(failed['requestId'], fake.mutationRequestIds.single);
     expect(failed['type'], 'debt');
     expect(failed['inputValue'], 100);
@@ -198,7 +200,7 @@ void main() {
     ]);
     final sent = jsonDecode(fake.mutationBodies[1]) as Map;
     expect(sent['requestId'], failed['requestId']);
-    expect(sent['expectedVersion'], 1);
+    expect(sent['expectedVersion'], 4);
     expect(sent['inputValue'], 100);
     expect(find.byKey(const Key('correction-form')), findsNothing);
     expect(
@@ -220,11 +222,17 @@ void main() {
       overrides: [
         ledgerProvider.overrideWith((ref, key) async {
           ledgerReads++;
-          final raw = FakeFixtures.ledger();
-          for (final item in raw['items'] as List) {
-            (item as Map)['version'] = -1;
-          }
-          return LedgerPage.fromData(raw, key.$1);
+          return LedgerPage.fromData(FakeFixtures.ledger(), key.$1);
+        }),
+        // A stale card version: the correction is checked against it.
+        accountCardProvider.overrideWith((ref, key) async {
+          final res = await ref
+              .read(apiLayerProvider)
+              .client
+              .get('/api/customers/${key.$2}');
+          final raw = Map<String, dynamic>.from(res.data as Map);
+          raw['version'] = -1;
+          return AccountCardDto.fromJson(raw, key.$1);
         }),
       ],
     );

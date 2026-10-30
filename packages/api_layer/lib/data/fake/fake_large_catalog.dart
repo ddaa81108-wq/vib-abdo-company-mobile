@@ -169,7 +169,7 @@ abstract final class FakeLargeCatalog {
       'sequence': index + 1,
       'type': index.isEven ? 'debt' : 'payment',
       'status': 'posted',
-      'date': _stamp(index),
+      'transactionDate': _stamp(index),
       'note': 'سطر سجل ${index + 1}',
       'amountUnits': amount,
       'inputValue': amount,
@@ -177,7 +177,6 @@ abstract final class FakeLargeCatalog {
       // Stored on the row. Not a running total of earlier lines.
       'balanceAfterUnits': 100 + (index % 400),
       'createdByName': 'كاتب السجل',
-      'version': 1,
     };
   }
 

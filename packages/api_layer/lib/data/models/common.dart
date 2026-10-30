@@ -35,6 +35,14 @@ List<Json> asJsonList(Object? v) => v is List
 String str(Object? v, [String fallback = '']) => v == null ? fallback : '$v';
 String? strOrNull(Object? v) => v == null ? null : '$v';
 DateTime? dateOrNull(Object? v) => v == null ? null : DateTime.tryParse('$v');
+
+/// Like [dateOrNull], converted to the device's local time.
+///
+/// The server stores a ledger date as a UTC instant. A line entered for
+/// 2026-10-31 in Africa/Tripoli (UTC+2) comes back as
+/// `2026-10-30T22:00:00.000Z`. Reading its calendar fields in UTC would show
+/// the previous day. A value without an offset is already local and is kept.
+DateTime? localDateOrNull(Object? v) => dateOrNull(v)?.toLocal();
 List<String> strList(Object? v) =>
     v is List ? v.map((e) => '$e').toList(growable: false) : const [];
 bool boolOf(Object? v) => v == true;
@@ -136,13 +144,24 @@ class MutationAck {
     final d = asJson(data);
     final transaction = d['transaction'];
     final nestedId = transaction is Map ? strOrNull(transaction['id']) : null;
+    // Account create answers `{customer: {id, version, …}}` (also `company`
+    // or `account` per section).
+    final created = d['customer'] ?? d['company'] ?? d['account'];
+    final createdId = created is Map ? strOrNull(created['id']) : null;
+    final createdVersion =
+        created is Map ? intOrNull(created['version']) : null;
     // Contract ledger writes use `transaction.id` and `customerVersion`.
-    // Older fake bodies use top-level `id` and `version`. Prefer those when
-    // both are present so an existing ack id does not move.
-    final id = strOrNull(d['id']) ?? nestedId;
+    // Purchase create and delete use `entryId`. Older fake bodies use
+    // top-level `id` and `version`. Prefer those when both are present so an
+    // existing ack id does not move.
+    final id =
+        strOrNull(d['id']) ?? nestedId ?? createdId ?? strOrNull(d['entryId']);
     return MutationAck(
       id: id,
-      version: intOrNull(d['version']) ?? intOrNull(d['customerVersion']),
+      version: intOrNull(d['version']) ??
+          intOrNull(d['customerVersion']) ??
+          intOrNull(d['cashVersion']) ??
+          createdVersion,
       balanceUnits: unitsOrNull(
         d['balanceUnits'],
         fieldPath: 'balanceUnits',

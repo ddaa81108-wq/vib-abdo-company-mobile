@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
@@ -56,7 +58,7 @@ void main() {
   testWidgets('DEF-004 cancel refreshes the header and the card list', (
     tester,
   ) async {
-    await pumpFakeApp(tester, size: const Size(800, 2200));
+    final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
 
@@ -69,6 +71,13 @@ void main() {
     await tester.tap(find.byKey(const Key('confirm-mutation')));
     await settle(tester);
 
+    // Cancel sends the CARD version (c_55 is 4), as production requires.
+    final fake = layer.client as FakeApiClient;
+    expect(
+      fake.mutationPaths.last,
+      '/api/customers/c_55/transactions/tx_2/cancel',
+    );
+    expect((jsonDecode(fake.mutationBodies.last) as Map)['expectedVersion'], 4);
     expect(_headerAmount('320 د.ل'), findsNothing);
     expect(_headerAmount('500 د.ل'), findsOneWidget);
 

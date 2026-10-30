@@ -293,7 +293,9 @@ void main() {
       final opened =
           jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
       expect(opened['requestId'], isNotEmpty);
-      expect(opened['expectedDayVersion'], 3);
+      // API docs: day correction takes `expectedVersion` (the day version).
+      expect(opened['expectedVersion'], 3);
+      expect(opened.containsKey('expectedDayVersion'), isFalse);
       expect(opened['open'], isTrue);
       expect(
         fake.mutationPaths.last,
@@ -313,7 +315,8 @@ void main() {
       final closed =
           jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
       expect(closed['requestId'], isNotEmpty);
-      expect(closed['expectedDayVersion'], 3);
+      expect(closed['expectedVersion'], 3);
+      expect(closed.containsKey('expectedDayVersion'), isFalse);
       expect(closed['open'], isFalse);
       expect(closed['requestId'], isNot(opened['requestId']));
       expect(find.text(AppStrings.correctionClosed), findsOneWidget);

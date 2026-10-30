@@ -60,7 +60,8 @@ import 'fake_large_catalog.dart';
 /// `finalized` and whose `correctionOpen` is false is rejected with 409
 /// [dayFinalizedCode]. The contract names `draft` and `finalized`; this 409
 /// code is still a stand-in. A stored success for the same `requestId` does
-/// not skip the check. Write bodies still send `expectedDayVersion` only.
+/// not skip the check. Edit and delete also need the row's `expectedVersion`
+/// (400 `INVALID_PURCHASE_VALUE` without it), as production does.
 class FakeApiClient implements ApiClient {
   FakeApiClient({
     this.latency = const Duration(milliseconds: 250),
@@ -1374,7 +1375,27 @@ class FakeApiClient implements ApiClient {
             _fail(400, error.code, error.message);
           }
         }
-        return _ok({'id': 'pe_new', 'version': 4});
+        final rowWrite = (method == 'PATCH' || method == 'DELETE') &&
+            seg.length > 3 &&
+            seg[2] == 'entries';
+        if (rowWrite) {
+          // Production needs the row's own `expectedVersion` next to
+          // `expectedDayVersion` on edit and delete.
+          if (b['expectedVersion'] is! int) {
+            _fail(
+              400,
+              'INVALID_PURCHASE_VALUE',
+              'إصدار المعاملة يجب أن يكون رقمًا صحيحًا بدون كسور.',
+            );
+          }
+          return _ok({'entryId': seg[3], 'eventSequences': const []});
+        }
+        // Production create answers `{entryId, sequence, eventSequences}`.
+        return _ok({
+          'entryId': 'pe_new',
+          'sequence': 99,
+          'eventSequences': const [],
+        });
       case 'treasury':
         if (method == 'GET') {
           _requireRead(SectionKey.treasury);
@@ -1537,6 +1558,15 @@ class FakeApiClient implements ApiClient {
         seg[2] == 'transactions' &&
         seg[4] == 'cancel') {
       return _applyCancel(head, seg[1], seg[3], b);
+    }
+    if (method == 'POST' &&
+        seg.length == 5 &&
+        seg[2] == 'transactions' &&
+        seg[4] == 'corrections') {
+      return _applyTxCorrection(head, seg[1], b);
+    }
+    if (method == 'PATCH' && seg.length == 3 && seg[2] == 'pin') {
+      return _applyPin(head, seg[1], b);
     }
     if (b['expectedVersion'] == -1) {
       _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
@@ -1799,13 +1829,12 @@ class FakeApiClient implements ApiClient {
         'type': 'payment',
         'status': 'posted',
         'paymentMode': 'partial',
-        'date': b['date'],
+        'transactionDate': b['date'],
         'amountUnits': entered,
         'inputValue': entered,
         'calculationMode': 'direct',
         'balanceAfterUnits': stored,
         'createdByName': 'مدير تجريبي',
-        'version': 1,
       });
     }
     _cardState['$section|${card['id']}'] = state;
@@ -1882,11 +1911,20 @@ class FakeApiClient implements ApiClient {
       if (item['id'] == txId) entry = item;
     }
     if (entry == null) _fail(404, 'NOT_FOUND', 'الحركة غير موجودة');
-    _requireVersion(b['expectedVersion'], entry['version']);
+    // Production checks cancel against the CARD version (`customerVersion`).
+    final card = _cardView(section, accountId);
+    if (b['expectedVersion'] == null) {
+      _fail(
+        400,
+        'EXPECTED_VERSION_REQUIRED',
+        'يلزم إرسال expectedVersion لمنع استبدال تعديل أحدث.',
+      );
+    }
+    _requireVersion(b['expectedVersion'], card['version']);
     final key = '$section|$txId';
     _reversedTx.add(key);
-    _txVersion[key] = (entry['version'] as int) + 1;
-    final card = _cardView(section, accountId);
+    final lineVersion = entry['version'];
+    if (lineVersion is int) _txVersion[key] = lineVersion + 1;
     final version = (card['version'] as int) + 1;
     final stored = _latestPostedBalance(section);
     _cardState['$section|${card['id']}'] = {
@@ -1900,6 +1938,58 @@ class FakeApiClient implements ApiClient {
       'status': 'reversed',
       'customerVersion': version,
       'balanceUnits': stored,
+    });
+  }
+
+  /// Correction of one line. Production checks the CARD version, like
+  /// cancel, and answers with the new `customerVersion`. The amount is not
+  /// recomputed here; the stored card balance is echoed.
+  ApiResponse _applyTxCorrection(String section, String accountId, Map b) {
+    final card = _cardView(section, accountId);
+    if (b['expectedVersion'] == null) {
+      _fail(
+        400,
+        'EXPECTED_VERSION_REQUIRED',
+        'يلزم إرسال expectedVersion لمنع استبدال تعديل أحدث.',
+      );
+    }
+    _requireVersion(b['expectedVersion'], card['version']);
+    final version = (card['version'] as int) + 1;
+    _cardState['$section|${card['id']}'] = {
+      ...?_cardState['$section|${card['id']}'],
+      'version': version,
+    };
+    return _ok(
+      _ledgerWriteData(
+        version: version,
+        section: section,
+        request: b,
+        balanceUnits: card['balanceUnits'],
+      ),
+    );
+  }
+
+  /// PATCH /{section}/{id}/pin `{expectedVersion, isPinned}`. Production
+  /// rejects any other body (for example `pinned`) with 400
+  /// `INVALID_PIN_STATE`.
+  ApiResponse _applyPin(String section, String accountId, Map b) {
+    final pinned = b['isPinned'];
+    if (pinned is! bool) {
+      _fail(400, 'INVALID_PIN_STATE', 'حالة التثبيت غير صالحة.');
+    }
+    final card = _cardView(section, accountId);
+    _requireVersion(b['expectedVersion'], card['version']);
+    final version = (card['version'] as int) + 1;
+    _cardState['$section|${card['id']}'] = {
+      ...?_cardState['$section|${card['id']}'],
+      'version': version,
+      'isPinned': pinned,
+      'pinned': pinned,
+    };
+    return _ok({
+      'customerId': card['id'],
+      'isPinned': pinned,
+      'customerVersion': version,
     });
   }
 
@@ -2363,7 +2453,8 @@ class FakeApiClient implements ApiClient {
     if (day == null || '${day['id']}' != dayId) {
       _fail(404, 'NOT_FOUND', 'اليوم غير موجود');
     }
-    _requireVersion(b['expectedDayVersion'], day['version']);
+    // API docs: this route takes `expectedVersion` (the day version).
+    _requireVersion(b['expectedVersion'], day['version']);
     final open = b['open'] == true;
     _purchaseDays['$book|$dayId'] = {
       ...?_purchaseDays['$book|$dayId'],
@@ -2470,7 +2561,7 @@ class FakeApiClient implements ApiClient {
     final body = _copy(FakeFixtures.treasury());
     final state = _treasuryState;
     if (state != null) {
-      body['version'] = state['version'];
+      body['cashVersion'] = state['cashVersion'];
       final totals = Map<String, dynamic>.from(body['totals'] as Map);
       totals['activeCashUnits'] = state['activeCashUnits'];
       totals['netUnits'] = state['netUnits'];
@@ -2520,7 +2611,8 @@ class FakeApiClient implements ApiClient {
   /// never reaches this method.
   ApiResponse _applyCashEntry(Map b) {
     final treasury = _treasuryView();
-    _requireVersion(b['expectedVersion'], treasury['version']);
+    // Production checks `expectedVersion` against `cashVersion`.
+    _requireVersion(b['expectedVersion'], treasury['cashVersion']);
     final direction = b['direction'];
     if (direction != 'in' && direction != 'out') {
       _fail(400, 'VALIDATION_ERROR', 'الاتجاه غير معروف');
@@ -2538,7 +2630,7 @@ class FakeApiClient implements ApiClient {
     final signed = direction == 'in' ? amount : -amount;
     final runningCash = previousCash + signed;
     final runningNet = previousNet + signed;
-    final version = (treasury['version'] as int) + 1;
+    final version = (treasury['cashVersion'] as int) + 1;
     final user = _me['user'];
     final actor = user is Map && user['displayName'] != null
         ? '${user['displayName']}'
@@ -2557,11 +2649,11 @@ class FakeApiClient implements ApiClient {
     };
     _cashEntries.add(entry);
     _treasuryState = {
-      'version': version,
+      'cashVersion': version,
       'activeCashUnits': runningCash,
       'netUnits': runningNet,
     };
-    return _ok({'id': entry['id'], 'version': version});
+    return _ok({'id': entry['id'], 'cashVersion': version});
   }
 
   Map<String, dynamic> _overlayCards(

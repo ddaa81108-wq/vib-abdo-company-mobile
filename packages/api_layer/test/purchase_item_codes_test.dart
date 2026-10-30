@@ -12,7 +12,8 @@ void main() {
     expect(allowed, isNot(contains('other')));
   });
 
-  test('the fake client rejects an item code outside the contract list', () async {
+  test('the fake client rejects an item code outside the contract list',
+      () async {
     final api = FakeApiClient(latency: Duration.zero);
     await api.post('/api/auth/login', body: {
       'username': 'admin.demo',
@@ -28,7 +29,8 @@ void main() {
           if (label != null) 'itemLabel': label,
         }),
         throwsA(
-          isA<BadRequestException>().having((e) => e.code, 'code', 'VALIDATION_ERROR'),
+          isA<BadRequestException>()
+              .having((e) => e.code, 'code', 'VALIDATION_ERROR'),
         ),
       );
     }
@@ -46,7 +48,7 @@ void main() {
       'itemCode': PurchaseItemCodes.custom,
       'itemLabel': 'صنف خاص',
     });
-    expect(typed.dataMap['id'], 'pe_new');
+    expect(typed.dataMap['entryId'], 'pe_new');
     expect(api.lastWireBody, contains('صنف خاص'));
     expect(api.lastWireBody, isNot(contains(PurchaseItemCodes.customCaption)));
 
@@ -55,6 +57,6 @@ void main() {
       'expectedDayVersion': 1,
       'itemCode': PurchaseItemCodes.vodafoneCash,
     });
-    expect(known.dataMap['id'], 'pe_new');
+    expect(known.dataMap['entryId'], 'pe_new');
   });
 }

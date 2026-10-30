@@ -104,9 +104,8 @@ class RemoteAccountsRepository implements AccountsRepository {
   Future<MutationAck> addTransaction(AccountSection s, String accountId,
       AccountTransactionRequest r, MutationMeta meta) async {
     final path = ApiEndpoints.accountTransactions(s.path, accountId);
-    final data = (await _api.post(path,
-            body: {...meta.toBody(), ...r.toJson()}))
-        .data;
+    final data =
+        (await _api.post(path, body: {...meta.toBody(), ...r.toJson()})).data;
     return runWithMoneyEndpoint(path, () => MutationAck.fromData(data));
   }
 
@@ -133,10 +132,11 @@ class RemoteAccountsRepository implements AccountsRepository {
   @override
   Future<MutationAck> setPinned(
           AccountSection s, String id, bool pinned, MutationMeta meta) async =>
-      MutationAck.fromData((await _api.patch(
-              ApiEndpoints.accountPin(s.path, id),
-              body: {...meta.toBody(), 'pinned': pinned}))
-          .data);
+      MutationAck.fromData(
+          (await _api.patch(ApiEndpoints.accountPin(s.path, id),
+              // The server field is `isPinned`; `pinned` is rejected with
+              // 400 INVALID_PIN_STATE.
+              body: {...meta.toBody(), 'isPinned': pinned})).data);
 
   @override
   Future<MutationAck> confirmZeroReview(

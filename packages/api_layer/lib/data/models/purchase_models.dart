@@ -109,7 +109,7 @@ class PurchaseEntryDto {
   final MoneyValue? egpValueUnits; // EGP
   final CalculationMode? calculationMode;
   final DecimalString?
-  exchangeRate; // decimal TEXT; display via formatDecimal only
+      exchangeRate; // decimal TEXT; display via formatDecimal only
   final MoneyValue? resultUnits; // LYD, server-computed
   final MoneyValue? paidUnits; // LYD
   final MoneyValue? remainingUnits; // LYD, server-computed
@@ -117,7 +117,8 @@ class PurchaseEntryDto {
   final String? actorName;
   final bool actorIsOwner;
 
-  /// Row version. Writes still send the day's version only (P-05).
+  /// Row version. Edit and delete send it as `expectedVersion`, next to the
+  /// day's `expectedDayVersion`; the server rejects either write without it.
   final int? version;
   final String? createdAt;
   final String? updatedAt;
@@ -353,18 +354,18 @@ class PurchaseEntryRequest {
   final int? egpValueUnits;
   final CalculationMode? calculationMode;
   final DecimalString?
-  exchangeRate; // decimal text; wire format per ApiConfig.rateWireFormat
+      exchangeRate; // decimal text; wire format per ApiConfig.rateWireFormat
   final int? paidUnits;
   final int? vodafoneConsumedUnits;
   Json toJson() => {
-    if (itemCode != null) 'itemCode': itemCode,
-    if (itemLabel != null) 'itemLabel': itemLabel,
-    if (egpValueUnits != null) 'egpValueUnits': egpValueUnits,
-    if (calculationMode != null) 'calculationMode': calculationMode!.name,
-    if (exchangeRate != null)
-      'exchangeRate': exchangeRate, // DecimalString; WireJson encodes it
-    if (paidUnits != null) 'paidUnits': paidUnits,
-    if (vodafoneConsumedUnits != null)
-      'vodafoneConsumedUnits': vodafoneConsumedUnits,
-  };
+        if (itemCode != null) 'itemCode': itemCode,
+        if (itemLabel != null) 'itemLabel': itemLabel,
+        if (egpValueUnits != null) 'egpValueUnits': egpValueUnits,
+        if (calculationMode != null) 'calculationMode': calculationMode!.name,
+        if (exchangeRate != null)
+          'exchangeRate': exchangeRate, // DecimalString; WireJson encodes it
+        if (paidUnits != null) 'paidUnits': paidUnits,
+        if (vodafoneConsumedUnits != null)
+          'vodafoneConsumedUnits': vodafoneConsumedUnits,
+      };
 }

@@ -295,19 +295,15 @@ class _TransactionCorrectionFormState
     );
   }
 
-  /// The line's `version` after the latest ledger fetch, else the one this
-  /// form opened with. A conflict refetch changes it, and the next send uses
-  /// that value.
-  int? _expectedVersion() {
-    final async = ref.watch(ledgerProvider((widget.section, widget.accountId)));
-    if (!async.hasValue) return widget.entry.version;
-    final page = async.value;
-    if (page == null) return widget.entry.version;
-    for (final item in page.page.items) {
-      if (item.id == widget.entry.id) return item.version;
-    }
-    return widget.entry.version;
-  }
+  /// The card's `version` from the latest card fetch. The server checks a
+  /// correction against the account version (`customerVersion`), not the
+  /// line: production ledger lines have no `version`. A conflict refetch
+  /// changes it, and the next send uses that value.
+  int? _expectedVersion() => ref
+      .watch(accountCardProvider((widget.section, widget.accountId)))
+      .asData
+      ?.value
+      .version;
 
   Future<String?> _submit(MutationMeta meta) async {
     final parsedDate = DateTime.tryParse(_date.text);

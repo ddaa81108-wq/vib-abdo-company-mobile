@@ -501,8 +501,7 @@ void main() {
     expect(err.code, 'CLIENT_VERSION_MISMATCH');
   });
 
-  test(
-      'REQUEST_ID_REUSED and DUPLICATE_SAME_WORKDAY are not generic conflicts',
+  test('REQUEST_ID_REUSED and DUPLICATE_SAME_WORKDAY are not generic conflicts',
       () {
     const mapper = ErrorMapper();
     final reused = mapper.fromResponse(409, _body(samples, 'reusedId'), null);
@@ -567,6 +566,7 @@ void main() {
         'd0f6a687-1267-471b-831e-a4568602d82c',
         request,
         MutationMeta(expectedVersion: 4, requestId: 'contract-entry-1'),
+        entryVersion: 2,
       );
       final patch = jsonDecode(api.lastWireBody!) as Map;
       expect(patch.containsKey('expectedVersion'), isTrue);
