@@ -29,7 +29,8 @@
 source /workspace/phase9/env.sh          # JAVA_HOME وANDROID_HOME وPATH، بلا أسرار
 flutter --version
 cd /workspace/phase9/repo
-git fetch origin && git checkout --detach <BUILD_COMMIT>   # commit يحدده Grok Bot
+BUILD_COMMIT=...                         # الـ sha الكامل الذي يحدده Grok Bot
+git fetch origin && git checkout --detach "$BUILD_COMMIT"
 git status --porcelain                   # يجب أن يكون فارغًا
 flutter clean && flutter pub get
 ```
@@ -106,3 +107,14 @@ $BT/apksigner sign --ks /workspace/phase9/secrets/vib-release.p12 --ks-type PKCS
 2. تحقق من أن السجلات لا تحوي كلمة المرور، دون طباعة أي تطابق:
    `grep -rlF -f /workspace/phase9/secrets/store.pass /workspace/phase9 --exclude-dir=secrets | wc -l` يجب أن يكون `0`.
 3. `git status --porcelain` فارغ، و`git ls-files | grep -Ei 'p12|jks|keystore|key.properties$'` فارغ.
+
+## 7. قبل إنشاء وسم الإصدار (tag)
+
+وثائق `docs/release/*.md` على `main` فيها عمدًا علامتان تُملآن عند الإصدار: `BUILD_COMMIT` و`PHASE9_MERGE_COMMIT`، كلٌّ بين قوسين زاويين. بعد ملئهما بالـ sha الفعلي، وقبل `git tag`:
+
+```bash
+tool/check_release_placeholders.sh   # يفشل إن بقيت أي علامة، ويطبع الملف والسطر
+```
+
+- لا يعمل هذا الفحص ضمن `tool/check.sh` ولا في CI، لأن العلامات متوقعة على `main` حتى الإصدار.
+- لا تُنشئ الوسم حتى ينجح الفحص.
