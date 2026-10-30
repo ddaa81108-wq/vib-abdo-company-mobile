@@ -51,7 +51,7 @@ void main() {
       419,
       _envelope('PAGE_EXPIRED', 'missing CSRF token'),
     );
-    expect(csrfMessage, isA<CsrfInvalidException>());
+    expect(csrfMessage, isA<SessionExpiredException>());
   });
 
   test('an authenticated 401 of any code asks the interceptor to end the session once', () async {

@@ -38,7 +38,7 @@ ResponseBody _json(int status, Object body, {List<String>? setCookie}) =>
 
 void main() {
   test(
-      'cookie captured, CSRF attached, CSRF-invalid refetched once, AUTH_REQUIRED forces logout',
+      'cookie captured, CSRF attached, 403 CSRF_REJECTED refetched once, AUTH_REQUIRED forces logout',
       () async {
     var csrfCalls = 0;
     var postCalls = 0;
@@ -68,7 +68,7 @@ void main() {
           return _json(403, {
             'ok': false,
             'error': {
-              'code': 'CSRF_INVALID',
+              'code': 'CSRF_REJECTED',
               'message': 'csrf',
               'correlationId': 'c1'
             }
@@ -166,7 +166,7 @@ void main() {
           return _json(403, {
             'ok': false,
             'error': {
-              'code': 'CSRF_INVALID',
+              'code': 'CSRF_REJECTED',
               'message': 'csrf',
               'correlationId': 'c1'
             }
