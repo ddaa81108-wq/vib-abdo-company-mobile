@@ -49,9 +49,9 @@ Session is a cookie plus `X-CSRF-Token` (see `CookieCsrfAuthStrategy`).
 - Login is expected to return `data.csrfToken` and a `Set-Cookie` session.
 - Later unsafe calls send the cookie and `X-CSRF-Token`.
 - `GET /api/auth/csrf` refreshes the token when it is missing (memory only; it is not stored).
-- Only HTTP 403 with code `CSRF_REJECTED` refreshes the token **once** and replays the request **once**. A second failure is not replayed. A 409, a 500, another 403 code, or a message that merely mentions CSRF is not refreshed.
+- Only HTTP 403 with code `CSRF_REJECTED` refreshes the token **once** and replays the request **once**. A second failure is not replayed. Nothing else is refreshed or replayed: not a `419`, not a `401` (even with a CSRF code), not a 409, a 500, or another 403 code. CSRF is typed by code only. A message that mentions CSRF never makes a response a CSRF error.
 - If that refresh itself returns `401` or `419`, the session is cleared instead of looping.
-- An authenticated `401`, or a `419` whose code and message do not mention CSRF, clears the cookie and the CSRF token and emits `session_expired`. A `419` is never refreshed or replayed. A `419` that mentions CSRF is surfaced as a CSRF error and does not wipe the session. The router sends the user to `/login` and shows "انتهت الجلسة، يرجى تسجيل الدخول". There is no refresh-token retry.
+- An authenticated `401` always clears the cookie and the CSRF token once and emits `session_expired`, even when its code is a CSRF code (`CSRF_REJECTED`, `CSRF_MISSING`). A `419` is never refreshed or replayed. A `419` whose code contains CSRF is surfaced as a CSRF error and does not wipe the session. Any other `419` wipes the session, including one with CSRF only in the message. The router sends the user to `/login` and shows "انتهت الجلسة، يرجى تسجيل الدخول". There is no refresh-token retry.
 - `GET`/`HEAD` may retry connection failures and `502`/`503`/`504` (at most twice). `401` and `419` are never in that set. Mutations are not retried by the transport layer.
 - SSE (`/api/events`) and polling (`/api/event-changes`) stop on `401`/`419` instead of reconnecting forever. Logout also stops them.
 
@@ -110,8 +110,8 @@ These are assumed, not confirmed. The contract notes are outside this repository
 1. Is a staging origin available, and who issues the test accounts? Keep both outside the repo.
 2. Does mobile stay on the cookie session, or will the bearer endpoints (`/api/auth/mobile/*`, currently a stub) exist?
 3. CSRF: is `GET /api/auth/csrf` correct, and is the body `{ "ok": true, "data": { "csrfToken": "..." } }` with header `X-CSRF-Token`? Does `POST /api/auth/login` itself require a token?
-4. Session expiry: which status and code should force a new login? This client treats an authenticated `401`, or a `419` whose code and message do not mention CSRF, as expiry. A `419` is never refreshed or replayed. A `419` that mentions CSRF is a CSRF error and does not wipe the session (`AUTH_REQUIRED` is the only code observed; `SESSION_EXPIRED`, `SESSION_REVOKED`, and `PAGE_EXPIRED` are defensive).
-5. CSRF failure: which status and code? After P-09/#73, only HTTP 403 with code `CSRF_REJECTED` triggers one refresh and one replay. A bare `419` still logs the user out.
+4. Session expiry: which status and code should force a new login? This client treats every authenticated `401` (even with a CSRF code), and every `419` whose code does not contain CSRF, as expiry. A `419` with CSRF only in the message is still expiry. A `419` is never refreshed or replayed. A `419` whose code contains CSRF is a CSRF error and does not wipe the session (`AUTH_REQUIRED` is the only code observed; `SESSION_EXPIRED`, `SESSION_REVOKED`, and `PAGE_EXPIRED` are defensive).
+5. CSRF failure: which status and code? After P-09/#73, only HTTP 403 with code `CSRF_REJECTED` triggers one refresh and one replay. CSRF is typed by code only, never by message. A `419` is never replayed, and a bare `419` still logs the user out.
 6. Login failure: which `401` code means bad credentials rather than a dead session?
 7. Validation: is it HTTP `422`, `400`, or both, and is `details` a `{ "fields": { "name": "..." } }` map, a flat map, or a list of `{ "field", "code", "message" }`?
 8. Still unconfirmed on a real response: `fullAccess`, management permission codes, `cashStatus`, `GET /api/home`, and whether rates are JSON numbers or strings.
