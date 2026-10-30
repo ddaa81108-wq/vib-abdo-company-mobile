@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/state/pending_mutation.dart';
+import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'package:vib_abdo_company_mobile/ui/theme.dart';
 import 'package:vib_abdo_company_mobile/ui/widgets/common.dart';
@@ -617,6 +618,78 @@ void main() {
       expect(sent.last['expectedVersion'], 5);
       expect(sent.last['inputValue'], 320);
       expect(find.byKey(const Key('overpayment-warning')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'DEF-031 a failed card reload with the form open hides save and says why',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/customers/c_55');
+      final fake = layer.client as FakeApiClient;
+
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.tap(find.byKey(const Key('add-payment')));
+      await settle(tester);
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const Key('movement-amount')),
+          matching: find.byType(TextField),
+        ),
+        '50',
+      );
+      await settle(tester);
+      expect(find.byKey(const Key('movement-reload-failed')), findsNothing);
+      expect(find.text(AppStrings.ledgerReloadFailed), findsNothing);
+
+      // Another user writes first, so the next save answers 409 and the
+      // form reloads the card. That reload fails.
+      await tester.runAsync(
+        () => layer.accounts.addTransaction(
+          AccountSection.customers,
+          'c_55',
+          AccountTransactionRequest.partialPayment(
+            inputValue: 100,
+            date: DateTime.utc(2026, 10, 22),
+          ),
+          MutationMeta(expectedVersion: 4),
+        ),
+      );
+      fake.failGetPaths.add(_cardPath);
+      final save = find.byKey(const Key('save-movement'));
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await settle(tester);
+
+      final sentBefore = fake.mutationPaths.length;
+      expect(save, findsNothing);
+      final hint = find.byKey(const Key('movement-reload-failed'));
+      expect(hint, findsOneWidget);
+      expect(tester.widget<Text>(hint).data, AppStrings.ledgerReloadFailed);
+      final semantics = tester.ensureSemantics();
+      expect(tester.getSemantics(hint).label, AppStrings.ledgerReloadFailed);
+      semantics.dispose();
+      expect(Directionality.of(tester.element(hint)), TextDirection.rtl);
+      expect(fake.mutationPaths, hasLength(sentBefore));
+
+      // Once the card loads again, the hint goes and save comes back with
+      // the new version.
+      fake.failGetPaths.remove(_cardPath);
+      ProviderScope.containerOf(tester.element(hint))
+          .invalidate(accountCardProvider((AccountSection.customers, 'c_55')));
+      await settle(tester);
+      expect(find.byKey(const Key('movement-reload-failed')), findsNothing);
+      expect(save, findsOneWidget);
+      expect(
+        tester
+            .widget<GuardedMutation>(
+              find.ancestor(of: save, matching: find.byType(GuardedMutation)),
+            )
+            .expectedVersion,
+        5,
+      );
       expect(tester.takeException(), isNull);
     },
   );

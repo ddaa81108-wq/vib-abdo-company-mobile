@@ -476,6 +476,19 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
           },
           onSubmit: _submit,
         ),
+        // The save button stays hidden while the card reload has failed, so
+        // no write goes out without a settled version. Say why instead of
+        // leaving the form without a button and without a word.
+        if (watchedCard.hasError)
+          Semantics(
+            container: true,
+            excludeSemantics: true,
+            label: AppStrings.ledgerReloadFailed,
+            child: const Text(
+              AppStrings.ledgerReloadFailed,
+              key: Key('movement-reload-failed'),
+            ),
+          ),
       ],
     );
   }
