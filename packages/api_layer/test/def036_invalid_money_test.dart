@@ -44,7 +44,11 @@ void main() {
 
     test('a double is never stored or rounded', () {
       final lines = _beginLog();
-      final value = unitsOrNull(10.005, fieldPath: 'balanceUnits', rowId: 'c_frac');
+      final value = unitsOrNull(
+        10.005,
+        fieldPath: 'balanceUnits',
+        rowId: 'c_frac',
+      );
       expect(value is double, isFalse);
       expect(value, isA<MoneyValue>());
       expect(value!.isInvalid, isTrue);
@@ -53,7 +57,10 @@ void main() {
       expect(value, isNot(10));
       expect(value, isNot(0));
       expect(value.toString(), 'MoneyInvalid');
-      expect(_money.formatOrDash(10.005, Currency.lyd), MoneyValue.invalidLabel);
+      expect(
+        _money.formatOrDash(10.005, Currency.lyd),
+        MoneyValue.invalidLabel,
+      );
       expect(_money.formatOrDash(value, Currency.lyd), MoneyValue.invalidLabel);
       _expectLine(lines, endpoint: '-', field: 'balanceUnits', row: 'c_frac');
       _expectClean(lines, const ['10.005', '10', 'اسم سري']);
@@ -71,11 +78,35 @@ void main() {
           ),
         );
         _expectCustomers(page, kind);
-        _expectLine(lines, endpoint: '/api/customers', field: 'balanceUnits', row: 'c_frac');
-        _expectLine(lines, endpoint: '/api/customers', field: 'balanceUnits', row: 'c_text');
-        _expectLine(lines, endpoint: '/api/customers', field: 'balanceUnits', row: 'c_huge');
-        _expectLine(lines, endpoint: '/api/customers', field: 'summary.netBalance', row: '-');
-        expect(lines.any((line) => line.contains('row=c_ok')), isFalse, reason: kind.name);
+        _expectLine(
+          lines,
+          endpoint: '/api/customers',
+          field: 'balanceUnits',
+          row: 'c_frac',
+        );
+        _expectLine(
+          lines,
+          endpoint: '/api/customers',
+          field: 'balanceUnits',
+          row: 'c_text',
+        );
+        _expectLine(
+          lines,
+          endpoint: '/api/customers',
+          field: 'balanceUnits',
+          row: 'c_huge',
+        );
+        _expectLine(
+          lines,
+          endpoint: '/api/customers',
+          field: 'summary.netBalance',
+          row: '-',
+        );
+        expect(
+          lines.any((line) => line.contains('row=c_ok')),
+          isFalse,
+          reason: kind.name,
+        );
         _expectClean(lines, [...kind.secret, ..._names]);
         _expectLogShape(lines);
       }
@@ -96,7 +127,12 @@ void main() {
         expect(card.name, 'اسم سري', reason: kind.name);
         expect(card.version, 4, reason: kind.name);
         _expectInvalid(card.balanceUnits, kind);
-        _expectLine(lines, endpoint: '/api/customers/c_55', field: 'balanceUnits', row: 'c_55');
+        _expectLine(
+          lines,
+          endpoint: '/api/customers/c_55',
+          field: 'balanceUnits',
+          row: 'c_55',
+        );
         _expectClean(lines, [...kind.secret, ..._names]);
       }
     });
@@ -107,15 +143,28 @@ void main() {
         lines.clear();
         final summary = runWithMoneyEndpoint(
           '/api/treasury',
-          () => TreasurySummaryDto.fromData(PreciseJson.decode(_treasuryJson(kind))),
+          () => TreasurySummaryDto.fromData(
+            PreciseJson.decode(_treasuryJson(kind)),
+          ),
         );
         _expectInvalid(summary.receivablesUnits, kind);
         expect(summary.liabilitiesUnits?.units, 12000, reason: kind.name);
         expect(summary.netUnits?.units, 51000, reason: kind.name);
         expect(summary.egyptianSourceUnits?.units, 95000, reason: kind.name);
-        expect(_money.formatOrDash(summary.netUnits, Currency.lyd), '51,000 د.ل');
-        _expectLine(lines, endpoint: '/api/treasury', field: 'totals.receivablesUnits', row: '-');
-        expect(lines.any((line) => line.contains('field=totals.netUnits')), isFalse);
+        expect(
+          _money.formatOrDash(summary.netUnits, Currency.lyd),
+          '51,000 د.ل',
+        );
+        _expectLine(
+          lines,
+          endpoint: '/api/treasury',
+          field: 'totals.receivablesUnits',
+          row: '-',
+        );
+        expect(
+          lines.any((line) => line.contains('field=totals.netUnits')),
+          isFalse,
+        );
         _expectClean(lines, [...kind.secret, ..._names]);
       }
     });
@@ -126,44 +175,64 @@ void main() {
         lines.clear();
         final page = runWithMoneyEndpoint(
           '/api/purchases/al_bayan',
-          () => PurchasesBookPage.fromData(PreciseJson.decode(_purchasesJson(kind))),
+          () =>
+              PurchasesPage.fromData(PreciseJson.decode(_purchasesJson(kind))),
         );
         _expectPurchases(page, kind);
         _expectLine(
           lines,
           endpoint: '/api/purchases/al_bayan',
-          field: 'lifetimeTotals.remainingUnits',
+          field: 'registerTotals.remainingUnits',
           row: '-',
         );
-        _expectLine(lines, endpoint: '/api/purchases/al_bayan', field: 'resultUnits', row: 'e_bad');
-        expect(lines.any((line) => line.contains('row=e_ok')), isFalse, reason: kind.name);
+        _expectLine(
+          lines,
+          endpoint: '/api/purchases/al_bayan',
+          field: 'resultUnits',
+          row: 'e_bad',
+        );
+        expect(
+          lines.any((line) => line.contains('row=e_ok')),
+          isFalse,
+          reason: kind.name,
+        );
         _expectClean(lines, [...kind.secret, ..._names, '47447', '47,447']);
       }
     });
 
-    test('a container that is not an object still fails the whole response', () {
-      expect(
-        () => AccountsPage.fromData(
-          PreciseJson.decode('{"items":[{"id":"c_ok","balanceUnits":320}],"summary":[10635]}'),
-          AccountSection.customers,
-        ),
-        throwsA(isA<InvalidServerResponseException>()),
-      );
-      expect(
-        () => AccountsPage.fromData(PreciseJson.decode('"broken"'), AccountSection.customers),
-        throwsA(isA<InvalidServerResponseException>()),
-      );
-      expect(
-        () => TreasurySummaryDto.fromData(PreciseJson.decode('{"totals":"51000"}')),
-        throwsA(isA<InvalidServerResponseException>()),
-      );
-      expect(
-        () => PurchasesBookPage.fromData(
-          PreciseJson.decode('{"days":[],"lifetimeTotals":[50000]}'),
-        ),
-        throwsA(isA<InvalidServerResponseException>()),
-      );
-    });
+    test(
+      'a container that is not an object still fails the whole response',
+      () {
+        expect(
+          () => AccountsPage.fromData(
+            PreciseJson.decode(
+              '{"items":[{"id":"c_ok","balanceUnits":320}],"summary":[10635]}',
+            ),
+            AccountSection.customers,
+          ),
+          throwsA(isA<InvalidServerResponseException>()),
+        );
+        expect(
+          () => AccountsPage.fromData(
+            PreciseJson.decode('"broken"'),
+            AccountSection.customers,
+          ),
+          throwsA(isA<InvalidServerResponseException>()),
+        );
+        expect(
+          () => TreasurySummaryDto.fromData(
+            PreciseJson.decode('{"totals":"51000"}'),
+          ),
+          throwsA(isA<InvalidServerResponseException>()),
+        );
+        expect(
+          () => PurchasesPage.fromData(
+            PreciseJson.decode('{"entries":[],"registerTotals":[50000]}'),
+          ),
+          throwsA(isA<InvalidServerResponseException>()),
+        );
+      },
+    );
 
     test('encoding an invalid amount refuses instead of writing 0', () {
       expect(wireMoney(null), isNull);
@@ -209,8 +278,18 @@ void main() {
         fake.scriptedGetJson['/api/customers'] = _customersJson(kind);
         final page = await repo.list(AccountSection.customers);
         _expectCustomers(page, kind);
-        _expectLine(lines, endpoint: '/api/customers', field: 'balanceUnits', row: 'c_frac');
-        _expectLine(lines, endpoint: '/api/customers', field: 'summary.netBalance', row: '-');
+        _expectLine(
+          lines,
+          endpoint: '/api/customers',
+          field: 'balanceUnits',
+          row: 'c_frac',
+        );
+        _expectLine(
+          lines,
+          endpoint: '/api/customers',
+          field: 'summary.netBalance',
+          row: '-',
+        );
         _expectClean(lines, [...kind.secret, ..._names]);
         _expectLogShape(lines);
       }
@@ -227,7 +306,12 @@ void main() {
         expect(card.name, 'اسم سري', reason: kind.name);
         expect(card.version, 4, reason: kind.name);
         _expectInvalid(card.balanceUnits, kind);
-        _expectLine(lines, endpoint: '/api/customers/c_55', field: 'balanceUnits', row: 'c_55');
+        _expectLine(
+          lines,
+          endpoint: '/api/customers/c_55',
+          field: 'balanceUnits',
+          row: 'c_55',
+        );
         _expectClean(lines, [...kind.secret, ..._names]);
       }
     });
@@ -243,46 +327,72 @@ void main() {
         _expectInvalid(summary.receivablesUnits, kind);
         expect(summary.netUnits?.units, 51000, reason: kind.name);
         expect(summary.liabilitiesUnits?.units, 12000, reason: kind.name);
-        _expectLine(lines, endpoint: '/api/treasury', field: 'totals.receivablesUnits', row: '-');
-        _expectClean(lines, [...kind.secret, ..._names]);
-      }
-    });
-
-    test('purchases book marks the bad lifetime total and the bad row', () async {
-      final fake = await _admin();
-      final repo = RemotePurchasesRepository(fake);
-      final lines = _beginLog();
-      for (final kind in _kinds) {
-        lines.clear();
-        fake.scriptedGetJson['/api/purchases/al_bayan'] = _purchasesJson(kind);
-        final page = await repo.list(PurchaseBook.alBayan);
-        _expectPurchases(page, kind);
         _expectLine(
           lines,
-          endpoint: '/api/purchases/al_bayan',
-          field: 'lifetimeTotals.remainingUnits',
+          endpoint: '/api/treasury',
+          field: 'totals.receivablesUnits',
           row: '-',
         );
-        _expectLine(lines, endpoint: '/api/purchases/al_bayan', field: 'resultUnits', row: 'e_bad');
         _expectClean(lines, [...kind.secret, ..._names]);
       }
     });
 
-    test('the app gateway still does not round a fraction into an integer', () async {
-      final api = ApiLayer.create(
-        config: const ApiConfig(baseUrl: 'https://fake.invalid', useFakeApi: true),
-        fakeLatency: Duration.zero,
-      );
-      addTearDown(api.dispose);
-      await api.session.login(username: 'admin.demo', password: 'demo-only');
-      final fake = api.client as FakeApiClient;
-      final lines = _beginLog();
-      fake.scriptedGetJson['/api/customers'] = _customersJson(_kinds.first);
-      final page = await api.accounts.list(AccountSection.customers);
-      _expectCustomers(page, _kinds.first);
-      _expectLine(lines, endpoint: '/api/customers', field: 'balanceUnits', row: 'c_frac');
-      _expectClean(lines, [..._kinds.first.secret, ..._names]);
-    });
+    test(
+      'purchases book marks the bad lifetime total and the bad row',
+      () async {
+        final fake = await _admin();
+        final repo = RemotePurchasesRepository(fake);
+        final lines = _beginLog();
+        for (final kind in _kinds) {
+          lines.clear();
+          fake.scriptedGetJson['/api/purchases/al_bayan'] = _purchasesJson(
+            kind,
+          );
+          final page = await repo.list(PurchaseBook.alBayan);
+          _expectPurchases(page, kind);
+          _expectLine(
+            lines,
+            endpoint: '/api/purchases/al_bayan',
+            field: 'registerTotals.remainingUnits',
+            row: '-',
+          );
+          _expectLine(
+            lines,
+            endpoint: '/api/purchases/al_bayan',
+            field: 'resultUnits',
+            row: 'e_bad',
+          );
+          _expectClean(lines, [...kind.secret, ..._names]);
+        }
+      },
+    );
+
+    test(
+      'the app gateway still does not round a fraction into an integer',
+      () async {
+        final api = ApiLayer.create(
+          config: const ApiConfig(
+            baseUrl: 'https://fake.invalid',
+            useFakeApi: true,
+          ),
+          fakeLatency: Duration.zero,
+        );
+        addTearDown(api.dispose);
+        await api.session.login(username: 'admin.demo', password: 'demo-only');
+        final fake = api.client as FakeApiClient;
+        final lines = _beginLog();
+        fake.scriptedGetJson['/api/customers'] = _customersJson(_kinds.first);
+        final page = await api.accounts.list(AccountSection.customers);
+        _expectCustomers(page, _kinds.first);
+        _expectLine(
+          lines,
+          endpoint: '/api/customers',
+          field: 'balanceUnits',
+          row: 'c_frac',
+        );
+        _expectClean(lines, [..._kinds.first.secret, ..._names]);
+      },
+    );
   });
 }
 
@@ -296,25 +406,34 @@ void _expectCustomers(AccountsPage page, _Kind kind) {
   expect(byId['c_ok']!.balanceUnits?.units, 320, reason: kind.name);
   expect(byId['c_ok']!.name, 'عميل سليم', reason: kind.name);
   expect(byId['c_zero']!.balanceUnits?.units, 0, reason: kind.name);
-  expect(_money.formatOrDash(byId['c_zero']!.balanceUnits, Currency.lyd), '0 د.ل');
-  expect(_money.formatOrDash(byId['c_ok']!.balanceUnits, Currency.lyd), '320 د.ل');
+  expect(
+    _money.formatOrDash(byId['c_zero']!.balanceUnits, Currency.lyd),
+    '0 د.ل',
+  );
+  expect(
+    _money.formatOrDash(byId['c_ok']!.balanceUnits, Currency.lyd),
+    '320 د.ل',
+  );
   _expectInvalid(page.summary.netBalanceUnits, kind, reason: 'summary');
   expect(page.summary.totalDebtUnits?.units, 10635, reason: kind.name);
-  expect(_money.formatOrDash(page.summary.totalDebtUnits, Currency.lyd), '10,635 د.ل');
+  expect(
+    _money.formatOrDash(page.summary.totalDebtUnits, Currency.lyd),
+    '10,635 د.ل',
+  );
   expect(page.summary.activeCards, 5, reason: kind.name);
 }
 
-void _expectPurchases(PurchasesBookPage page, _Kind kind) {
-  final totals = page.lifetimeTotals!;
-  expect(totals.resultUnits?.units, 50000, reason: kind.name);
-  expect(totals.paidUnits?.units, 47447, reason: kind.name);
-  _expectInvalid(totals.remainingUnits, kind, reason: 'lifetime');
+void _expectPurchases(PurchasesPage page, _Kind kind) {
+  final totals = page.registerTotals!;
+  expect(totals.resultUnits?.asInt, 50000, reason: kind.name);
+  expect(totals.paidUnits?.asInt, 47447, reason: kind.name);
+  _expectInvalid(totals.remainingUnits, kind, reason: 'register');
   expect(_money.formatOrDash(totals.resultUnits, Currency.lyd), '50,000 د.ل');
-  final day = page.page.items.single;
-  expect(day.todayResultUnits?.units, 100, reason: kind.name);
+  final day = page.day!;
+  expect(day.todayResultUnits?.asInt, 100, reason: kind.name);
   expect(_money.formatOrDash(day.todayResultUnits, Currency.lyd), '100 د.ل');
-  final bad = day.entries.singleWhere((entry) => entry.id == 'e_bad');
-  final ok = day.entries.singleWhere((entry) => entry.id == 'e_ok');
+  final bad = page.entries.singleWhere((entry) => entry.id == 'e_bad');
+  final ok = page.entries.singleWhere((entry) => entry.id == 'e_ok');
   _expectInvalid(bad.resultUnits, kind, reason: 'e_bad');
   expect(bad.paidUnits?.units, 7, reason: kind.name);
   expect(bad.itemLabel, 'صنف سري', reason: kind.name);
@@ -334,10 +453,22 @@ void _expectInvalid(MoneyValue? value, _Kind kind, {String? reason}) {
   expect(value, const MoneyValue.invalid(), reason: where);
   expect(value.toString(), 'MoneyInvalid', reason: where);
   expect(value is double, isFalse, reason: where);
-  expect(_money.formatOrDash(value, Currency.lyd), MoneyValue.invalidLabel, reason: where);
+  expect(
+    _money.formatOrDash(value, Currency.lyd),
+    MoneyValue.invalidLabel,
+    reason: where,
+  );
   for (final secret in kind.secret) {
-    expect(value.toString().contains(secret), isFalse, reason: '$where $secret');
-    expect(_money.formatOrDash(value, Currency.lyd).contains(secret), isFalse, reason: secret);
+    expect(
+      value.toString().contains(secret),
+      isFalse,
+      reason: '$where $secret',
+    );
+    expect(
+      _money.formatOrDash(value, Currency.lyd).contains(secret),
+      isFalse,
+      reason: secret,
+    );
   }
 }
 
@@ -376,7 +507,9 @@ void _expectClean(List<String> lines, List<String> secrets) {
 }
 
 void _expectLogShape(List<String> lines) {
-  final shape = RegExp(r'^\[api\] invalid_money endpoint=\S+ field=\S+ row=\S+$');
+  final shape = RegExp(
+    r'^\[api\] invalid_money endpoint=\S+ field=\S+ row=\S+$',
+  );
   expect(lines, isNotEmpty);
   for (final line in lines) {
     expect(line, matches(shape), reason: line);
@@ -392,7 +525,8 @@ Future<FakeApiClient> _admin() async {
   return api;
 }
 
-String _customersJson(_Kind kind) => '''
+String _customersJson(_Kind kind) =>
+    '''
 {
   "items": [
     {"id":"c_frac","name":"اسم سري","balanceUnits":10.005,"currency":"LYD"},
@@ -409,7 +543,8 @@ String _customersJson(_Kind kind) => '''
 String _cardJson(_Kind kind) =>
     '{"id":"c_55","name":"اسم سري","balanceUnits":${kind.json},"currency":"LYD","version":4}';
 
-String _treasuryJson(_Kind kind) => '''
+String _treasuryJson(_Kind kind) =>
+    '''
 {
   "version": 7,
   "totals": {
@@ -424,23 +559,29 @@ String _treasuryJson(_Kind kind) => '''
 }
 ''';
 
-String _purchasesJson(_Kind kind) => '''
+String _purchasesJson(_Kind kind) =>
+    '''
 {
-  "days": [
-    {
-      "day": "1",
-      "id": "day-1",
-      "totals": {"todayResultUnits": 100, "todayPaidUnits": 40},
-      "entries": [
-        {"id":"e_ok","kind":"entry","itemLabel":"صنف سليم","resultUnits":40,"paidUnits":40,"remainingUnits":40},
-        {"id":"e_bad","kind":"entry","itemLabel":"صنف سري","resultUnits":10.005,"paidUnits":7,"remainingUnits":7}
-      ]
-    }
+  "merchant": {"key": "al_bayan", "name": "البيان"},
+  "day": {
+    "id": "day-1",
+    "dayNumber": 1,
+    "status": "draft",
+    "version": 1,
+    "todayResultUnits": 100,
+    "todayPaidUnits": 40
+  },
+  "entries": [
+    {"id":"e_ok","itemLabel":"صنف سليم","resultUnits":40,"paidUnits":40,"remainingUnits":40,"version":1,"dayVersion":1},
+    {"id":"e_bad","itemLabel":"صنف سري","resultUnits":10.005,"paidUnits":7,"remainingUnits":7,"version":1,"dayVersion":1}
   ],
-  "lifetimeTotals": {
+  "nextBefore": null,
+  "registerTotals": {
     "resultUnits": 50000,
     "paidUnits": 47447,
-    "remainingUnits": ${kind.json}
+    "remainingUnits": ${kind.json},
+    "vodafoneConsumedUnits": 0,
+    "vodafoneRemainingUnits": 1
   }
 }
 ''';

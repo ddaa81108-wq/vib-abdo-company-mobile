@@ -54,55 +54,55 @@ void main() {
     },
   );
 
-  test(
-    'DEF-003 full payment stores balance 0',
-    () async {
-      final api = await login('admin@example.invalid');
-      final before = await api.accounts.list(AccountSection.customers);
-      expect(before.totalItems, 10);
-      expect(before.summary.netBalanceUnits?.units, 10635);
-      final demo = before.page.items.firstWhere((card) => card.id == 'c_55');
-      expect(demo.balanceUnits?.units, 320);
-      final ack = await api.accounts.addTransaction(
+  test('DEF-003 full payment stores balance 0', () async {
+    final api = await login('admin@example.invalid');
+    final before = await api.accounts.list(AccountSection.customers);
+    expect(before.totalItems, 10);
+    expect(before.summary.netBalanceUnits?.units, 10635);
+    final demo = before.page.items.firstWhere((card) => card.id == 'c_55');
+    expect(demo.balanceUnits?.units, 320);
+    final ack = await api.accounts.addTransaction(
+      AccountSection.customers,
+      'c_55',
+      AccountTransactionRequest.fullPayment(date: DateTime(2026, 10, 19)),
+      MutationMeta(expectedVersion: demo.version),
+    );
+    expect(ack.version, 5);
+
+    final card = await api.accounts.get(AccountSection.customers, 'c_55');
+    expect(card.balanceUnits?.units, 0);
+    expect(card.version, 5);
+    final after = await api.accounts.list(AccountSection.customers);
+    expect(
+      after.page.items
+          .firstWhere((item) => item.id == 'c_55')
+          .balanceUnits
+          ?.units,
+      0,
+    );
+    // The fixture summary is 10635. The stored change is 320 -> 0.
+    expect(after.summary.netBalanceUnits?.units, 10315);
+    expect(after.summary.totalDebtUnits?.units, 10315);
+
+    await expectLater(
+      api.accounts.addTransaction(
         AccountSection.customers,
         'c_55',
         AccountTransactionRequest.fullPayment(date: DateTime(2026, 10, 19)),
-        MutationMeta(expectedVersion: demo.version),
-      );
-      expect(ack.version, 5);
-
-      final card = await api.accounts.get(AccountSection.customers, 'c_55');
-      expect(card.balanceUnits?.units, 0);
-      expect(card.version, 5);
-      final after = await api.accounts.list(AccountSection.customers);
-      expect(
-        after.page.items.firstWhere((item) => item.id == 'c_55').balanceUnits?.units,
-        0,
-      );
-      // The fixture summary is 10635. The stored change is 320 -> 0.
-      expect(after.summary.netBalanceUnits?.units, 10315);
-      expect(after.summary.totalDebtUnits?.units, 10315);
-
-      await expectLater(
-        api.accounts.addTransaction(
-          AccountSection.customers,
-          'c_55',
-          AccountTransactionRequest.fullPayment(date: DateTime(2026, 10, 19)),
-          MutationMeta(expectedVersion: 4, requestId: 'full-2'),
+        MutationMeta(expectedVersion: 4, requestId: 'full-2'),
+      ),
+      throwsA(
+        isA<ConflictException>().having(
+          (e) => e.code,
+          'code',
+          'VERSION_CONFLICT',
         ),
-        throwsA(
-          isA<ConflictException>().having(
-            (e) => e.code,
-            'code',
-            'VERSION_CONFLICT',
-          ),
-        ),
-      );
-      final still = await api.accounts.get(AccountSection.customers, 'c_55');
-      expect(still.balanceUnits?.units, 0);
-      expect(still.version, 5);
-    },
-  );
+      ),
+    );
+    final still = await api.accounts.get(AccountSection.customers, 'c_55');
+    expect(still.balanceUnits?.units, 0);
+    expect(still.version, 5);
+  });
 
   test(
     'DEF-004 cancel copies the stored balance of the latest posted line',
@@ -128,7 +128,10 @@ void main() {
       expect(card.balanceUnits?.units, 500);
       final page = await api.accounts.list(AccountSection.customers);
       expect(
-        page.page.items.firstWhere((item) => item.id == 'c_55').balanceUnits?.units,
+        page.page.items
+            .firstWhere((item) => item.id == 'c_55')
+            .balanceUnits
+            ?.units,
         500,
       );
       // The fixture summary is 10635. The stored change is 320 -> 500.
@@ -182,88 +185,100 @@ void main() {
     },
   );
 
-  test('partial payment stores the new balance and rejects a stale version',
-      () async {
-    final api = await login('admin@example.invalid');
-    const stale = 'تم تعديل البيانات من مستخدم آخر';
+  test(
+    'partial payment stores the new balance and rejects a stale version',
+    () async {
+      final api = await login('admin@example.invalid');
+      const stale = 'تم تعديل البيانات من مستخدم آخر';
 
-    await expectLater(
-      api.accounts.addTransaction(
+      await expectLater(
+        api.accounts.addTransaction(
+          AccountSection.customers,
+          'c_55',
+          AccountTransactionRequest.partialPayment(
+            inputValue: 100,
+            date: DateTime(2026, 10, 19),
+          ),
+          MutationMeta(expectedVersion: 1, requestId: 'partial-stale'),
+        ),
+        throwsA(
+          isA<ConflictException>()
+              .having((e) => e.code, 'code', 'VERSION_CONFLICT')
+              .having((e) => e.message, 'message', stale),
+        ),
+      );
+      final untouched = await api.accounts.get(
+        AccountSection.customers,
+        'c_55',
+      );
+      expect(untouched.balanceUnits?.units, 320);
+      expect(untouched.version, 4);
+
+      final ack = await api.accounts.addTransaction(
         AccountSection.customers,
         'c_55',
         AccountTransactionRequest.partialPayment(
           inputValue: 100,
           date: DateTime(2026, 10, 19),
         ),
-        MutationMeta(expectedVersion: 1, requestId: 'partial-stale'),
-      ),
-      throwsA(
-        isA<ConflictException>()
-            .having((e) => e.code, 'code', 'VERSION_CONFLICT')
-            .having((e) => e.message, 'message', stale),
-      ),
-    );
-    final untouched = await api.accounts.get(AccountSection.customers, 'c_55');
-    expect(untouched.balanceUnits?.units, 320);
-    expect(untouched.version, 4);
+        MutationMeta(expectedVersion: 4, requestId: 'partial-1'),
+      );
+      // The server stores 220: the card's 320 with the received 100 applied.
+      expect(ack.version, 5);
+      final card = await api.accounts.get(AccountSection.customers, 'c_55');
+      expect(card.balanceUnits?.units, 220);
+      expect(card.version, 5);
+      final page = await api.accounts.list(AccountSection.customers);
+      expect(
+        page.page.items
+            .firstWhere((item) => item.id == 'c_55')
+            .balanceUnits
+            ?.units,
+        220,
+      );
+      // The fixture summary is 10635. The stored change is 320 -> 220.
+      expect(page.summary.netBalanceUnits?.units, 10535);
+      expect(page.summary.totalDebtUnits?.units, 10535);
 
-    final ack = await api.accounts.addTransaction(
-      AccountSection.customers,
-      'c_55',
-      AccountTransactionRequest.partialPayment(
-        inputValue: 100,
-        date: DateTime(2026, 10, 19),
-      ),
-      MutationMeta(expectedVersion: 4, requestId: 'partial-1'),
-    );
-    // The server stores 220: the card's 320 with the received 100 applied.
-    expect(ack.version, 5);
-    final card = await api.accounts.get(AccountSection.customers, 'c_55');
-    expect(card.balanceUnits?.units, 220);
-    expect(card.version, 5);
-    final page = await api.accounts.list(AccountSection.customers);
-    expect(
-      page.page.items.firstWhere((item) => item.id == 'c_55').balanceUnits?.units,
-      220,
-    );
-    // The fixture summary is 10635. The stored change is 320 -> 220.
-    expect(page.summary.netBalanceUnits?.units, 10535);
-    expect(page.summary.totalDebtUnits?.units, 10535);
-
-    await expectLater(
-      api.accounts.addTransaction(
-        AccountSection.customers,
-        'c_55',
-        AccountTransactionRequest.partialPayment(
-          inputValue: 100,
-          date: DateTime(2026, 10, 19),
+      await expectLater(
+        api.accounts.addTransaction(
+          AccountSection.customers,
+          'c_55',
+          AccountTransactionRequest.partialPayment(
+            inputValue: 100,
+            date: DateTime(2026, 10, 19),
+          ),
+          MutationMeta(expectedVersion: 4, requestId: 'partial-2'),
         ),
-        MutationMeta(expectedVersion: 4, requestId: 'partial-2'),
-      ),
-      throwsA(
-        isA<ConflictException>().having(
-          (e) => e.code,
-          'code',
-          'VERSION_CONFLICT',
+        throwsA(
+          isA<ConflictException>().having(
+            (e) => e.code,
+            'code',
+            'VERSION_CONFLICT',
+          ),
         ),
-      ),
-    );
-    final still = await api.accounts.get(AccountSection.customers, 'c_55');
-    expect(still.balanceUnits?.units, 220);
-    expect(still.version, 5);
-  });
+      );
+      final still = await api.accounts.get(AccountSection.customers, 'c_55');
+      expect(still.balanceUnits?.units, 220);
+      expect(still.version, 5);
+    },
+  );
 
   test('DEF-016 home debt rows copy the stored card balance', () async {
     final api = await login('admin@example.invalid');
     final before = await api.home.fetch();
     expect(
-      before.oldDebts!.singleWhere((row) => row.id == 'c_55').balanceUnits?.units,
+      before.oldDebts!
+          .singleWhere((row) => row.id == 'c_55')
+          .balanceUnits
+          ?.units,
       320,
     );
     expect(
       before.summaries
           .firstWhere((item) => item.section == 'customers')
-          .valueUnits?.units,
+          .valueUnits
+          ?.units,
       10635,
     );
 
@@ -284,13 +299,15 @@ void main() {
     expect(
       after.summaries
           .firstWhere((item) => item.section == 'customers')
-          .valueUnits?.units,
+          .valueUnits
+          ?.units,
       10315,
     );
     expect(
       after.summaries
           .firstWhere((item) => item.section == 'egyptian-deposits')
-          .valueUnits?.units,
+          .valueUnits
+          ?.units,
       23750,
     );
 
@@ -329,7 +346,8 @@ void main() {
       expect(
         partialHome.summaries
             .firstWhere((item) => item.section == 'customers')
-            .valueUnits?.units,
+            .valueUnits
+            ?.units,
         10535,
       );
 
@@ -542,55 +560,57 @@ void main() {
     },
   );
 
-  test('purchase day finalize stores the day version and rejects a stale one',
-      () async {
-    final api = await login('admin@example.invalid');
-    final before = await api.purchases.list(PurchaseBook.alBayan);
-    final day = before.page.items.single;
-    expect(day.version, 3);
-    expect(day.status, 'draft');
+  test(
+    'purchase day finalize stores the day version and rejects a stale one',
+    () async {
+      final api = await login('admin@example.invalid');
+      final before = await api.purchases.list(PurchaseBook.alBayan);
+      final day = before.day!;
+      expect(day.version, 3);
+      expect(day.status, 'draft');
 
-    await expectLater(
-      api.purchases.finalizeDay(
-        PurchaseBook.alBayan,
-        MutationMeta(expectedVersion: 1, requestId: 'finalize-stale'),
-      ),
-      throwsA(
-        isA<ConflictException>().having(
-          (e) => e.code,
-          'code',
-          'VERSION_CONFLICT',
+      await expectLater(
+        api.purchases.finalizeDay(
+          PurchaseBook.alBayan,
+          MutationMeta(expectedVersion: 1, requestId: 'finalize-stale'),
         ),
-      ),
-    );
-    final untouched = await api.purchases.list(PurchaseBook.alBayan);
-    expect(untouched.page.items.single.version, 3);
-    expect(untouched.page.items.single.status, 'draft');
-
-    final ack = await api.purchases.finalizeDay(
-      PurchaseBook.alBayan,
-      MutationMeta(expectedVersion: 3, requestId: 'finalize-1'),
-    );
-    expect(ack.version, 4);
-    final after = await api.purchases.list(PurchaseBook.alBayan);
-    expect(after.page.items.single.version, 4);
-    expect(after.page.items.single.status, 'finalized');
-
-    await expectLater(
-      api.purchases.finalizeDay(
-        PurchaseBook.alBayan,
-        MutationMeta(expectedVersion: 3, requestId: 'finalize-2'),
-      ),
-      throwsA(
-        isA<ConflictException>().having(
-          (e) => e.code,
-          'code',
-          'VERSION_CONFLICT',
+        throwsA(
+          isA<ConflictException>().having(
+            (e) => e.code,
+            'code',
+            'VERSION_CONFLICT',
+          ),
         ),
-      ),
-    );
-    final still = await api.purchases.list(PurchaseBook.alBayan);
-    expect(still.page.items.single.version, 4);
-    expect(still.page.items.single.status, 'finalized');
-  });
+      );
+      final untouched = await api.purchases.list(PurchaseBook.alBayan);
+      expect(untouched.day!.version, 3);
+      expect(untouched.day!.status, 'draft');
+
+      final ack = await api.purchases.finalizeDay(
+        PurchaseBook.alBayan,
+        MutationMeta(expectedVersion: 3, requestId: 'finalize-1'),
+      );
+      expect(ack.version, 4);
+      final after = await api.purchases.list(PurchaseBook.alBayan);
+      expect(after.day!.version, 4);
+      expect(after.day!.status, 'finalized');
+
+      await expectLater(
+        api.purchases.finalizeDay(
+          PurchaseBook.alBayan,
+          MutationMeta(expectedVersion: 3, requestId: 'finalize-2'),
+        ),
+        throwsA(
+          isA<ConflictException>().having(
+            (e) => e.code,
+            'code',
+            'VERSION_CONFLICT',
+          ),
+        ),
+      );
+      final still = await api.purchases.list(PurchaseBook.alBayan);
+      expect(still.day!.version, 4);
+      expect(still.day!.status, 'finalized');
+    },
+  );
 }

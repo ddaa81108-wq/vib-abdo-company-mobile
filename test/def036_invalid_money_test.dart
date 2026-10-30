@@ -39,13 +39,14 @@ void main() {
     testWidgets('DEF-036 customers ${kind.name} summary keeps the other rows', (
       tester,
     ) async {
-      final lines = await _open(
-        tester,
-        {'/api/customers': _customersJson(kind)},
-        '/customers',
-      );
+      final lines = await _open(tester, {
+        '/api/customers': _customersJson(kind),
+      }, '/customers');
 
-      expect(find.byKey(const Key('screen-customers'), skipOffstage: false), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen-customers'), skipOffstage: false),
+        findsOneWidget,
+      );
       expect(_text('عميل سليم'), findsWidgets);
       expect(_text('320 د.ل'), findsWidgets);
       expect(_text('0 د.ل'), findsWidgets);
@@ -56,7 +57,10 @@ void main() {
       expect(_text('11 د.ل'), findsNothing);
       expect(_text('1,500 د.ل'), findsNothing);
       expect(_text('1,500'), findsNothing);
-      expect(find.textContaining('123456789012345678901234', skipOffstage: false), findsNothing);
+      expect(
+        find.textContaining('123456789012345678901234', skipOffstage: false),
+        findsNothing,
+      );
       expect(
         find.descendant(
           of: find.byKey(const Key('account-card-c_ok'), skipOffstage: false),
@@ -93,72 +97,111 @@ void main() {
       expect(_key(const ValueKey('zero-review-c_frac')), findsNothing);
       expect(_key(const ValueKey('zero-review-c_text')), findsNothing);
       expect(_key(const ValueKey('zero-review-c_huge')), findsNothing);
-      _expectLine(lines, endpoint: '/api/customers', field: 'balanceUnits', row: 'c_frac');
-      _expectLine(lines, endpoint: '/api/customers', field: 'balanceUnits', row: 'c_text');
-      _expectLine(lines, endpoint: '/api/customers', field: 'balanceUnits', row: 'c_huge');
-      _expectLine(lines, endpoint: '/api/customers', field: 'summary.netBalance', row: '-');
+      _expectLine(
+        lines,
+        endpoint: '/api/customers',
+        field: 'balanceUnits',
+        row: 'c_frac',
+      );
+      _expectLine(
+        lines,
+        endpoint: '/api/customers',
+        field: 'balanceUnits',
+        row: 'c_text',
+      );
+      _expectLine(
+        lines,
+        endpoint: '/api/customers',
+        field: 'balanceUnits',
+        row: 'c_huge',
+      );
+      _expectLine(
+        lines,
+        endpoint: '/api/customers',
+        field: 'summary.netBalance',
+        row: '-',
+      );
       expect(lines.any((line) => line.contains('row=c_ok')), isFalse);
-      _expectClean(lines, [...kind.secret, ..._names, '10.005', '1500', '123456789012345678901234']);
+      _expectClean(lines, [
+        ...kind.secret,
+        ..._names,
+        '10.005',
+        '1500',
+        '123456789012345678901234',
+      ]);
       _expectLogShape(lines);
     });
 
-    testWidgets('DEF-036 balance ${kind.name} refuses payment and full payment', (
-      tester,
-    ) async {
-      final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
-      final fake = layer.client as FakeApiClient;
-      await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      final lines = _beginLog();
-      fake.scriptedGetJson['/api/customers/c_55'] = _cardJson(kind);
-      await go(tester, '/customers/c_55');
+    testWidgets(
+      'DEF-036 balance ${kind.name} refuses payment and full payment',
+      (tester) async {
+        final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
+        final fake = layer.client as FakeApiClient;
+        await signIn(tester, username: 'admin.demo', password: 'demo-only');
+        final lines = _beginLog();
+        fake.scriptedGetJson['/api/customers/c_55'] = _cardJson(kind);
+        await go(tester, '/customers/c_55');
 
-      final header = tester.widget<MoneyText>(
-        find.byKey(const Key('ledger-header-balance'), skipOffstage: false),
-      );
-      expect(header.text, MoneyValue.invalidLabel);
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('ledger-header-balance'), skipOffstage: false),
-          matching: _icon(),
-          skipOffstage: false,
-        ),
-        findsOneWidget,
-      );
-      expect(_text('اسم سري'), findsWidgets);
-      expect(_text('سداد جزئي'), findsWidgets);
-      expect(_text('320 د.ل'), findsWidgets);
-      expect(_text('10 د.ل'), findsNothing);
-      expect(_text('1,500 د.ل'), findsNothing);
-      expect(find.textContaining('123456789012345678901234', skipOffstage: false), findsNothing);
+        final header = tester.widget<MoneyText>(
+          find.byKey(const Key('ledger-header-balance'), skipOffstage: false),
+        );
+        expect(header.text, MoneyValue.invalidLabel);
+        expect(
+          find.descendant(
+            of: find.byKey(
+              const Key('ledger-header-balance'),
+              skipOffstage: false,
+            ),
+            matching: _icon(),
+            skipOffstage: false,
+          ),
+          findsOneWidget,
+        );
+        expect(_text('اسم سري'), findsWidgets);
+        expect(_text('سداد جزئي'), findsWidgets);
+        expect(_text('320 د.ل'), findsWidgets);
+        expect(_text('10 د.ل'), findsNothing);
+        expect(_text('1,500 د.ل'), findsNothing);
+        expect(
+          find.textContaining('123456789012345678901234', skipOffstage: false),
+          findsNothing,
+        );
 
-      await tester.ensureVisible(find.byKey(const Key('full-payment')));
-      await tester.tap(find.byKey(const Key('full-payment')));
-      await settle(tester);
-      expect(fake.mutationRequestIds, isEmpty);
-      expect(_errorTexts(tester), contains(MoneyValue.invalidLabel));
+        await tester.ensureVisible(find.byKey(const Key('full-payment')));
+        await tester.tap(find.byKey(const Key('full-payment')));
+        await settle(tester);
+        expect(fake.mutationRequestIds, isEmpty);
+        expect(_errorTexts(tester), contains(MoneyValue.invalidLabel));
 
-      await tester.tap(find.byKey(const Key('add-payment')));
-      await settle(tester);
-      await enterAmount(tester, '10');
-      await tester.tap(find.byKey(const Key('save-movement')));
-      await settle(tester);
+        await tester.tap(find.byKey(const Key('add-payment')));
+        await settle(tester);
+        await enterAmount(tester, '10');
+        await tester.tap(find.byKey(const Key('save-movement')));
+        await settle(tester);
 
-      expect(fake.mutationRequestIds, isEmpty);
-      expect(_errorTexts(tester), everyElement(MoneyValue.invalidLabel));
-      _expectLine(lines, endpoint: '/api/customers/c_55', field: 'balanceUnits', row: 'c_55');
-      _expectClean(lines, [...kind.secret, ..._names]);
-      _expectLogShape(lines);
-    });
+        expect(fake.mutationRequestIds, isEmpty);
+        expect(_errorTexts(tester), everyElement(MoneyValue.invalidLabel));
+        _expectLine(
+          lines,
+          endpoint: '/api/customers/c_55',
+          field: 'balanceUnits',
+          row: 'c_55',
+        );
+        _expectClean(lines, [...kind.secret, ..._names]);
+        _expectLogShape(lines);
+      },
+    );
   }
 
   testWidgets('DEF-036 treasury totals keep the other totals', (tester) async {
-    final lines = await _open(
-      tester,
-      {'/api/treasury': _treasuryJson()},
-      '/treasury',
-    );
+    final lines = await _open(tester, {
+      '/api/treasury': _treasuryJson(),
+    }, '/treasury');
 
-    expect(find.byKey(TreasuryScreen.screenKey, skipOffstage: false), findsOneWidget);
+    expect(
+      find.byKey(TreasuryScreen.screenKey, skipOffstage: false),
+      findsOneWidget,
+    );
     expect(_text('51,000 د.ل'), findsWidgets);
     expect(_text('95,000 ج.م'), findsWidgets);
     expect(_text('10,000 د.ل'), findsWidgets);
@@ -167,11 +210,32 @@ void main() {
     expect(_text('10 د.ل'), findsNothing);
     expect(_text('12,000 د.ل'), findsNothing);
     expect(_text('1,500 د.ل'), findsNothing);
-    expect(find.textContaining('123456789012345678901234', skipOffstage: false), findsNothing);
-    _expectLine(lines, endpoint: '/api/treasury', field: 'totals.receivablesUnits', row: '-');
-    _expectLine(lines, endpoint: '/api/treasury', field: 'totals.liabilitiesUnits', row: '-');
-    _expectLine(lines, endpoint: '/api/treasury', field: 'totals.activeCashUnits', row: '-');
-    expect(lines.any((line) => line.contains('field=totals.netUnits')), isFalse);
+    expect(
+      find.textContaining('123456789012345678901234', skipOffstage: false),
+      findsNothing,
+    );
+    _expectLine(
+      lines,
+      endpoint: '/api/treasury',
+      field: 'totals.receivablesUnits',
+      row: '-',
+    );
+    _expectLine(
+      lines,
+      endpoint: '/api/treasury',
+      field: 'totals.liabilitiesUnits',
+      row: '-',
+    );
+    _expectLine(
+      lines,
+      endpoint: '/api/treasury',
+      field: 'totals.activeCashUnits',
+      row: '-',
+    );
+    expect(
+      lines.any((line) => line.contains('field=totals.netUnits')),
+      isFalse,
+    );
     _expectClean(lines, const [
       '10.005',
       '12000',
@@ -183,13 +247,14 @@ void main() {
   });
 
   testWidgets('DEF-036 purchases totals keep the other rows', (tester) async {
-    final lines = await _open(
-      tester,
-      {'/api/purchases/al_bayan': _purchasesJson()},
-      '/purchases',
-    );
+    final lines = await _open(tester, {
+      '/api/purchases/al_bayan': _purchasesJson(),
+    }, '/purchases');
 
-    expect(find.byKey(PurchasesScreen.screenKey, skipOffstage: false), findsOneWidget);
+    expect(
+      find.byKey(PurchasesScreen.screenKey, skipOffstage: false),
+      findsOneWidget,
+    );
     expect(_text('صنف سليم'), findsWidgets);
     expect(_text('40 د.ل'), findsWidgets);
     expect(_text('7 د.ل'), findsWidgets);
@@ -199,18 +264,26 @@ void main() {
     expect(_icon(), findsWidgets);
     expect(_text('10 د.ل'), findsNothing);
     expect(_text('47,447 د.ل'), findsNothing);
-    expect(find.textContaining('123456789012345678901234', skipOffstage: false), findsNothing);
-    _expectLine(lines, endpoint: '/api/purchases/al_bayan', field: 'resultUnits', row: 'e_bad');
+    expect(
+      find.textContaining('123456789012345678901234', skipOffstage: false),
+      findsNothing,
+    );
     _expectLine(
       lines,
       endpoint: '/api/purchases/al_bayan',
-      field: 'lifetimeTotals.paidUnits',
+      field: 'resultUnits',
+      row: 'e_bad',
+    );
+    _expectLine(
+      lines,
+      endpoint: '/api/purchases/al_bayan',
+      field: 'registerTotals.paidUnits',
       row: '-',
     );
     _expectLine(
       lines,
       endpoint: '/api/purchases/al_bayan',
-      field: 'lifetimeTotals.remainingUnits',
+      field: 'registerTotals.remainingUnits',
       row: '-',
     );
     expect(lines.any((line) => line.contains('row=e_ok')), isFalse);
@@ -232,7 +305,9 @@ Finder _icon() => find.byIcon(Icons.error_outline, skipOffstage: false);
 Finder _key(Key key) => find.byKey(key, skipOffstage: false);
 
 List<String?> _errorTexts(WidgetTester tester) {
-  final errors = tester.widgetList<Text>(find.byKey(const Key('mutation-error'), skipOffstage: false));
+  final errors = tester.widgetList<Text>(
+    find.byKey(const Key('mutation-error'), skipOffstage: false),
+  );
   return [for (final text in errors) text.data];
 }
 
@@ -285,7 +360,9 @@ void _expectClean(List<String> lines, List<String> secrets) {
 }
 
 void _expectLogShape(List<String> lines) {
-  final shape = RegExp(r'^\[api\] invalid_money endpoint=\S+ field=\S+ row=\S+$');
+  final shape = RegExp(
+    r'^\[api\] invalid_money endpoint=\S+ field=\S+ row=\S+$',
+  );
   expect(lines, isNotEmpty);
   for (final line in lines) {
     expect(line, matches(shape), reason: line);
@@ -317,7 +394,8 @@ Future<void> enterAmount(WidgetTester tester, String value) async {
   await tester.pump();
 }
 
-String _customersJson(_Kind kind) => '''
+String _customersJson(_Kind kind) =>
+    '''
 {
   "items": [
     {"id":"c_frac","name":"اسم سري","balanceUnits":10.005,"currency":"LYD"},
@@ -352,20 +430,24 @@ String _treasuryJson() => '''
 
 String _purchasesJson() => '''
 {
-  "days": [
-    {
-      "day": "1",
-      "totals": {"todayResultUnits": 100, "todayPaidUnits": 40},
-      "entries": [
-        {"id":"e_ok","kind":"entry","itemLabel":"صنف سليم","resultUnits":40,"paidUnits":40,"remainingUnits":40},
-        {"id":"e_bad","kind":"entry","itemLabel":"صنف سري","resultUnits":10.005,"paidUnits":7,"remainingUnits":7}
-      ]
-    }
+  "day": {
+    "id": "day-1",
+    "dayNumber": 1,
+    "status": "draft",
+    "version": 1,
+    "todayResultUnits": 100,
+    "todayPaidUnits": 40
+  },
+  "entries": [
+    {"id":"e_ok","itemLabel":"صنف سليم","resultUnits":40,"paidUnits":40,"remainingUnits":40},
+    {"id":"e_bad","itemLabel":"صنف سري","resultUnits":10.005,"paidUnits":7,"remainingUnits":7}
   ],
-  "lifetimeTotals": {
+  "registerTotals": {
     "resultUnits": 50000,
     "paidUnits": "47447",
-    "remainingUnits": 123456789012345678901234
+    "remainingUnits": 123456789012345678901234,
+    "vodafoneConsumedUnits": 0,
+    "vodafoneRemainingUnits": 1
   }
 }
 ''';
