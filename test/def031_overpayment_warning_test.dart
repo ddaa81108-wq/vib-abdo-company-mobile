@@ -642,7 +642,7 @@ void main() {
       );
       await settle(tester);
       expect(find.byKey(const Key('movement-reload-failed')), findsNothing);
-      expect(find.text(AppStrings.ledgerReloadFailed), findsNothing);
+      expect(find.text(AppStrings.movementCardReloadFailed), findsNothing);
 
       // Another user writes first, so the next save answers 409 and the
       // form reloads the card. That reload fails.
@@ -667,9 +667,15 @@ void main() {
       expect(save, findsNothing);
       final hint = find.byKey(const Key('movement-reload-failed'));
       expect(hint, findsOneWidget);
-      expect(tester.widget<Text>(hint).data, AppStrings.ledgerReloadFailed);
+      expect(
+        tester.widget<Text>(hint).data,
+        AppStrings.movementCardReloadFailed,
+      );
       final semantics = tester.ensureSemantics();
-      expect(tester.getSemantics(hint).label, AppStrings.ledgerReloadFailed);
+      expect(
+        tester.getSemantics(hint).label,
+        AppStrings.movementCardReloadFailed,
+      );
       semantics.dispose();
       expect(Directionality.of(tester.element(hint)), TextDirection.rtl);
       expect(fake.mutationPaths, hasLength(sentBefore));

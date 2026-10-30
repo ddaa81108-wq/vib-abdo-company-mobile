@@ -103,6 +103,11 @@ abstract final class AppStrings {
   /// above it is the acknowledgement balance from the server reply.
   static const ledgerReloadFailed =
       'الرصيد المعروض من رد الخادم؛ تعذّر تحديث الكارت';
+
+  /// Movement form when the card reload has failed. Save stays hidden until
+  /// the card loads again with a version.
+  static const movementCardReloadFailed =
+      'تعذّر تحديث الكارت؛ الحفظ متوقف حتى يُحدّث';
   static const dateInvalid = 'أدخل التاريخ بصيغة سنة-شهر-يوم.';
   static const unitsHint =
       'عدد صحيح بالوحدة الصغرى التي يخزّنها الخادم. بلا فواصل وبلا كسور. التطبيق لا يحوّل هذا الرقم ولا يحسبه.';

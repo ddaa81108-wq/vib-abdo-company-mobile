@@ -483,9 +483,9 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
           Semantics(
             container: true,
             excludeSemantics: true,
-            label: AppStrings.ledgerReloadFailed,
+            label: AppStrings.movementCardReloadFailed,
             child: const Text(
-              AppStrings.ledgerReloadFailed,
+              AppStrings.movementCardReloadFailed,
               key: Key('movement-reload-failed'),
             ),
           ),
