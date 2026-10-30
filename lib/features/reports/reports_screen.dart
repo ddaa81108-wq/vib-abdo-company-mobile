@@ -66,9 +66,9 @@ class ReportsScreen extends ConsumerWidget {
                 message: AppStrings.emptyReports,
               );
             }
-            final showChange = data.rows.any(
-              (row) => row.netChangeUnits != null,
-            );
+            // netChangeUnits is not displayed. ReportsDto has no current,
+            // daily, or summary object yet, so the list stays the rows the
+            // model already parsed. Those three shapes need api_layer.
             final current = data.rows.first;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -76,17 +76,9 @@ class ReportsScreen extends ConsumerWidget {
                 _CurrentDay(row: current, money: money),
                 const SizedBox(height: AppSpacing.md),
                 if (phone)
-                  _ReportCards(
-                    rows: data.rows,
-                    money: money,
-                    showChange: showChange,
-                  )
+                  _ReportCards(rows: data.rows, money: money)
                 else
-                  _ReportTable(
-                    rows: data.rows,
-                    money: money,
-                    showChange: showChange,
-                  ),
+                  _ReportTable(rows: data.rows, money: money),
                 if (data.formula != null || data.methodologyNote != null) ...[
                   const SizedBox(height: AppSpacing.lg),
                   Text(
@@ -181,39 +173,26 @@ class _CurrentDay extends StatelessWidget {
 }
 
 class _ReportCards extends StatelessWidget {
-  const _ReportCards({
-    required this.rows,
-    required this.money,
-    required this.showChange,
-  });
+  const _ReportCards({required this.rows, required this.money});
 
   final List<DailyReportRowDto> rows;
   final MoneyFormatter money;
-  final bool showChange;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       key: const Key('report-cards'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final row in rows)
-          _ReportCard(row: row, money: money, showChange: showChange),
-      ],
+      children: [for (final row in rows) _ReportCard(row: row, money: money)],
     );
   }
 }
 
 class _ReportCard extends StatelessWidget {
-  const _ReportCard({
-    required this.row,
-    required this.money,
-    required this.showChange,
-  });
+  const _ReportCard({required this.row, required this.money});
 
   final DailyReportRowDto row;
   final MoneyFormatter money;
-  final bool showChange;
 
   @override
   Widget build(BuildContext context) {
@@ -284,11 +263,6 @@ class _ReportCard extends StatelessWidget {
               label: AppStrings.owedDebts,
               value: money.formatOrDash(row.liabilitiesUnits, Currency.lyd),
             ),
-            if (showChange)
-              LabeledMoney(
-                label: AppStrings.netChange,
-                value: money.formatOrDash(row.netChangeUnits, Currency.lyd),
-              ),
             if (row.note != null && row.note!.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.sm),
               Text(AppStrings.systemNote, style: theme.textTheme.labelLarge),
@@ -307,15 +281,10 @@ class _ReportCard extends StatelessWidget {
 }
 
 class _ReportTable extends StatefulWidget {
-  const _ReportTable({
-    required this.rows,
-    required this.money,
-    required this.showChange,
-  });
+  const _ReportTable({required this.rows, required this.money});
 
   final List<DailyReportRowDto> rows;
   final MoneyFormatter money;
-  final bool showChange;
 
   @override
   State<_ReportTable> createState() => _ReportTableState();
@@ -335,7 +304,7 @@ class _ReportTableState extends State<_ReportTable> {
     final scheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
     final scale = MediaQuery.textScalerOf(context).scale(1);
-    final columns = _columns(widget.showChange);
+    final columns = _columns();
     final widths = [
       for (final column in columns) _columnWidth(scale, column.glyphs),
     ];
@@ -406,9 +375,6 @@ class _ReportTableState extends State<_ReportTable> {
             ),
             _ColKind.net => moneyCell(
               money.formatOrDash(row.netUnits, Currency.lyd),
-            ),
-            _ColKind.change => moneyCell(
-              money.formatOrDash(row.netChangeUnits, Currency.lyd),
             ),
             _ColKind.status => Padding(
               padding: const EdgeInsetsDirectional.symmetric(
@@ -496,7 +462,6 @@ enum _ColKind {
   egyptianLyd,
   liabilities,
   net,
-  change,
   status,
   note,
   reasons,
@@ -510,7 +475,7 @@ class _Col {
   final _ColKind kind;
 }
 
-List<_Col> _columns(bool showChange) => [
+List<_Col> _columns() => [
   const _Col(AppStrings.pinnedColumn, 12, _ColKind.date),
   const _Col(AppStrings.sequence, 8, _ColKind.sequence),
   const _Col(AppStrings.ourDebts, 14, _ColKind.receivables),
@@ -519,7 +484,6 @@ List<_Col> _columns(bool showChange) => [
   const _Col(AppStrings.egyptianLyd, 14, _ColKind.egyptianLyd),
   const _Col(AppStrings.owedDebts, 14, _ColKind.liabilities),
   const _Col(AppStrings.net, 14, _ColKind.net),
-  if (showChange) const _Col(AppStrings.netChange, 16, _ColKind.change),
   const _Col(AppStrings.status, 16, _ColKind.status),
   const _Col(AppStrings.systemNote, 18, _ColKind.note),
   const _Col(AppStrings.reasons, 20, _ColKind.reasons),
