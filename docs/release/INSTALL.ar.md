@@ -1,8 +1,8 @@
 # تعليمات التثبيت وخطة اختباره: APK Debug وAPK Release وAAB (المرحلة 9)
 
-> مبنية على مسودة QA (`/workspace/phase9/install-test-plan.ar.md`)، ومحدَّثة لمعرّف التطبيق الجديد `com.vip2100.vib` ولتوقيع الإصدار. الجداول المرجعية في القسم 1 تصف `main` عند `faa54fb` كما جردها QA؛ الأسطر التي غيّرها فرع المرحلة 9 معلَّمة.
+> مبنية على مسودة QA (`/workspace/phase9/install-test-plan.ar.md`)، ومحدَّثة لمعرّف التطبيق الجديد `com.vip2100.vib` ولتوقيع الإصدار. الجداول المرجعية في القسم 1 جردها QA على `main` عند `faa54fb`، وراجعناها بعد دمج المرحلة 8 (`f1dee47`: #73 و#81 و#68 و#83)؛ الأسطر التي غيّرها فرع المرحلة 9 معلَّمة.
 
-- **الأساس:** `origin/main` عند `faa54fb3422dfe6eecd8c46e96ddf3933cd869a8`.
+- **الأساس:** `origin/main` عند `f1dee47416dd440214e8713a9a3341ebba9de8cf` (بعد دمج المرحلة 8). commit البناء النهائي: `<BUILD_COMMIT>` (يُملأ بعد دمج #84).
 - **التاريخ:** 2026-10-30 (توقيت طرابلس، UTC+2).
 - **قراءة فقط:** لم يُعدَّل المستودع.
 - **ممنوع في هذه الوثيقة:** أي بيانات دخول، أو اسم مستخدم، أو كلمة مرور، أو مسار keystore، أو كلمة مروره، أو رابط فيه سر. يُكتب مضيف staging هنا `<staging-host>` كما في `docs/staging.md:10`.
@@ -36,9 +36,9 @@ adb shell am start -n com.vip2100.vib/.MainActivity
 
 | البند | القيمة على `main` | المرجع |
 |---|---|---|
-| `applicationId` / `namespace` | **`com.vip2100.vib`** بعد المرحلة 9 (كان `com.vip2100.vib`) | `android/app/build.gradle.kts` |
-| `versionCode` / `versionName` | من `pubspec.yaml` `version: 1.0.0+1`، أي versionName `1.0.0` وversionCode `1` | `pubspec.yaml:4`؛ `build.gradle.kts:33-34` |
-| minSdk / targetSdk / compileSdk | `minOf(flutter.minSdkVersion, 29)`، أي 24. target 36. compile 36. يجب أن يبقى Android 10 (API 29) قابلًا للتثبيت | `build.gradle.kts:23-27`؛ `docs/NOTIFICATIONS.md:35-44` |
+| `applicationId` / `namespace` | **`com.vip2100.vib`** بعد المرحلة 9 (كان `com.example.vib_abdo_company_mobile`) | `android/app/build.gradle.kts` |
+| `versionCode` / `versionName` | من `pubspec.yaml` `version: 1.0.0+1`، أي versionName `1.0.0` وversionCode `1` | `pubspec.yaml:4`؛ `build.gradle.kts` (`versionCode = flutter.versionCode`) |
+| minSdk / targetSdk / compileSdk | `minOf(flutter.minSdkVersion, 29)`، أي 24. target 36. compile 36. يجب أن يبقى Android 10 (API 29) قابلًا للتثبيت | `build.gradle.kts` (`minSdk = minOf(...)`)؛ `docs/NOTIFICATIONS.md:35-44` |
 | توقيع release | **بعد المرحلة 9:** مفتاح الإصدار `vib-release` من جهاز البناء (`ANDROID_KEY_PROPERTIES`). بلا مادة توقيع (مثل CI) يوقَّع بمفتاح debug مع تحذير | `build.gradle.kts`؛ `docs/release/BUILD.ar.md` |
 | أذونات الـ Manifest | `INTERNET`، و`ACCESS_NETWORK_STATE`، و`POST_NOTIFICATIONS` (API 33+). لا `RECEIVE_BOOT_COMPLETED` | `android/app/src/main/AndroidManifest.xml:2-6` |
 | اسم التطبيق | `VIB` | `AndroidManifest.xml:8` |
@@ -106,7 +106,7 @@ adb shell am start -n com.vip2100.vib/.MainActivity
 | artefact في CI | `app-debug-apk` يُرفع | لا يُرفع، يُبنى للفحص فقط | `ci.yml:167-174` و`:300` |
 | سجل الطلبات | `API_DEBUG_LOG` افتراضه `false` في الاثنين؛ السجلات منقّحة | — | `docs/staging.md:32` |
 | الترجمة | JIT مع `assert` | AOT. الحارس ثابت وقت الترجمة، ثم فحص وقت التشغيل | `release_fake_api_guard.dart:16-20` و`:33-41` |
-| `applicationId` | واحد للنوعين، بلا لاحقة. لا يمكن تثبيتهما معًا؛ الثاني يحل محل الأول إن تطابقت الشهادة | — | `build.gradle.kts:20` |
+| `applicationId` | واحد للنوعين، بلا لاحقة. لا يمكن تثبيتهما معًا؛ الثاني يحل محل الأول إن تطابقت الشهادة | — | `build.gradle.kts` (`applicationId = "com.vip2100.vib"`) |
 
 ## 5. الأدلة المطلوب جمعها
 

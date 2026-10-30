@@ -1,18 +1,23 @@
 # سجل التغييرات
 
-> مأخوذ من تاريخ `main` حتى `faa54fb` (عناوين الـ PRs كما دُمجت، بالإنجليزية كما هي). الإدخالات الجديدة تُضاف أعلى الملف عند كل نسخة.
+> مأخوذ من تاريخ `main` حتى `f1dee47` (عناوين الـ PRs كما دُمجت، بالإنجليزية كما هي). commit البناء النهائي: `<BUILD_COMMIT>` (يُملأ بعد دمج #84). الإدخالات الجديدة تُضاف أعلى الملف عند كل نسخة.
 
 ## [1.0.0+1] — غير مُصدَرة بعد (نسخة تجريبية على staging)
 
-### المرحلة 9: تجهيز الإصدار (فرع `cursor/phase9-release-prep`، غير مدموج)
+### المرحلة 9: تجهيز الإصدار (#84، فرع `cursor/phase9-release-prep`، غير مدموج؛ commit الدمج `<PHASE9_MERGE_COMMIT>`)
 
 - معرّف التطبيق و`namespace` صارا `com.vip2100.vib` (كان `com.example.vib_abdo_company_mobile`)، ونُقل `MainActivity` إلى الحزمة الجديدة.
-- توقيع Release يُقرأ من `ANDROID_KEY_PROPERTIES` أو `android/key.properties` أو متغيرات `ANDROID_KEYSTORE_*`؛ مفتاح debug مع تحذير عند غياب المادة كليًا، وفشل عند نقصها أو عند `ANDROID_REQUIRE_RELEASE_SIGNING=true`.
+- توقيع Release يُقرأ من `ANDROID_KEY_PROPERTIES` أو `android/key.properties` أو متغيرات `ANDROID_KEYSTORE_*`؛ مفتاح debug مع تحذير عند غياب المادة كليًا، وفشل عند نقصها (ومنه ملف `key.properties` فارغ أو بأسماء مفاتيح خاطئة) أو عند `ANDROID_REQUIRE_RELEASE_SIGNING=true`. الفحص يعمل فقط عند طلب مهمة Release، فلا يكسر بناء debug ولا `flutter run`.
+- `tool/check_release_signing_gradle.sh`: فحص سلوك قواعد التوقيع بـ Gradle dry-run ومفتاح مؤقت في `/tmp`.
 - `.gitignore` يستثني `key.properties` و`*.p12` في الجذر و`android/`، مع قالب `android/key.properties.example`.
 - وثائق الإصدار في `docs/release/`.
 
-### المرحلة 8: التكامل مع الخادم والمطابقة المالية (2026-10-23)
+### المرحلة 8: التكامل مع الخادم والمطابقة المالية (2026-10-23 – 2026-10-30)
 
+- Ledger follow-ups after DEF-031 (#83) (`f1dee47`، 2026-10-30)
+- Parse the purchases page contract (P-04 / DEF-034) (#68) (`ab5276e`، 2026-10-30)
+- docs: gaps G-16..G-18 and Ali's staging rule (#81) (`9d5beb1`، 2026-10-30)
+- Map catalog error codes to typed exceptions (P-09 / G-07) (#73) (`1c33f4d`، 2026-10-30)
 - P-15 / DEF-031: warn before a partial payment above the balance (#65) (`faa54fb`، 2026-10-23)
 - P-14 api (G-12): ledger fields, report objects, and section filter (#77) (`f48e7be`، 2026-10-23)
 - P-15: return balanceUnits and accept overpayment in the fake API (#79) (`be431df`، 2026-10-23)

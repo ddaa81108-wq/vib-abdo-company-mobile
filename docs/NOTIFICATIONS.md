@@ -111,7 +111,7 @@ gh workflow run android-notifications-emulator.yml --ref <branch>
 
 1. **Who owns the Firebase project** (create it, billing, who has IAM). This repo does not.
 2. **Staging and production Firebase apps.** Separate `google-services.json` files, or one shared project. The secret names above are the split; CI reads only `GOOGLE_SERVICES_JSON_BASE64`.
-3. **Final application id.** `google-services.json` is bound to `package_name`. It must match `com.vip2100.vib`, the id Ali chose in Phase 9. Any file made for the old `com.example.vib_abdo_company_mobile` id is invalid; register a Firebase Android app for `com.vip2100.vib` and use its file.
+3. **Final application id.** `google-services.json` is bound to `package_name`. It must match `com.vip2100.vib`, the id Ali approved on 2026-10-30 (card t205s824 in the coordinator chat) for Phase 9. Any file made for the old `com.example.vib_abdo_company_mobile` id is invalid; register a Firebase Android app for `com.vip2100.vib` and use its file.
 4. **Whether FCM is in scope.** The server contract is still web push. Turning FCM on means adding the Messaging SDK and a backend sender. The Gradle hook and the manifest meta-data are the only client pieces in place.
 5. **Where the service account lives.** On the backend. Not in this app.
 6. **Channel importance and extra channels.** One high-importance channel covers general and collections alerts. A quieter channel is a product choice.
