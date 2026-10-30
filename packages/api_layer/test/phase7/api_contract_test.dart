@@ -38,7 +38,12 @@ void main() {
     final harness = await Phase7Harness.open();
     try {
       await harness.login(username: 'admin', password: 'demo-only');
-      final call = expectCall(harness, 'POST', ApiEndpoints.login, session: false);
+      final call = expectCall(
+        harness,
+        'POST',
+        ApiEndpoints.login,
+        session: false,
+      );
       expect(call.jsonBody?['username'], 'admin');
       expect(call.jsonBody?['password'], 'demo-only');
       expect(call.header('x-csrf-token'), isNull);
@@ -92,9 +97,7 @@ void main() {
           'password': 'not-a-real-secret',
           'phone': '555-0100',
         };
-        final error = await _capture(
-          harness.layer.client.get(ApiEndpoints.me),
-        );
+        final error = await _capture(harness.layer.client.get(ApiEndpoints.me));
         expect(error.message, isNot(contains('not-a-real-secret')));
         expect(error.message, isNot(contains('555-0100')));
         expect(error.toString(), isNot(contains('not-a-real-secret')));
@@ -220,8 +223,11 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
       );
       expect(updated.version, 5);
       expect(
-        expectCall(h, 'PATCH', ApiEndpoints.account('customers', 'c1'))
-            .jsonBody?['name'],
+        expectCall(
+          h,
+          'PATCH',
+          ApiEndpoints.account('customers', 'c1'),
+        ).jsonBody?['name'],
         'اسم محدّث',
       );
 
@@ -280,8 +286,11 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
         meta,
       );
       expect(
-        expectCall(h, 'PATCH', ApiEndpoints.accountPin('customers', 'c1'))
-            .jsonBody?['pinned'],
+        expectCall(
+          h,
+          'PATCH',
+          ApiEndpoints.accountPin('customers', 'c1'),
+        ).jsonBody?['pinned'],
         isTrue,
       );
       await h.layer.accounts.confirmZeroReview('c1', meta);
@@ -349,8 +358,11 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
       );
       await h.layer.collections.markCashReceived('sub1', meta);
       expect(
-        expectCall(h, 'POST', ApiEndpoints.collectionSubmissionCashReceived('sub1'))
-            .jsonBody,
+        expectCall(
+          h,
+          'POST',
+          ApiEndpoints.collectionSubmissionCashReceived('sub1'),
+        ).jsonBody,
         isNull,
       );
       await h.layer.collections.createUnlinkedReceipt(
@@ -376,13 +388,18 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
       );
       await h.layer.collections.markUnlinkedCashReceived('ur1', meta);
       expect(
-        expectCall(h, 'POST', ApiEndpoints.collectionUnlinkedCashReceived('ur1'))
+        expectCall(
+                h, 'POST', ApiEndpoints.collectionUnlinkedCashReceived('ur1'))
             .jsonBody,
         isNull,
       );
       await h.layer.collections.closeDay(batchId: 'b1', meta: meta);
       expect(
-        expectCall(h, 'POST', ApiEndpoints.collectionDaysClose).jsonBody?['batchId'],
+        expectCall(
+          h,
+          'POST',
+          ApiEndpoints.collectionDaysClose,
+        ).jsonBody?['batchId'],
         'b1',
       );
     },
@@ -431,7 +448,8 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
       final meta = MutationMeta(requestId: 'req-book', expectedVersion: 2);
       for (final book in PurchaseBook.values) {
         final page = await h.layer.purchases.list(book);
-        expect(page.page.items, isEmpty);
+        expect(page.day, isNull);
+        expect(page.entries, isEmpty);
         expectCall(h, 'GET', ApiEndpoints.purchases(book.path));
       }
       const entry = PurchaseEntryRequest(
@@ -544,9 +562,10 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
       expectCall(h, 'GET', ApiEndpoints.events);
       await h.layer.client.get(ApiEndpoints.eventChanges);
       expectCall(h, 'GET', ApiEndpoints.eventChanges);
-      await h.layer.client.post(ApiEndpoints.proposedMobilePushDevices, body: {
-        'token': 'push-demo-token',
-      });
+      await h.layer.client.post(
+        ApiEndpoints.proposedMobilePushDevices,
+        body: {'token': 'push-demo-token'},
+      );
       expectCall(h, 'POST', ApiEndpoints.proposedMobilePushDevices);
       await h.layer.client.get(ApiEndpoints.accountRequests);
       expectCall(h, 'GET', ApiEndpoints.accountRequests);
@@ -575,10 +594,10 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
       }
       await h.layer.client.get(ApiEndpoints.user('u_20'));
       expectCall(h, 'GET', ApiEndpoints.user('u_20'));
-      await h.layer.client.post(ApiEndpoints.proposedMobileLogin, body: {
-        'username': 'admin',
-        'password': 'demo-only',
-      });
+      await h.layer.client.post(
+        ApiEndpoints.proposedMobileLogin,
+        body: {'username': 'admin', 'password': 'demo-only'},
+      );
       expectCall(h, 'POST', ApiEndpoints.proposedMobileLogin);
       await h.layer.client.post(ApiEndpoints.proposedMobileRefresh);
       expectCall(h, 'POST', ApiEndpoints.proposedMobileRefresh);
@@ -631,11 +650,7 @@ RecordedCall expectCall(
   return call;
 }
 
-Future<void> _expectStatus(
-  Phase7Harness harness,
-  int status,
-  Type type,
-) async {
+Future<void> _expectStatus(Phase7Harness harness, int status, Type type) async {
   harness.transport.failNextStatus = status;
   harness.transport.failNextDetails = {'password': 'not-a-real-secret'};
   final error = await _capture(

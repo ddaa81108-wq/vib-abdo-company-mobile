@@ -81,19 +81,27 @@ void main() {
     expect(
       payroll.employees
           .firstWhere((row) => row.userId == 'u_12')
-          .remainingUnits?.units,
+          .remainingUnits
+          ?.units,
       1250,
     );
     expect(
       payroll.employees
           .firstWhere((row) => row.userId == 'u_20')
-          .remainingUnits?.units,
+          .remainingUnits
+          ?.units,
       2580,
     );
 
     final purchases = await layer.purchases.list(PurchaseBook.alBayan);
-    expect(purchases.lifetimeTotals?.remainingUnits?.units, 2553);
-    expect(purchases.page.items.single.entries.single.remainingUnits?.units, 553);
+    expect(purchases.registerTotals?.remainingUnits?.asInt, 2553);
+    expect(
+      purchases.entries
+          .firstWhere((entry) => entry.id == 'pe_1')
+          .remainingUnits
+          ?.asInt,
+      553,
+    );
   });
 
   testWidgets('P7-06 the zero card shows the server age label', (tester) async {

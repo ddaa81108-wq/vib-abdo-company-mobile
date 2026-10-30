@@ -6,7 +6,7 @@
 /// repository and DTO path. A case that does not match the contract today is
 /// skipped with a G id from `docs/api/gap-analysis.ar.md` section 0 only.
 /// GET /api/collections is not parsed here (G-01, owned by P-03). GET
-/// /api/purchases is not parsed here (G-02, owned by P-04). DEF-028 and the
+/// /api/purchases is parsed here (G-02 / DEF-034). DEF-028 and the
 /// Egyptian part of DEF-035 have no G id.
 @Tags(['contract'])
 library;
@@ -170,28 +170,49 @@ void main() {
         'sources.* is not read.',
   );
 
-  test(
-    'GET /api/purchases sample parse',
-    () {
-      // TODO(PR #68): re-enable the parser assertion after
-      // cursor/p04-purchases-contract-shape lands. This body does not name
-      // PurchasesBookPage or PurchasesPage.
-      final raw = _data(samples, 'GET /api/purchases/al_bayan');
-      expect(raw.containsKey('merchant'), isTrue);
-      expect(raw.containsKey('day'), isTrue);
-      expect(raw.containsKey('entries'), isTrue);
-      expect(raw.containsKey('nextBefore'), isTrue);
-      expect(
-          (raw['registerTotals'] as Map).containsKey('remainingUnits'), isTrue);
-      expect(raw.containsKey('days'), isFalse);
-      expect(raw.containsKey('lifetimeTotals'), isFalse);
-      fail('todo: G-02');
-    },
-    skip: 'G-02. PurchasesBookPage reads days[] and lifetimeTotals/totals. '
-        'The sample is merchant, day, entries, nextBefore, and registerTotals '
-        '(DEF-034). The passing parse belongs to P-04 '
-        '(cursor/p04-purchases-contract-shape). This suite does not add one.',
-  );
+  test('GET /api/purchases sample parse', () async {
+    final api = await _session();
+    final raw = _data(samples, 'GET /api/purchases/al_bayan');
+    expect(raw.containsKey('merchant'), isTrue);
+    expect(raw.containsKey('day'), isTrue);
+    expect(raw.containsKey('entries'), isTrue);
+    expect(raw.containsKey('nextBefore'), isTrue);
+    expect(
+      (raw['registerTotals'] as Map).containsKey('remainingUnits'),
+      isTrue,
+    );
+    expect(raw.containsKey('days'), isFalse);
+    expect(raw.containsKey('lifetimeTotals'), isFalse);
+    expect(raw.containsKey('totals'), isFalse);
+    api.scriptedGetJson['/api/purchases/al_bayan'] = jsonEncode(raw);
+    final page =
+        await RemotePurchasesRepository(api).list(PurchaseBook.alBayan);
+    final day = raw['day'] as Map;
+    final row = (raw['entries'] as List).single as Map;
+    final totals = raw['registerTotals'] as Map;
+    expect(page.merchant?.key, raw['merchant']['key']);
+    expect(page.merchant?.name, raw['merchant']['name']);
+    expect(page.day?.id, day['id']);
+    expect(page.day?.status, day['status']);
+    expect(page.day?.version, day['version']);
+    expect(page.day?.todayResultUnits?.asInt, day['todayResultUnits']);
+    expect(page.entries, hasLength(1));
+    expect(page.entries.single.id, row['id']);
+    expect(page.entries.single.dayId, day['id']);
+    expect(page.entries.single.dayVersion, row['dayVersion']);
+    expect(page.entries.single.version, row['version']);
+    expect(page.entries.single.itemCode, row['itemCode']);
+    expect(page.entries.single.resultUnits?.asInt, row['resultUnits']);
+    expect(page.nextBefore, raw['nextBefore']);
+    expect(
+        page.registerTotals?.remainingUnits?.asInt, totals['remainingUnits']);
+    expect(page.registerTotals?.vodafoneRemainingUnits?.asInt,
+        totals['vodafoneRemainingUnits']);
+    expect(
+      _money.format(page.day!.todayResultUnits!.asInt!, Currency.lyd),
+      '100 د.ل',
+    );
+  });
 
   test(
     'GET /api/collections sample parse',
@@ -472,45 +493,34 @@ void main() {
     expect(auth.code, 'AUTH_REQUIRED');
   });
 
-  test(
-    'CLIENT_VERSION_MISMATCH is an upgrade, not a data conflict',
-    () {
-      final err = const ErrorMapper()
-          .fromResponse(409, _body(samples, 'versionHeaderError'), null);
-      expect(err, isA<UpgradeRequiredException>());
-      expect(err.code, 'CLIENT_VERSION_MISMATCH');
-    },
-    skip: 'G-07. Every non-VERSION_CONFLICT 409 becomes ConflictException, '
-        'including CLIENT_VERSION_MISMATCH.',
-  );
+  test('CLIENT_VERSION_MISMATCH is an upgrade, not a data conflict', () {
+    final err = const ErrorMapper()
+        .fromResponse(409, _body(samples, 'versionHeaderError'), null);
+    expect(err, isA<ClientVersionMismatchException>());
+    expect(err, isNot(isA<ConflictException>()));
+    expect(err.code, 'CLIENT_VERSION_MISMATCH');
+  });
 
   test(
-    'REQUEST_ID_REUSED and DUPLICATE_SAME_WORKDAY are not generic conflicts',
-    () {
-      const mapper = ErrorMapper();
-      final reused = mapper.fromResponse(409, _body(samples, 'reusedId'), null);
-      final duplicate =
-          mapper.fromResponse(409, _body(samples, 'duplicateWarning'), null);
-      expect(reused, isNot(isA<ConflictException>()));
-      expect(duplicate.code, 'DUPLICATE_SAME_WORKDAY');
-      expect(duplicate, isNot(isA<ConflictException>()));
-    },
-    skip: 'G-07. REQUEST_ID_REUSED and DUPLICATE_SAME_WORKDAY are both '
-        'ConflictException. The duplicate warning is not a distinct type.',
-  );
+      'REQUEST_ID_REUSED and DUPLICATE_SAME_WORKDAY are not generic conflicts',
+      () {
+    const mapper = ErrorMapper();
+    final reused = mapper.fromResponse(409, _body(samples, 'reusedId'), null);
+    final duplicate =
+        mapper.fromResponse(409, _body(samples, 'duplicateWarning'), null);
+    expect(reused, isA<RequestIdReusedException>());
+    expect(reused, isNot(isA<ConflictException>()));
+    expect(duplicate.code, 'DUPLICATE_SAME_WORKDAY');
+    expect(duplicate, isA<DuplicateSameWorkdayException>());
+    expect(duplicate, isNot(isA<ConflictException>()));
+  });
 
-  test(
-    'INVALID_AMOUNT details.field is the field name',
-    () {
-      final err = const ErrorMapper()
-          .fromResponse(400, _body(samples, 'invalidAmount'), null);
-      expect(err, isA<ValidationException>());
-      expect(
-          (err as ValidationException).fieldErrors.single.field, 'inputValue');
-    },
-    skip: 'G-07. details is {"field": "inputValue"}. The mapper treats the '
-        'key "field" as the field name.',
-  );
+  test('INVALID_AMOUNT details.field is the field name', () {
+    final err = const ErrorMapper()
+        .fromResponse(400, _body(samples, 'invalidAmount'), null);
+    expect(err, isA<ValidationException>());
+    expect((err as ValidationException).fieldErrors.single.field, 'inputValue');
+  });
 
   test(
     'MFA_REQUIRED is not shown as invalid credentials',
