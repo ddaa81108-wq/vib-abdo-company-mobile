@@ -48,7 +48,7 @@ LOG="${PHASE7_LOG:-phase7-long-history.log}"
 MEMLOG="${LOG}.mem"
 : > "$LOG"
 : > "$MEMLOG"
-PKG=com.example.vib_abdo_company_mobile
+PKG=com.vip2100.vib
 
 # Report-only. A missing dumpsys field or a dead process does not fail the job.
 capture_meminfo() {

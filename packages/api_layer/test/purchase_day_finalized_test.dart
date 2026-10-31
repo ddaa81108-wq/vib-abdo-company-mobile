@@ -122,6 +122,7 @@ void main() {
           'pe_1',
           entry,
           MutationMeta(expectedVersion: 4, requestId: 'update-finalized'),
+          entryVersion: 1,
         ),
       );
       await expectDayFinalized(
@@ -130,6 +131,7 @@ void main() {
           'pe_1',
           entry,
           MutationMeta(expectedVersion: 4, requestId: 'update-finalized'),
+          entryVersion: 1,
         ),
       );
       await expectDayFinalized(
@@ -137,6 +139,7 @@ void main() {
           book,
           'pe_1',
           MutationMeta(expectedVersion: 4, requestId: 'delete-finalized'),
+          entryVersion: 1,
         ),
       );
       await expectDayFinalized(
@@ -144,6 +147,7 @@ void main() {
           book,
           'pe_1',
           MutationMeta(expectedVersion: 4, requestId: 'delete-finalized'),
+          entryVersion: 1,
         ),
       );
 
@@ -186,11 +190,18 @@ void main() {
         'pe_1',
         entry,
         updateMeta,
+        entryVersion: 1,
       );
-      final deleted = await api.purchases.delete(book, 'pe_1', deleteMeta);
+      final deleted = await api.purchases.delete(
+        book,
+        'pe_1',
+        deleteMeta,
+        entryVersion: 1,
+      );
       expect(created.id, 'pe_new');
-      expect(updated.id, 'pe_new');
-      expect(deleted.id, 'pe_new');
+      // Edit and delete answer with the row's own `entryId`.
+      expect(updated.id, 'pe_1');
+      expect(deleted.id, 'pe_1');
       final replayed = await api.purchases.create(book, entry, createMeta);
       expect(replayed.id, created.id);
       expect(replayed.version, created.version);
@@ -213,10 +224,21 @@ void main() {
         () => api.purchases.create(book, entry, createMeta),
       );
       await expectDayFinalized(
-        () => api.purchases.update(book, 'pe_1', entry, updateMeta),
+        () => api.purchases.update(
+          book,
+          'pe_1',
+          entry,
+          updateMeta,
+          entryVersion: 1,
+        ),
       );
       await expectDayFinalized(
-        () => api.purchases.delete(book, 'pe_1', deleteMeta),
+        () => api.purchases.delete(
+          book,
+          'pe_1',
+          deleteMeta,
+          entryVersion: 1,
+        ),
       );
       expect(fingerprint(await api.purchases.list(book)), frozen);
       expect(fake.mutationRequestIds.where((id) => id == 'create-once'), [
@@ -323,6 +345,7 @@ void main() {
         book,
         'pe_1',
         MutationMeta(expectedVersion: 3, requestId: 'employee-delete'),
+        entryVersion: 1,
       ),
       throwsA(isA<ForbiddenException>()),
     );

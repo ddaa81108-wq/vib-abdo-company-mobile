@@ -117,7 +117,8 @@ class PurchaseEntryDto {
   final String? actorName;
   final bool actorIsOwner;
 
-  /// Row version. Writes still send the day's version only (P-05).
+  /// Row version. Edit and delete send it as `expectedVersion`, next to the
+  /// day's `expectedDayVersion`; the server rejects either write without it.
   final int? version;
   final String? createdAt;
   final String? updatedAt;

@@ -23,7 +23,7 @@ abstract final class NotificationChannels {
   static const postNotificationsPermission =
       'android.permission.POST_NOTIFICATIONS';
 
-  static const applicationId = 'com.example.vib_abdo_company_mobile';
+  static const applicationId = 'com.vip2100.vib';
 
   static const fcmDefaultIconMeta =
       'com.google.firebase.messaging.default_notification_icon';

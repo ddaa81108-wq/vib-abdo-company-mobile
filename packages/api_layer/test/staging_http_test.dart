@@ -183,12 +183,13 @@ void main() {
       expect(failed.message, 'رفض');
     });
 
-    test('a 419 that names CSRF is a CSRF failure', () {
+    test('a 419 that names CSRF only in the message wipes', () {
       final csrf = mapper.fromResponse(419, {
         'message': 'CSRF token mismatch.',
       });
-      expect(csrf, isA<CsrfInvalidException>());
-      expect(csrf.code, 'CSRF_INVALID');
+      expect(csrf, isA<SessionExpiredException>());
+      expect(csrf.code, 'PAGE_EXPIRED');
+      expect(isCsrfRejection(csrf), isFalse);
     });
   });
 
@@ -265,7 +266,7 @@ void main() {
       expect(await cookies.cookieHeader(), 'sid=abc');
     });
 
-    test('CSRF 419 is refreshed once and a second CSRF failure is not a logout',
+    test('a 419 whose code contains CSRF is not refreshed or replayed',
         () async {
       final cookies = InMemoryCookieStore();
       final adapter = _Adapter((request) {
@@ -299,8 +300,8 @@ void main() {
         layer.client.post('/api/collections', body: {'requestId': 'r1'}),
         throwsA(isA<CsrfInvalidException>()),
       );
-      expect(adapter.count('/api/collections'), 2);
-      expect(adapter.count('/api/auth/csrf'), 1);
+      expect(adapter.count('/api/collections'), 1);
+      expect(adapter.count('/api/auth/csrf'), 0);
       expect(layer.session.state, isA<SessionAuthenticated>());
       expect(await cookies.cookieHeader(), 'sid=abc');
     });
@@ -326,7 +327,7 @@ void main() {
         if (request.path == '/api/auth/csrf') {
           return _fail(401, 'AUTH_REQUIRED', 'انتهت');
         }
-        return _fail(403, 'CSRF_INVALID', 'CSRF rejected');
+        return _fail(403, 'CSRF_REJECTED', 'CSRF rejected');
       });
       final layer = open(adapter, cookies);
       await layer.session.login(username: 'person', password: 'secret');

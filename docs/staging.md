@@ -30,7 +30,7 @@ Other defines, all optional:
 | `API_BASE` | empty | Required origin when fake mode is off |
 | `AUTH_BEARER` | `false` | `true` selects the bearer stub. The live server is cookie + CSRF until the owner says otherwise |
 | `API_DEBUG_LOG` | `false` | Redacted request logs |
-| `MONEY_UNIT_SCALE` | `0` | Fractional digits in `*Units`. Unconfirmed |
+| `MONEY_UNIT_SCALE` | `0` | Fractional digits in `*Units`. Closed in DEF-029: whole currency units, scale 0. Do not set this in a release |
 | `RATE_WIRE_FORMAT` | `number` | `string` sends rates as JSON strings |
 
 Check the binary without a device:
@@ -49,9 +49,9 @@ Session is a cookie plus `X-CSRF-Token` (see `CookieCsrfAuthStrategy`).
 - Login is expected to return `data.csrfToken` and a `Set-Cookie` session.
 - Later unsafe calls send the cookie and `X-CSRF-Token`.
 - `GET /api/auth/csrf` refreshes the token when it is missing (memory only; it is not stored).
-- A body whose code or message contains `CSRF` refreshes the token **once** and replays the request **once**. A second failure is not replayed.
+- Only HTTP 403 with code `CSRF_REJECTED` refreshes the token **once** and replays the request **once**. A second failure is not replayed. Nothing else is refreshed or replayed: not a `419`, not a `401` (even with a CSRF code), not a 409, a 500, or another 403 code. CSRF is typed by code only. A message that mentions CSRF never makes a response a CSRF error.
 - If that refresh itself returns `401` or `419`, the session is cleared instead of looping.
-- An authenticated `401`, or a `419` that is not a CSRF failure, clears the cookie and the CSRF token and emits `session_expired`. The router sends the user to `/login` and shows "انتهت الجلسة، يرجى تسجيل الدخول". There is no refresh-token retry.
+- An authenticated `401` always clears the cookie and the CSRF token once and emits `session_expired`, even when its code is a CSRF code (`CSRF_REJECTED`, `CSRF_MISSING`). A `419` is never refreshed or replayed. A `419` whose code contains CSRF is surfaced as a CSRF error and does not wipe the session. Any other `419` wipes the session, including one with CSRF only in the message. The router sends the user to `/login` and shows "انتهت الجلسة، يرجى تسجيل الدخول". There is no refresh-token retry.
 - `GET`/`HEAD` may retry connection failures and `502`/`503`/`504` (at most twice). `401` and `419` are never in that set. Mutations are not retried by the transport layer.
 - SSE (`/api/events`) and polling (`/api/event-changes`) stop on `401`/`419` instead of reconnecting forever. Logout also stops them.
 
@@ -110,8 +110,10 @@ These are assumed, not confirmed. The contract notes are outside this repository
 1. Is a staging origin available, and who issues the test accounts? Keep both outside the repo.
 2. Does mobile stay on the cookie session, or will the bearer endpoints (`/api/auth/mobile/*`, currently a stub) exist?
 3. CSRF: is `GET /api/auth/csrf` correct, and is the body `{ "ok": true, "data": { "csrfToken": "..." } }` with header `X-CSRF-Token`? Does `POST /api/auth/login` itself require a token?
-4. Session expiry: which status and code should force a new login? This client treats authenticated `401` and non-CSRF `419` as expiry (`AUTH_REQUIRED` is the only code observed; `SESSION_EXPIRED`, `SESSION_REVOKED`, and `PAGE_EXPIRED` are defensive).
-5. CSRF failure: which status and code? A code or message containing `CSRF` refreshes once. A bare `419` logs the user out.
+4. Session expiry: which status and code should force a new login? This client treats every authenticated `401` (even with a CSRF code), and every `419` whose code does not contain CSRF, as expiry. A `419` with CSRF only in the message is still expiry. A `419` is never refreshed or replayed. A `419` whose code contains CSRF is a CSRF error and does not wipe the session (`AUTH_REQUIRED` is the only code observed; `SESSION_EXPIRED`, `SESSION_REVOKED`, and `PAGE_EXPIRED` are defensive).
+5. CSRF failure: which status and code? After P-09/#73, only HTTP 403 with code `CSRF_REJECTED` triggers one refresh and one replay. CSRF is typed by code only, never by message. A `419` is never replayed, and a bare `419` still logs the user out.
 6. Login failure: which `401` code means bad credentials rather than a dead session?
 7. Validation: is it HTTP `422`, `400`, or both, and is `details` a `{ "fields": { "name": "..." } }` map, a flat map, or a list of `{ "field", "code", "message" }`?
-8. Still unconfirmed on a real response: `fullAccess`, management permission codes, `cashStatus`, `GET /api/home`, `MONEY_UNIT_SCALE`, and whether rates are JSON numbers or strings.
+8. Still unconfirmed on a real response: `fullAccess`, management permission codes, `cashStatus`, `GET /api/home`, and whether rates are JSON numbers or strings.
+9. معلّق. P-15 / DEF-031: when a receipt or collection is approved and linked to an account whose currency differs from the receipt's, what does the server do? The Fake in PR #79 approves without posting a balance and omits `balanceUnits`. The error catalog has no code for this; `INVALID_LEDGER_CURRENCY` is only the financial-ledger query. Please confirm whether the server rejects (and with which code), converts, or posts nothing.
+10. معلّق. Successful ledger and collection writes: does the server return HTTP 200 or 201? The contract documents 201 for a successful ledger write. The Fake answers every successful write with 200. Please confirm which status the server uses.

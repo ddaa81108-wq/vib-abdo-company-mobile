@@ -212,7 +212,7 @@ void main() {
     expect(container.read(unreadNotificationsCountProvider).value, 4);
   });
 
-  test('mark-read keeps the previous count when the write and the count route omit it', () async {
+  test('mark-read reads the list count when the write omits it and the count route is 404', () async {
     final harness = await signedIn('employee.demo');
     final container = harness.container;
     final fake = harness.layer.client as FakeApiClient;
@@ -226,8 +226,9 @@ void main() {
     final ready =
         container.read(notificationsStateProvider) as NotificationsReady;
     expect(ready.items.single.isRead, isTrue);
-    expect(container.read(unreadNotificationsCountProvider).value, 1);
-    expect(container.read(notificationsProvider).value!.unreadCount, 1);
+    // Production has no unread-count route. Its 404 falls back to
+    // `unreadCount` on GET /api/notifications, which is 0 after the read.
+    expect(container.read(unreadNotificationsCountProvider).value, 0);
   });
 
   test('refresh can announce a new unread row and the initial list does not', () async {

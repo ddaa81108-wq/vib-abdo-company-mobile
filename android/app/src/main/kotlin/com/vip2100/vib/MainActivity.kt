@@ -1,4 +1,4 @@
-package com.example.vib_abdo_company_mobile
+package com.vip2100.vib
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

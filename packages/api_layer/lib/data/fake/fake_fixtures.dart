@@ -625,6 +625,8 @@ class FakeFixtures {
         'ageStatusLabel': card['ageStatusLabel'],
       };
 
+  /// Ledger lines in the production shape: `transactionDate` as a UTC
+  /// instant and no per-line `version` (writes use the card version).
   static Map<String, dynamic> ledger({String? before}) {
     if (before != null && before.isNotEmpty) {
       return {
@@ -634,14 +636,13 @@ class FakeFixtures {
             'sequence': 0,
             'type': 'debt',
             'status': 'posted',
-            'date': '2026-09-01T10:00:00+02:00',
+            'transactionDate': '2026-09-01T08:00:00.000Z',
             'note': 'دين أقدم',
             'amountUnits': 40,
             'inputValue': 40,
             'calculationMode': 'direct',
             'balanceAfterUnits': 40,
             'createdByName': 'مدير تجريبي',
-            'version': 1,
           },
         ],
         'pageOpeningBalanceUnits': 0,
@@ -656,28 +657,26 @@ class FakeFixtures {
           'sequence': 1,
           'type': 'debt',
           'status': 'posted',
-          'date': '2026-10-02T10:00:00+02:00',
+          'transactionDate': '2026-10-02T08:00:00.000Z',
           'note': 'دين',
           'amountUnits': 500,
           'inputValue': 500,
           'calculationMode': 'direct',
           'balanceAfterUnits': 500,
           'createdByName': 'مدير تجريبي',
-          'version': 1,
         },
         {
           'id': 'tx_2',
           'sequence': 2,
           'type': 'payment',
           'status': 'posted',
-          'date': '2026-10-10T10:00:00+02:00',
+          'transactionDate': '2026-10-10T08:00:00.000Z',
           'note': 'سداد جزئي',
           'amountUnits': 180,
           'inputValue': 180,
           'calculationMode': 'direct',
           'balanceAfterUnits': 320,
           'createdByName': 'مدير تجريبي',
-          'version': 1,
         },
       ],
       'pageOpeningBalanceUnits': 0,
@@ -1064,8 +1063,9 @@ class FakeFixtures {
         },
       };
 
+  /// Production names the cash version `cashVersion` (no `version`).
   static Map<String, dynamic> treasury() => {
-        'version': 7,
+        'cashVersion': 7,
         'totals': {
           'receivablesUnits': 45000,
           'liabilitiesUnits': 12000,

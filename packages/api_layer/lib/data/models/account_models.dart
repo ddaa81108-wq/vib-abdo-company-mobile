@@ -264,8 +264,10 @@ class LedgerEntryDto {
         sequence: intOrNull(j['sequence']),
         type: str(j['type']),
         status: str(j['status']),
-        date: dateOrNull(j['date']),
-        recordedAt: dateOrNull(j['createdAt']),
+        // Production sends `transactionDate`. `date` is the older name some
+        // staging and fake bodies still use.
+        date: localDateOrNull(j['transactionDate'] ?? j['date']),
+        recordedAt: localDateOrNull(j['createdAt']),
         note: strOrNull(j['displayNote'] ?? j['note']),
         amountUnits: unitsOrNull(
           j['amountUnits'],

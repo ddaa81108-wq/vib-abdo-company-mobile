@@ -12,19 +12,26 @@ abstract interface class PurchasesRepository {
     PurchaseEntryRequest r,
     MutationMeta meta,
   );
+
+  /// [meta] carries the day version (`expectedDayVersion`). [entryVersion]
+  /// is the row's own `version`, sent as `expectedVersion`. The server
+  /// rejects an edit without it (400 INVALID_PURCHASE_VALUE).
   Future<MutationAck> update(
     PurchaseBook book,
     String entryId,
     PurchaseEntryRequest r,
-    MutationMeta meta,
-  );
+    MutationMeta meta, {
+    required int? entryVersion,
+  });
 
-  /// Server deletes and recomputes following days.
+  /// Server deletes and recomputes following days. Same two versions as
+  /// [update].
   Future<MutationAck> delete(
     PurchaseBook book,
     String entryId,
-    MutationMeta meta,
-  );
+    MutationMeta meta, {
+    required int? entryVersion,
+  });
   Future<MutationAck> setOpening(
     PurchaseBook book, {
     required int previousDebtUnits,
@@ -84,14 +91,16 @@ class RemotePurchasesRepository implements PurchasesRepository {
     PurchaseBook book,
     String entryId,
     PurchaseEntryRequest r,
-    MutationMeta meta,
-  ) async {
+    MutationMeta meta, {
+    required int? entryVersion,
+  }) async {
     PurchaseItemCodes.require(r.itemCode, r.itemLabel);
     return MutationAck.fromData(
       (await _api.patch(
         ApiEndpoints.purchaseEntry(book.path, entryId),
         body: {
           ...meta.toBody(versionField: _v),
+          if (entryVersion != null) 'expectedVersion': entryVersion,
           ...r.toJson(),
         },
       )).data,
@@ -102,11 +111,15 @@ class RemotePurchasesRepository implements PurchasesRepository {
   Future<MutationAck> delete(
     PurchaseBook book,
     String entryId,
-    MutationMeta meta,
-  ) async => MutationAck.fromData(
+    MutationMeta meta, {
+    required int? entryVersion,
+  }) async => MutationAck.fromData(
     (await _api.delete(
       ApiEndpoints.purchaseEntry(book.path, entryId),
-      body: meta.toBody(versionField: _v),
+      body: {
+        ...meta.toBody(versionField: _v),
+        if (entryVersion != null) 'expectedVersion': entryVersion,
+      },
     )).data,
   );
 
@@ -145,8 +158,10 @@ class RemotePurchasesRepository implements PurchasesRepository {
   }) async => MutationAck.fromData(
     (await _api.patch(
       ApiEndpoints.purchasesDayCorrection(book.path, day),
+      // Per API docs this route takes `expectedVersion` (the day version),
+      // not `expectedDayVersion`.
       body: {
-        ...meta.toBody(versionField: _v),
+        ...meta.toBody(),
         'open': open,
       },
     )).data,

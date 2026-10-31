@@ -33,6 +33,7 @@ void main() {
               'id': key.$2,
               'name': 'عميل',
               'balanceUnits': '125000',
+              'version': 4,
             }, key.$1);
           }
           return ref.read(apiLayerProvider).accounts.get(key.$1, key.$2);

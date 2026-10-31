@@ -157,17 +157,17 @@ void main() {
   });
 
   test(
-    'treasury expectedVersion is cashVersion and sources are read',
+    'treasury expectedVersion is cashVersion',
     () async {
       final api = await _session();
       final raw = _data(samples, 'GET /api/treasury');
       api.scriptedGetJson[ApiEndpoints.treasury] = jsonEncode(raw);
       final summary = await RemoteTreasuryRepository(api).summary();
+      expect(raw['cashVersion'], isA<int>());
       expect(summary.version, raw['cashVersion']);
+      // sources.* is still not read (gap-analysis section 2). The G-04 part,
+      // cashVersion, is fixed.
     },
-    skip: 'G-04. The sample version field is cashVersion. '
-        'TreasurySummaryDto reads version, so expectedVersion stays null. '
-        'sources.* is not read.',
   );
 
   test('GET /api/purchases sample parse', () async {
@@ -493,45 +493,34 @@ void main() {
     expect(auth.code, 'AUTH_REQUIRED');
   });
 
-  test(
-    'CLIENT_VERSION_MISMATCH is an upgrade, not a data conflict',
-    () {
-      final err = const ErrorMapper()
-          .fromResponse(409, _body(samples, 'versionHeaderError'), null);
-      expect(err, isA<UpgradeRequiredException>());
-      expect(err.code, 'CLIENT_VERSION_MISMATCH');
-    },
-    skip: 'G-07. Every non-VERSION_CONFLICT 409 becomes ConflictException, '
-        'including CLIENT_VERSION_MISMATCH.',
-  );
+  test('CLIENT_VERSION_MISMATCH is an upgrade, not a data conflict', () {
+    final err = const ErrorMapper()
+        .fromResponse(409, _body(samples, 'versionHeaderError'), null);
+    expect(err, isA<ClientVersionMismatchException>());
+    expect(err, isNot(isA<ConflictException>()));
+    expect(err.code, 'CLIENT_VERSION_MISMATCH');
+  });
 
   test(
-    'REQUEST_ID_REUSED and DUPLICATE_SAME_WORKDAY are not generic conflicts',
-    () {
-      const mapper = ErrorMapper();
-      final reused = mapper.fromResponse(409, _body(samples, 'reusedId'), null);
-      final duplicate =
-          mapper.fromResponse(409, _body(samples, 'duplicateWarning'), null);
-      expect(reused, isNot(isA<ConflictException>()));
-      expect(duplicate.code, 'DUPLICATE_SAME_WORKDAY');
-      expect(duplicate, isNot(isA<ConflictException>()));
-    },
-    skip: 'G-07. REQUEST_ID_REUSED and DUPLICATE_SAME_WORKDAY are both '
-        'ConflictException. The duplicate warning is not a distinct type.',
-  );
+      'REQUEST_ID_REUSED and DUPLICATE_SAME_WORKDAY are not generic conflicts',
+      () {
+    const mapper = ErrorMapper();
+    final reused = mapper.fromResponse(409, _body(samples, 'reusedId'), null);
+    final duplicate =
+        mapper.fromResponse(409, _body(samples, 'duplicateWarning'), null);
+    expect(reused, isA<RequestIdReusedException>());
+    expect(reused, isNot(isA<ConflictException>()));
+    expect(duplicate.code, 'DUPLICATE_SAME_WORKDAY');
+    expect(duplicate, isA<DuplicateSameWorkdayException>());
+    expect(duplicate, isNot(isA<ConflictException>()));
+  });
 
-  test(
-    'INVALID_AMOUNT details.field is the field name',
-    () {
-      final err = const ErrorMapper()
-          .fromResponse(400, _body(samples, 'invalidAmount'), null);
-      expect(err, isA<ValidationException>());
-      expect(
-          (err as ValidationException).fieldErrors.single.field, 'inputValue');
-    },
-    skip: 'G-07. details is {"field": "inputValue"}. The mapper treats the '
-        'key "field" as the field name.',
-  );
+  test('INVALID_AMOUNT details.field is the field name', () {
+    final err = const ErrorMapper()
+        .fromResponse(400, _body(samples, 'invalidAmount'), null);
+    expect(err, isA<ValidationException>());
+    expect((err as ValidationException).fieldErrors.single.field, 'inputValue');
+  });
 
   test(
     'MFA_REQUIRED is not shown as invalid credentials',
@@ -547,18 +536,19 @@ void main() {
     'pin sends isPinned and expectedVersion',
     () async {
       final api = await _session();
-      await RemoteAccountsRepository(api).setPinned(
+      // A card the fake knows, at its current version (4).
+      final ack = await RemoteAccountsRepository(api).setPinned(
         AccountSection.customers,
-        '0342102a-b304-4e81-a4b7-a08081516bfa',
+        'c_55',
         true,
-        MutationMeta(expectedVersion: 2, requestId: 'contract-pin-01'),
+        MutationMeta(expectedVersion: 4, requestId: 'contract-pin-01'),
       );
       final body = jsonDecode(api.lastWireBody!) as Map;
       expect(body['isPinned'], isTrue);
       expect(body.containsKey('pinned'), isFalse);
-      expect(body['expectedVersion'], 2);
+      expect(body['expectedVersion'], 4);
+      expect(ack.version, 5);
     },
-    skip: 'G-05. setPinned sends pinned, not isPinned.',
   );
 
   test(
@@ -578,13 +568,30 @@ void main() {
         'd0f6a687-1267-471b-831e-a4568602d82c',
         request,
         MutationMeta(expectedVersion: 4, requestId: 'contract-entry-1'),
+        entryVersion: 2,
       );
       final patch = jsonDecode(api.lastWireBody!) as Map;
-      expect(patch.containsKey('expectedVersion'), isTrue);
-      expect(patch.containsKey('expectedDayVersion'), isTrue);
+      expect(patch['expectedVersion'], 2);
+      expect(patch['expectedDayVersion'], 4);
+      await repo.delete(
+        PurchaseBook.alBayan,
+        'd0f6a687-1267-471b-831e-a4568602d82c',
+        MutationMeta(expectedVersion: 4, requestId: 'contract-entry-2'),
+        entryVersion: 2,
+      );
+      final delete = jsonDecode(api.lastWireBody!) as Map;
+      expect(delete['expectedVersion'], 2);
+      expect(delete['expectedDayVersion'], 4);
+      await repo.setDayCorrection(
+        PurchaseBook.alBayan,
+        '12',
+        open: true,
+        meta: MutationMeta(expectedVersion: 3, requestId: 'contract-corr-1'),
+      );
+      final correction = jsonDecode(api.lastWireBody!) as Map;
+      expect(correction['expectedVersion'], 3);
+      expect(correction.containsKey('expectedDayVersion'), isFalse);
     },
-    skip: 'G-06. Entry PATCH and DELETE send expectedDayVersion only. '
-        'Day correction sends expectedDayVersion; the contract name is expectedVersion.',
   );
 
   test(

@@ -19,6 +19,14 @@ import 'edit_account_card_screen.dart';
 import 'overpayment_warning.dart';
 import 'transaction_correction_form.dart';
 
+/// A write may send [expectedVersion] only from a settled card. Loading,
+/// refresh, and error (including a failed reload) keep the previous figure
+/// on screen, and [AsyncValue.asData] is either null or still the old card.
+bool _cardReadyForWrite(AsyncValue<AccountCardDto> card) {
+  if (card.isLoading || card.hasError) return false;
+  return card.asData?.value.version != null;
+}
+
 /// Ledger for one card. Customers, companies, Libyan deposits, and Egyptian
 /// deposits all use this screen; [section] selects the repository and the labels.
 class LedgerScreen extends ConsumerStatefulWidget {
@@ -57,6 +65,8 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   Widget build(BuildContext context) {
     ref.listen(accountCardProvider((section, id)), (previous, next) {
       if (!_balanceAwaitingReload) return;
+      // A failed reload keeps [MutationAck.balanceUnits]. The header does
+      // not go back to the card that was on screen before the payment.
       if (next.isLoading || next.isRefreshing || next.hasError) return;
       if (!next.hasValue) return;
       setState(() {
@@ -73,6 +83,9 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     String messageOf(Object error) =>
         failureText(ref.read(errorHandlerProvider).toFailure(error));
     failureOf(Object error) => ref.read(errorHandlerProvider).toFailure(error);
+    final reloadError = _balanceAwaitingReload && card.hasError
+        ? messageOf(card.error!)
+        : null;
 
     return Scaffold(
       key: Key('screen-ledger-${section.path}'),
@@ -108,10 +121,11 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                 for (final entry in page.page.items) entry.id,
               ];
               final tight = layoutIsTight(context);
+              final cardReady = _cardReadyForWrite(card);
               final writes = <Widget>[
                 GatedButton(
                   buttonKey: const Key('add-debt'),
-                  allowed: true,
+                  allowed: cardReady,
                   online: online,
                   label: section == AccountSection.libyanDeposits
                       ? AppStrings.depositIn
@@ -122,7 +136,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                 ),
                 GatedButton(
                   buttonKey: const Key('add-payment'),
-                  allowed: true,
+                  allowed: cardReady,
                   online: online,
                   label: section == AccountSection.libyanDeposits
                       ? AppStrings.depositOut
@@ -134,6 +148,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                 GuardedMutation(
                   buttonKey: const Key('full-payment'),
                   allowed:
+                      cardReady &&
                       section != AccountSection.libyanDeposits &&
                       section != AccountSection.egyptianDeposits,
                   filled: false,
@@ -171,6 +186,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                             title: _ledgerTitle(section),
                             awaitingServerBalance: _balanceAwaitingReload,
                             ackBalance: _ackBalance,
+                            reloadError: reloadError,
                           ),
                         ),
                       ],
@@ -391,6 +407,9 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
 
   @override
   Widget build(BuildContext context) {
+    final watchedCard = ref.watch(
+      accountCardProvider((widget.section, widget.id)),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -444,13 +463,10 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
         const SizedBox(height: AppSpacing.md),
         GuardedMutation(
           buttonKey: const Key('save-movement'),
+          allowed: _cardReadyForWrite(watchedCard),
           inputs:
               '${widget.type}|$_mode|${_amount.text}|${_factor.text}|${_date.text}|${_note.text}',
-          expectedVersion: ref
-              .watch(accountCardProvider((widget.section, widget.id)))
-              .asData
-              ?.value
-              .version,
+          expectedVersion: watchedCard.asData?.value.version,
           label: AppStrings.save,
           onVersionConflict: () {
             ref.invalidate(ledgerProvider((widget.section, widget.id)));
@@ -460,6 +476,19 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
           },
           onSubmit: _submit,
         ),
+        // The save button stays hidden while the card reload has failed, so
+        // no write goes out without a settled version. Say why instead of
+        // leaving the form without a button and without a word.
+        if (watchedCard.hasError)
+          Semantics(
+            container: true,
+            excludeSemantics: true,
+            label: AppStrings.movementCardReloadFailed,
+            child: const Text(
+              AppStrings.movementCardReloadFailed,
+              key: Key('movement-reload-failed'),
+            ),
+          ),
       ],
     );
   }
@@ -469,45 +498,28 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
     if (units == null) return AppStrings.integerOnly;
     // Direct partial payment only. A rate is not an amount, so it is not
     // compared. An invalid balance is refused. It is not treated as 0.
-    // An amount above the fresh balance is not refused. The warning names
-    // the current balance and the typed amount, then the send still uses
-    // this form's requestId.
+    // The warning uses the balance already on the card. It does not read
+    // the card again, so a failed read cannot block the send. An amount
+    // above that balance is not refused. Cancel returns an empty string
+    // and sends nothing. Null would be treated as success and would drop
+    // this form's request id. The empty string is not shown.
     if (widget.type == 'payment' && _mode == CalculationMode.direct) {
-      // An invalid balance already on screen is not a number. Refuse it
-      // before any send. It is not treated as 0.
-      final watched = ref
+      final loaded = ref
           .read(accountCardProvider((widget.section, widget.id)))
           .asData
-          ?.value
-          .balanceUnits;
+          ?.value;
+      final watched = loaded?.balanceUnits;
       if (watched != null && watched.isInvalid) {
         return AppStrings.invalidAmount;
       }
-      // The same repository call accountCardProvider uses. Reading it here,
-      // instead of refreshing that provider, leaves the form's watched
-      // expectedVersion (and therefore its requestId) unchanged.
-      final AccountCardDto fresh;
-      try {
-        fresh = await ref
-            .read(apiLayerProvider)
-            .accounts
-            .get(widget.section, widget.id);
-      } catch (error) {
-        return failureText(ref.read(errorHandlerProvider).toFailure(error));
-      }
-      if (!mounted) return '';
-      final remaining = fresh.balanceUnits;
-      if (remaining != null && remaining.isInvalid) {
-        return AppStrings.invalidAmount;
-      }
-      final remainingUnits = remaining?.asInt;
-      if (remainingUnits != null && units > remainingUnits) {
+      final remainingUnits = watched?.asInt;
+      if (loaded != null && remainingUnits != null && units > remainingUnits) {
         final proceed = await _confirmOverpayment(
-          fresh.currency,
+          loaded.currency,
           remainingUnits,
           units,
         );
-        if (proceed != true) return '';
+        if (!mounted || proceed != true) return '';
       }
     }
     final parsedDate = DateTime.tryParse(_date.text);
@@ -620,6 +632,7 @@ class _Header extends StatelessWidget {
     required this.title,
     this.awaitingServerBalance = false,
     this.ackBalance,
+    this.reloadError,
   });
 
   final AccountSection section;
@@ -632,6 +645,10 @@ class _Header extends StatelessWidget {
 
   /// [MutationAck.balanceUnits] while [awaitingServerBalance] is set.
   final MoneyValue? ackBalance;
+
+  /// Set when the card reload after that acknowledgement failed.
+  /// The figure stays [ackBalance]. This is the reload failure, not a new balance.
+  final String? reloadError;
 
   @override
   Widget build(BuildContext context) {
@@ -705,6 +722,17 @@ class _Header extends StatelessWidget {
                   color: balanceColor,
                 ),
               ),
+              if (reloadError != null)
+                Semantics(
+                  container: true,
+                  excludeSemantics: true,
+                  label: AppStrings.ledgerReloadFailed,
+                  child: Text(
+                    AppStrings.ledgerReloadFailed,
+                    key: const Key('ledger-reload-failed'),
+                    style: cairo(12, 500, color: accent),
+                  ),
+                ),
               if (value.systemManaged)
                 Text(
                   AppStrings.systemCard,
@@ -1260,7 +1288,7 @@ class _AmountBlock extends StatelessWidget {
   }
 }
 
-class _EntryActions extends StatelessWidget {
+class _EntryActions extends ConsumerWidget {
   const _EntryActions({
     required this.section,
     required this.accountId,
@@ -1276,12 +1304,19 @@ class _EntryActions extends StatelessWidget {
   final Future<String?> Function(MutationMeta meta) onCancel;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The server checks cancel against the CARD version (`customerVersion`),
+    // not a ledger line version. Production ledger lines carry no `version`.
+    final cardVersion = ref
+        .watch(accountCardProvider((section, accountId)))
+        .asData
+        ?.value
+        .version;
     final cancel = canCancel
         ? GuardedMutation(
             buttonKey: Key('cancel-${entry.id}'),
-            inputs: 'cancel:${entry.id}:${entry.version}',
-            expectedVersion: entry.version,
+            inputs: 'cancel:${entry.id}:$cardVersion',
+            expectedVersion: cardVersion,
             filled: false,
             label: AppStrings.cancelMovement,
             confirmText: AppStrings.confirmCancel,

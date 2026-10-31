@@ -115,7 +115,7 @@ Use `PERF_SURFACE=emulator` on an emulator and `PERF_SURFACE=device` on a phone.
 
 The script for the CI emulator is `tool/android_performance_emulator_test.sh`. It does not pass `HISTORY_WINDOW_TRIM`, and neither do the required CI jobs, so trimming is active in the emulator measurements. The default is approved by Ali on 2026-10-22, enabled by default. Pass `--dart-define=HISTORY_WINDOW_TRIM=false` to measure with trimming off.
 
-On that emulator, and on a phone when `PERF_SURFACE=device` is set for the same script, the script runs `adb shell dumpsys meminfo com.example.vib_abdo_company_mobile` before and after the long scroll. It records total PSS and, when dumpsys prints it, total RSS. API 29's app summary often has PSS and no RSS; the missing field is `unavailable`. The integration test records Dart heap bytes through the VM service when that service publishes a URI. When it does not, the line is `unavailable` and the test still passes. Both figures are report-only. They are in the job summary. They do not pass or fail the job.
+On that emulator, and on a phone when `PERF_SURFACE=device` is set for the same script, the script runs `adb shell dumpsys meminfo com.vip2100.vib` before and after the long scroll. It records total PSS and, when dumpsys prints it, total RSS. API 29's app summary often has PSS and no RSS; the missing field is `unavailable`. The integration test records Dart heap bytes through the VM service when that service publishes a URI. When it does not, the line is `unavailable` and the test still passes. Both figures are report-only. They are in the job summary. They do not pass or fail the job.
 
 ## P7-26 devices
 
@@ -135,13 +135,13 @@ Debug with `USE_FAKE_API=true` is a developer loop. Do not fill the protocol for
 ### Physical device
 
 ```bash
-adb uninstall com.example.vib_abdo_company_mobile || true
+adb uninstall com.vip2100.vib || true
 flutter build apk --release \
   --dart-define=USE_FAKE_API=false \
   --dart-define=API_BASE="$STAGING_API_BASE"
 adb install -r build/app/outputs/flutter-apk/app-release.apk
-adb shell am force-stop com.example.vib_abdo_company_mobile
-adb shell am start -W -n com.example.vib_abdo_company_mobile/.MainActivity
+adb shell am force-stop com.vip2100.vib
+adb shell am start -W -n com.vip2100.vib/.MainActivity
 ```
 
 Then run the profile drive command above with `PERF_SURFACE=device` for the long ledger. For the release home timing, export the three staging names and run `PERF_SURFACE=device bash tool/measure_release_cold_start.sh` with the phone as the only adb device.

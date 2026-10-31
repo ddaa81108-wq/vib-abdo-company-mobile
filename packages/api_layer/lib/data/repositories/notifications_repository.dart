@@ -15,9 +15,10 @@ abstract interface class NotificationsRepository {
   /// the first page of GET /api/notifications. Null when the server omits it.
   Future<int?> fetchUnreadCount();
 
-  /// 🔶 GET /api/notifications/unread-count. The matrix lists the path as
-  /// declared and not called. Throws when `unreadCount` is missing so the
-  /// client does not invent 0.
+  /// 🔶 GET /api/notifications/unread-count. Production answers 404
+  /// `ROUTE_NOT_FOUND`; any 404 falls back to `unreadCount` from the first
+  /// page of GET /api/notifications. Throws when `unreadCount` is missing so
+  /// the client does not invent 0.
   Future<int> serverUnreadCount();
 
   /// Drops stored write results. The controller calls this when the session
@@ -79,11 +80,34 @@ class RemoteNotificationsRepository implements NotificationsRepository {
   @override
   Future<int?> fetchUnreadCount() async => (await list()).unreadCount;
 
+  /// True after the server answered 404 `ROUTE_NOT_FOUND` for the proposed
+  /// unread-count route. Production does not have it, so later calls go
+  /// straight to the list's `unreadCount` instead of repeating the 404.
+  bool _unreadRouteMissing = false;
+
   @override
   Future<int> serverUnreadCount() async {
-    final data =
-        (await _api.get(ApiEndpoints.proposedUnreadCount)).data;
+    if (_unreadRouteMissing) return _unreadFromList();
+    final Object? data;
+    try {
+      data = (await _api.get(ApiEndpoints.proposedUnreadCount)).data;
+    } on NotFoundException catch (error) {
+      if (error.code == 'ROUTE_NOT_FOUND') _unreadRouteMissing = true;
+      return _unreadFromList();
+    }
     final count = data is int ? data : intOrNull(asJson(data)['unreadCount']);
+    if (count == null) {
+      throw const InvalidServerResponseException(
+        message: 'استجابة الخادم غير صالحة (عدد الإشعارات)',
+      );
+    }
+    return count;
+  }
+
+  /// `unreadCount` from GET /api/notifications. Null there is still an
+  /// invalid response: the badge must not invent a 0.
+  Future<int> _unreadFromList() async {
+    final count = (await list()).unreadCount;
     if (count == null) {
       throw const InvalidServerResponseException(
         message: 'استجابة الخادم غير صالحة (عدد الإشعارات)',
