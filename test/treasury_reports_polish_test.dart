@@ -381,6 +381,28 @@ void main() {
     expect(find.text(AppStrings.converted), findsNothing);
   });
 
+  test('expectNoLatin exempts only the exact fake badge text', () {
+    expect(noLatinExemptions, {AppStrings.envFake});
+    expect(AppStrings.envFake, 'بيانات وهمية (Fake API)');
+    expect(hasForbiddenLatin(AppStrings.envFake), isFalse);
+    // Whole-string match: a part or a variant of it is not exempt.
+    expect(hasForbiddenLatin('Fake API'), isTrue);
+    expect(hasForbiddenLatin('${AppStrings.envFake} '), isTrue);
+    // Staging is Arabic, so it passes without an exemption.
+    expect(noLatinExemptions, isNot(contains(AppStrings.envStaging)));
+    expect(hasForbiddenLatin(AppStrings.envStaging), isFalse);
+    // Host-bearing labels are never exempt.
+    expect(
+      hasForbiddenLatin(AppStrings.envOtherHost('api.example.test')),
+      isTrue,
+    );
+    expect(
+      hasForbiddenLatin(AppStrings.envProductionMismatch('http://vip2100.com')),
+      isTrue,
+    );
+    expect(hasForbiddenLatin(AppStrings.envUnknown), isFalse);
+  });
+
   testWidgets('both screens lay out on phones in light and dark', (
     tester,
   ) async {
@@ -509,11 +531,23 @@ void expectChip(
   expect(text.style?.color, foreground);
 }
 
+/// Whole Text values [expectNoLatin] accepts. Only the fake-API badge: rule 6
+/// fixes its wording, and every widget test build is fake. Staging is Arabic
+/// and needs no entry. Other-host and production-mismatch labels carry a Latin
+/// host from API_BASE and are deliberately not exempt: they never appear in a
+/// fake build, and a test that pumps these screens with one should fail here.
+const noLatinExemptions = {AppStrings.envFake};
+
+final _latin = RegExp(r'[A-Za-z]{4,}');
+
+/// True when [data] has a Latin word and is not exactly an exempt string.
+bool hasForbiddenLatin(String data) =>
+    !noLatinExemptions.contains(data) && _latin.hasMatch(data);
+
 void expectNoLatin(WidgetTester tester) {
-  final latin = RegExp(r'[A-Za-z]{4,}');
   for (final widget in tester.widgetList<Text>(find.byType(Text))) {
     final data = widget.data ?? '';
-    expect(latin.hasMatch(data), isFalse, reason: data);
+    expect(hasForbiddenLatin(data), isFalse, reason: data);
   }
 }
 

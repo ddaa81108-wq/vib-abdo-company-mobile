@@ -14,9 +14,14 @@ import 'state/theme_controller.dart';
 import 'state/user_scope.dart';
 import 'ui/strings.dart';
 import 'ui/theme.dart';
+import 'ui/widgets/environment_badge.dart';
 
 class CompanyApp extends ConsumerWidget {
-  const CompanyApp({super.key});
+  const CompanyApp({this.environment, super.key});
+
+  /// Badge source. Null means this build's defines ([kBuildEnvironment]).
+  /// Only the environment badge reads it.
+  final BuildEnvironment? environment;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -74,9 +79,16 @@ class CompanyApp extends ConsumerWidget {
       home: child,
     );
   }
+
+  Widget _live(BuildContext context, Widget? page) {
+    return EnvironmentBadgeOverlay(
+      environment: environment ?? kBuildEnvironment,
+      child: _services(page),
+    );
+  }
 }
 
-Widget _live(BuildContext context, Widget? page) {
+Widget _services(Widget? page) {
   return NotificationPermissionRegistration(
     child: NotificationTransportHost(
       child: ForegroundNotificationBanner(

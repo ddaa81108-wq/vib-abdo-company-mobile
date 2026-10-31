@@ -381,4 +381,13 @@ abstract final class AppStrings {
   static const notificationPermissionDenied =
       'لم يُمنح إذن الإشعارات. يمكنك تفعيله من إعدادات التطبيق.';
   static const notificationPermissionSettings = 'فتح الإعدادات';
+
+  // Build environment badge (rule 6). Production shows no badge.
+  static const envFake = 'بيانات وهمية (Fake API)';
+  static const envStaging = 'خادم التجربة';
+  static const envUnknown = 'خادم غير معروف';
+  static String envOtherHost(String host) => 'خادم آخر: $host';
+  static String envProductionMismatch(String origin) =>
+      'عنوان إنتاج غير معتمد: $origin';
+  static const envSemanticsPrefix = 'بيئة الاتصال: ';
 }

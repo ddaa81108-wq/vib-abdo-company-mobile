@@ -14,6 +14,7 @@ import 'package:vib_abdo_company_mobile/notifications/device_token_store.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_providers.dart';
 import 'package:vib_abdo_company_mobile/notifications/shown_notification_store.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
+import 'package:vib_abdo_company_mobile/ui/widgets/environment_badge.dart';
 
 /// Pumps the app with an injected fake [ApiLayer]. The provider does not build one.
 Future<ApiLayer> pumpFakeApp(
@@ -25,6 +26,7 @@ Future<ApiLayer> pumpFakeApp(
   ConnectivityPort? connectivity,
   NotificationPermissionService? notificationsPermission,
   String? fakeDataset,
+  BuildEnvironment? environment,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -73,7 +75,7 @@ Future<ApiLayer> pumpFakeApp(
         ),
         ...overrides,
       ],
-      child: const CompanyApp(),
+      child: CompanyApp(environment: environment),
     ),
   );
   await tester.pumpAndSettle(
