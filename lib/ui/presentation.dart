@@ -218,11 +218,16 @@ String? reportStatusLabel(String? status) => switch (status) {
   };
 }
 
-/// Sign of a server integer, used only for labels the spec ties to direction.
-String? vodafoneCaption(MoneyValue? units) {
+/// PurchasesSection `function me` labels the Vodafone remainder by its sign.
+///
+/// Positive is «باقي فودافون لصالحنا», negative is «استهلاك فودافون علينا»,
+/// and zero or a missing figure is «باقي فودافون كاش». The day card prints
+/// the absolute figure; this label still sees the signed server value.
+String vodafoneRemainingLabel(MoneyValue? units) {
   final value = units?.asInt;
-  if (value == null || value == 0) return null;
-  return value > 0 ? AppStrings.vodafoneOurs : AppStrings.vodafoneOwed;
+  if (value != null && value > 0) return AppStrings.vodafoneOurs;
+  if (value != null && value < 0) return AppStrings.vodafoneOwed;
+  return AppStrings.vodafoneCashRemaining;
 }
 
 /// Visual band only. Not a financial status.

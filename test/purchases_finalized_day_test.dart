@@ -26,6 +26,8 @@ void main() {
     expect(find.byKey(const Key('edit-pe_1')), findsNothing);
     expect(find.byKey(const Key('delete-pe_1')), findsNothing);
     expect(find.text(AppStrings.add), findsNothing);
+    expect(find.text(AppStrings.addPurchaseEntry), findsNothing);
+    expect(find.text(AppStrings.finalizeDay), findsNothing);
     expect(find.text(AppStrings.edit), findsNothing);
     expect(find.text(AppStrings.delete), findsNothing);
     expect(find.byKey(const Key('finalize-day-12')), findsNothing);
