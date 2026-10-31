@@ -396,10 +396,12 @@ void main() {
       hasForbiddenLatin(AppStrings.envOtherHost('api.example.test')),
       isTrue,
     );
+    // The production-mismatch label is Arabic, so it passes without one.
     expect(
-      hasForbiddenLatin(AppStrings.envProductionMismatch('http://vip2100.com')),
-      isTrue,
+      noLatinExemptions,
+      isNot(contains(AppStrings.envProductionMismatch)),
     );
+    expect(hasForbiddenLatin(AppStrings.envProductionMismatch), isFalse);
     expect(hasForbiddenLatin(AppStrings.envUnknown), isFalse);
   });
 

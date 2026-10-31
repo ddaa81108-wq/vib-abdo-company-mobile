@@ -37,9 +37,7 @@ class BuildEnvironment {
     BuildEnvironmentKind.fake => AppStrings.envFake,
     BuildEnvironmentKind.staging => AppStrings.envStaging,
     BuildEnvironmentKind.production => null,
-    BuildEnvironmentKind.productionMismatch => AppStrings.envProductionMismatch(
-      origin,
-    ),
+    BuildEnvironmentKind.productionMismatch => AppStrings.envProductionMismatch,
     BuildEnvironmentKind.other =>
       host.isEmpty ? AppStrings.envUnknown : AppStrings.envOtherHost(host),
   };
@@ -65,7 +63,7 @@ class BuildEnvironment {
 /// - Exactly `https://vip2100.com` on the default port (none or 443):
 ///   production, no badge.
 /// - Host `vip2100.com` with `http` or another port: production mismatch, a
-///   warning badge with the origin.
+///   warning badge.
 /// - Any other host, including `www.vip2100.com`, lookalikes such as
 ///   `vip2100.com.evil.test` or `evilvip2100.com`, localhost, or a missing or
 ///   unparsable value: other. It shows a badge, so a build that talks to an

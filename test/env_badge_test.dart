@@ -89,11 +89,8 @@ void main() {
           BuildEnvironmentKind.productionMismatch,
           reason: entry.key,
         );
-        expect(
-          env.label,
-          'عنوان إنتاج غير معتمد: ${entry.value}',
-          reason: entry.key,
-        );
+        expect(env.label, 'خادم غير معتمد', reason: entry.key);
+        expect(env.origin, entry.value, reason: entry.key);
       }
     });
 
@@ -397,10 +394,7 @@ void main() {
           apiBase: 'http://vip2100.com',
         ),
       );
-      expect(
-        find.text(AppStrings.envProductionMismatch('http://vip2100.com')),
-        findsOneWidget,
-      );
+      expect(find.text(AppStrings.envProductionMismatch), findsOneWidget);
       expect(
         _fill(tester),
         Theme.of(tester.element(_badge)).colorScheme.inverseSurface,

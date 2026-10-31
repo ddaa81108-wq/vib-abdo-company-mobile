@@ -59,16 +59,18 @@ void main() {
           await _saveRootShot(tester, 'env-badge-staging-home-$suffix');
         }
       }
-      for (final dark in [false, true]) {
-        await open(const Size(320, 568), dark, insecure);
+      for (final (dark, size) in const [
+        (false, Size(320, 568)),
+        (true, Size(320, 568)),
+        (false, Size(430, 932)),
+      ]) {
+        await open(size, dark, insecure);
         await signIn(tester, username: 'admin.demo', password: 'demo-only');
-        expect(
-          find.text(AppStrings.envProductionMismatch('http://vip2100.com')),
-          findsOneWidget,
-        );
+        expect(find.text(AppStrings.envProductionMismatch), findsOneWidget);
         await _saveRootShot(
           tester,
-          'env-badge-http-production-home-${dark ? 'dark' : 'light'}-320x568',
+          'env-badge-http-production-home-${dark ? 'dark' : 'light'}-'
+          '${size.width.toInt()}x${size.height.toInt()}',
         );
       }
     },

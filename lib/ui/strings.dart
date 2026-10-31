@@ -387,7 +387,6 @@ abstract final class AppStrings {
   static const envStaging = 'خادم التجربة';
   static const envUnknown = 'خادم غير معروف';
   static String envOtherHost(String host) => 'خادم آخر: $host';
-  static String envProductionMismatch(String origin) =>
-      'عنوان إنتاج غير معتمد: $origin';
+  static const envProductionMismatch = 'خادم غير معتمد';
   static const envSemanticsPrefix = 'بيئة الاتصال: ';
 }
