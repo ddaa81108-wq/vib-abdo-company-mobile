@@ -6,7 +6,15 @@ import '../theme.dart';
 import '../tokens.dart';
 
 /// Which server a build talks to. Rule 6: every test build shows it.
-enum BuildEnvironmentKind { fake, staging, production, other }
+enum BuildEnvironmentKind {
+  fake,
+  staging,
+  production,
+
+  /// Host `vip2100.com` without `https` on the default port. Never production.
+  productionMismatch,
+  other,
+}
 
 /// Hosts named by the build rules. Any other host is [BuildEnvironmentKind.other].
 const kStagingApiHost = 'staging.vip2100.com';
@@ -14,43 +22,56 @@ const kProductionApiHost = 'vip2100.com';
 
 @immutable
 class BuildEnvironment {
-  const BuildEnvironment._(this.kind, this.host);
+  const BuildEnvironment._(this.kind, this.host, [this.origin = '']);
 
   final BuildEnvironmentKind kind;
 
   /// Lowercase API_BASE host. Empty for fake mode and for a value with no host.
   final String host;
 
+  /// `scheme://host[:port]`, set only for [BuildEnvironmentKind.productionMismatch].
+  final String origin;
+
   /// Badge text, or null when no badge is shown (production).
   String? get label => switch (kind) {
     BuildEnvironmentKind.fake => AppStrings.envFake,
     BuildEnvironmentKind.staging => AppStrings.envStaging,
     BuildEnvironmentKind.production => null,
+    BuildEnvironmentKind.productionMismatch => AppStrings.envProductionMismatch(
+      origin,
+    ),
     BuildEnvironmentKind.other =>
       host.isEmpty ? AppStrings.envUnknown : AppStrings.envOtherHost(host),
   };
 
   @override
   bool operator ==(Object other) =>
-      other is BuildEnvironment && other.kind == kind && other.host == host;
+      other is BuildEnvironment &&
+      other.kind == kind &&
+      other.host == host &&
+      other.origin == origin;
 
   @override
-  int get hashCode => Object.hash(kind, host);
+  int get hashCode => Object.hash(kind, host, origin);
 
   @override
-  String toString() => 'BuildEnvironment($kind, $host)';
+  String toString() => 'BuildEnvironment($kind, $host, $origin)';
 }
 
 /// Pure mapping from the two defines `ApiConfig.fromEnvironment` reads.
 ///
 /// - `USE_FAKE_API=true`: fake, whatever `API_BASE` says (fake mode ignores it).
-/// - Host `staging.vip2100.com`: staging.
-/// - Host `vip2100.com`: production, no badge.
-/// - Any other host, including `www.vip2100.com`, localhost, or a missing or
+/// - Host exactly `staging.vip2100.com`: staging.
+/// - Exactly `https://vip2100.com` on the default port (none or 443):
+///   production, no badge.
+/// - Host `vip2100.com` with `http` or another port: production mismatch, a
+///   warning badge with the origin.
+/// - Any other host, including `www.vip2100.com`, lookalikes such as
+///   `vip2100.com.evil.test` or `evilvip2100.com`, localhost, or a missing or
 ///   unparsable value: other. It shows a badge, so a build that talks to an
 ///   unexpected server is never mistaken for production.
 ///
-/// Only the host is compared. Scheme and port do not change the result.
+/// Hosts are compared whole and case-insensitively, never by suffix.
 BuildEnvironment resolveBuildEnvironment({
   required bool useFakeApi,
   required String apiBase,
@@ -58,13 +79,28 @@ BuildEnvironment resolveBuildEnvironment({
   if (useFakeApi) {
     return const BuildEnvironment._(BuildEnvironmentKind.fake, '');
   }
-  final host = (Uri.tryParse(apiBase.trim())?.host ?? '').toLowerCase();
-  final kind = switch (host) {
-    kStagingApiHost => BuildEnvironmentKind.staging,
-    kProductionApiHost => BuildEnvironmentKind.production,
-    _ => BuildEnvironmentKind.other,
-  };
-  return BuildEnvironment._(kind, host);
+  final uri = Uri.tryParse(apiBase.trim());
+  final host = (uri?.host ?? '').toLowerCase();
+  if (uri == null || host != kProductionApiHost) {
+    final kind = host == kStagingApiHost
+        ? BuildEnvironmentKind.staging
+        : BuildEnvironmentKind.other;
+    return BuildEnvironment._(kind, host);
+  }
+  final scheme = uri.scheme.toLowerCase();
+  // Dart drops a default port, so `https://vip2100.com:443` has port 443 too.
+  if (scheme == 'https' && uri.port == 443) {
+    return const BuildEnvironment._(
+      BuildEnvironmentKind.production,
+      kProductionApiHost,
+    );
+  }
+  final port = uri.hasPort ? ':${uri.port}' : '';
+  return BuildEnvironment._(
+    BuildEnvironmentKind.productionMismatch,
+    host,
+    '$scheme://$host$port',
+  );
 }
 
 /// This build, from the same compile-time defines as `ApiConfig.fromEnvironment`.
@@ -122,7 +158,23 @@ class EnvironmentBadgeOverlay extends StatelessWidget {
   }
 }
 
-/// The pill itself. Colours are the review/critical chip tokens of the theme.
+/// Fill and text of the pill. Fake data uses the review-status chip pair
+/// (yellow, the same in both themes; a status colour, not a money colour).
+/// Every real server that is not production uses the theme's neutral inverse
+/// surface pair, which flips between light and dark.
+(Color, Color) environmentBadgeColors(
+  ThemeData theme,
+  BuildEnvironmentKind kind,
+) {
+  if (kind == BuildEnvironmentKind.fake) {
+    final status = theme.extension<AppStatusColors>()!;
+    return (status.chipReviewBg, status.chipReviewFg);
+  }
+  final scheme = theme.colorScheme;
+  return (scheme.inverseSurface, scheme.onInverseSurface);
+}
+
+/// The pill itself. Colours come from [environmentBadgeColors].
 class EnvironmentBadge extends StatelessWidget {
   const EnvironmentBadge({required this.environment, super.key});
 
@@ -132,11 +184,10 @@ class EnvironmentBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = environment.label;
     if (label == null) return const SizedBox.shrink();
-    final status = context.statusColors;
-    // Fake data is a review state. A real non-production server is critical.
-    final fake = environment.kind == BuildEnvironmentKind.fake;
-    final background = fake ? status.chipReviewBg : status.chipCriticalBg;
-    final foreground = fake ? status.chipReviewFg : status.chipCriticalFg;
+    final (background, foreground) = environmentBadgeColors(
+      Theme.of(context),
+      environment.kind,
+    );
     final base = Theme.of(context).textTheme.labelSmall ?? const TextStyle();
     return Semantics(
       container: true,

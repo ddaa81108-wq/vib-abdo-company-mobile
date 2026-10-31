@@ -19,47 +19,56 @@ const _captureScreenshots = bool.fromEnvironment('CAPTURE_SCREENSHOTS');
 /// PNGs land in build/screenshots/env-badge-*.png.
 void main() {
   testWidgets(
-    'env badge screenshots: fake light/dark at 320x568 and 430x932, staging',
+    'env badge screenshots: fake and staging, light and dark, 320x568 and '
+    '430x932, plus an http production warning',
     (tester) async {
-      for (final dark in [false, true]) {
-        for (final size in const [Size(320, 568), Size(430, 932)]) {
-          final suffix =
-              '${dark ? 'dark' : 'light'}-${size.width.toInt()}x${size.height.toInt()}';
-          await pumpFakeApp(tester, size: size);
-          await tester.runAsync(loadScreenshotFonts);
-          await tester.pump();
-          if (dark) {
-            await tester.tap(find.byKey(LoginScreen.themeKey));
-            await tester.pumpAndSettle();
-          }
-          expect(find.text(AppStrings.envFake), findsOneWidget);
-          await _saveRootShot(tester, 'env-badge-fake-login-$suffix');
-          await signIn(tester, username: 'admin.demo', password: 'demo-only');
-          await _saveRootShot(tester, 'env-badge-fake-home-$suffix');
-          await go(tester, '/settings');
-          await _saveRootShot(tester, 'env-badge-fake-settings-$suffix');
-        }
-      }
-      for (final dark in [false, true]) {
-        await pumpFakeApp(
-          tester,
-          size: const Size(360, 780),
-          environment: resolveBuildEnvironment(
-            useFakeApi: false,
-            apiBase: 'https://staging.vip2100.com',
-          ),
-        );
+      final staging = resolveBuildEnvironment(
+        useFakeApi: false,
+        apiBase: 'https://staging.vip2100.com',
+      );
+      final insecure = resolveBuildEnvironment(
+        useFakeApi: false,
+        apiBase: 'http://vip2100.com',
+      );
+      Future<void> open(Size size, bool dark, BuildEnvironment? env) async {
+        await pumpFakeApp(tester, size: size, environment: env);
         await tester.runAsync(loadScreenshotFonts);
         await tester.pump();
         if (dark) {
           await tester.tap(find.byKey(LoginScreen.themeKey));
           await tester.pumpAndSettle();
         }
+      }
+
+      for (final dark in [false, true]) {
+        for (final size in const [Size(320, 568), Size(430, 932)]) {
+          final suffix =
+              '${dark ? 'dark' : 'light'}-${size.width.toInt()}x${size.height.toInt()}';
+          await open(size, dark, null);
+          expect(find.text(AppStrings.envFake), findsOneWidget);
+          await _saveRootShot(tester, 'env-badge-fake-login-$suffix');
+          await signIn(tester, username: 'admin.demo', password: 'demo-only');
+          await _saveRootShot(tester, 'env-badge-fake-home-$suffix');
+          await go(tester, '/settings');
+          await _saveRootShot(tester, 'env-badge-fake-settings-$suffix');
+
+          await open(size, dark, staging);
+          expect(find.text(AppStrings.envStaging), findsOneWidget);
+          await _saveRootShot(tester, 'env-badge-staging-login-$suffix');
+          await signIn(tester, username: 'admin.demo', password: 'demo-only');
+          await _saveRootShot(tester, 'env-badge-staging-home-$suffix');
+        }
+      }
+      for (final dark in [false, true]) {
+        await open(const Size(320, 568), dark, insecure);
         await signIn(tester, username: 'admin.demo', password: 'demo-only');
-        expect(find.text(AppStrings.envStaging), findsOneWidget);
+        expect(
+          find.text(AppStrings.envProductionMismatch('http://vip2100.com')),
+          findsOneWidget,
+        );
         await _saveRootShot(
           tester,
-          'env-badge-staging-home-${dark ? 'dark' : 'light'}-360x780',
+          'env-badge-http-production-home-${dark ? 'dark' : 'light'}-320x568',
         );
       }
     },
