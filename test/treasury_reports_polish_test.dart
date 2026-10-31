@@ -14,6 +14,7 @@ import 'package:vib_abdo_company_mobile/state/theme_controller.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'package:vib_abdo_company_mobile/ui/theme.dart';
 import 'package:vib_abdo_company_mobile/ui/widgets/common.dart';
+import 'package:vib_abdo_company_mobile/ui/widgets/environment_badge.dart';
 import 'package:vib_abdo_company_mobile/ui/widgets/export_pdf_button.dart';
 
 import 'support/pump_app.dart';
@@ -511,7 +512,15 @@ void expectChip(
 
 void expectNoLatin(WidgetTester tester) {
   final latin = RegExp(r'[A-Za-z]{4,}');
+  // The environment badge's «(Fake API)» and «Staging» are Latin by rule 6.
+  final badge = find.descendant(
+    of: find.byType(EnvironmentBadge),
+    matching: find.byType(Text),
+  );
+  final badgeTexts = tester.widgetList<Text>(badge).toSet();
+  expect(badgeTexts, hasLength(1));
   for (final widget in tester.widgetList<Text>(find.byType(Text))) {
+    if (badgeTexts.contains(widget)) continue;
     final data = widget.data ?? '';
     expect(latin.hasMatch(data), isFalse, reason: data);
   }
