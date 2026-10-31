@@ -293,7 +293,9 @@ void main() {
       final opened =
           jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
       expect(opened['requestId'], isNotEmpty);
-      expect(opened['expectedDayVersion'], 3);
+      // API docs: day correction takes `expectedVersion` (the day version).
+      expect(opened['expectedVersion'], 3);
+      expect(opened.containsKey('expectedDayVersion'), isFalse);
       expect(opened['open'], isTrue);
       expect(
         fake.mutationPaths.last,
@@ -313,7 +315,8 @@ void main() {
       final closed =
           jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
       expect(closed['requestId'], isNotEmpty);
-      expect(closed['expectedDayVersion'], 3);
+      expect(closed['expectedVersion'], 3);
+      expect(closed.containsKey('expectedDayVersion'), isFalse);
       expect(closed['open'], isFalse);
       expect(closed['requestId'], isNot(opened['requestId']));
       expect(find.text(AppStrings.correctionClosed), findsOneWidget);
@@ -566,6 +569,54 @@ void main() {
     tester.view.physicalSize = const Size(320, 900);
     await settle(tester);
     await capturePurchases(tester, 'dark-small');
+  });
+
+  // Fix #5 screen wiring: the edit and delete buttons send the entry's own
+  // version as `expectedVersion` next to the day's `expectedDayVersion`. The
+  // fake rejects a null entry version (400 INVALID_PURCHASE_VALUE), and the
+  // body checks below fail if either version goes missing.
+  testWidgets('editing a purchase sends the entry and day versions', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
+    final fake = layer.client as FakeApiClient;
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+    await show(tester, find.byKey(const Key('edit-pe_1')));
+    await tester.tap(find.byKey(const Key('edit-pe_1')));
+    await settle(tester);
+    await tester.ensureVisible(find.byKey(const Key('save-purchase')));
+    await tester.pump();
+    // The save button sends without a confirm dialog.
+    await tester.tap(find.byKey(const Key('save-purchase')));
+    await finishSend(tester);
+
+    expect(fake.mutationPaths, ['/api/purchases/al_bayan/entries/pe_1']);
+    final body = jsonDecode(fake.mutationBodies.single) as Map<String, dynamic>;
+    expect(body['expectedVersion'], 1, reason: 'entry version');
+    expect(body['expectedDayVersion'], 3, reason: 'day version');
+    expect(find.textContaining('${AppStrings.serverReply} pe_1'), findsWidgets);
+  });
+
+  testWidgets('deleting a purchase sends the entry and day versions', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
+    final fake = layer.client as FakeApiClient;
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+    await show(tester, find.byKey(const Key('delete-pe_1')));
+    await tester.tap(find.byKey(const Key('delete-pe_1')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byKey(const Key('confirm-mutation')));
+    await finishSend(tester);
+
+    expect(fake.mutationPaths, ['/api/purchases/al_bayan/entries/pe_1']);
+    final body = jsonDecode(fake.mutationBodies.single) as Map<String, dynamic>;
+    expect(body['expectedVersion'], 1, reason: 'entry version');
+    expect(body['expectedDayVersion'], 3, reason: 'day version');
+    expect(find.textContaining('${AppStrings.serverReply} pe_1'), findsWidgets);
   });
 }
 

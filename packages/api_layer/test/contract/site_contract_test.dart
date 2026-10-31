@@ -157,17 +157,17 @@ void main() {
   });
 
   test(
-    'treasury expectedVersion is cashVersion and sources are read',
+    'treasury expectedVersion is cashVersion',
     () async {
       final api = await _session();
       final raw = _data(samples, 'GET /api/treasury');
       api.scriptedGetJson[ApiEndpoints.treasury] = jsonEncode(raw);
       final summary = await RemoteTreasuryRepository(api).summary();
+      expect(raw['cashVersion'], isA<int>());
       expect(summary.version, raw['cashVersion']);
+      // sources.* is still not read (gap-analysis section 2). The G-04 part,
+      // cashVersion, is fixed.
     },
-    skip: 'G-04. The sample version field is cashVersion. '
-        'TreasurySummaryDto reads version, so expectedVersion stays null. '
-        'sources.* is not read.',
   );
 
   test('GET /api/purchases sample parse', () async {
@@ -536,18 +536,19 @@ void main() {
     'pin sends isPinned and expectedVersion',
     () async {
       final api = await _session();
-      await RemoteAccountsRepository(api).setPinned(
+      // A card the fake knows, at its current version (4).
+      final ack = await RemoteAccountsRepository(api).setPinned(
         AccountSection.customers,
-        '0342102a-b304-4e81-a4b7-a08081516bfa',
+        'c_55',
         true,
-        MutationMeta(expectedVersion: 2, requestId: 'contract-pin-01'),
+        MutationMeta(expectedVersion: 4, requestId: 'contract-pin-01'),
       );
       final body = jsonDecode(api.lastWireBody!) as Map;
       expect(body['isPinned'], isTrue);
       expect(body.containsKey('pinned'), isFalse);
-      expect(body['expectedVersion'], 2);
+      expect(body['expectedVersion'], 4);
+      expect(ack.version, 5);
     },
-    skip: 'G-05. setPinned sends pinned, not isPinned.',
   );
 
   test(
@@ -567,13 +568,30 @@ void main() {
         'd0f6a687-1267-471b-831e-a4568602d82c',
         request,
         MutationMeta(expectedVersion: 4, requestId: 'contract-entry-1'),
+        entryVersion: 2,
       );
       final patch = jsonDecode(api.lastWireBody!) as Map;
-      expect(patch.containsKey('expectedVersion'), isTrue);
-      expect(patch.containsKey('expectedDayVersion'), isTrue);
+      expect(patch['expectedVersion'], 2);
+      expect(patch['expectedDayVersion'], 4);
+      await repo.delete(
+        PurchaseBook.alBayan,
+        'd0f6a687-1267-471b-831e-a4568602d82c',
+        MutationMeta(expectedVersion: 4, requestId: 'contract-entry-2'),
+        entryVersion: 2,
+      );
+      final delete = jsonDecode(api.lastWireBody!) as Map;
+      expect(delete['expectedVersion'], 2);
+      expect(delete['expectedDayVersion'], 4);
+      await repo.setDayCorrection(
+        PurchaseBook.alBayan,
+        '12',
+        open: true,
+        meta: MutationMeta(expectedVersion: 3, requestId: 'contract-corr-1'),
+      );
+      final correction = jsonDecode(api.lastWireBody!) as Map;
+      expect(correction['expectedVersion'], 3);
+      expect(correction.containsKey('expectedDayVersion'), isFalse);
     },
-    skip: 'G-06. Entry PATCH and DELETE send expectedDayVersion only. '
-        'Day correction sends expectedDayVersion; the contract name is expectedVersion.',
   );
 
   test(

@@ -49,7 +49,10 @@ class TreasurySummaryDto {
       egyptianRate: decimalOrNull(t['egyptianRate']),
       egyptianConvertedUnits: money('egyptianConvertedUnits'),
       netUnits: money('netUnits'),
-      version: intOrNull(d['version'] ?? t['version']),
+      // Production names the cash version `cashVersion` (POST cash-entries
+      // rejects a body without it). `version` is the older name.
+      version: intOrNull(
+          d['cashVersion'] ?? t['cashVersion'] ?? d['version'] ?? t['version']),
       rateMissing: t['egyptianRate'] == null,
       activeCashTone: SummaryTone.fromServer(
           t['activeCashTone'] ?? t['tone'] ?? d['activeCashTone']),

@@ -285,8 +285,9 @@ class _DayCard extends ConsumerWidget {
                     label: AppStrings.add,
                     onPressed: () => showAppForm<void>(
                       context,
-                      // expectedDayVersion is the open day's version. The row
-                      // version stays on the entry until P-05.
+                      // expectedDayVersion is the open day's version. A new
+                      // row has no version yet; edit and delete send the
+                      // entry's own version as expectedVersion.
                       _PurchaseForm(book: book, version: day.version),
                     ),
                   ),
@@ -558,7 +559,13 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
       final existing = widget.entry;
       final ack = existing == null
           ? await purchases.create(widget.book, request, meta)
-          : await purchases.update(widget.book, existing.id, request, meta);
+          : await purchases.update(
+              widget.book,
+              existing.id,
+              request,
+              meta,
+              entryVersion: existing.version,
+            );
       if (!mounted) return null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
@@ -885,7 +892,7 @@ class _Entry extends ConsumerWidget {
                     ),
                     GuardedMutation(
                       buttonKey: Key('delete-${entry.id}'),
-                      inputs: 'delete:${entry.id}:$version',
+                      inputs: 'delete:${entry.id}:$version:${entry.version}',
                       expectedVersion: version,
                       label: AppStrings.delete,
                       filled: false,
@@ -911,7 +918,7 @@ class _Entry extends ConsumerWidget {
       final ack = await ref
           .read(apiLayerProvider)
           .purchases
-          .delete(book, entry.id, meta);
+          .delete(book, entry.id, meta, entryVersion: entry.version);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),

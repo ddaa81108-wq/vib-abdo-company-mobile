@@ -53,7 +53,19 @@ ANDROID_REQUIRE_RELEASE_SIGNING=true flutter build apk --release \
 ANDROID_REQUIRE_RELEASE_SIGNING=true flutter build appbundle --release \
   --dart-define=USE_FAKE_API=false \
   --dart-define=API_BASE=https://staging.vip2100.com
+
+# Release APK على الخادم الرئيسي (production)
+ANDROID_REQUIRE_RELEASE_SIGNING=true flutter build apk --release \
+  --dart-define=USE_FAKE_API=false \
+  --dart-define=API_BASE=https://vip2100.com \
+  --dart-define=EMPLOYEE_TOTALS_SOURCE=collections
 ```
+
+**مصدر إجماليات الموظفين (`EMPLOYEE_TOTALS_SOURCE`):**
+- `standalone` (الافتراضي) يطلب `GET /api/admin/employee-totals`. هذا المسار غير موجود على الخادم الرئيسي ولا على staging (404 `ROUTE_NOT_FOUND`).
+- `collections` يقرأ مصفوفة `employeeTotals` من `GET /api/collections`، وهي متاحة للمدير فقط. **مرّر `EMPLOYEE_TOTALS_SOURCE=collections` في بناء الخادم الرئيسي.**
+- إن نُسي التعريف فالتطبيق لا يتعطل: عند 404 `ROUTE_NOT_FOUND` من المسار المستقل يرجع تلقائيًا إلى `employeeTotals` في `/api/collections`، للمدير فقط. غير المدير يبقى رفض الخادم كما هو، ولا يُستبدل بالمصفوفة. أي 404 آخر يُعرض خطأً كما هو.
+- إذا أضاف الخادم المسار المستقل لاحقًا فإن الافتراضي يستعمله تلقائيًا.
 
 المخرجات:
 - `build/app/outputs/flutter-apk/app-debug.apk`

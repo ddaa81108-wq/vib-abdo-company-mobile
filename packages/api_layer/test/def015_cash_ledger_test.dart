@@ -191,7 +191,7 @@ void main() {
       final items = (ledger.data as Map)['items'] as List;
       expect(items.map((entry) => (entry as Map)['id']), ['ce_1']);
       final treasury = await api.get('/api/treasury');
-      expect((treasury.data as Map)['version'], 7);
+      expect((treasury.data as Map)['cashVersion'], 7);
     },
   );
 }

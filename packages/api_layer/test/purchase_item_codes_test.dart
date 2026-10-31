@@ -46,7 +46,7 @@ void main() {
       'itemCode': PurchaseItemCodes.custom,
       'itemLabel': 'صنف خاص',
     });
-    expect(typed.dataMap['id'], 'pe_new');
+    expect(typed.dataMap['entryId'], 'pe_new');
     expect(api.lastWireBody, contains('صنف خاص'));
     expect(api.lastWireBody, isNot(contains(PurchaseItemCodes.customCaption)));
 
@@ -55,6 +55,6 @@ void main() {
       'expectedDayVersion': 1,
       'itemCode': PurchaseItemCodes.vodafoneCash,
     });
-    expect(known.dataMap['id'], 'pe_new');
+    expect(known.dataMap['entryId'], 'pe_new');
   });
 }

@@ -1288,7 +1288,7 @@ class _AmountBlock extends StatelessWidget {
   }
 }
 
-class _EntryActions extends StatelessWidget {
+class _EntryActions extends ConsumerWidget {
   const _EntryActions({
     required this.section,
     required this.accountId,
@@ -1304,12 +1304,19 @@ class _EntryActions extends StatelessWidget {
   final Future<String?> Function(MutationMeta meta) onCancel;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The server checks cancel against the CARD version (`customerVersion`),
+    // not a ledger line version. Production ledger lines carry no `version`.
+    final cardVersion = ref
+        .watch(accountCardProvider((section, accountId)))
+        .asData
+        ?.value
+        .version;
     final cancel = canCancel
         ? GuardedMutation(
             buttonKey: Key('cancel-${entry.id}'),
-            inputs: 'cancel:${entry.id}:${entry.version}',
-            expectedVersion: entry.version,
+            inputs: 'cancel:${entry.id}:$cardVersion',
+            expectedVersion: cardVersion,
             filled: false,
             label: AppStrings.cancelMovement,
             confirmText: AppStrings.confirmCancel,

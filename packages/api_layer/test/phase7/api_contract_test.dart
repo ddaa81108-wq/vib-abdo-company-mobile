@@ -290,8 +290,16 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
           h,
           'PATCH',
           ApiEndpoints.accountPin('customers', 'c1'),
-        ).jsonBody?['pinned'],
+        ).jsonBody?['isPinned'],
         isTrue,
+      );
+      expect(
+        expectCall(
+          h,
+          'PATCH',
+          ApiEndpoints.accountPin('customers', 'c1'),
+        ).jsonBody?.containsKey('pinned'),
+        isFalse,
       );
       await h.layer.accounts.confirmZeroReview('c1', meta);
       final zero = expectCall(h, 'POST', ApiEndpoints.customerZeroReview('c1'));
@@ -460,9 +468,11 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
       final created = expectCall(h, 'POST', ApiEndpoints.purchases('al_bayan'));
       expect(created.jsonBody?['expectedDayVersion'], 2);
       expect(created.jsonBody?['itemCode'], 'vodafone_cash');
-      await h.layer.purchases.update(PurchaseBook.alBayan, 'e1', entry, meta);
+      await h.layer.purchases
+          .update(PurchaseBook.alBayan, 'e1', entry, meta, entryVersion: 1);
       expectCall(h, 'PATCH', ApiEndpoints.purchaseEntry('al_bayan', 'e1'));
-      await h.layer.purchases.delete(PurchaseBook.alBayan, 'e1', meta);
+      await h.layer.purchases
+          .delete(PurchaseBook.alBayan, 'e1', meta, entryVersion: 1);
       expectCall(h, 'DELETE', ApiEndpoints.purchaseEntry('al_bayan', 'e1'));
       await h.layer.purchases.setOpening(
         PurchaseBook.alBayan,

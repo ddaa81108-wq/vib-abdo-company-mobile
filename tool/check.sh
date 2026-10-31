@@ -10,6 +10,8 @@ flutter test --exclude-tags screenshots
   cd packages/api_layer
   flutter analyze
   flutter test
+  # Ledger dates must show the local calendar day (UTC+2), as in CI.
+  TZ=Africa/Tripoli flutter test test/prod_compat_test.dart --plain-name "1 ledger dates"
 )
 
 # Negative permission gate, staging preflight, and the release fake-API checks.

@@ -116,11 +116,13 @@ void main() {
         (entry) => entry.id == 'tx_2',
       );
       expect(payment.balanceAfterUnits?.units, 320);
+      // Cancel is checked against the card version, as on production.
+      final before = await api.accounts.get(AccountSection.customers, 'c_55');
       await api.accounts.cancelTransaction(
         AccountSection.customers,
         'c_55',
-        'tx_2',
-        MutationMeta(expectedVersion: payment.version),
+        payment.id,
+        MutationMeta(expectedVersion: before.version),
       );
 
       final card = await api.accounts.get(AccountSection.customers, 'c_55');
@@ -359,12 +361,16 @@ void main() {
       final payment = ledger.page.items.firstWhere(
         (entry) => entry.id == 'tx_2',
       );
+      final cardBefore = await cancelled.accounts.get(
+        AccountSection.customers,
+        'c_55',
+      );
       await cancelled.accounts.cancelTransaction(
         AccountSection.customers,
         'c_55',
-        'tx_2',
+        payment.id,
         MutationMeta(
-          expectedVersion: payment.version,
+          expectedVersion: cardBefore.version,
           requestId: 'def-016-cancel',
         ),
       );
