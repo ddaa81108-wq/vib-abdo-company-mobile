@@ -48,7 +48,7 @@ abstract final class AppStrings {
   static const emptyPayroll = 'لا توجد بيانات مرتبات';
   static const emptyReports = 'لا توجد بيانات';
   static const emptyPurchases = 'لا توجد أيام مسجّلة في هذا الدفتر';
-  static const online = 'متصل • جميع التغييرات محفوظة';
+  static const online = 'متصل • محفوظ';
   static const offline = 'غير متصل — تُعرض آخر بيانات محمّلة للقراءة';
   static const more = 'المزيد';
   static const menu = 'القائمة';

@@ -259,7 +259,8 @@ void _expectRole(
   final onSurface = theme.colorScheme.onSurface;
   final background = onSidebar
       ? theme.extension<AppColors>()!.sidebarBg
-      : theme.scaffoldBackgroundColor;
+      // Phone: the role now sits in the status strip at the top.
+      : theme.extension<AppColors>()!.successBg;
 
   expect(shine, const Color(0xFFFFFDE0));
   expect(role.style?.fontSize, 13);

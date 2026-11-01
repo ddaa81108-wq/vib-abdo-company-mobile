@@ -154,7 +154,24 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ),
       body: Column(
         children: [
-          ConnectionBanner(online: online),
+          ConnectionBanner(
+            online: online,
+            // Phone: the role sits at the top right of every screen, in
+            // place of the old identity block. Wider layouts keep it in the
+            // side list.
+            start: showIdentityHere
+                ? Text(
+                    roleLabel(summary.role),
+                    key: HomeShell.roleKey,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  )
+                : null,
+          ),
           Expanded(
             child: Row(
               children: [
@@ -190,12 +207,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                     ),
                   ),
                 Expanded(
-                  child: Column(
-                    children: [
-                      if (showIdentityHere) _PhoneIdentity(summary: summary),
-                      Expanded(child: widget.child),
-                    ],
-                  ),
+                  child: Column(children: [Expanded(child: widget.child)]),
                 ),
               ],
             ),
@@ -315,26 +327,6 @@ class IdentityBlock extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Keeps the signed-in name readable without pushing the page off screen
-/// when the text scale is large.
-class _PhoneIdentity extends StatelessWidget {
-  const _PhoneIdentity({required this.summary});
-
-  final HomeSummary summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final scale = MediaQuery.textScalerOf(context).scale(1);
-    final block = IdentityBlock(summary: summary);
-    if (scale <= 1.15) return block;
-    final cap = (88 * scale).clamp(88.0, 160.0);
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: cap),
-      child: SingleChildScrollView(child: block),
     );
   }
 }

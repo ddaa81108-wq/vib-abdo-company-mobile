@@ -27,9 +27,7 @@ class MoneyText extends StatelessWidget {
   Widget build(BuildContext context) {
     final extras = context.textExtras;
     if (text == MoneyValue.invalidLabel) {
-      final labelStyle = (style ?? extras.amount).copyWith(
-        fontFamily: 'Cairo',
-      );
+      final labelStyle = (style ?? extras.amount).copyWith(fontFamily: 'Cairo');
       return Semantics(
         label: MoneyValue.invalidLabel,
         child: LayoutBuilder(
@@ -361,14 +359,36 @@ class GatedButton extends StatelessWidget {
 }
 
 class ConnectionBanner extends StatelessWidget {
-  const ConnectionBanner({required this.online, super.key});
+  const ConnectionBanner({required this.online, this.start, super.key});
 
   final bool online;
+
+  /// Shown at the start edge (the right in RTL), e.g. the signed-in role.
+  /// The status then sits at the end edge (the left in RTL).
+  final Widget? start;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final scheme = Theme.of(context).colorScheme;
+    final status = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.circle,
+          size: 10,
+          color: online ? colors.success : scheme.error,
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Flexible(
+          child: Text(
+            online ? AppStrings.online : AppStrings.offline,
+            key: Key(online ? 'online-banner' : 'offline-banner'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      ],
+    );
     return Material(
       color: online ? colors.successBg : scheme.errorContainer,
       child: Padding(
@@ -376,23 +396,27 @@ class ConnectionBanner extends StatelessWidget {
           horizontal: AppSpacing.lg,
           vertical: AppSpacing.sm,
         ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.circle,
-              size: 10,
-              color: online ? colors.success : scheme.error,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                online ? AppStrings.online : AppStrings.offline,
-                key: Key(online ? 'online-banner' : 'offline-banner'),
-                style: Theme.of(context).textTheme.bodySmall,
+        child: start == null
+            ? Row(
+                children: [
+                  Expanded(
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: status,
+                    ),
+                  ),
+                ],
+              )
+            // The start item (right in RTL) and the status at the end edge
+            // (left in RTL).
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(child: start!),
+                  const SizedBox(width: AppSpacing.md),
+                  Flexible(flex: 2, child: status),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }

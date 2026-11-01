@@ -375,6 +375,46 @@ void main() {
     expect(find.text(AppStrings.operationsEmpty), findsOneWidget);
   });
 
+  testWidgets('phone status strip: role on the right, status on the left', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(360, 800));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+
+    // The old centred identity block is gone from the page body.
+    expect(find.text(AppStrings.signedInAs), findsNothing);
+    final strip = find.byType(ConnectionBanner);
+    expect(strip, findsOneWidget);
+    final role = find.descendant(
+      of: strip,
+      matching: find.byKey(HomeShell.roleKey),
+    );
+    expect(role, findsOneWidget);
+    expect(tester.widget<Text>(role).data, AppStrings.roleAdmin);
+    final status = find.byKey(const Key('online-banner'));
+    expect(tester.widget<Text>(status).data, 'متصل • محفوظ');
+    // RTL: the role hugs the right edge, the status sits to its left.
+    expect(tester.getRect(role).right, greaterThan(340));
+    expect(tester.getRect(status).right, lessThan(tester.getRect(role).left));
+    expect(tester.getRect(status).center.dx, lessThan(180));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a wide window keeps the role in the side list only', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(1100, 900));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    expect(find.byKey(HomeShell.roleKey), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(ConnectionBanner),
+        matching: find.byKey(HomeShell.roleKey),
+      ),
+      findsNothing,
+    );
+  });
+
   testWidgets('home is the icon grid only, ending with the settings tile', (
     tester,
   ) async {
