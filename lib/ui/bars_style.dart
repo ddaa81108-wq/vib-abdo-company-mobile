@@ -50,7 +50,12 @@ class StripLook {
   final Color? roleIconColor;
 
   /// What the role text is painted on (chip or strip).
-  Color get roleBackground => roleChip?.color ?? background;
+  Color get roleBackground {
+    final chip = roleChip?.color;
+    if (chip == null) return background;
+    // A translucent chip shows the strip through it.
+    return Color.alphaBlend(chip, background);
+  }
 
   static const chipPadding = EdgeInsetsDirectional.symmetric(
     horizontal: 10,

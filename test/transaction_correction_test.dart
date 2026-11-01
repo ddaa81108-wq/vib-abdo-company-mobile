@@ -593,6 +593,9 @@ Future<void> scrollTo(WidgetTester tester, Key key, String section) async {
     200,
     scrollable: scrollable.first,
   );
+  // Bring it fully into view (a taller bottom bar can leave it at the edge).
+  await tester.ensureVisible(find.byKey(key));
+  await settle(tester);
 }
 
 /// Opens the confirm dialog. The save control stays busy, with a spinning
