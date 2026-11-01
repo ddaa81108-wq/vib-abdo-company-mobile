@@ -451,6 +451,15 @@ void main() {
         find.descendant(of: bar, matching: find.text(text));
     expect(inBar(AppStrings.bottomTabCustomers), findsOneWidget);
     expect(inBar(AppStrings.bottomTabCompanies), findsOneWidget);
+    expect(inBar(AppStrings.bottomTabCollections), findsOneWidget);
+    expect(inBar(sectionLabel(SectionKey.collections)), findsNothing);
+    expect(
+      find.descendant(
+        of: bar,
+        matching: find.bySemanticsLabel(sectionLabel(SectionKey.collections)),
+      ),
+      findsOneWidget,
+    );
     expect(inBar(sectionLabel(SectionKey.customers)), findsNothing);
     expect(inBar(sectionLabel(SectionKey.companies)), findsNothing);
     // Screen readers still hear the full names.

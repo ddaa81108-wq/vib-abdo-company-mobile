@@ -16,6 +16,7 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/environment_badge.dart';
 import '../../ui/widgets/logout_confirm.dart';
 import '../../ui/widgets/soft_tile.dart';
 
@@ -160,21 +161,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         children: [
           ConnectionBanner(
             online: online,
-            // Phone: the role sits at the top right of every screen, in
-            // place of the old identity block. Wider layouts keep it in the
-            // side list.
-            start: showIdentityHere
-                ? Text(
-                    roleLabel(summary.role),
-                    key: HomeShell.roleKey,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  )
-                : null,
+            // Phone: role at the top right and the Tripoli day and date in
+            // the middle, on every screen (in place of the old identity
+            // block). Wider layouts keep the identity in the side list.
+            role: showIdentityHere ? roleLabel(summary.role) : null,
+            roleKey: HomeShell.roleKey,
+            showDate: showIdentityHere,
+            topInset: showIdentityHere ? _badgeClearance(context) : 0,
           ),
           Expanded(
             child: Row(
@@ -291,6 +284,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     }
     return AppStrings.appTitle;
   }
+}
+
+/// How far the environment pill reaches below the app bar, plus 2px, so
+/// the strip's middle text starts under it. Zero when no pill is drawn
+/// (production).
+double _badgeClearance(BuildContext context) {
+  if (kBuildEnvironment.label == null) return 0;
+  final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3);
+  final reach =
+      EnvironmentBadgeOverlay.height * scale - EnvironmentBadgeOverlay.lift;
+  return math.max(0, reach - AppSpacing.sm + 2);
 }
 
 bool _matches(String path, String location) {

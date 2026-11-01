@@ -56,6 +56,7 @@ abstract final class AppStrings {
   /// semantics label, use the full [sectionLabel].
   static const bottomTabCustomers = 'د العملاء';
   static const bottomTabCompanies = 'د الشركات';
+  static const bottomTabCollections = 'الاستلامات';
   static const menu = 'القائمة';
   static const searchHint = 'بحث موحد في كل الحسابات…';
   static const search = 'بحث';

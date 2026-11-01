@@ -1,9 +1,13 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../error_handling/app_failure.dart';
 import '../../error_handling/error_handler.dart';
+import '../date_labels.dart';
 import '../presentation.dart';
 import '../strings.dart';
 import '../theme.dart';
@@ -358,20 +362,91 @@ class GatedButton extends StatelessWidget {
   }
 }
 
-class ConnectionBanner extends StatelessWidget {
-  const ConnectionBanner({required this.online, this.start, super.key});
+/// Top status strip. On phones: role (start, right in RTL), the Tripoli day
+/// and date in the middle, and the connection status (end, left in RTL).
+class ConnectionBanner extends StatefulWidget {
+  const ConnectionBanner({
+    required this.online,
+    this.role,
+    this.roleKey,
+    this.showDate = false,
+    this.topInset = 0,
+    super.key,
+  });
 
   final bool online;
 
-  /// Shown at the start edge (the right in RTL), e.g. the signed-in role.
-  /// The status then sits at the end edge (the left in RTL).
-  final Widget? start;
+  /// Signed-in role label, shown at the start edge.
+  final String? role;
+  final Key? roleKey;
+
+  /// Day and date between the role and the status.
+  final bool showDate;
+
+  /// Extra top padding so the middle text clears the environment pill that
+  /// straddles the app bar edge.
+  final double topInset;
+
+  static const dateKey = Key('strip-date');
+
+  @override
+  State<ConnectionBanner> createState() => _ConnectionBannerState();
+}
+
+class _ConnectionBannerState extends State<ConnectionBanner>
+    with WidgetsBindingObserver {
+  Timer? _midnight;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _schedule();
+  }
+
+  @override
+  void didUpdateWidget(ConnectionBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.showDate != widget.showDate) _schedule();
+  }
+
+  /// One timer to the next Tripoli midnight (the date is also recomputed on
+  /// every rebuild and when the app resumes).
+  void _schedule() {
+    _midnight?.cancel();
+    _midnight = null;
+    if (!widget.showDate) return;
+    _midnight = Timer(untilTripoliMidnight(), () {
+      if (!mounted) return;
+      setState(() {});
+      _schedule();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && widget.showDate) {
+      setState(() {});
+      _schedule();
+    }
+  }
+
+  @override
+  void dispose() {
+    _midnight?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final online = widget.online;
     final colors = context.appColors;
-    final scheme = Theme.of(context).colorScheme;
-    final status = Row(
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final statusText = online ? AppStrings.online : AppStrings.offline;
+    final statusStyle = theme.textTheme.bodySmall;
+    Widget status({int? maxLines}) => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
@@ -382,41 +457,135 @@ class ConnectionBanner extends StatelessWidget {
         const SizedBox(width: AppSpacing.sm),
         Flexible(
           child: Text(
-            online ? AppStrings.online : AppStrings.offline,
+            statusText,
             key: Key(online ? 'online-banner' : 'offline-banner'),
-            style: Theme.of(context).textTheme.bodySmall,
+            maxLines: maxLines,
+            style: statusStyle,
           ),
         ),
       ],
     );
+    final role = widget.role;
+    final Widget body;
+    if (role == null && !widget.showDate) {
+      body = Row(
+        children: [
+          Expanded(
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: status(),
+            ),
+          ),
+        ],
+      );
+    } else {
+      final roleStyle = theme.textTheme.bodyMedium?.copyWith(
+        fontWeight: FontWeight.w800,
+        color: scheme.onSurface,
+      );
+      final dateStyle = theme.textTheme.bodySmall?.copyWith(
+        fontWeight: FontWeight.w700,
+        color: scheme.onSurface,
+      );
+      final direction = Directionality.of(context);
+      final scaler = MediaQuery.textScalerOf(context);
+      double measure(String text, TextStyle? style) {
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: style),
+          textDirection: direction,
+          textScaler: scaler,
+          maxLines: 1,
+        )..layout();
+        final width = painter.width;
+        painter.dispose();
+        return width;
+      }
+
+      body = LayoutBuilder(
+        builder: (context, constraints) {
+          const gap = AppSpacing.md;
+          final width = constraints.maxWidth;
+          // Both sides get the same width so the date sits in the true
+          // centre, under the environment pill. A long side (the offline
+          // text) is capped and wraps to two lines.
+          final cap = width * 0.3;
+          final roleWidth = role == null
+              ? 0.0
+              : math.min(measure(role, roleStyle) + 1, cap);
+          final statusWidth = math.min(
+            measure(statusText, statusStyle) + 10 + AppSpacing.sm + 1,
+            cap,
+          );
+          final side = math.max(roleWidth, statusWidth);
+          final slot = width - 2 * side - 2 * gap;
+          String? date;
+          if (widget.showDate) {
+            final today = tripoliNow();
+            // Longest form that fits on one line: full, then short, then
+            // digits only.
+            final forms = [
+              tripoliDateLabel(today),
+              tripoliDateLabel(today, short: true),
+              tripoliDateLabel(today, numeric: true),
+            ];
+            date = forms.firstWhere(
+              (form) => measure(form, dateStyle) <= slot,
+              orElse: () => forms.last,
+            );
+          }
+          return Row(
+            children: [
+              SizedBox(
+                width: side,
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: role == null
+                      ? null
+                      : Text(
+                          role,
+                          key: widget.roleKey,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: roleStyle,
+                        ),
+                ),
+              ),
+              const SizedBox(width: gap),
+              Expanded(
+                child: date == null
+                    ? const SizedBox.shrink()
+                    : Text(
+                        date,
+                        key: ConnectionBanner.dateKey,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: dateStyle,
+                      ),
+              ),
+              const SizedBox(width: gap),
+              SizedBox(
+                width: side,
+                child: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: status(maxLines: 2),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    }
     return Material(
       color: online ? colors.successBg : scheme.errorContainer,
       child: Padding(
-        padding: const EdgeInsetsDirectional.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.sm,
+        padding: EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.lg,
+          AppSpacing.sm + widget.topInset,
+          AppSpacing.lg,
+          AppSpacing.sm,
         ),
-        child: start == null
-            ? Row(
-                children: [
-                  Expanded(
-                    child: Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: status,
-                    ),
-                  ),
-                ],
-              )
-            // The start item (right in RTL) and the status at the end edge
-            // (left in RTL).
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(child: start!),
-                  const SizedBox(width: AppSpacing.md),
-                  Flexible(flex: 2, child: status),
-                ],
-              ),
+        child: body,
       ),
     );
   }

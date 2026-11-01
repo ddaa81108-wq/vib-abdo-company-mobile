@@ -22,6 +22,9 @@ String? sectionBottomTabLabel(String sectionKey) {
   if (sectionKey == SectionKey.customers.key) {
     return AppStrings.bottomTabCustomers;
   }
+  if (sectionKey == SectionKey.collections.key) {
+    return AppStrings.bottomTabCollections;
+  }
   if (sectionKey == SectionKey.companies.key) {
     return AppStrings.bottomTabCompanies;
   }
