@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../error_handling/app_failure.dart';
 import '../../error_handling/error_handler.dart';
+import '../bars_style.dart';
 import '../date_labels.dart';
 import '../presentation.dart';
 import '../strings.dart';
@@ -441,29 +442,39 @@ class _ConnectionBannerState extends State<ConnectionBanner>
   @override
   Widget build(BuildContext context) {
     final online = widget.online;
-    final colors = context.appColors;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final look = stripLook(context, online: online);
     final statusText = online ? AppStrings.online : AppStrings.offline;
-    final statusStyle = theme.textTheme.bodySmall;
-    Widget status({int? maxLines}) => Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.circle,
-          size: 10,
-          color: online ? colors.success : scheme.error,
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Flexible(
-          child: Text(
-            statusText,
-            key: Key(online ? 'online-banner' : 'offline-banner'),
-            maxLines: maxLines,
-            style: statusStyle,
+    final statusStyle = look.statusStyle;
+    // Extra width a chip adds around its text.
+    final statusChipExtra = look.statusChip == null
+        ? 0.0
+        : StripLook.chipPadding.horizontal;
+    final roleChipExtra =
+        (look.roleChip == null ? 0.0 : StripLook.chipPadding.horizontal) +
+        (look.roleIcon == null ? 0.0 : 14 + AppSpacing.xs);
+    Widget chip(BoxDecoration? decoration, Widget child) => decoration == null
+        ? child
+        : DecoratedBox(
+            decoration: decoration,
+            child: Padding(padding: StripLook.chipPadding, child: child),
+          );
+    Widget status({int? maxLines}) => chip(
+      look.statusChip,
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.circle, size: 8, color: look.dotColor),
+          const SizedBox(width: AppSpacing.sm),
+          Flexible(
+            child: Text(
+              statusText,
+              key: Key(online ? 'online-banner' : 'offline-banner'),
+              maxLines: maxLines,
+              style: statusStyle,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
     final role = widget.role;
     final Widget body;
@@ -479,19 +490,16 @@ class _ConnectionBannerState extends State<ConnectionBanner>
         ],
       );
     } else {
-      final roleStyle = theme.textTheme.bodyMedium?.copyWith(
-        fontWeight: FontWeight.w800,
-        color: scheme.onSurface,
-      );
-      final dateStyle = theme.textTheme.bodySmall?.copyWith(
-        fontWeight: FontWeight.w700,
-        color: scheme.onSurface,
-      );
+      final roleStyle = look.roleStyle;
+      final dateStyle = look.dateStyle;
       final direction = Directionality.of(context);
+      final inherited = DefaultTextStyle.of(context).style;
       final scaler = MediaQuery.textScalerOf(context);
       double measure(String text, TextStyle? style) {
         final painter = TextPainter(
-          text: TextSpan(text: text, style: style),
+          // Same effective style as the Text widget (merged with the
+          // inherited default), so the measured width matches the paint.
+          text: TextSpan(text: text, style: inherited.merge(style)),
           textDirection: direction,
           textScaler: scaler,
           maxLines: 1,
@@ -510,10 +518,31 @@ class _ConnectionBannerState extends State<ConnectionBanner>
           // (the offline text, or very large text) wraps and is never cut.
           final roleWidth = role == null
               ? 0.0
-              : math.min(measure(role, roleStyle) + 1, width * 0.3);
+              : math.min(
+                  measure(role, roleStyle) + roleChipExtra + 1,
+                  width * 0.34,
+                );
           final statusNatural =
-              measure(statusText, statusStyle) + 10 + AppSpacing.sm + 1;
-          final statusWidth = math.min(statusNatural, width * 0.5);
+              measure(statusText, statusStyle) +
+              8 +
+              AppSpacing.sm +
+              statusChipExtra +
+              1;
+          var statusWidth = math.min(statusNatural, width * 0.5);
+          if (widget.showDate) {
+            // Keep room for at least the digits-only date: a long status
+            // (offline) wraps onto more lines instead.
+            final digits =
+                measure(
+                  tripoliDateLabel(tripoliNow(), numeric: true),
+                  look.dateStyle,
+                ) +
+                1;
+            final room = width - roleWidth - 2 * gap - digits;
+            if (statusWidth > room) {
+              statusWidth = math.max(width * 0.28, room);
+            }
+          }
           final slot = width - roleWidth - statusWidth - 2 * gap;
           String? date;
           if (widget.showDate) {
@@ -538,12 +567,30 @@ class _ConnectionBannerState extends State<ConnectionBanner>
                   alignment: AlignmentDirectional.centerStart,
                   child: role == null
                       ? null
-                      : Text(
-                          role,
-                          key: widget.roleKey,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: roleStyle,
+                      : chip(
+                          look.roleChip,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (look.roleIcon != null) ...[
+                                Icon(
+                                  look.roleIcon,
+                                  size: 14,
+                                  color: look.roleIconColor,
+                                ),
+                                const SizedBox(width: AppSpacing.xs),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  role,
+                                  key: widget.roleKey,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: roleStyle,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                 ),
               ),
@@ -573,16 +620,28 @@ class _ConnectionBannerState extends State<ConnectionBanner>
         },
       );
     }
-    return Material(
-      color: online ? colors.successBg : scheme.errorContainer,
-      child: Padding(
-        padding: EdgeInsetsDirectional.fromSTEB(
-          AppSpacing.lg,
-          AppSpacing.sm + widget.topInset,
-          AppSpacing.lg,
-          AppSpacing.sm,
+    return Padding(
+      padding: look.margin,
+      child: Material(
+        key: const Key('status-strip'),
+        color: Colors.transparent,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: look.background,
+            border: look.border,
+            borderRadius: look.radius,
+            boxShadow: look.shadow,
+          ),
+          child: Padding(
+            padding: EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.lg,
+              AppSpacing.sm + widget.topInset,
+              AppSpacing.lg,
+              AppSpacing.sm,
+            ),
+            child: body,
+          ),
         ),
-        child: body,
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/ui/bars_style.dart';
 import 'package:flutter_api_layer/api_layer.dart' show SectionKey;
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
@@ -259,11 +260,14 @@ void _expectRole(
   final onSurface = theme.colorScheme.onSurface;
   final background = onSidebar
       ? theme.extension<AppColors>()!.sidebarBg
-      // Phone: the role now sits in the status strip at the top.
-      : theme.extension<AppColors>()!.successBg;
+      // Phone: the role sits in the status strip (or its chip) at the top.
+      : stripLook(
+          tester.element(find.byKey(HomeShell.roleKey)),
+          online: true,
+        ).roleBackground;
 
   expect(shine, const Color(0xFFFFFDE0));
-  expect(role.style?.fontSize, 13);
+  expect(role.style?.fontSize, onSidebar ? 13 : greaterThanOrEqualTo(12));
   if (onSidebar) {
     expect(role.style?.color, shine);
     expect(role.style?.color, isNot(onSurface));
@@ -271,7 +275,7 @@ void _expectRole(
       background,
       dark ? const Color(0xFF101B2A) : const Color(0xFF102A26),
     );
-  } else {
+  } else if (kBarsStyle == 0) {
     expect(role.style?.color, onSurface);
     expect(role.style?.color, isNot(shine));
   }

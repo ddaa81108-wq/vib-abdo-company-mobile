@@ -394,7 +394,8 @@ void main() {
     final status = find.byKey(const Key('online-banner'));
     expect(tester.widget<Text>(status).data, 'متصل • محفوظ');
     // RTL: the role hugs the right edge, the status sits to its left.
-    expect(tester.getRect(role).right, greaterThan(340));
+    // The role sits in the right part of the strip (a chip may pad it).
+    expect(tester.getRect(role).left, greaterThan(360 * 0.6));
     expect(tester.getRect(status).right, lessThan(tester.getRect(role).left));
     expect(tester.getRect(status).center.dx, lessThan(180));
     expect(tester.takeException(), isNull);

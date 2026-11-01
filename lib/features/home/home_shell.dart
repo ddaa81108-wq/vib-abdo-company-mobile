@@ -11,6 +11,7 @@ import '../../notifications/unread_badge.dart';
 import '../../state/notification_providers.dart';
 import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
+import '../../ui/bars_style.dart';
 import '../../ui/section_labels.dart';
 import '../../ui/strings.dart';
 import '../../ui/theme.dart';
@@ -19,6 +20,7 @@ import '../../ui/widgets/common.dart';
 import '../../ui/widgets/environment_badge.dart';
 import '../../ui/widgets/logout_confirm.dart';
 import '../../ui/widgets/soft_tile.dart';
+import 'home_drawer.dart';
 
 class NavItem {
   const NavItem({
@@ -93,7 +95,22 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
     return Scaffold(
       key: HomeShell.shellKey,
-      drawer: phone
+      drawer: phone && kBarsStyle != 0
+          ? Drawer(
+              child: StyledDrawer(
+                items: items,
+                selected: selected,
+                summary: summary,
+                dark: dark,
+                onSelect: (item) {
+                  Navigator.of(context).pop();
+                  context.go(item.path);
+                },
+                onToggleTheme: () =>
+                    ref.read(themeModeProvider.notifier).toggle(),
+              ),
+            )
+          : phone
           ? Drawer(
               child: _NavList(
                 items: items,
@@ -537,34 +554,61 @@ class PhoneBottomNav extends StatelessWidget {
     final safeIndex = tabs.isEmpty
         ? 0
         : selectedIndex.clamp(0, tabs.length - 1);
-    return Material(
-      color: background,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsetsDirectional.symmetric(
-            horizontal: AppSpacing.xs,
-            vertical: AppSpacing.xs,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var i = 0; i < tabs.length; i++)
-                Expanded(
-                  child: _PhoneTab(
-                    key: Key('bottom-tab-${tabs[i].id}'),
-                    item: tabs[i],
-                    selected: i == safeIndex,
-                    indicator: indicator,
-                    selectedColor: selectedColor,
-                    idleColor: idleColor,
-                    onTap: () => onSelected(i),
-                  ),
-                ),
-            ],
-          ),
-        ),
+    final look = kBarsStyle == 0 ? null : barLook(context);
+    final row = Padding(
+      padding: EdgeInsetsDirectional.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: look?.topLine == true ? 0 : AppSpacing.xs,
       ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < tabs.length; i++)
+            Expanded(
+              child: _PhoneTab(
+                key: Key('bottom-tab-${tabs[i].id}'),
+                item: tabs[i],
+                selected: i == safeIndex,
+                indicator: indicator,
+                selectedColor: selectedColor,
+                idleColor: idleColor,
+                look: look,
+                onTap: () => onSelected(i),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (look == null) {
+      return Material(
+        color: background,
+        child: SafeArea(top: false, child: row),
+      );
+    }
+    final floating = look.radius != null;
+    final bar = DecoratedBox(
+      decoration: BoxDecoration(
+        color: look.background,
+        border: look.border,
+        borderRadius: look.radius,
+        boxShadow: look.shadow,
+      ),
+      child: floating
+          ? Padding(
+              padding: const EdgeInsetsDirectional.symmetric(vertical: 4),
+              child: row,
+            )
+          : SafeArea(top: false, child: row),
+    );
+    return Material(
+      color: floating ? Theme.of(context).scaffoldBackgroundColor : null,
+      type: floating ? MaterialType.canvas : MaterialType.transparency,
+      child: floating
+          ? SafeArea(
+              top: false,
+              child: Padding(padding: look.margin, child: bar),
+            )
+          : bar,
     );
   }
 }
@@ -577,6 +621,7 @@ class _PhoneTab extends StatelessWidget {
     required this.selectedColor,
     required this.idleColor,
     required this.onTap,
+    this.look,
     super.key,
   });
 
@@ -586,9 +631,12 @@ class _PhoneTab extends StatelessWidget {
   final Color selectedColor;
   final Color idleColor;
   final VoidCallback onTap;
+  final BarLook? look;
 
   @override
   Widget build(BuildContext context) {
+    final look = this.look;
+    if (look != null) return _styled(context, look);
     final color = selected ? selectedColor : idleColor;
     final style =
         Theme.of(context).navigationBarTheme.labelTextStyle?.resolve({}) ??
@@ -628,6 +676,88 @@ class _PhoneTab extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _styled(BuildContext context, BarLook look) {
+    final color = selected ? look.selected : look.idle;
+    final labelColor = selected ? (look.selectedLabel ?? color) : color;
+    final label = ExcludeSemantics(
+      child: Text(
+        item.shortLabel ?? item.label,
+        key: Key('bottom-tab-label-${item.id}'),
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: cairo(11, selected ? 800 : 600, color: labelColor),
+      ),
+    );
+    final icon = Icon(item.icon, color: color, size: 22);
+    final radius = BorderRadius.circular(look.iconPill ? 16 : 18);
+    final Widget content;
+    if (look.iconPill) {
+      content = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 52,
+            height: 30,
+            decoration: BoxDecoration(
+              color: selected ? look.indicator : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadii.pill),
+            ),
+            child: icon,
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          label,
+        ],
+      );
+    } else {
+      content = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (look.topLine)
+            Container(
+              width: 28,
+              height: 3,
+              margin: const EdgeInsetsDirectional.only(bottom: 6),
+              decoration: BoxDecoration(
+                color: selected ? kBrandGold : Colors.transparent,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(3),
+                ),
+              ),
+            ),
+          icon,
+          const SizedBox(height: AppSpacing.xxs),
+          label,
+        ],
+      );
+    }
+    final wholeTab = !look.iconPill && look.indicator != null;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: item.label,
+      child: Material(
+        color: wholeTab && selected ? look.indicator : Colors.transparent,
+        borderRadius: radius,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Padding(
+              padding: EdgeInsetsDirectional.symmetric(
+                horizontal: AppSpacing.xxs,
+                vertical: look.topLine ? AppSpacing.xxs : AppSpacing.xs,
+              ),
+              child: content,
             ),
           ),
         ),
