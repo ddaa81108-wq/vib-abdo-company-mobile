@@ -388,26 +388,30 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             ],
           );
     if (width <= AppBreakpoints.phone && !_showAllDebts) {
-      return ExpansionTile(
-        tilePadding: const EdgeInsetsDirectional.symmetric(
-          horizontal: AppSpacing.sm,
-        ),
-        childrenPadding: const EdgeInsetsDirectional.only(
-          bottom: AppSpacing.sm,
-        ),
-        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        title: const Text(AppStrings.oldDebtsTitle),
-        children: [
-          body,
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: TextButton(
-              key: const Key('show-all-debts'),
-              onPressed: () => _showAll(nextCursor, retainLimit: retainLimit),
-              child: const Text(AppStrings.showAll),
-            ),
+      // Its own Material, so its ink stays visible under page transitions.
+      return Material(
+        type: MaterialType.transparency,
+        child: ExpansionTile(
+          tilePadding: const EdgeInsetsDirectional.symmetric(
+            horizontal: AppSpacing.sm,
           ),
-        ],
+          childrenPadding: const EdgeInsetsDirectional.only(
+            bottom: AppSpacing.sm,
+          ),
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          title: const Text(AppStrings.oldDebtsTitle),
+          children: [
+            body,
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                key: const Key('show-all-debts'),
+                onPressed: () => _showAll(nextCursor, retainLimit: retainLimit),
+                child: const Text(AppStrings.showAll),
+              ),
+            ),
+          ],
+        ),
       );
     }
     return Column(

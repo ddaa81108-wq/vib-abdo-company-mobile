@@ -508,7 +508,7 @@ class _ConnectionBannerState extends State<ConnectionBanner>
           // Each side takes its own text width: the role up to 30% (one
           // line), the status up to half the strip. A status wider than that
           // (the offline text, or very large text) wraps and is never cut.
-          final roleWidth = role == null
+          var roleWidth = role == null
               ? 0.0
               : math.min(measure(role, roleStyle) + 1, width * 0.34);
           final statusNatural =
@@ -532,7 +532,29 @@ class _ConnectionBannerState extends State<ConnectionBanner>
               statusWidth = math.max(width * 0.28, room);
             }
           }
-          final slot = width - roleWidth - statusWidth - 2 * gap;
+          // A status that would need more than two lines at its width (the
+          // offline text with large text) goes on its own row below, so the
+          // strip stays short.
+          final stacked = statusNatural > 2 * statusWidth;
+          if (stacked && role != null) {
+            // On its own row the role may use the room the status left,
+            // keeping space for the digits-only date.
+            final digits = widget.showDate
+                ? measure(
+                        tripoliDateLabel(tripoliNow(), numeric: true),
+                        dateStyle,
+                      ) +
+                      1 +
+                      gap
+                : 0.0;
+            roleWidth = math.max(
+              roleWidth,
+              math.min(measure(role, roleStyle) + 1, width - digits),
+            );
+          }
+          final slot = stacked
+              ? width - roleWidth - gap
+              : width - roleWidth - statusWidth - 2 * gap;
           String? date;
           if (widget.showDate) {
             final today = tripoliNow();
@@ -548,36 +570,56 @@ class _ConnectionBannerState extends State<ConnectionBanner>
               orElse: () => forms.last,
             );
           }
+          final roleBox = SizedBox(
+            width: roleWidth,
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: role == null
+                  ? null
+                  : Text(
+                      role,
+                      key: widget.roleKey,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: roleStyle,
+                    ),
+            ),
+          );
+          final dateText = date == null
+              ? const SizedBox.shrink()
+              : Text(
+                  date,
+                  key: ConnectionBanner.dateKey,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: dateStyle,
+                );
+          if (stacked) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    roleBox,
+                    const SizedBox(width: gap),
+                    Expanded(child: dateText),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: status(),
+                ),
+              ],
+            );
+          }
           return Row(
             children: [
-              SizedBox(
-                width: roleWidth,
-                child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: role == null
-                      ? null
-                      : Text(
-                          role,
-                          key: widget.roleKey,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: roleStyle,
-                        ),
-                ),
-              ),
+              roleBox,
               const SizedBox(width: gap),
-              Expanded(
-                child: date == null
-                    ? const SizedBox.shrink()
-                    : Text(
-                        date,
-                        key: ConnectionBanner.dateKey,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: dateStyle,
-                      ),
-              ),
+              Expanded(child: dateText),
               const SizedBox(width: gap),
               SizedBox(
                 width: statusWidth,
@@ -827,13 +869,19 @@ class _KeptDataState<T> extends State<KeptData<T>> {
     return value.when(
       skipLoadingOnReload: true,
       data: widget.builder,
-      loading: () => widget.loading ?? const SkeletonBox(height: 88),
+      loading: () => _fill(widget.loading ?? const SkeletonBox(height: 88)),
       error: (error, _) {
         if (_forbidden(error)) return const ForbiddenPane();
-        return _pane(error);
+        return _fill(_pane(error));
       },
     );
   }
+
+  /// With [KeptData.expand] the pane gets a bounded height (the screen's),
+  /// so a skeleton or message taller than a small phone, or than large
+  /// text allows, scrolls instead of overflowing.
+  Widget _fill(Widget pane) =>
+      widget.expand ? SingleChildScrollView(child: pane) : pane;
 
   /// 403 is [ForbiddenPane] whether the screen passed [KeptData.failureOf]
   /// or only a thrown [ApiException].
@@ -862,12 +910,19 @@ class _KeptDataState<T> extends State<KeptData<T>> {
   Widget _withError(Widget body, Object error) {
     final pane = _pane(error);
     if (widget.expand) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          pane,
-          Expanded(child: body),
-        ],
+      // The message takes at most half the height (scrolling inside it),
+      // so the kept list below always keeps room.
+      return LayoutBuilder(
+        builder: (context, constraints) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: constraints.maxHeight / 2),
+              child: SingleChildScrollView(child: pane),
+            ),
+            Expanded(child: body),
+          ],
+        ),
       );
     }
     return Column(
