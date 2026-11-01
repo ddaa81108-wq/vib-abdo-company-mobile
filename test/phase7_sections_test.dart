@@ -26,13 +26,13 @@ void main() {
     await pumpFakeApp(tester, size: const Size(800, 1800));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
 
-    // 🔶 GET /api/home. The date and the customers net are server literals.
+    // Home is the icon grid only (no date or summary). The customers net
+    // is still the server literal on the customers screen below.
     expect(find.byKey(HomeDashboard.screenKey), findsOneWidget);
-    expect(find.byKey(const Key('home-business-date')), findsOneWidget);
-    expect(find.text('2026-10-19'), findsWidgets);
+    expect(find.byKey(const Key('home-business-date')), findsNothing);
     expect(
-      _inside(HomeShell.summaryKey('customers.netBalance'), '10,635 د.ل'),
-      findsOneWidget,
+      find.byKey(HomeShell.summaryKey('customers.netBalance')),
+      findsNothing,
     );
 
     await go(tester, '/customers');

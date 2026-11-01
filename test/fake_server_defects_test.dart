@@ -50,8 +50,8 @@ void main() {
       await pumpFakeApp(tester, size: const Size(800, 2400));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
 
+      // Home has no debt bulletin now; the customers list shows the age.
       expect(find.textContaining('مرّ عليه 3 أيام'), findsNothing);
-      expect(find.textContaining('منذ 4 أيام'), findsWidgets);
 
       await go(tester, '/customers');
       expect(find.text('مرّ عليه 3 أيام'), findsNothing);

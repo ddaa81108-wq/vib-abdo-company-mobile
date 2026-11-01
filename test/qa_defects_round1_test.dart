@@ -147,7 +147,9 @@ void main() {
   ) async {
     final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    expect(_debtAmount('320 د.ل'), findsOneWidget);
+    // Home has no debt bulletin now (icon grid only); the server value is
+    // checked below.
+    expect(_debtAmount('320 د.ل'), findsNothing);
 
     await go(tester, '/customers/c_55');
     await tester.ensureVisible(find.byKey(const Key('full-payment')));
@@ -161,7 +163,7 @@ void main() {
     final shown = layer.money.format(card!.balanceUnits!.units!, Currency.lyd);
     expect(card.balanceUnits?.units, 0);
     expect(_debtAmount('320 د.ل'), findsNothing);
-    expect(_debtAmount(shown), findsOneWidget);
+    expect(_debtAmount(shown), findsNothing);
   });
 
   testWidgets('DEF-016 a partial payment shows the stored home balance', (
@@ -189,7 +191,7 @@ void main() {
     );
     final shown = layer.money.format(card!.balanceUnits!.units!, Currency.lyd);
     expect(card.balanceUnits?.units, isNot(320));
-    expect(_debtAmount(shown), findsOneWidget);
+    expect(_debtAmount(shown), findsNothing);
     expect(_debtAmount('320 د.ل'), findsNothing);
   });
 
@@ -213,7 +215,7 @@ void main() {
     );
     final shown = layer.money.format(card!.balanceUnits!.units!, Currency.lyd);
     expect(card.balanceUnits?.units, isNot(320));
-    expect(_debtAmount(shown), findsOneWidget);
+    expect(_debtAmount(shown), findsNothing);
     expect(_debtAmount('320 د.ل'), findsNothing);
   });
 }

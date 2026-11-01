@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/notifications/unread_badge.dart';
@@ -41,11 +42,12 @@ void main() {
       expect(homeWritable(tester), contains(SectionKey.collections));
       final badge = tester.widget<Text>(find.byKey(UnreadBadge.badgeKey));
       expect(badge.data, '1');
-      expect(find.text('2026-10-19'), findsOneWidget);
-      expect(find.textContaining('320 د.ل'), findsNothing);
-      expect(find.text('0 د.ل'), findsOneWidget);
-      expect(find.textContaining('10,635 د.ل'), findsNothing);
+      // Home is the icon grid only: no date and no amounts.
+      expect(find.text('2026-10-19'), findsNothing);
+      expect(find.textContaining('د.ل'), findsNothing);
       expect(find.textContaining('ج.م'), findsNothing);
+      // An employee cannot open settings, so there is no settings tile.
+      expect(find.byKey(HomeDashboard.settingsTileKey), findsNothing);
 
       await tester.tap(find.byKey(HomeShell.logoutKey));
       await tester.pumpAndSettle(
@@ -77,20 +79,16 @@ void main() {
         findsOneWidget,
       );
       expect(homeWritable(tester), contains(SectionKey.treasury));
-      expect(homeWritable(tester), contains(SectionKey.treasury));
       expect(find.byKey(HomeShell.writeKey(SectionKey.treasury)), findsNothing);
+      expect(homeActions(tester), contains(ManagementAction.collectionsDecide));
       expect(
-        find.byKey(HomeShell.actionKey(ManagementAction.collectionsDecide)),
-        findsOneWidget,
+        homeActions(tester),
+        contains(ManagementAction.collectionsCashReceived),
       );
-      expect(
-        find.byKey(
-          HomeShell.actionKey(ManagementAction.collectionsCashReceived),
-        ),
-        findsOneWidget,
-      );
-      expect(find.textContaining('23,750 ج.م'), findsOneWidget);
-      expect(find.textContaining('8,000 د.ل'), findsOneWidget);
+      // The admin's home shows no amounts now; it ends with settings.
+      expect(find.textContaining('ج.م'), findsNothing);
+      expect(find.textContaining('د.ل'), findsNothing);
+      expect(find.byKey(HomeDashboard.settingsTileKey), findsOneWidget);
       expect(
         find.byKey(HomeShell.sectionKey(SectionKey.reports)),
         findsOneWidget,

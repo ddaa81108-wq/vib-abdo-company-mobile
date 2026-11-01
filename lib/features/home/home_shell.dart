@@ -230,8 +230,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           icon: sectionIcon(section),
           path: sectionPath(section),
         ),
-      if (permissions.canViewFinancialLedger ||
-          permissions.canDo(ManagementAction.settingsManage))
+      if (showsSettingsEntry(permissions))
         const NavItem(
           id: 'settings',
           label: AppStrings.settings,

@@ -109,29 +109,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a failed home request shows per-section fields', (tester) async {
-    final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    expect(find.text('صافي ديون العملاء'), findsOneWidget);
-
-    (layer.client as FakeApiClient).failHomeRemaining = 1;
-    final refresh = tester
-        .widget<RefreshIndicator>(find.byType(RefreshIndicator))
-        .onRefresh();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-    await refresh;
-    await settle(tester);
-
-    expect(find.text('صافي ديون العملاء'), findsNothing);
-    expect(
-      find.textContaining('ديون العملاء · ${AppStrings.netDebt}'),
-      findsOneWidget,
-    );
-    expect(find.textContaining(AppStrings.totalDebt), findsWidgets);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('a failed refresh keeps the last report', (tester) async {
     var fail = false;
     await pumpFakeApp(

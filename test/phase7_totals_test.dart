@@ -139,22 +139,12 @@ void main() {
       await tester.tap(find.byKey(const Key('full-payment')));
       await settle(tester);
 
+      // Home no longer shows the debt row (icon grid only). The customers
+      // list shows the stored balance instead.
       await go(tester, '/');
-      expect(find.byKey(const Key('old-debt-c_55')), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('old-debt-c_55')),
-          matching: find.textContaining('0 د.ل'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('old-debt-c_55')),
-          matching: find.textContaining('320 د.ل'),
-        ),
-        findsNothing,
-      );
+      expect(find.byKey(const Key('old-debt-c_55')), findsNothing);
+      await go(tester, '/customers');
+      expect(find.textContaining('320 د.ل'), findsNothing);
     },
   );
 }

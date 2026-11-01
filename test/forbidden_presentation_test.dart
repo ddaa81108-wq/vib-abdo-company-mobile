@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/error_handling/app_failure.dart';
 import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart';
@@ -62,14 +63,11 @@ void main() {
   ) async {
     await pumpFakeApp(tester, size: const Size(800, 1600));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    expect(
-      find.byKey(HomeShell.actionKey(ManagementAction.collectionsDecide)),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(HomeShell.actionKey(ManagementAction.settingsManage)),
-      findsOneWidget,
-    );
+    // Home is the icon grid only; the admin gets the settings tile and keeps
+    // both management permissions.
+    expect(find.byKey(HomeDashboard.settingsTileKey), findsOneWidget);
+    expect(homeActions(tester), contains(ManagementAction.collectionsDecide));
+    expect(homeActions(tester), contains(ManagementAction.settingsManage));
 
     await go(tester, '/collections');
     expect(find.byKey(const Key('collections-metrics')), findsOneWidget);

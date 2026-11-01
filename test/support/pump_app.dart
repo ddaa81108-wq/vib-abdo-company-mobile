@@ -134,3 +134,10 @@ Future<T> _widget<T extends Widget>(WidgetTester tester, Key key) async {
 List<SectionKey> homeWritable(WidgetTester tester) => ProviderScope.containerOf(
   tester.element(find.byKey(const Key('home-shell'))),
 ).read(homeSummaryProvider)!.writableSections;
+
+/// Management actions the home summary allows (permission service). Home no
+/// longer draws them as buttons, so tests read them from here.
+List<ManagementAction> homeActions(WidgetTester tester) =>
+    ProviderScope.containerOf(
+      tester.element(find.byKey(const Key('home-shell'))),
+    ).read(homeSummaryProvider)!.actions;

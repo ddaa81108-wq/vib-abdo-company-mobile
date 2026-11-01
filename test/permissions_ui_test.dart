@@ -38,8 +38,8 @@ void main() {
     expect(find.text(AppStrings.writeAction), findsNothing);
     expect(find.byKey(HomeShell.sectionKey(SectionKey.treasury)), findsNothing);
     expect(
-      find.byKey(HomeShell.actionKey(ManagementAction.settingsManage)),
-      findsNothing,
+      homeActions(tester),
+      isNot(contains(ManagementAction.settingsManage)),
     );
   });
 
@@ -104,19 +104,14 @@ void main() {
         find.byKey(HomeShell.sectionKey(SectionKey.treasury)),
         findsNothing,
       );
+      expect(homeActions(tester), contains(ManagementAction.collectionsDecide));
       expect(
-        find.byKey(HomeShell.actionKey(ManagementAction.collectionsDecide)),
-        findsOneWidget,
+        homeActions(tester),
+        isNot(contains(ManagementAction.collectionsCashReceived)),
       );
       expect(
-        find.byKey(
-          HomeShell.actionKey(ManagementAction.collectionsCashReceived),
-        ),
-        findsNothing,
-      );
-      expect(
-        find.byKey(HomeShell.actionKey(ManagementAction.settingsManage)),
-        findsNothing,
+        homeActions(tester),
+        isNot(contains(ManagementAction.settingsManage)),
       );
     },
   );

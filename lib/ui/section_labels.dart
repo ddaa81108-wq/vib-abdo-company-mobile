@@ -77,6 +77,12 @@ String actionLabel(ManagementAction action) => switch (action) {
   ManagementAction.settingsManage => 'الإعدادات',
 };
 
+/// Whether the «الإعدادات» entry is shown (navigation, «المزيد», home tile).
+/// Same rule as the `/settings` gate in `auth_gate.dart`.
+bool showsSettingsEntry(PermissionService permissions) =>
+    permissions.canViewFinancialLedger ||
+    permissions.canDo(ManagementAction.settingsManage);
+
 String actionPath(ManagementAction action) => switch (action) {
   ManagementAction.collectionsAssign => sectionPath(SectionKey.customers),
   ManagementAction.collectionsDecide ||

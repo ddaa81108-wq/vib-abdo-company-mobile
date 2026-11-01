@@ -15,9 +15,11 @@ void main() {
       await pumpFakeApp(tester, size: const Size(800, 2400));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
 
-      final homeCash = HomeShell.summaryKey('treasury.activeCash');
-      await tester.ensureVisible(find.byKey(homeCash));
-      expect(_inside(homeCash, '8,000 د.ل'), findsOneWidget);
+      // Home no longer shows the treasury summary card (icon grid only).
+      expect(
+        find.byKey(HomeShell.summaryKey('treasury.activeCash')),
+        findsNothing,
+      );
 
       await go(tester, '/treasury');
       expect(find.byKey(const Key('cash-entry-ce_1')), findsOneWidget);
@@ -106,9 +108,10 @@ void main() {
       );
 
       await go(tester, '/');
-      await tester.ensureVisible(find.byKey(homeCash));
-      expect(_inside(homeCash, '9,050 د.ل'), findsOneWidget);
-      expect(_inside(homeCash, '8,000 د.ل'), findsNothing);
+      expect(
+        find.byKey(HomeShell.summaryKey('treasury.activeCash')),
+        findsNothing,
+      );
       expect(find.byKey(TreasuryScreen.screenKey), findsNothing);
     },
   );

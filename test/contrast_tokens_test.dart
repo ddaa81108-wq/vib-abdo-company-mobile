@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_api_layer/api_layer.dart' show SectionKey;
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
@@ -350,16 +351,26 @@ Future<void> _expectRenderedInk(
   final theme = Theme.of(tester.element(find.byKey(HomeShell.shellKey)));
   final scheme = theme.colorScheme;
   final status = theme.extension<AppStatusColors>()!;
-  final action = find.byKey(const Key('show-all-customers'));
-  expect(action, findsOneWidget);
-  final foreground = _buttonForeground(tester, action);
-  expect(foreground, scheme.primary);
-  _expectContrast(foreground, theme.scaffoldBackgroundColor, 4.5);
-  if (dark) {
-    expect(foreground, const Color(0xFF36B496));
-  } else {
-    expect(foreground, const Color(0xFF175F50));
+  // Home icon grid: white label and gold icon on the deep blue tile, in both
+  // themes (the tile colours do not change with the theme).
+  final tileLabel = tester.widget<Text>(
+    find.byKey(const Key('home-tile-label-customers')),
+  );
+  final tileIcon = tester.widget<Icon>(
+    find.descendant(
+      of: find.byKey(HomeShell.sectionKey(SectionKey.customers)),
+      matching: find.byType(Icon),
+    ),
+  );
+  for (final tileColor in const [Color(0xFF1E3F9A), Color(0xFF0B2468)]) {
+    _expectContrast(tileLabel.style!.color!, tileColor, 4.5);
+    _expectContrast(tileIcon.color!, tileColor, 3);
   }
+  // «عرض الكل» left home; the primary ink is still checked on /purchases.
+  expect(
+    scheme.primary,
+    dark ? const Color(0xFF36B496) : const Color(0xFF175F50),
+  );
 
   await _go(tester, '/treasury');
   final card = tester.widget<Card>(find.byKey(const Key('active-cash-card')));
