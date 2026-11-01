@@ -130,13 +130,12 @@ class HomeDashboard extends ConsumerWidget {
                 if (tiles.isNotEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) => HomeFillGrid(
-                        tiles: tiles,
-                        columns: homeTileColumns(
-                          constraints.maxWidth,
-                          textScale,
-                        ),
+                    // No LayoutBuilder here: SliverFillRemaining measures intrinsics.
+                    child: HomeFillGrid(
+                      tiles: tiles,
+                      columns: homeTileColumns(
+                        width - pad.horizontal,
+                        textScale,
                       ),
                     ),
                   ),
