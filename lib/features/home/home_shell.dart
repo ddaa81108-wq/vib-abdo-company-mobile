@@ -25,10 +25,14 @@ class NavItem {
     required this.label,
     required this.icon,
     required this.path,
+    this.shortLabel,
   });
 
   final String id;
   final String label;
+
+  /// Bottom bar text when it differs from [label]. Semantics keep [label].
+  final String? shortLabel;
   final IconData icon;
   final String path;
 }
@@ -607,12 +611,16 @@ class _PhoneTab extends StatelessWidget {
                 children: [
                   Icon(item.icon, color: color, size: 22),
                   const SizedBox(height: AppSpacing.xxs),
-                  Text(
-                    item.label,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: style.copyWith(color: color),
+                  // The full name stays the semantics label above.
+                  ExcludeSemantics(
+                    child: Text(
+                      item.shortLabel ?? item.label,
+                      key: Key('bottom-tab-label-${item.id}'),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: style.copyWith(color: color),
+                    ),
                   ),
                 ],
               ),
@@ -647,7 +655,16 @@ class _BottomBar extends StatelessWidget {
       (item) =>
           item.id != 'home' && item.id != 'settings' && item.id != 'account',
     );
-    final head = sections.take(3).toList();
+    final head = [
+      for (final item in sections.take(3))
+        NavItem(
+          id: item.id,
+          label: item.label,
+          icon: item.icon,
+          path: item.path,
+          shortLabel: sectionBottomTabLabel(item.id),
+        ),
+    ];
     final rest = sections.skip(3).toList();
     final tail = items
         .where((item) => item.id == 'settings' || item.id == 'account')

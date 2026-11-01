@@ -415,6 +415,92 @@ void main() {
     );
   });
 
+  testWidgets('home tiles fill a tall phone and scroll on a small one', (
+    tester,
+  ) async {
+    // 430x932: five rows grow to the bottom bar, no empty band below.
+    await pumpFakeApp(tester, size: const Size(430, 932));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    final barTop = tester.getRect(find.byType(PhoneBottomNav)).top;
+    final settings = tester.getRect(find.byKey(HomeDashboard.settingsTileKey));
+    expect(barTop - settings.bottom, lessThan(40));
+    expect(settings.height, greaterThan(120));
+    expect(settings.height, lessThanOrEqualTo(190));
+    expect(tester.takeException(), isNull);
+
+    // 320x568: tiles keep their minimum height and the grid scrolls.
+    await pumpFakeApp(tester, size: const Size(320, 568));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    final first = tester.getRect(
+      find.byKey(HomeShell.sectionKey(SectionKey.customers)),
+    );
+    expect(first.height, greaterThanOrEqualTo(112));
+    final small = tester.getRect(find.byKey(HomeDashboard.settingsTileKey));
+    expect(small.top, greaterThan(568));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('bottom bar: short debt names, full names everywhere else', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await pumpFakeApp(tester, size: const Size(430, 932));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    final bar = find.byType(PhoneBottomNav);
+    Finder inBar(String text) =>
+        find.descendant(of: bar, matching: find.text(text));
+    expect(inBar(AppStrings.bottomTabCustomers), findsOneWidget);
+    expect(inBar(AppStrings.bottomTabCompanies), findsOneWidget);
+    expect(inBar(sectionLabel(SectionKey.customers)), findsNothing);
+    expect(inBar(sectionLabel(SectionKey.companies)), findsNothing);
+    // Screen readers still hear the full names.
+    expect(
+      find.descendant(
+        of: bar,
+        matching: find.bySemanticsLabel(sectionLabel(SectionKey.customers)),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: bar,
+        matching: find.bySemanticsLabel(sectionLabel(SectionKey.companies)),
+      ),
+      findsOneWidget,
+    );
+    // Home tiles keep the full names; the short ones appear only in the bar.
+    expect(find.text(sectionLabel(SectionKey.customers)), findsOneWidget);
+    expect(find.text(AppStrings.bottomTabCustomers), findsOneWidget);
+
+    // App bar title and drawer keep the full name.
+    await go(tester, '/customers');
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text(sectionLabel(SectionKey.customers)),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(HomeShell.menuKey));
+    await settle(tester);
+    final drawer = find.byType(Drawer);
+    expect(
+      find.descendant(
+        of: drawer,
+        matching: find.text(sectionLabel(SectionKey.companies)),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: drawer,
+        matching: find.text(AppStrings.bottomTabCompanies),
+      ),
+      findsNothing,
+    );
+    semantics.dispose();
+  });
+
   testWidgets('home is the icon grid only, ending with the settings tile', (
     tester,
   ) async {
@@ -433,8 +519,17 @@ void main() {
     }
     expect(find.byKey(HomeDashboard.settingsTileKey), findsOneWidget);
     // The settings tile is last, after the nine sections.
-    final tiles = tester.widget<Wrap>(grid).children;
-    expect(tiles, hasLength(SectionKey.values.length + 1));
+    final tiles = find.descendant(of: grid, matching: find.byType(HomeTile));
+    expect(tiles, findsNWidgets(SectionKey.values.length + 1));
+    final settingsTop = tester
+        .getRect(find.byKey(HomeDashboard.settingsTileKey))
+        .top;
+    for (final element in tiles.evaluate()) {
+      expect(
+        tester.getRect(find.byWidget(element.widget)).top,
+        lessThanOrEqualTo(settingsTop),
+      );
+    }
     // Removed from home (Ali, 2026-11-01): summary, bulletin, actions, date.
     expect(find.text(AppStrings.homeCardsTitle), findsNothing);
     expect(find.text(AppStrings.oldDebtsTitle), findsNothing);

@@ -51,6 +51,11 @@ abstract final class AppStrings {
   static const online = 'متصل • محفوظ';
   static const offline = 'غير متصل — تُعرض آخر بيانات محمّلة للقراءة';
   static const more = 'المزيد';
+
+  /// Bottom bar only (Ali, 2026-11-01). Everywhere else, and the bottom bar
+  /// semantics label, use the full [sectionLabel].
+  static const bottomTabCustomers = 'د العملاء';
+  static const bottomTabCompanies = 'د الشركات';
   static const menu = 'القائمة';
   static const searchHint = 'بحث موحد في كل الحسابات…';
   static const search = 'بحث';
