@@ -106,44 +106,47 @@ class HomeDashboard extends ConsumerWidget {
         ),
     ];
 
-    return RefreshIndicator(
+    final pad = pagePadding(width);
+    final scroll = RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(homeDashboardProvider);
         ref.invalidate(unreadCountProvider);
         ref.invalidate(unreadNotificationsCountProvider);
       },
-      child: ListView(
+      child: CustomScrollView(
         key: screenKey,
-        padding: pagePadding(width),
-        children: [
-          const SizedBox(height: AppSpacing.sm),
-          if (summary.sections.isEmpty)
-            const EmptyPane(message: AppStrings.noSections),
-          if (tiles.isNotEmpty)
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final columns = homeTileColumns(
-                  constraints.maxWidth,
-                  textScale,
-                );
-                final tileWidth =
-                    (constraints.maxWidth - AppSpacing.md * (columns - 1)) /
-                    columns;
-                return Wrap(
-                  key: const Key('home-tile-grid'),
-                  spacing: AppSpacing.md,
-                  runSpacing: AppSpacing.md,
-                  children: [
-                    for (final tile in tiles)
-                      SizedBox(width: tileWidth, child: tile),
-                  ],
-                );
-              },
+        slivers: [
+          SliverPadding(
+            padding: pad,
+            sliver: SliverMainAxisGroup(
+              slivers: [
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppSpacing.sm),
+                ),
+                if (summary.sections.isEmpty)
+                  const SliverToBoxAdapter(
+                    child: EmptyPane(message: AppStrings.noSections),
+                  ),
+                if (tiles.isNotEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => HomeFillGrid(
+                        tiles: tiles,
+                        columns: homeTileColumns(
+                          constraints.maxWidth,
+                          textScale,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-          const SizedBox(height: AppSpacing.xl),
+          ),
         ],
       ),
     );
+    return scroll;
   }
 }
 
@@ -232,6 +235,292 @@ class HomeTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+const _tileTop = Color(0xFF1E3F9A);
+const _tileBottom = Color(0xFF0B2468);
+const _tileEdge = Color(0xFFF2B705);
+const _tileGold = Color(0xFFFFC928);
+
+/// Blue/gold card frame shared by the home extras (same look as [HomeTile]).
+class _BlueCard extends StatelessWidget {
+  const _BlueCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(AppRadii.xxl);
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        color: _tileEdge,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 6,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsetsDirectional.only(bottom: 4),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_tileTop, _tileBottom],
+          ),
+        ),
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+const _weekdays = [
+  'الاثنين',
+  'الثلاثاء',
+  'الأربعاء',
+  'الخميس',
+  'الجمعة',
+  'السبت',
+  'الأحد',
+];
+const _months = [
+  'يناير',
+  'فبراير',
+  'مارس',
+  'أبريل',
+  'مايو',
+  'يونيو',
+  'يوليو',
+  'أغسطس',
+  'سبتمبر',
+  'أكتوبر',
+  'نوفمبر',
+  'ديسمبر',
+];
+
+/// Today in Africa/Tripoli (UTC+2 all year, no DST), Arabic names with
+/// Latin digits like the rest of the app, e.g. «الأحد 1 نوفمبر 2026».
+String tripoliTodayLabel([DateTime? now]) {
+  final t = (now ?? DateTime.now()).toUtc().add(const Duration(hours: 2));
+  return '${_weekdays[t.weekday - 1]} ${t.day} ${_months[t.month - 1]} ${t.year}';
+}
+
+/// Option 1: «مرحبًا، name» and today's date. Device clock only.
+class HomeWelcomeCard extends StatelessWidget {
+  const HomeWelcomeCard({required this.name, super.key});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return _BlueCard(
+      child: Row(
+        children: [
+          const Icon(Icons.waving_hand, color: _tileGold, size: 32),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'مرحبًا، $name',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: cairo(18, 800, color: Colors.white),
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  tripoliTodayLabel(),
+                  style: cairo(13, 600, color: _tileGold),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Option 2: text wordmark (no logo files exist), gold icon in a blue badge.
+class HomeBrandBanner extends StatelessWidget {
+  const HomeBrandBanner({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsetsDirectional.symmetric(vertical: AppSpacing.sm),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [_tileTop, _tileBottom],
+              ),
+              border: Border.fromBorderSide(
+                BorderSide(color: _tileEdge, width: 2),
+              ),
+            ),
+            child: const Icon(Icons.receipt_long, color: _tileGold, size: 30),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  AppStrings.appTitle,
+                  style: cairo(
+                    26,
+                    900,
+                    color: dark ? Colors.white : _tileBottom,
+                  ),
+                ),
+                Container(height: 3, width: 64, color: _tileEdge),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Option 3: looks like a field, opens the existing /search screen (the
+/// same route as the app bar search icon). No search logic of its own.
+class HomeSearchField extends StatelessWidget {
+  const HomeSearchField({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final radius = BorderRadius.circular(AppRadii.pill);
+    return Semantics(
+      button: true,
+      label: 'ابحث عن عميل',
+      excludeSemantics: true,
+      child: Material(
+        color: scheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: const BorderSide(color: _tileEdge, width: 1.5),
+        ),
+        child: InkWell(
+          key: const Key('home-search-field'),
+          customBorder: RoundedRectangleBorder(borderRadius: radius),
+          onTap: () => context.go('/search'),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.search, color: _tileTop),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    'ابحث عن عميل',
+                    style: cairo(15, 600, color: scheme.onSurfaceVariant),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Option 4: rows share the free height evenly; each tile keeps its own
+/// minimum (so small screens scroll) and is capped at 190.
+class HomeFillGrid extends StatelessWidget {
+  const HomeFillGrid({required this.tiles, required this.columns, super.key});
+
+  final List<Widget> tiles;
+  final int columns;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < tiles.length; i += columns) {
+      if (rows.isNotEmpty) rows.add(const SizedBox(height: AppSpacing.md));
+      rows.add(
+        Flexible(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 190),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var c = 0; c < columns; c++) ...[
+                  if (c > 0) const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: i + c < tiles.length
+                        ? tiles[i + c]
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
+      child: Column(
+        key: const Key('home-tile-grid'),
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: rows,
+      ),
+    );
+  }
+}
+
+/// Option 5: the build name Flutter injects from pubspec (FLUTTER_BUILD_NAME).
+/// No new dependency. Hidden when the define is missing.
+class HomeVersionFooter extends StatelessWidget {
+  const HomeVersionFooter({super.key});
+
+  static const _version = String.fromEnvironment('FLUTTER_BUILD_NAME');
+
+  @override
+  Widget build(BuildContext context) {
+    if (_version.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsetsDirectional.symmetric(vertical: AppSpacing.sm),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.verified, size: 14, color: _tileEdge),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            '${AppStrings.appTitle} • الإصدار $_version',
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
       ),
     );
   }
