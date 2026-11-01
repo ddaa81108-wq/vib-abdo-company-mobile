@@ -90,12 +90,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final items = _items(summary, permissions);
     final selected = _selectedIndex(items, widget.location);
     final showIdentityHere = phone;
-    final sidebar = context.sidebarPalette;
     final colors = context.appColors;
 
     return Scaffold(
       key: HomeShell.shellKey,
-      drawer: phone && kBarsStyle != 0
+      drawer: phone
           ? Drawer(
               child: StyledDrawer(
                 items: items,
@@ -108,20 +107,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 },
                 onToggleTheme: () =>
                     ref.read(themeModeProvider.notifier).toggle(),
-              ),
-            )
-          : phone
-          ? Drawer(
-              child: _NavList(
-                items: items,
-                selected: selected,
-                summary: summary,
-                showIdentity: false,
-                dark: dark,
-                onSelect: (item) {
-                  Navigator.of(context).pop();
-                  context.go(item.path);
-                },
               ),
             )
           : null,
@@ -232,8 +217,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ? _BottomBar(
               items: items,
               location: widget.location,
-              indicator: sidebar.glowSoft,
-              selectedColor: sidebar.bright,
+              indicator: BarLook.indicator,
+              selectedColor: BarLook.selected,
               idleColor: colors.sidebarMuted,
               background: colors.sidebarBg,
             )
@@ -554,11 +539,11 @@ class PhoneBottomNav extends StatelessWidget {
     final safeIndex = tabs.isEmpty
         ? 0
         : selectedIndex.clamp(0, tabs.length - 1);
-    final look = kBarsStyle == 0 ? null : barLook(context);
+    // Floating rounded bar over the page background.
     final row = Padding(
-      padding: EdgeInsetsDirectional.symmetric(
+      padding: const EdgeInsetsDirectional.symmetric(
         horizontal: AppSpacing.xs,
-        vertical: look?.topLine == true ? 0 : AppSpacing.xs,
+        vertical: AppSpacing.xs,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -572,43 +557,31 @@ class PhoneBottomNav extends StatelessWidget {
                 indicator: indicator,
                 selectedColor: selectedColor,
                 idleColor: idleColor,
-                look: look,
                 onTap: () => onSelected(i),
               ),
             ),
         ],
       ),
     );
-    if (look == null) {
-      return Material(
-        color: background,
-        child: SafeArea(top: false, child: row),
-      );
-    }
-    final floating = look.radius != null;
-    final bar = DecoratedBox(
-      decoration: BoxDecoration(
-        color: look.background,
-        border: look.border,
-        borderRadius: look.radius,
-        boxShadow: look.shadow,
-      ),
-      child: floating
-          ? Padding(
+    return Material(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: BarLook.margin,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BarLook.radius,
+              boxShadow: BarLook.shadow,
+            ),
+            child: Padding(
               padding: const EdgeInsetsDirectional.symmetric(vertical: 4),
               child: row,
-            )
-          : SafeArea(top: false, child: row),
-    );
-    return Material(
-      color: floating ? Theme.of(context).scaffoldBackgroundColor : null,
-      type: floating ? MaterialType.canvas : MaterialType.transparency,
-      child: floating
-          ? SafeArea(
-              top: false,
-              child: Padding(padding: look.margin, child: bar),
-            )
-          : bar,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -621,7 +594,6 @@ class _PhoneTab extends StatelessWidget {
     required this.selectedColor,
     required this.idleColor,
     required this.onTap,
-    this.look,
     super.key,
   });
 
@@ -631,26 +603,21 @@ class _PhoneTab extends StatelessWidget {
   final Color selectedColor;
   final Color idleColor;
   final VoidCallback onTap;
-  final BarLook? look;
 
   @override
   Widget build(BuildContext context) {
-    final look = this.look;
-    if (look != null) return _styled(context, look);
     final color = selected ? selectedColor : idleColor;
-    final style =
-        Theme.of(context).navigationBarTheme.labelTextStyle?.resolve({}) ??
-        cairo(11, 700, color: color);
+    final radius = BorderRadius.circular(18);
     return Semantics(
       button: true,
       selected: selected,
       label: item.label,
       child: Material(
         color: selected ? indicator : Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
+        borderRadius: radius,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadii.lg),
+          borderRadius: radius,
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 48),
             child: Padding(
@@ -671,93 +638,11 @@ class _PhoneTab extends StatelessWidget {
                       textAlign: TextAlign.center,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: style.copyWith(color: color),
+                      style: cairo(11, selected ? 800 : 600, color: color),
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _styled(BuildContext context, BarLook look) {
-    final color = selected ? look.selected : look.idle;
-    final labelColor = selected ? (look.selectedLabel ?? color) : color;
-    final label = ExcludeSemantics(
-      child: Text(
-        item.shortLabel ?? item.label,
-        key: Key('bottom-tab-label-${item.id}'),
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: cairo(11, selected ? 800 : 600, color: labelColor),
-      ),
-    );
-    final icon = Icon(item.icon, color: color, size: 22);
-    final radius = BorderRadius.circular(look.iconPill ? 16 : 18);
-    final Widget content;
-    if (look.iconPill) {
-      content = Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 52,
-            height: 30,
-            decoration: BoxDecoration(
-              color: selected ? look.indicator : Colors.transparent,
-              borderRadius: BorderRadius.circular(AppRadii.pill),
-            ),
-            child: icon,
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          label,
-        ],
-      );
-    } else {
-      content = Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (look.topLine)
-            Container(
-              width: 28,
-              height: 3,
-              margin: const EdgeInsetsDirectional.only(bottom: 6),
-              decoration: BoxDecoration(
-                color: selected ? kBrandGold : Colors.transparent,
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(3),
-                ),
-              ),
-            ),
-          icon,
-          const SizedBox(height: AppSpacing.xxs),
-          label,
-        ],
-      );
-    }
-    final wholeTab = !look.iconPill && look.indicator != null;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: item.label,
-      child: Material(
-        color: wholeTab && selected ? look.indicator : Colors.transparent,
-        borderRadius: radius,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: radius,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 48),
-            child: Padding(
-              padding: EdgeInsetsDirectional.symmetric(
-                horizontal: AppSpacing.xxs,
-                vertical: look.topLine ? AppSpacing.xxs : AppSpacing.xs,
-              ),
-              child: content,
             ),
           ),
         ),

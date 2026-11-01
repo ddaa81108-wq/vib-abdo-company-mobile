@@ -260,14 +260,14 @@ void _expectRole(
   final onSurface = theme.colorScheme.onSurface;
   final background = onSidebar
       ? theme.extension<AppColors>()!.sidebarBg
-      // Phone: the role sits in the status strip (or its chip) at the top.
+      // Phone: the role sits in the status strip at the top.
       : stripLook(
           tester.element(find.byKey(HomeShell.roleKey)),
           online: true,
-        ).roleBackground;
+        ).background;
 
   expect(shine, const Color(0xFFFFFDE0));
-  expect(role.style?.fontSize, onSidebar ? 13 : greaterThanOrEqualTo(12));
+  expect(role.style?.fontSize, 13);
   if (onSidebar) {
     expect(role.style?.color, shine);
     expect(role.style?.color, isNot(onSurface));
@@ -275,8 +275,7 @@ void _expectRole(
       background,
       dark ? const Color(0xFF101B2A) : const Color(0xFF102A26),
     );
-  } else if (kBarsStyle == 0) {
-    expect(role.style?.color, onSurface);
+  } else {
     expect(role.style?.color, isNot(shine));
   }
   _expectTextContrast(role, background);
