@@ -107,6 +107,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 },
                 onToggleTheme: () =>
                     ref.read(themeModeProvider.notifier).toggle(),
+                onLogout: () => requestLogout(context, ref),
               ),
             )
           : null,

@@ -19,8 +19,11 @@ class StyledDrawer extends StatelessWidget {
     required this.dark,
     required this.onSelect,
     required this.onToggleTheme,
+    required this.onLogout,
     super.key,
   });
+
+  static const logoutKey = Key('drawer-logout');
 
   final List<NavItem> items;
   final int selected;
@@ -28,6 +31,9 @@ class StyledDrawer extends StatelessWidget {
   final bool dark;
   final ValueChanged<NavItem> onSelect;
   final VoidCallback onToggleTheme;
+
+  /// The app's existing logout request (it asks to confirm first).
+  final VoidCallback onLogout;
 
   bool _isAccount(NavItem item) =>
       item.id == 'settings' || item.id == 'account';
@@ -48,6 +54,8 @@ class StyledDrawer extends StatelessWidget {
         _groupTitle(AppStrings.signedInAs, palette),
         _group(context, palette, account),
       ],
+      const SizedBox(height: 16),
+      _card(palette, [_logoutRow(palette)]),
     ];
     return Material(
       color: palette.background,
@@ -170,32 +178,77 @@ class StyledDrawer extends StatelessWidget {
     child: Text(text, style: cairo(12, 700, color: p.muted)),
   );
 
+  Widget _group(BuildContext context, _Palette p, List<int> indexes) =>
+      _card(p, [for (final i in indexes) _row(context, p, i)]);
+
   // Inset grouped card with hairlines.
-  Widget _group(BuildContext context, _Palette p, List<int> indexes) {
-    final rows = [for (final i in indexes) _row(context, p, i)];
-    return Padding(
-      padding: const EdgeInsetsDirectional.symmetric(horizontal: 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: p.card,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          children: [
-            for (var r = 0; r < rows.length; r++) ...[
-              if (r > 0)
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 56),
-                  child: Divider(height: 0.5, thickness: 0.5, color: p.line),
-                ),
-              rows[r],
-            ],
+  Widget _card(_Palette p, List<Widget> rows) => Padding(
+    padding: const EdgeInsetsDirectional.symmetric(horizontal: 16),
+    child: Container(
+      decoration: BoxDecoration(
+        color: p.card,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var r = 0; r < rows.length; r++) ...[
+            if (r > 0)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: 56),
+                child: Divider(height: 0.5, thickness: 0.5, color: p.line),
+              ),
+            rows[r],
           ],
+        ],
+      ),
+    ),
+  );
+
+  /// Same size as the other rows: icon square and label, in red.
+  Widget _logoutRow(_Palette p) => Semantics(
+    button: true,
+    label: AppStrings.logout,
+    child: InkWell(
+      key: logoutKey,
+      onTap: onLogout,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        // The label is on the Semantics above; the tap stays on the InkWell.
+        child: ExcludeSemantics(
+          child: Padding(
+            padding: const EdgeInsetsDirectional.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(7),
+                    color: p.danger,
+                  ),
+                  child: const Icon(
+                    Icons.logout,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    AppStrings.logout,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: cairo(14.5, 700, color: p.dangerInk),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-    );
-  }
+    ),
+  );
 
   Widget _row(BuildContext context, _Palette p, int index) {
     final item = items[index];
@@ -285,6 +338,8 @@ class _Palette {
     required this.muted,
     required this.selectedInk,
     required this.line,
+    required this.danger,
+    required this.dangerInk,
   });
 
   final Color background;
@@ -294,6 +349,10 @@ class _Palette {
   final Color selectedInk;
   final Color line;
 
+  /// Logout icon square and label.
+  final Color danger;
+  final Color dangerInk;
+
   static _Palette of(BuildContext context, bool dark) => dark
       ? const _Palette(
           background: Color(0xFF000000),
@@ -302,6 +361,8 @@ class _Palette {
           muted: Color(0xFF8E8E93),
           selectedInk: kBrandGoldIcon,
           line: Color(0x33FFFFFF),
+          danger: Color(0xFFD93A3A),
+          dangerInk: Color(0xFFFF7A7A),
         )
       : const _Palette(
           background: Color(0xFFF2F2F7),
@@ -310,5 +371,7 @@ class _Palette {
           muted: Color(0xFF8A8A8F),
           selectedInk: kBrandBlue,
           line: Color(0x22000000),
+          danger: Color(0xFFD93A3A),
+          dangerInk: Color(0xFFC62828),
         );
 }
