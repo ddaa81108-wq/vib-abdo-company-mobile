@@ -190,6 +190,12 @@ class EmptyPane extends StatelessWidget {
   }
 }
 
+/// Placeholder shade: in light mode a step darker than the page and card
+/// backgrounds (the container shade matched the page); dark mode unchanged.
+Color skeletonColor(ThemeData theme) => theme.brightness == Brightness.dark
+    ? theme.colorScheme.surfaceContainerHighest
+    : const Color(0xFFC9D4E2);
+
 class SkeletonBox extends StatelessWidget {
   const SkeletonBox({super.key, this.height = 112, this.width});
 
@@ -202,7 +208,7 @@ class SkeletonBox extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: skeletonColor(Theme.of(context)),
         borderRadius: BorderRadius.circular(AppRadii.card),
       ),
     );

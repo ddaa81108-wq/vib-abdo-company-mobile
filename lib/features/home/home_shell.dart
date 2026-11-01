@@ -515,6 +515,9 @@ class _NavList extends ConsumerWidget {
 
 /// Phone destinations in one row of equal slots. Labels wrap to two lines.
 /// [tabs] always ends with the "more" item.
+/// Largest text scale for bottom bar labels.
+const kTabLabelMaxScale = 1.3;
+
 class PhoneBottomNav extends StatelessWidget {
   const PhoneBottomNav({
     required this.tabs,
@@ -632,14 +635,23 @@ class _PhoneTab extends StatelessWidget {
                   Icon(item.icon, color: color, size: 22),
                   const SizedBox(height: AppSpacing.xxs),
                   // The full name stays the semantics label above.
+                  // One line, like platform tab bars: text scaling is capped
+                  // at 1.3x and a long name shrinks to fit the tab.
                   ExcludeSemantics(
-                    child: Text(
-                      item.shortLabel ?? item.label,
-                      key: Key('bottom-tab-label-${item.id}'),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: cairo(11, selected ? 800 : 600, color: color),
+                    child: MediaQuery.withClampedTextScaling(
+                      maxScaleFactor: kTabLabelMaxScale,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          item.shortLabel ?? item.label,
+                          key: Key('bottom-tab-label-${item.id}'),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.visible,
+                          style: cairo(11, selected ? 800 : 600, color: color),
+                        ),
+                      ),
                     ),
                   ),
                 ],
