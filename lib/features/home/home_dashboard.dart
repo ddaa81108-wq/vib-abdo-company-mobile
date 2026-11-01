@@ -14,7 +14,6 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
-import '../../ui/widgets/soft_tile.dart';
 import 'home_shell.dart';
 
 /// Readable debt sections in first-seen order. Each one gets its own control.
@@ -42,6 +41,29 @@ int homeCardColumns(double width, double textScale) {
   if (textScale >= 1.3) return 1;
   return AppBreakpoints.cardColumns(width);
 }
+
+/// Columns for the home icon grid. Two on a phone (as in Ali's reference),
+/// more on wider screens, one at a large text scale so labels never clip.
+int homeTileColumns(double width, double textScale) {
+  if (textScale >= 1.3) return 1;
+  if (width <= AppBreakpoints.phone) return 2;
+  if (width <= AppBreakpoints.tablet) return 3;
+  return 4;
+}
+
+/// Filled icon for a home tile. Presentation only; the drawer keeps
+/// [sectionIcon].
+IconData homeTileIcon(SectionKey section) => switch (section) {
+  SectionKey.customers => Icons.person,
+  SectionKey.collections => Icons.payments,
+  SectionKey.companies => Icons.apartment,
+  SectionKey.libyanDeposits => Icons.account_balance_wallet,
+  SectionKey.egyptianDeposits => Icons.currency_exchange,
+  SectionKey.masraweya => Icons.menu_book,
+  SectionKey.purchases => Icons.shopping_bag,
+  SectionKey.treasury => Icons.account_balance,
+  SectionKey.reports => Icons.insights,
+};
 
 class HomeDashboard extends ConsumerWidget {
   const HomeDashboard({super.key});
@@ -76,6 +98,35 @@ class HomeDashboard extends ConsumerWidget {
         key: screenKey,
         padding: pagePadding(width),
         children: [
+          // Ali's reference: one large tile per visible section, name only.
+          // Same sections, order, permissions, and routes as before.
+          if (summary.sections.isEmpty)
+            const EmptyPane(message: AppStrings.noSections)
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = homeTileColumns(
+                  constraints.maxWidth,
+                  textScale,
+                );
+                final tileWidth =
+                    (constraints.maxWidth - AppSpacing.md * (columns - 1)) /
+                    columns;
+                return Wrap(
+                  key: const Key('home-tile-grid'),
+                  spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.md,
+                  children: [
+                    for (final section in summary.sections)
+                      SizedBox(
+                        width: tileWidth,
+                        child: HomeSectionTile(section: section),
+                      ),
+                  ],
+                );
+              },
+            ),
+          const SizedBox(height: AppSpacing.lg),
           KeptData<HomeDto?>(
             value: dashboard,
             resetKey: 'home',
@@ -204,47 +255,6 @@ class HomeDashboard extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.xl),
           ],
-          Text(AppStrings.sectionsTitle, style: theme.textTheme.titleMedium),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            AppStrings.sectionsHint,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          if (summary.sections.isEmpty)
-            const EmptyPane(message: AppStrings.noSections)
-          else
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final columns = homeCardColumns(
-                  constraints.maxWidth,
-                  textScale,
-                );
-                final tileWidth =
-                    ((constraints.maxWidth - AppSpacing.md * (columns - 1)) /
-                            columns)
-                        .clamp(96.0, constraints.maxWidth);
-                return Wrap(
-                  spacing: AppSpacing.md,
-                  runSpacing: AppSpacing.md,
-                  children: [
-                    for (final section in summary.sections)
-                      SizedBox(
-                        width: tileWidth,
-                        child: _sectionTile(
-                          context,
-                          section,
-                          summary,
-                          online,
-                          dashboard.asData?.value,
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
         ],
       ),
     );
@@ -266,82 +276,6 @@ class HomeDashboard extends ConsumerWidget {
         if (sectionIsReadable(debt.section, permissions)) debt,
     ];
   }
-
-  Widget _sectionTile(
-    BuildContext context,
-    SectionKey section,
-    HomeSummary summary,
-    bool online,
-    HomeDto? home,
-  ) {
-    final writable = summary.writableSections.contains(section);
-    final count = home?.counters[section.key];
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          InkWell(
-            key: HomeShell.sectionKey(section),
-            onTap: () => context.go(sectionPath(section)),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(sectionIcon(section)),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(sectionLabel(section)),
-                        if (count != null)
-                          Text(
-                            '${AppStrings.serverCount} $count',
-                            key: Key('section-counter-${section.key}'),
-                            style: theme.textTheme.bodySmall,
-                          ),
-                      ],
-                    ),
-                  ),
-                  forwardChevron(context),
-                ],
-              ),
-            ),
-          ),
-          if (writable)
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: TextButton(
-                key: HomeShell.writeKey(section),
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(48, 48),
-                  tapTargetSize: MaterialTapTargetSize.padded,
-                ),
-                onPressed: online
-                    ? () => context.go(sectionPath(section))
-                    : null,
-                child: Text(_writeLabel(section)),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  String _writeLabel(SectionKey section) => switch (section) {
-    SectionKey.customers => AppStrings.addCustomer,
-    SectionKey.companies => AppStrings.addCompany,
-    SectionKey.libyanDeposits ||
-    SectionKey.egyptianDeposits => AppStrings.addDeposit,
-    SectionKey.collections => AppStrings.submitReceipt,
-    SectionKey.purchases => AppStrings.add,
-    SectionKey.treasury => AppStrings.cashIn,
-    SectionKey.masraweya => AppStrings.save,
-    SectionKey.reports => AppStrings.refresh,
-  };
 }
 
 class _SummaryGrid extends StatelessWidget {
@@ -490,6 +424,86 @@ class _DebtRow extends StatelessWidget {
                     style: cairo(11, 500, color: accent),
                   ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Deep blue tile with a gold bottom edge, a gold icon, and the white name.
+class HomeSectionTile extends StatelessWidget {
+  const HomeSectionTile({required this.section, super.key});
+
+  final SectionKey section;
+
+  static const _top = Color(0xFF1E3F9A);
+  static const _bottom = Color(0xFF0B2468);
+  static const _edge = Color(0xFFF2B705);
+  static const _icon = Color(0xFFFFC928);
+
+  @override
+  Widget build(BuildContext context) {
+    final label = sectionLabel(section);
+    final radius = BorderRadius.circular(AppRadii.xxl);
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          color: _edge,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 6,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        // The gold shows only along the bottom edge.
+        padding: const EdgeInsetsDirectional.only(bottom: 4),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: radius,
+          clipBehavior: Clip.antiAlias,
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [_top, _bottom],
+              ),
+            ),
+            child: InkWell(
+              key: HomeShell.sectionKey(section),
+              onTap: () => context.go(sectionPath(section)),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 112),
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.lg,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(homeTileIcon(section), size: 40, color: _icon),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        label,
+                        key: Key('home-tile-label-${section.key}'),
+                        textAlign: TextAlign.center,
+                        softWrap: true,
+                        style: cairo(16, 800, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ),

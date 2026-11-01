@@ -14,6 +14,7 @@ import 'package:vib_abdo_company_mobile/notifications/device_token_store.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_providers.dart';
 import 'package:vib_abdo_company_mobile/notifications/shown_notification_store.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
+import 'package:vib_abdo_company_mobile/state/session_providers.dart';
 import 'package:vib_abdo_company_mobile/ui/widgets/environment_badge.dart';
 
 /// Pumps the app with an injected fake [ApiLayer]. The provider does not build one.
@@ -127,3 +128,9 @@ Future<T> _widget<T extends Widget>(WidgetTester tester, Key key) async {
     'login=${find.byKey(const Key('login-screen'), skipOffstage: false).evaluate().length}',
   );
 }
+
+/// Sections the signed-in home summary marks writable (permission service).
+/// The home tiles show names only, so tests read write access from here.
+List<SectionKey> homeWritable(WidgetTester tester) => ProviderScope.containerOf(
+  tester.element(find.byKey(const Key('home-shell'))),
+).read(homeSummaryProvider)!.writableSections;

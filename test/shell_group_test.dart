@@ -127,6 +127,15 @@ void main() {
           expect(find.text(AppStrings.organization), findsNothing);
         }
         expect(find.text('مدير تجريبي'), findsOneWidget);
+        // The home icon grid comes first; the settings action sits below it.
+        await tester.scrollUntilVisible(
+          find.byKey(HomeShell.actionKey(ManagementAction.settingsManage)),
+          300,
+          scrollable: find.descendant(
+            of: find.byKey(HomeDashboard.screenKey),
+            matching: find.byType(Scrollable),
+          ),
+        );
         expect(find.text(AppStrings.settings), findsWidgets);
         final nav = width > 900 ? HomeShell.panelKey : HomeShell.railKey;
         await tester.scrollUntilVisible(
@@ -176,17 +185,13 @@ void main() {
     await pumpFakeApp(tester, size: const Size(360, 1400));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     expectRtl(tester);
-    await tester.scrollUntilVisible(
-      find.byKey(HomeShell.sectionKey(SectionKey.customers)),
-      300,
-      scrollable: find.descendant(
-        of: find.byKey(HomeDashboard.screenKey),
-        matching: find.byType(Scrollable),
+    // Home section tiles (icon grid) carry no disclosure chevron.
+    expect(
+      find.descendant(
+        of: find.byKey(HomeShell.sectionKey(SectionKey.customers)),
+        matching: find.byIcon(Icons.chevron_right),
       ),
-    );
-    expectChevronMirrors(
-      tester,
-      find.byKey(HomeShell.sectionKey(SectionKey.customers)),
+      findsNothing,
     );
 
     await go(tester, '/settings');
@@ -280,11 +285,13 @@ void main() {
       find.byKey(HomeShell.sectionKey(SectionKey.collections)),
       findsOneWidget,
     );
+    // The tiles show names only; write access stays in the home summary.
+    expect(homeWritable(tester), contains(SectionKey.collections));
+    expect(homeWritable(tester), isNot(contains(SectionKey.customers)));
     expect(
       find.byKey(HomeShell.writeKey(SectionKey.collections)),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.byKey(HomeShell.writeKey(SectionKey.customers)), findsNothing);
     expect(find.byKey(HomeShell.sectionKey(SectionKey.treasury)), findsNothing);
     expect(find.text(AppStrings.settings), findsNothing);
 

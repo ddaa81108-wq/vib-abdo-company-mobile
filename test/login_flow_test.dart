@@ -24,18 +24,12 @@ void main() {
         find.byKey(HomeShell.sectionKey(SectionKey.collections)),
         findsOneWidget,
       );
-      expect(
-        find.byKey(HomeShell.writeKey(SectionKey.collections)),
-        findsOneWidget,
-      );
+      expect(homeWritable(tester), contains(SectionKey.collections));
       expect(
         find.byKey(HomeShell.sectionKey(SectionKey.customers)),
         findsNothing,
       );
-      expect(
-        find.byKey(HomeShell.writeKey(SectionKey.customers)),
-        findsNothing,
-      );
+      expect(homeWritable(tester), isNot(contains(SectionKey.customers)));
       expect(
         find.byKey(HomeShell.sectionKey(SectionKey.treasury)),
         findsNothing,
@@ -44,10 +38,7 @@ void main() {
         find.byKey(HomeShell.sectionKey(SectionKey.reports)),
         findsNothing,
       );
-      final collectionsWrite = tester.widget<TextButton>(
-        find.byKey(HomeShell.writeKey(SectionKey.collections)),
-      );
-      expect(collectionsWrite.enabled, isTrue);
+      expect(homeWritable(tester), contains(SectionKey.collections));
       final badge = tester.widget<Text>(find.byKey(UnreadBadge.badgeKey));
       expect(badge.data, '1');
       expect(find.text('2026-10-19'), findsOneWidget);
@@ -85,18 +76,9 @@ void main() {
         find.byKey(HomeShell.sectionKey(SectionKey.treasury)),
         findsOneWidget,
       );
-      expect(
-        find.byKey(HomeShell.writeKey(SectionKey.treasury)),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .widget<TextButton>(
-              find.byKey(HomeShell.writeKey(SectionKey.treasury)),
-            )
-            .enabled,
-        isTrue,
-      );
+      expect(homeWritable(tester), contains(SectionKey.treasury));
+      expect(homeWritable(tester), contains(SectionKey.treasury));
+      expect(find.byKey(HomeShell.writeKey(SectionKey.treasury)), findsNothing);
       expect(
         find.byKey(HomeShell.actionKey(ManagementAction.collectionsDecide)),
         findsOneWidget,

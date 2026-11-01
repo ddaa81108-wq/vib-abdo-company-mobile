@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
@@ -54,21 +53,15 @@ void main() {
         find.byKey(HomeShell.sectionKey(SectionKey.customers)),
         findsNothing,
       );
-      expect(
-        find.byKey(HomeShell.writeKey(SectionKey.customers)),
-        findsNothing,
-      );
+      expect(homeWritable(tester), isNot(contains(SectionKey.customers)));
       expect(
         find.byKey(HomeShell.sectionKey(SectionKey.collections)),
         findsOneWidget,
       );
+      expect(homeWritable(tester), contains(SectionKey.collections));
       expect(
-        tester
-            .widget<TextButton>(
-              find.byKey(HomeShell.writeKey(SectionKey.collections)),
-            )
-            .enabled,
-        isTrue,
+        find.byKey(HomeShell.writeKey(SectionKey.collections)),
+        findsNothing,
       );
       expect(
         find.byKey(HomeShell.sectionKey(SectionKey.treasury)),
@@ -97,21 +90,15 @@ void main() {
         find.byKey(HomeShell.sectionKey(SectionKey.customers)),
         findsOneWidget,
       );
-      expect(
-        find.byKey(HomeShell.writeKey(SectionKey.customers)),
-        findsNothing,
-      );
+      expect(homeWritable(tester), isNot(contains(SectionKey.customers)));
       expect(
         find.byKey(HomeShell.sectionKey(SectionKey.collections)),
         findsOneWidget,
       );
+      expect(homeWritable(tester), contains(SectionKey.collections));
       expect(
-        tester
-            .widget<TextButton>(
-              find.byKey(HomeShell.writeKey(SectionKey.collections)),
-            )
-            .enabled,
-        isTrue,
+        find.byKey(HomeShell.writeKey(SectionKey.collections)),
+        findsNothing,
       );
       expect(
         find.byKey(HomeShell.sectionKey(SectionKey.treasury)),
