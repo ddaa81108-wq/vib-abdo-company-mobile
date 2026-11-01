@@ -505,19 +505,16 @@ class _ConnectionBannerState extends State<ConnectionBanner>
         builder: (context, constraints) {
           const gap = AppSpacing.md;
           final width = constraints.maxWidth;
-          // Both sides get the same width so the date sits in the true
-          // centre, under the environment pill. A long side (the offline
-          // text) is capped and wraps to two lines.
-          final cap = width * 0.3;
+          // Each side takes its own text width: the role up to 30% (one
+          // line), the status up to half the strip. A status wider than that
+          // (the offline text, or very large text) wraps and is never cut.
           final roleWidth = role == null
               ? 0.0
-              : math.min(measure(role, roleStyle) + 1, cap);
-          final statusWidth = math.min(
-            measure(statusText, statusStyle) + 10 + AppSpacing.sm + 1,
-            cap,
-          );
-          final side = math.max(roleWidth, statusWidth);
-          final slot = width - 2 * side - 2 * gap;
+              : math.min(measure(role, roleStyle) + 1, width * 0.3);
+          final statusNatural =
+              measure(statusText, statusStyle) + 10 + AppSpacing.sm + 1;
+          final statusWidth = math.min(statusNatural, width * 0.5);
+          final slot = width - roleWidth - statusWidth - 2 * gap;
           String? date;
           if (widget.showDate) {
             final today = tripoliNow();
@@ -536,7 +533,7 @@ class _ConnectionBannerState extends State<ConnectionBanner>
           return Row(
             children: [
               SizedBox(
-                width: side,
+                width: roleWidth,
                 child: Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: role == null
@@ -565,10 +562,10 @@ class _ConnectionBannerState extends State<ConnectionBanner>
               ),
               const SizedBox(width: gap),
               SizedBox(
-                width: side,
+                width: statusWidth,
                 child: Align(
                   alignment: AlignmentDirectional.centerEnd,
-                  child: status(maxLines: 2),
+                  child: status(),
                 ),
               ),
             ],

@@ -60,8 +60,23 @@ void main() {
         final dateRect = tester.getRect(date);
         expect(dateRect.right, lessThanOrEqualTo(role.left + 0.5));
         expect(dateRect.left, greaterThanOrEqualTo(status.right - 0.5));
-        // Centred under the environment pill, and below it.
-        expect(dateRect.center.dx, closeTo(width / 2, 1));
+        // The status text is never cut either.
+        final statusText = tester.renderObject<RenderParagraph>(
+          find.descendant(
+            of: find.byKey(Key(online ? 'online-banner' : 'offline-banner')),
+            matching: find.byType(RichText),
+          ),
+        );
+        expect(
+          statusText.didExceedMaxLines,
+          isFalse,
+          reason: 'status width $width online $online',
+        );
+        if (online) {
+          // «متصل • محفوظ» stays on one line.
+          expect(status.height, lessThan(24));
+        }
+        // Below the environment pill.
         final badge = tester.getRect(
           find.byKey(EnvironmentBadgeOverlay.badgeKey),
         );
