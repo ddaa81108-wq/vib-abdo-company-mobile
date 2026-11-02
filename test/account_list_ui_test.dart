@@ -325,6 +325,9 @@ void main() {
     await settle(tester);
 
     await _reveal(tester, find.byKey(const Key('assign-mode')), customers);
+    // Bring it clear of the floating bottom bar before tapping.
+    await tester.ensureVisible(find.byKey(const Key('assign-mode')));
+    await settle(tester);
     await tester.tap(find.byKey(const Key('assign-mode')));
     await settle(tester);
     expect(find.byKey(const Key('assignee-field')), findsOneWidget);

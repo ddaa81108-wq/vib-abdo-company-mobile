@@ -124,6 +124,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                       : null,
                 ),
               _SummaryStrip(
+                section: section,
                 summary: data.summary,
                 currency: section.currency,
                 money: money,
@@ -586,11 +587,13 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
 
 class _SummaryStrip extends StatelessWidget {
   const _SummaryStrip({
+    required this.section,
     required this.summary,
     required this.currency,
     required this.money,
   });
 
+  final AccountSection section;
   final AccountsSummaryDto summary;
   final Currency currency;
   final MoneyFormatter money;
@@ -598,6 +601,22 @@ class _SummaryStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Customers show only the server totalDebt, as the headline (Ali,
+    // 2026-11-02). Other sections keep net and total.
+    if (section == AccountSection.customers) {
+      return Card(
+        key: const Key('summary-total-only'),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+          child: _Metric(
+            label: AppStrings.totalDebt,
+            value: money.formatOrDash(summary.totalDebtUnits, currency),
+            valueStyle: theme.textTheme.titleSmall,
+            amountStyle: context.textExtras.amountLarge,
+          ),
+        ),
+      );
+    }
     return Card(
       child: Padding(
         padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
