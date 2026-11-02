@@ -81,6 +81,8 @@ abstract final class AppStrings {
   static const totalDebt = 'إجمالي الديون';
   static const customersTotalDebt = 'إجمالي ديون العملاء';
   static const activeCardsCount = 'البطاقات النشطة';
+  static const customerDebtWord = 'دين';
+  static const customerCreditWord = 'أمانة';
   static const lastActivity = 'آخر حركة';
   static const withEmployee = 'لدى';
   static const systemCard = 'نظامي';

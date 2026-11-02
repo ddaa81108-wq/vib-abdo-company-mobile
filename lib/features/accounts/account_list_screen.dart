@@ -19,6 +19,7 @@ import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
 import 'account_list_logic.dart';
 import 'account_name_suggestions.dart';
+import 'customer_card_tone.dart';
 
 /// Customers, companies, Libyan deposits, and Egyptian deposits share this
 /// screen. [section] selects the repository path, currency, and labels.
@@ -81,7 +82,8 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       controller: _search,
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
-        labelText: AppStrings.filterSearch,
+        labelText: isCustomers ? null : AppStrings.filterSearch,
+        hintText: isCustomers ? AppStrings.filterSearch : null,
         isDense: false,
         prefixIcon: const Icon(Icons.search),
         suffixIcon: ValueListenableBuilder<TextEditingValue>(
@@ -811,11 +813,15 @@ class _AccountCard extends StatelessWidget {
   /// existing zero-review action as a check button (Ali, 2026-11-02).
   Widget _customerBody(
     BuildContext context, {
-    required Color fg,
-    required Color accent,
+    required CustomerTone tone,
     required bool showAssign,
     required bool showZero,
   }) {
+    final word = switch (customerBalanceKind(card.balanceUnits)) {
+      CustomerBalanceKind.debt => AppStrings.customerDebtWord,
+      CustomerBalanceKind.credit => AppStrings.customerCreditWord,
+      _ => null,
+    };
     return Padding(
       padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
       child: Column(
@@ -836,17 +842,27 @@ class _AccountCard extends StatelessWidget {
                           card.name,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: cairo(16, 800, color: fg),
+                          style: cairo(16, 800, color: tone.ink),
                         ),
                       ),
                       if (card.systemManaged)
                         Tooltip(
                           message: AppStrings.systemCard,
-                          child: Icon(Icons.lock_outline, size: 16, color: fg),
+                          child: Icon(
+                            Icons.lock_outline,
+                            size: 16,
+                            color: tone.ink,
+                          ),
                         ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xs),
+                  if (word != null)
+                    Text(
+                      word,
+                      key: Key('account-kind-${card.id}'),
+                      style: cairo(12, 800, color: tone.amount),
+                    ),
                   Align(
                     alignment: AlignmentDirectional.centerStart,
                     child: FittedBox(
@@ -855,7 +871,7 @@ class _AccountCard extends StatelessWidget {
                       child: MoneyText(
                         money.formatOrDash(card.balanceUnits, card.currency),
                         style: context.textExtras.amountLarge.copyWith(
-                          color: fg,
+                          color: tone.amount,
                           fontSize: 22,
                         ),
                       ),
@@ -867,7 +883,11 @@ class _AccountCard extends StatelessWidget {
                       key: Key('account-assignee-${card.id}'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: cairo(12, 700, color: accent),
+                      style: cairo(
+                        12,
+                        700,
+                        color: tone.ink.withValues(alpha: 0.75),
+                      ),
                     ),
                 ],
               ),
@@ -929,24 +949,33 @@ class _AccountCard extends StatelessWidget {
     final showZero = onZero != null && !card.systemManaged;
     final showAssign = assigning && canSelectAccountForAssignment(card);
     final showActions = showAssign || showPin || showZero;
+    // Customers: debt / credit / zero tone from the balance sign (Ali,
+    // 2026-11-02) instead of the age gradient.
+    final tone = section == AccountSection.customers
+        ? customerTone(context, customerBalanceKind(card.balanceUnits))
+        : null;
     return Material(
       key: Key('account-card-${card.id}'),
-      color: colored
-          ? (flat ? visual.flat : colors.neutralCard)
-          : scheme.surface,
+      color:
+          tone?.background ??
+          (colored
+              ? (flat ? visual.flat : colors.neutralCard)
+              : scheme.surface),
       borderRadius: BorderRadius.circular(AppRadii.card),
       clipBehavior: Clip.antiAlias,
       child: Ink(
         decoration: BoxDecoration(
-          gradient: colored && !flat ? visual.gradient : null,
-          color: colored && flat ? visual.flat : null,
+          gradient: tone == null && colored && !flat ? visual.gradient : null,
+          color: tone?.background ?? (colored && flat ? visual.flat : null),
           borderRadius: BorderRadius.circular(AppRadii.card),
           border: Border.all(
-            color: card.ageStatus == 'zero'
-                ? colors.zeroCardBorder
-                : colored
-                ? colors.onStatus.withValues(alpha: 0.2)
-                : scheme.outline,
+            color:
+                tone?.border ??
+                (card.ageStatus == 'zero'
+                    ? colors.zeroCardBorder
+                    : colored
+                    ? colors.onStatus.withValues(alpha: 0.2)
+                    : scheme.outline),
           ),
         ),
         child: InkWell(
@@ -954,8 +983,7 @@ class _AccountCard extends StatelessWidget {
           child: section == AccountSection.customers
               ? _customerBody(
                   context,
-                  fg: fg,
-                  accent: accent,
+                  tone: tone!,
                   showAssign: showAssign,
                   showZero: showZero,
                 )
@@ -1085,37 +1113,82 @@ class _CustomersToolbar extends StatelessWidget {
   final Widget search;
   final Widget assign;
 
+  /// One height for all three controls, grown with the text scale.
+  static double heightFor(double scale) => 24 + 28 * scale.clamp(1.0, 2.0);
+
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      key: const Key('customers-toolbar'),
-      builder: (context, constraints) {
-        final scale = MediaQuery.textScalerOf(context).scale(1);
-        if (constraints.maxWidth / scale >= 330) {
-          return Row(
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final scale = MediaQuery.textScalerOf(context).scale(1);
+    final height = heightFor(scale);
+    final radius = BorderRadius.circular(AppRadii.card);
+    final side = BorderSide(color: scheme.primary, width: 1.5);
+    const padding = EdgeInsetsDirectional.symmetric(horizontal: AppSpacing.lg);
+    final outline = OutlineInputBorder(borderRadius: radius, borderSide: side);
+    final themed = theme.copyWith(
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: Size(0, height),
+          padding: padding,
+          shape: RoundedRectangleBorder(borderRadius: radius, side: side),
+          textStyle: cairo(15, 800),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          minimumSize: Size(0, height),
+          padding: padding,
+          shape: RoundedRectangleBorder(borderRadius: radius, side: side),
+          foregroundColor: scheme.primary,
+          textStyle: cairo(15, 800),
+        ),
+      ),
+      inputDecorationTheme: theme.inputDecorationTheme.copyWith(
+        isDense: true,
+        contentPadding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.md,
+        ),
+        border: outline,
+        enabledBorder: outline,
+        focusedBorder: outline.copyWith(borderSide: side.copyWith(width: 2)),
+      ),
+    );
+    Widget sized(Widget child) => SizedBox(height: height, child: child);
+    return Theme(
+      data: themed,
+      child: LayoutBuilder(
+        key: const Key('customers-toolbar'),
+        builder: (context, constraints) {
+          if (constraints.maxWidth / scale >= 330) {
+            return Row(
+              children: [
+                sized(add),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(child: sized(search)),
+                const SizedBox(width: AppSpacing.sm),
+                sized(assign),
+              ],
+            );
+          }
+          // Narrow or large text: the two buttons share one row at equal
+          // width, the search sits under them at the same height.
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              add,
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(child: search),
-              const SizedBox(width: AppSpacing.sm),
-              assign,
+              Row(
+                children: [
+                  Expanded(child: sized(add)),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(child: sized(assign)),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              sized(search),
             ],
           );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: [add, assign],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            search,
-          ],
-        );
-      },
+        },
+      ),
     );
   }
 }

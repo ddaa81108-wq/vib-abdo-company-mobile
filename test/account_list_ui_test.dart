@@ -121,6 +121,9 @@ void main() {
       final theme = Theme.of(tester.element(find.byType(HomeShell)));
       expect(theme.brightness, dark ? Brightness.dark : Brightness.light);
       _expectAmountOnStart(tester, '320 د.ل');
+      // Customer cards use the debt/credit/zero tone (Ali, 2026-11-02);
+      // the age gradient is checked on companies.
+      await go(tester, '/companies');
       final gradient = _cardGradient(tester);
       expect(
         gradient.colors.first,
