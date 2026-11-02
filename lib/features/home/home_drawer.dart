@@ -54,9 +54,28 @@ class StyledDrawer extends StatelessWidget {
         _groupTitle(AppStrings.signedInAs, palette),
         _group(context, palette, account),
       ],
-      const SizedBox(height: 16),
-      _card(palette, [_logoutRow(palette)]),
     ];
+    // Footer: the theme row, then logout last. Pinned at the bottom on
+    // normal phones; with large text or a short screen it scrolls at the
+    // end of the list instead, so nothing is hidden or overlapped.
+    final footer = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _themeRow(context, palette),
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(12, 0, 12, 12),
+          child: Material(
+            color: palette.card,
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            child: _logoutRow(palette),
+          ),
+        ),
+      ],
+    );
+    final pinned =
+        MediaQuery.textScalerOf(context).scale(1) <= 1.3 &&
+        MediaQuery.sizeOf(context).height >= 560;
     return Material(
       color: palette.background,
       child: Column(
@@ -67,11 +86,16 @@ class StyledDrawer extends StatelessWidget {
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [header, ...groups, const SizedBox(height: 12)],
+                children: [
+                  header,
+                  ...groups,
+                  const SizedBox(height: 12),
+                  if (!pinned) SafeArea(top: false, child: footer),
+                ],
               ),
             ),
           ),
-          SafeArea(top: false, child: _themeRow(context, palette)),
+          if (pinned) SafeArea(top: false, child: footer),
         ],
       ),
     );
@@ -298,7 +322,7 @@ class StyledDrawer extends StatelessWidget {
   Widget _themeRow(BuildContext context, _Palette p) {
     final label = dark ? AppStrings.themeLight : AppStrings.themeDark;
     return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 12, 12),
+      padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 12, 8),
       child: Material(
         color: p.card,
         borderRadius: BorderRadius.circular(12),

@@ -20,6 +20,28 @@ import 'support/pump_app.dart';
 const _captureScreenshots = bool.fromEnvironment('CAPTURE_SCREENSHOTS');
 const _phone = Size(320, 568);
 
+/// The row is inside the drawer and the screen, and taps at its centre and
+/// near its corners land on it (nothing drawn over it).
+void _expectFullyVisible(WidgetTester tester, Finder row, Finder drawer) {
+  final rect = tester.getRect(row);
+  final box = tester.getRect(drawer);
+  final screen = Offset.zero & tester.view.physicalSize;
+  expect(box.contains(rect.topLeft), isTrue, reason: '$rect in $box');
+  expect(
+    box.contains(rect.bottomRight - const Offset(0.5, 0.5)),
+    isTrue,
+    reason: '$rect in $box',
+  );
+  expect(screen.contains(rect.bottomRight - const Offset(0.5, 0.5)), isTrue);
+  for (final at in const [
+    Alignment.center,
+    Alignment(-0.9, -0.6),
+    Alignment(0.9, 0.6),
+  ]) {
+    expect(row.hitTestable(at: at), findsOneWidget, reason: '$at');
+  }
+}
+
 void main() {
   testWidgets(
     'logout asks first, cancel stays signed in, confirm uses the existing logout',
@@ -98,11 +120,16 @@ void main() {
     },
   );
 
-  for (final scale in [1.0, 2.0]) {
+  for (final (size, scale) in const [
+    (Size(430, 932), 1.0),
+    (_phone, 1.0),
+    (_phone, 2.0),
+  ]) {
     testWidgets(
-      'the drawer logout row (text x$scale) uses the existing logout flow',
+      'the drawer logout row (${size.width.toInt()}x${size.height.toInt()} '
+      'text x$scale) is last, visible, and uses the existing logout flow',
       (tester) async {
-        await pumpFakeApp(tester, size: _phone, textScale: scale);
+        await pumpFakeApp(tester, size: size, textScale: scale);
         await signIn(tester, username: 'employee.demo', password: 'demo-only');
         for (final dark in [false, true]) {
           await tester.tap(find.byKey(HomeShell.menuKey));
@@ -115,6 +142,16 @@ void main() {
             find.descendant(of: drawer, matching: find.byIcon(Icons.logout)),
             findsOneWidget,
           );
+          final themeRow = find.descendant(
+            of: drawer,
+            matching: find.text(
+              dark ? AppStrings.themeLight : AppStrings.themeDark,
+            ),
+          );
+          if (size.width >= 430 && scale == 1.0) {
+            // Normal phone: fully visible as soon as the drawer opens.
+            _expectFullyVisible(tester, row, drawer);
+          }
           await tester.scrollUntilVisible(
             row,
             120,
@@ -125,6 +162,12 @@ void main() {
           );
           await settle(tester);
           expect(tester.takeException(), isNull, reason: 'dark $dark');
+          // Logout is the last row, below the theme row, not overlapped.
+          expect(
+            tester.getRect(row).top,
+            greaterThanOrEqualTo(tester.getRect(themeRow).bottom),
+          );
+          _expectFullyVisible(tester, row, drawer);
           expect(Directionality.of(tester.element(row)), TextDirection.rtl);
           expect(
             Theme.of(tester.element(row)).brightness,
