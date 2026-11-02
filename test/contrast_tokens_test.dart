@@ -306,11 +306,8 @@ void _expectTokenPairs(ThemeData theme) {
   final sidebar = theme.extension<AppSidebarPalette>()!;
   const white = Color(0xFFFFFFFF);
 
-  expect(status.cashPositive, const Color(0xFF166534));
-  expect(
-    status.cashNegative,
-    dark ? const Color(0xFFB91C1C) : const Color(0xFFDC2626),
-  );
+  expect(status.cashPositive, const Color(0xFF087A50));
+  expect(status.cashNegative, const Color(0xFFB43131));
   _expectContrast(white, status.cashPositive, 4.5);
   _expectContrast(status.cashPositiveText, scheme.surface, 4.5);
   for (final tone in status.dayTones) {
@@ -329,7 +326,7 @@ void _expectTokenPairs(ThemeData theme) {
     expect(scheme.onPrimary, const Color(0xFF0B1020));
     expect(scheme.surface, const Color(0xFF131A2C));
     expect(status.dayTones[2], const Color(0xFF13261E));
-    expect(status.cashPositiveText, const Color(0xFF4ADE80));
+    expect(status.cashPositiveText, const Color(0xFF0CB677));
     expect(sidebar.base, const Color(0xFF60A5FA));
     _expectSameHue(status.cashPositiveText, status.cashPositive);
     _expectContrast(scheme.primary, const Color(0xFF131A2C), 4.5);
@@ -338,7 +335,7 @@ void _expectTokenPairs(ThemeData theme) {
   } else {
     expect(scheme.primary, const Color(0xFF2563EB));
     expect(scheme.inversePrimary, const Color(0xFF93C5FD));
-    expect(status.cashPositiveText, const Color(0xFF166534));
+    expect(status.cashPositiveText, const Color(0xFF087A50));
     expect(sidebar.base, const Color(0xFF2563EB));
     expect(theme.scaffoldBackgroundColor, const Color(0xFFF5F7FB));
     _expectContrast(sidebar.base, theme.scaffoldBackgroundColor, 4.5);
@@ -379,7 +376,7 @@ Future<void> _expectRenderedInk(
 
   await _go(tester, '/treasury');
   final card = tester.widget<Card>(find.byKey(const Key('active-cash-card')));
-  expect(card.color, const Color(0xFF166534));
+  expect(card.color, const Color(0xFF087A50));
   final title = tester.widget<Text>(find.text(AppStrings.activeCash));
   expect(title.style?.color, status.onStatus);
   _expectContrast(title.style!.color!, card.color!, 4.5);

@@ -192,10 +192,10 @@ class EmptyPane extends StatelessWidget {
 }
 
 /// Placeholder shade: in light mode a step darker than the page and card
-/// backgrounds (the container shade matched the page); dark mode unchanged.
+/// backgrounds; in dark mode a step lighter than the navy page.
 Color skeletonColor(ThemeData theme) => theme.brightness == Brightness.dark
-    ? theme.colorScheme.surfaceContainerHighest
-    : const Color(0xFFE2E8F0);
+    ? const Color(0xFF263252)
+    : const Color(0xFFD5DDE8);
 
 class SkeletonBox extends StatelessWidget {
   const SkeletonBox({super.key, this.height = 112, this.width});
