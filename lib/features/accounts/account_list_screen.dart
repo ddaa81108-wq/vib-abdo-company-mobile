@@ -689,22 +689,27 @@ class _SummaryStrip extends StatelessWidget {
               const SizedBox(width: AppSpacing.md),
               Flexible(
                 flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      AppStrings.activeCardsCount,
-                      textAlign: TextAlign.end,
-                      style: theme.textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      count == null ? AppStrings.dash : '$count',
-                      key: const Key('customers-summary-count'),
-                      textDirection: TextDirection.ltr,
-                      style: context.textExtras.amountLarge,
-                    ),
-                  ],
+                // Scales down instead of breaking a word at large text.
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.topEnd,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        AppStrings.activeCardsCount,
+                        textAlign: TextAlign.end,
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        count == null ? AppStrings.dash : '$count',
+                        key: const Key('customers-summary-count'),
+                        textDirection: TextDirection.ltr,
+                        style: context.textExtras.amountLarge,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
