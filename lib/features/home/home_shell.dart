@@ -90,7 +90,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final items = _items(summary, permissions);
     final selected = _selectedIndex(items, widget.location);
     final showIdentityHere = phone;
-    final colors = context.appColors;
 
     return Scaffold(
       key: HomeShell.shellKey,
@@ -218,10 +217,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ? _BottomBar(
               items: items,
               location: widget.location,
-              indicator: BarLook.indicator,
-              selectedColor: BarLook.selected,
-              idleColor: colors.sidebarMuted,
-              background: colors.sidebarBg,
+              indicator: context.look.barIndicator,
+              selectedColor: context.look.barSelected,
+              idleColor: context.look.barIdle,
+              background: context.look.bar,
             )
           : null,
     );
@@ -577,6 +576,7 @@ class PhoneBottomNav extends StatelessWidget {
             decoration: BoxDecoration(
               color: background,
               borderRadius: BarLook.radius,
+              border: Border.all(color: context.look.cardBorder),
               boxShadow: BarLook.shadow,
             ),
             child: Padding(

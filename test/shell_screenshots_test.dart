@@ -215,9 +215,22 @@ int _pngCrc(List<int> bytes) {
 }
 
 Future<void> loadScreenshotFonts() async {
-  await _loadFont('assets/fonts/Cairo-Variable.ttf', 'Cairo');
-  await _loadFont('assets/fonts/JetBrainsMono-Bold.ttf', 'JetBrainsMono');
-  await _loadFont('assets/fonts/JetBrainsMono-ExtraBold.ttf', 'JetBrainsMono');
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Regular.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Medium.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-SemiBold.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Bold.ttf',
+    'IBMPlexSansArabic',
+  );
   final icons = _materialIconsFile();
   if (icons != null) {
     await ui.loadFontFromList(

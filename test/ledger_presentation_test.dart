@@ -696,13 +696,26 @@ Future<void> settle(WidgetTester tester) {
   );
 }
 
-/// Loads Cairo, JetBrains Mono, and Material Icons after the test app is up.
+/// Loads IBM Plex Sans Arabic and Material Icons after the test app is up.
 /// Call from [WidgetTester.runAsync]. flutter_tester does not bundle those
 /// faces, so icons and Arabic otherwise paint as empty squares.
 Future<void> loadScreenshotFonts() async {
-  await _loadFont('assets/fonts/Cairo-Variable.ttf', 'Cairo');
-  await _loadFont('assets/fonts/JetBrainsMono-Bold.ttf', 'JetBrainsMono');
-  await _loadFont('assets/fonts/JetBrainsMono-ExtraBold.ttf', 'JetBrainsMono');
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Regular.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Medium.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-SemiBold.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Bold.ttf',
+    'IBMPlexSansArabic',
+  );
   final icons = _materialIconsFile();
   if (icons == null) {
     throw StateError('MaterialIcons-Regular.otf was not found');

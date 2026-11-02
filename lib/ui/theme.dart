@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 
 import 'tokens.dart';
 
+/// The app face (IBM Plex Sans Arabic, OFL). Its digits are tabular, so
+/// amounts and Arabic text share it.
+const kAppFont = 'IBMPlexSansArabic';
+
 ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
   final dark = brightness == Brightness.dark;
   final scheme = dark ? _darkScheme : _lightScheme;
   final colors = dark ? AppColors.dark : AppColors.light;
   final status = dark ? AppStatusColors.dark : AppStatusColors.light;
-  // Light login is gold on a pale canvas, so that theme's base is darker.
-  // Dark mode keeps the bright gold. The sidebar word uses bright.
   final sidebar = dark
-      ? AppSidebarPalette.gold
-      : AppSidebarPalette.gold.copyWith(base: const Color(0xFF7C6100));
+      ? AppSidebarPalette.glassNavy
+      : AppSidebarPalette.fintechLight;
+  final look = dark ? AppLook.dark : AppLook.light;
   final extras = AppTextExtras.standard;
   final base = cairo(13, 500, color: scheme.onSurface);
 
@@ -20,8 +23,8 @@ ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
     brightness: brightness,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surfaceContainerLowest,
-    fontFamily: 'Cairo',
-    shadowColor: dark ? const Color(0x00000000) : scheme.shadow,
+    fontFamily: kAppFont,
+    shadowColor: scheme.shadow,
     splashFactory: InkSparkle.splashFactory,
     textTheme: TextTheme(
       headlineMedium: cairo(20, 800, color: scheme.onSurface),
@@ -46,13 +49,13 @@ ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
       iconTheme: IconThemeData(color: sidebar.bright),
     ),
     cardTheme: CardThemeData(
-      color: scheme.surface,
+      color: look.card,
       elevation: 0,
       margin: EdgeInsets.zero,
       shadowColor: dark ? const Color(0x00000000) : scheme.shadow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.card),
-        side: BorderSide(color: dark ? scheme.outline : scheme.outlineVariant),
+        side: BorderSide(color: look.cardBorder),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -71,8 +74,8 @@ ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         minimumSize: const Size(48, 48),
-        backgroundColor: scheme.primary,
-        foregroundColor: scheme.onPrimary,
+        backgroundColor: look.button,
+        foregroundColor: look.onButton,
         textStyle: cairo(16, 700),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.lg),
@@ -80,7 +83,14 @@ ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        foregroundColor: look.accent,
+        side: BorderSide(color: look.cardBorder),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+        ),
+      ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
@@ -89,8 +99,8 @@ ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
       style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: colors.sidebarBg,
-      indicatorColor: sidebar.glow,
+      backgroundColor: look.bar,
+      indicatorColor: look.barIndicator,
       height: 68,
       labelTextStyle: WidgetStatePropertyAll(
         cairo(11, 700, color: sidebar.shine),
@@ -120,79 +130,79 @@ ThemeData buildAppTheme([Brightness brightness = Brightness.light]) {
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: colors.sidebarBg,
-      contentTextStyle: cairo(13, 600, color: sidebar.shine),
+      backgroundColor: scheme.inverseSurface,
+      contentTextStyle: cairo(13, 600, color: scheme.onInverseSurface),
     ),
-    extensions: [colors, status, sidebar, extras],
+    extensions: [colors, status, sidebar, extras, look],
   );
 }
 
 const _lightScheme = ColorScheme(
   brightness: Brightness.light,
-  primary: Color(0xFF175F50),
+  primary: Color(0xFF2563EB),
   onPrimary: Color(0xFFFFFFFF),
-  primaryContainer: Color(0xFFE6F2ED),
-  onPrimaryContainer: Color(0xFF0F453A),
-  secondary: Color(0xFFC79232),
-  onSecondary: Color(0xFF24180E),
-  secondaryContainer: Color(0xFFFFF6E0),
-  onSecondaryContainer: Color(0xFF24180E),
-  tertiary: Color(0xFF175F50),
+  primaryContainer: Color(0xFFE8EFFE),
+  onPrimaryContainer: Color(0xFF1E3A8A),
+  secondary: Color(0xFF7C3AED),
+  onSecondary: Color(0xFFFFFFFF),
+  secondaryContainer: Color(0xFFF1EAFE),
+  onSecondaryContainer: Color(0xFF4C1D95),
+  tertiary: Color(0xFF166534),
   onTertiary: Color(0xFFFFFFFF),
-  error: Color(0xFF8D2C2C),
+  error: Color(0xFFDC2626),
   onError: Color(0xFFFFFFFF),
-  errorContainer: Color(0xFFFFF0F0),
-  onErrorContainer: Color(0xFF8D2C2C),
+  errorContainer: Color(0xFFFEE2E2),
+  onErrorContainer: Color(0xFF991B1B),
   surface: Color(0xFFFFFFFF),
-  onSurface: Color(0xFF172723),
-  onSurfaceVariant: Color(0xFF5F6E69),
-  outline: Color(0xFFD5DEE9),
-  outlineVariant: Color(0xFFE8EDF3),
-  shadow: Color(0x12172723),
-  scrim: Color(0x8F0D211E),
-  inverseSurface: Color(0xFF172333),
-  onInverseSurface: Color(0xFFEDF2FA),
-  inversePrimary: Color(0xFF247763),
-  surfaceTint: Color(0xFF175F50),
-  surfaceContainerLowest: Color(0xFFE5EDF6),
-  surfaceContainerLow: Color(0xFFF6F8FB),
-  surfaceContainer: Color(0xFFF6F8FB),
-  surfaceContainerHigh: Color(0xFFE7EDF4),
-  surfaceContainerHighest: Color(0xFFE7EDF4),
+  onSurface: Color(0xFF0F172A),
+  onSurfaceVariant: Color(0xFF5B6B80),
+  outline: Color(0xFFE4E8F1),
+  outlineVariant: Color(0xFFEEF1F6),
+  shadow: Color(0x140F172A),
+  scrim: Color(0x990F172A),
+  inverseSurface: Color(0xFF0F172A),
+  onInverseSurface: Color(0xFFF5F7FB),
+  inversePrimary: Color(0xFF93C5FD),
+  surfaceTint: Color(0xFF2563EB),
+  surfaceContainerLowest: Color(0xFFF5F7FB),
+  surfaceContainerLow: Color(0xFFF8FAFC),
+  surfaceContainer: Color(0xFFF1F4F9),
+  surfaceContainerHigh: Color(0xFFEDF1F7),
+  surfaceContainerHighest: Color(0xFFE4E8F1),
 );
 
 const _darkScheme = ColorScheme(
   brightness: Brightness.dark,
-  primary: Color(0xFF36B496),
-  onPrimary: Color(0xFF041510),
-  primaryContainer: Color(0xFF193B37),
-  onPrimaryContainer: Color(0xFFEDF2FA),
-  secondary: Color(0xFFD8BC7E),
-  onSecondary: Color(0xFF24180E),
-  secondaryContainer: Color(0xFF3A2E16),
-  onSecondaryContainer: Color(0xFFFFF6E0),
-  tertiary: Color(0xFF36B496),
-  onTertiary: Color(0xFF041510),
-  error: Color(0xFFFFB1B7),
-  onError: Color(0xFF3A1216),
-  errorContainer: Color(0xFF3A2430),
-  onErrorContainer: Color(0xFFFFB1B7),
-  surface: Color(0xFF172333),
-  onSurface: Color(0xFFEDF2FA),
-  onSurfaceVariant: Color(0xFFACBBCE),
-  outline: Color(0xFF36465B),
-  outlineVariant: Color(0xFF27364A),
-  shadow: Color(0x40000000),
-  scrim: Color(0xCC050B16),
-  inverseSurface: Color(0xFFEDF2FA),
-  onInverseSurface: Color(0xFF172333),
-  inversePrimary: Color(0xFF175F50),
-  surfaceTint: Color(0xFF36B496),
-  surfaceContainerLowest: Color(0xFF0D1522),
-  surfaceContainerLow: Color(0xFF1C2A3D),
-  surfaceContainer: Color(0xFF1C2A3D),
-  surfaceContainerHigh: Color(0xFF25354A),
-  surfaceContainerHighest: Color(0xFF25354A),
+  primary: Color(0xFF60A5FA),
+  onPrimary: Color(0xFF0B1020),
+  primaryContainer: Color(0xFF1A2550),
+  onPrimaryContainer: Color(0xFFDBEAFE),
+  secondary: Color(0xFFA855F7),
+  onSecondary: Color(0xFFFFFFFF),
+  secondaryContainer: Color(0xFF2A1B4A),
+  onSecondaryContainer: Color(0xFFF3E8FF),
+  tertiary: Color(0xFF22C55E),
+  onTertiary: Color(0xFF06140C),
+  error: Color(0xFFF87171),
+  onError: Color(0xFF2A0B0B),
+  errorContainer: Color(0xFF3A1A22),
+  onErrorContainer: Color(0xFFFECACA),
+  surface: Color(0xFF131A2C),
+  onSurface: Color(0xFFE5E7EB),
+  onSurfaceVariant: Color(0xFF94A3B8),
+  outline: Color(0xFF263252),
+  outlineVariant: Color(0xFF1C2540),
+  shadow: Color(0x66000000),
+  scrim: Color(0xCC05070F),
+  inverseSurface: Color(0xFFE5E7EB),
+  onInverseSurface: Color(0xFF0B1020),
+  inversePrimary: Color(0xFF2563EB),
+  surfaceTint: Color(0xFF60A5FA),
+  surfaceContainerLowest: Color(0xFF0B1020),
+  surfaceContainerLow: Color(0xFF111827),
+  surfaceContainer: Color(0xFF151C30),
+  surfaceContainerHigh: Color(0xFF1A2238),
+  surfaceContainerHighest: Color(0xFF212A42),
 );
 
 TextStyle cairo(
@@ -202,18 +212,17 @@ TextStyle cairo(
   double height = 1.35,
 }) {
   return TextStyle(
-    fontFamily: 'Cairo',
+    fontFamily: kAppFont,
     fontSize: size,
     height: height,
     color: color,
     fontWeight: _weight(weight),
-    fontVariations: [FontVariation('wght', weight)],
   );
 }
 
 TextStyle mono(double size, FontWeight weight, {Color? color}) {
   return TextStyle(
-    fontFamily: 'JetBrainsMono',
+    fontFamily: kAppFont,
     fontSize: size,
     height: 1.3,
     color: color,
@@ -223,7 +232,6 @@ TextStyle mono(double size, FontWeight weight, {Color? color}) {
 }
 
 FontWeight _weight(double weight) {
-  if (weight >= 800) return FontWeight.w800;
   if (weight >= 700) return FontWeight.w700;
   if (weight >= 600) return FontWeight.w600;
   if (weight >= 500) return FontWeight.w500;
@@ -259,31 +267,31 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color fieldBg;
 
   static const light = AppColors(
-    label: Color(0xFF344640),
-    sidebarBg: Color(0xFF102A26),
-    sidebarMuted: Color(0xFFA9C0B8),
-    noteBg: Color(0xFFEDF5F1),
-    noteLine: Color(0xFFD4E6DE),
-    noteText: Color(0xFF4C675F),
-    success: Color(0xFF17624D),
-    successBg: Color(0xFFEDF9F4),
-    successLine: Color(0xFFC6E9DC),
-    overlay: Color(0x8F0D211E),
+    label: Color(0xFF334155),
+    sidebarBg: Color(0xFFF5F7FB),
+    sidebarMuted: Color(0xFF5B6B80),
+    noteBg: Color(0xFFEFF4FF),
+    noteLine: Color(0xFFD6E2FB),
+    noteText: Color(0xFF1E3A8A),
+    success: Color(0xFF166534),
+    successBg: Color(0xFFE8F5EC),
+    successLine: Color(0xFFBBE5C8),
+    overlay: Color(0x990F172A),
     fieldBg: Color(0xFFFFFFFF),
   );
 
   static const dark = AppColors(
-    label: Color(0xFFDCE5F2),
-    sidebarBg: Color(0xFF101B2A),
-    sidebarMuted: Color(0xFFB1C0D3),
-    noteBg: Color(0xFF182F39),
-    noteLine: Color(0xFF345263),
-    noteText: Color(0xFFC1DCE4),
-    success: Color(0xFF92DFC2),
-    successBg: Color(0xFF19392F),
-    successLine: Color(0xFF386D59),
-    overlay: Color(0xCC050B16),
-    fieldBg: Color(0xFF111D2C),
+    label: Color(0xFFCBD5E1),
+    sidebarBg: Color(0xFF0B1020),
+    sidebarMuted: Color(0xFF94A3B8),
+    noteBg: Color(0xFF141E3A),
+    noteLine: Color(0xFF263A6B),
+    noteText: Color(0xFFBFDBFE),
+    success: Color(0xFF4ADE80),
+    successBg: Color(0xFF10291C),
+    successLine: Color(0xFF1F5134),
+    overlay: Color(0xCC05070F),
+    fieldBg: Color(0xFF0F1526),
   );
 
   @override
@@ -346,17 +354,32 @@ class AppSidebarPalette extends ThemeExtension<AppSidebarPalette> {
   final Color glow;
   final Color glowSoft;
 
-  static const gold = AppSidebarPalette(
-    tint: Color(0xFF191303),
-    edge: Color(0xFFD5A71E),
-    line: Color(0xFF624B10),
-    light: Color(0xFFFFE477),
-    shine: Color(0xFFFFFDE0),
-    bright: Color(0xFFFFDB35),
-    base: Color(0xFFEAB600),
-    ink: Color(0xFF24180E),
-    glow: Color(0x66FFD52B),
-    glowSoft: Color(0x12FFD52B),
+  /// Concept 1 «زجاج كحلي نيون»: light ink and neon blue on deep navy.
+  static const glassNavy = AppSidebarPalette(
+    tint: Color(0xFF111827),
+    edge: Color(0xFF3B82F6),
+    line: Color(0xFF263252),
+    light: Color(0xFF93C5FD),
+    shine: Color(0xFFE2E8F0),
+    bright: Color(0xFFF1F5F9),
+    base: Color(0xFF60A5FA),
+    ink: Color(0xFF0B1020),
+    glow: Color(0x333B82F6),
+    glowSoft: Color(0x143B82F6),
+  );
+
+  /// Concept 3 «فنتك بسيط»: dark ink and one blue on a pale canvas.
+  static const fintechLight = AppSidebarPalette(
+    tint: Color(0xFFEFF4FF),
+    edge: Color(0xFF2563EB),
+    line: Color(0xFFE4E8F1),
+    light: Color(0xFF2563EB),
+    shine: Color(0xFF1E293B),
+    bright: Color(0xFF0F172A),
+    base: Color(0xFF2563EB),
+    ink: Color(0xFFFFFFFF),
+    glow: Color(0x242563EB),
+    glowSoft: Color(0x0F2563EB),
   );
 
   @override
@@ -478,66 +501,66 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
     newDebt: LinearGradient(
       begin: _statusGradientBegin,
       end: _statusGradientEnd,
-      colors: [Color(0xFF3548FF), Color(0xFF211CAF), Color(0xFF15126F)],
+      colors: [Color(0xFF3B82F6), Color(0xFF2563EB), Color(0xFF1E3A8A)],
       stops: [0, 0.52, 1],
     ),
     warningDebt: LinearGradient(
       begin: _statusGradientBegin,
       end: _statusGradientEnd,
-      colors: [Color(0xFFFF9A00), Color(0xFFE36D00), Color(0xFF9F3F00)],
+      colors: [Color(0xFFF59E0B), Color(0xFFD97706), Color(0xFF92400E)],
       stops: [0, 0.52, 1],
     ),
     overdueDebt: LinearGradient(
       begin: _statusGradientBegin,
       end: _statusGradientEnd,
-      colors: [Color(0xFFFF164E), Color(0xFFD30036), Color(0xFF870021)],
+      colors: [Color(0xFFF43F5E), Color(0xFFDC2626), Color(0xFF991B1B)],
       stops: [0, 0.52, 1],
     ),
     zeroBalance: LinearGradient(
       begin: _statusGradientBegin,
       end: _statusGradientEnd,
-      colors: [Color(0xFF151515), Color(0xFF050505), Color(0xFF000000)],
-      stops: [0, 0.58, 1],
+      colors: [Color(0xFF9A7656), Color(0xFF7A5230), Color(0xFF4A3424)],
+      stops: [0, 0.52, 1],
     ),
     creditBalance: LinearGradient(
       begin: _statusGradientBegin,
       end: _statusGradientEnd,
-      colors: [Color(0xFF00C77B), Color(0xFF00965E), Color(0xFF00603E)],
+      colors: [Color(0xFF22C55E), Color(0xFF166534), Color(0xFF14532D)],
       stops: [0, 0.52, 1],
     ),
-    flatNew: Color(0xFF1769AA),
-    flatWarning: Color(0xFFC08A08),
-    flatOverdue: Color(0xFFB52835),
-    flatZero: Color(0xFF5B3A29),
-    flatCredit: Color(0xFF178447),
-    accentNew: Color(0xFFE4E7FF),
-    accentWarning: Color(0xFFFFF0CE),
-    accentOverdue: Color(0xFFFFE2E9),
-    accentZero: Color(0xFFE5E5E5),
-    accentCredit: Color(0xFFDDFFF1),
-    debtText: Color(0xFFA54339),
-    creditText: Color(0xFF23705D),
+    flatNew: Color(0xFF2563EB),
+    flatWarning: Color(0xFFB45309),
+    flatOverdue: Color(0xFFDC2626),
+    flatZero: Color(0xFF7A5230),
+    flatCredit: Color(0xFF166534),
+    accentNew: Color(0xFFDBEAFE),
+    accentWarning: Color(0xFFFEF3C7),
+    accentOverdue: Color(0xFFFEE2E2),
+    accentZero: Color(0xFFF7EEE3),
+    accentCredit: Color(0xFFDCFCE7),
+    debtText: Color(0xFFDC2626),
+    creditText: Color(0xFF166534),
     badgeBg: Color(0xFFDC2626),
-    cashPositive: Color(0xFF087A50),
-    cashPositiveText: Color(0xFF087A50),
-    cashNegative: Color(0xFFB43131),
-    chipNormalBg: Color(0xFFE7F7F1),
-    chipNormalFg: Color(0xFF08795C),
-    chipReviewBg: Color(0xFFFFF0C4),
-    chipReviewFg: Color(0xFF91600D),
-    chipCriticalBg: Color(0xFFFDE1E5),
-    chipCriticalFg: Color(0xFFB32635),
-    unlinkedPending: Color(0xFF4F5F73),
-    unlinkedApproved: Color(0xFF178447),
+    cashPositive: Color(0xFF166534),
+    cashPositiveText: Color(0xFF166534),
+    cashNegative: Color(0xFFDC2626),
+    chipNormalBg: Color(0xFFE8F5EC),
+    chipNormalFg: Color(0xFF166534),
+    chipReviewBg: Color(0xFFFEF3C7),
+    chipReviewFg: Color(0xFF92400E),
+    chipCriticalBg: Color(0xFFFEE2E2),
+    chipCriticalFg: Color(0xFFB91C1C),
+    unlinkedPending: Color(0xFF5B6B80),
+    unlinkedApproved: Color(0xFF166534),
     dayTones: [
-      Color(0xFFE7F0FA),
-      Color(0xFFF3EFE4),
-      Color(0xFFE7F2EC),
-      Color(0xFFF6EBE3),
-      Color(0xFFEEEAF6),
+      Color(0xFFEFF4FF),
+      Color(0xFFF5F0FF),
+      Color(0xFFECF8F0),
+      Color(0xFFFDF1F1),
+      Color(0xFFF7EEE3),
     ],
     neutralCard: Color(0xFFFFFFFF),
-    zeroCardBorder: Color(0xFF737373),
+    zeroCardBorder: Color(0xFFD9C3A5),
   );
 
   static const dark = AppStatusColors(
@@ -545,61 +568,61 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
     newDebt: LinearGradient(
       begin: _statusGradientBegin,
       end: _statusGradientEnd,
-      colors: [Color(0xFF294B80), Color(0xFF1A3053)],
+      colors: [Color(0xFF4F46E5), Color(0xFF1E3A8A)],
     ),
     warningDebt: LinearGradient(
       begin: _statusGradientBegin,
       end: _statusGradientEnd,
-      colors: [Color(0xFF78551E), Color(0xFF503912)],
+      colors: [Color(0xFF92400E), Color(0xFF5A2A0A)],
     ),
     overdueDebt: LinearGradient(
       begin: _statusGradientBegin,
       end: _statusGradientEnd,
-      colors: [Color(0xFF813849), Color(0xFF552537)],
+      colors: [Color(0xFF9F1239), Color(0xFF5F0F24)],
     ),
     zeroBalance: LinearGradient(
       begin: _statusGradientBegin,
       end: _statusGradientEnd,
-      colors: [Color(0xFF24262B), Color(0xFF14161A)],
+      colors: [Color(0xFF3A2E24), Color(0xFF241C16)],
     ),
     creditBalance: LinearGradient(
       begin: _statusGradientBegin,
       end: _statusGradientEnd,
-      colors: [Color(0xFF24634F), Color(0xFF193E36)],
+      colors: [Color(0xFF166534), Color(0xFF0F3B22)],
     ),
-    flatNew: Color(0xFF294B80),
-    flatWarning: Color(0xFF78551E),
-    flatOverdue: Color(0xFF813849),
-    flatZero: Color(0xFF24262B),
-    flatCredit: Color(0xFF24634F),
-    accentNew: Color(0xFFE4E7FF),
-    accentWarning: Color(0xFFFFF0CE),
-    accentOverdue: Color(0xFFFFE2E9),
-    accentZero: Color(0xFFE5E5E5),
-    accentCredit: Color(0xFFDDFFF1),
-    debtText: Color(0xFFFFB1B7),
-    creditText: Color(0xFF92DFC2),
+    flatNew: Color(0xFF1E40AF),
+    flatWarning: Color(0xFF92400E),
+    flatOverdue: Color(0xFF9F1239),
+    flatZero: Color(0xFF3A2E24),
+    flatCredit: Color(0xFF166534),
+    accentNew: Color(0xFFDBEAFE),
+    accentWarning: Color(0xFFFEF3C7),
+    accentOverdue: Color(0xFFFFE4E6),
+    accentZero: Color(0xFFF5E6D3),
+    accentCredit: Color(0xFFDCFCE7),
+    debtText: Color(0xFFF87171),
+    creditText: Color(0xFF4ADE80),
     badgeBg: Color(0xFFDC2626),
-    cashPositive: Color(0xFF087A50),
-    cashPositiveText: Color(0xFF0CB677),
-    cashNegative: Color(0xFFB43131),
-    chipNormalBg: Color(0xFFE7F7F1),
-    chipNormalFg: Color(0xFF08795C),
-    chipReviewBg: Color(0xFFFFF0C4),
-    chipReviewFg: Color(0xFF91600D),
-    chipCriticalBg: Color(0xFFFDE1E5),
-    chipCriticalFg: Color(0xFFB32635),
-    unlinkedPending: Color(0xFF4F5F73),
-    unlinkedApproved: Color(0xFF178447),
+    cashPositive: Color(0xFF166534),
+    cashPositiveText: Color(0xFF4ADE80),
+    cashNegative: Color(0xFFB91C1C),
+    chipNormalBg: Color(0xFF10291C),
+    chipNormalFg: Color(0xFF4ADE80),
+    chipReviewBg: Color(0xFF33280F),
+    chipReviewFg: Color(0xFFFBBF24),
+    chipCriticalBg: Color(0xFF3A1A22),
+    chipCriticalFg: Color(0xFFFCA5A5),
+    unlinkedPending: Color(0xFF94A3B8),
+    unlinkedApproved: Color(0xFF4ADE80),
     dayTones: [
-      Color(0xFF1A2740),
-      Color(0xFF2A261C),
-      Color(0xFF1A2C24),
-      Color(0xFF2C221C),
-      Color(0xFF241E30),
+      Color(0xFF16203A),
+      Color(0xFF1E1935),
+      Color(0xFF13261E),
+      Color(0xFF2A1A1F),
+      Color(0xFF231D18),
     ],
-    neutralCard: Color(0xFF172333),
-    zeroCardBorder: Color(0xFF737373),
+    neutralCard: Color(0xFF131A2C),
+    zeroCardBorder: Color(0xFF4A3A2C),
   );
 
   @override
@@ -651,6 +674,213 @@ class AppTextExtras extends ThemeExtension<AppTextExtras> {
       other is AppTextExtras && t >= 0.5 ? other : this;
 }
 
+/// Visual tokens shared by the redesigned screens: concept 1
+/// «زجاج كحلي نيون» (dark) and concept 3 «فنتك بسيط» (light), Ali 2026-11-03.
+@immutable
+class AppLook extends ThemeExtension<AppLook> {
+  const AppLook({
+    required this.page,
+    required this.card,
+    required this.cardBorder,
+    required this.ink,
+    required this.muted,
+    required this.accent,
+    required this.violet,
+    required this.success,
+    required this.danger,
+    required this.zero,
+    required this.zeroCard,
+    required this.zeroBorder,
+    required this.button,
+    required this.onButton,
+    required this.heroStart,
+    required this.heroEnd,
+    required this.onHero,
+    required this.onHeroMuted,
+    required this.heroFigure,
+    required this.bar,
+    required this.barIndicator,
+    required this.barSelected,
+    required this.barIdle,
+    required this.strip,
+    required this.glass,
+  });
+
+  /// Page canvas.
+  final Color page;
+
+  /// Card and tile surface.
+  final Color card;
+
+  /// Thin tinted card border.
+  final Color cardBorder;
+
+  /// Main text.
+  final Color ink;
+
+  /// Secondary text.
+  final Color muted;
+
+  /// Accent text and icons (blue).
+  final Color accent;
+
+  /// Second accent (violet).
+  final Color violet;
+
+  /// Green accent and أمانة.
+  final Color success;
+
+  /// Red accent and دين.
+  final Color danger;
+
+  /// Brown ink for a zero balance.
+  final Color zero;
+
+  /// Zero-balance card fill.
+  final Color zeroCard;
+
+  /// Zero-balance card border.
+  final Color zeroBorder;
+
+  /// Primary button fill.
+  final Color button;
+
+  /// Primary button text.
+  final Color onButton;
+
+  /// Headline gradient start.
+  final Color heroStart;
+
+  /// Headline gradient end.
+  final Color heroEnd;
+
+  /// Text on the headline gradient.
+  final Color onHero;
+
+  /// Labels on the headline gradient.
+  final Color onHeroMuted;
+
+  /// Figures on the headline gradient.
+  final Color heroFigure;
+
+  /// Bottom bar fill.
+  final Color bar;
+
+  /// Selected-tab pill.
+  final Color barIndicator;
+
+  /// Selected tab icon and label.
+  final Color barSelected;
+
+  /// Idle tab icon and label.
+  final Color barIdle;
+
+  /// Top status strip fill.
+  final Color strip;
+
+  /// Dark mode uses tinted glass tiles; light mode uses flat white cards
+  /// with a soft shadow.
+  final bool glass;
+
+  static const light = AppLook(
+    page: Color(0xFFF5F7FB),
+    card: Color(0xFFFFFFFF),
+    cardBorder: Color(0xFFE4E8F1),
+    ink: Color(0xFF0F172A),
+    muted: Color(0xFF5B6B80),
+    accent: Color(0xFF2563EB),
+    violet: Color(0xFF7C3AED),
+    success: Color(0xFF166534),
+    danger: Color(0xFFDC2626),
+    zero: Color(0xFF7A5230),
+    zeroCard: Color(0xFFF7EEE3),
+    zeroBorder: Color(0xFFE6D3BC),
+    button: Color(0xFF2563EB),
+    onButton: Color(0xFFFFFFFF),
+    heroStart: Color(0xFF1E3A8A),
+    heroEnd: Color(0xFF2563EB),
+    onHero: Color(0xFFFFFFFF),
+    onHeroMuted: Color(0xFFDBEAFE),
+    heroFigure: Color(0xFFFFFFFF),
+    bar: Color(0xFFFFFFFF),
+    barIndicator: Color(0xFFE8EFFE),
+    barSelected: Color(0xFF1D4ED8),
+    barIdle: Color(0xFF5B6B80),
+    strip: Color(0xFFFFFFFF),
+    glass: false,
+  );
+
+  static const dark = AppLook(
+    page: Color(0xFF0B1020),
+    card: Color(0xFF131A2C),
+    cardBorder: Color(0xFF232C48),
+    ink: Color(0xFFE5E7EB),
+    muted: Color(0xFF94A3B8),
+    accent: Color(0xFF60A5FA),
+    violet: Color(0xFFC084FC),
+    success: Color(0xFF4ADE80),
+    danger: Color(0xFFF87171),
+    zero: Color(0xFFD6B48C),
+    zeroCard: Color(0xFF211B1C),
+    zeroBorder: Color(0xFF4A3A2C),
+    button: Color(0xFF2563EB),
+    onButton: Color(0xFFFFFFFF),
+    heroStart: Color(0xFF4F46E5),
+    heroEnd: Color(0xFF7C3AED),
+    onHero: Color(0xFFFFFFFF),
+    onHeroMuted: Color(0xFFE0E7FF),
+    heroFigure: Color(0xFFFFFFFF),
+    bar: Color(0xFF111827),
+    barIndicator: Color(0xFF1A2550),
+    barSelected: Color(0xFF93C5FD),
+    barIdle: Color(0xFF94A3B8),
+    strip: Color(0xFF131A2C),
+    glass: true,
+  );
+
+  LinearGradient get hero => LinearGradient(
+    begin: AlignmentDirectional.topStart,
+    end: AlignmentDirectional.bottomEnd,
+    colors: [heroStart, heroEnd],
+  );
+
+  /// Soft shadow under cards. Light mode only; glass cards rely on borders.
+  List<BoxShadow> get cardShadow => glass
+      ? const []
+      : const [
+          BoxShadow(
+            color: Color(0x0A0F172A),
+            blurRadius: 2,
+            offset: Offset(0, 1),
+          ),
+          BoxShadow(
+            color: Color(0x0F0F172A),
+            blurRadius: 24,
+            offset: Offset(0, 8),
+          ),
+        ];
+
+  /// A tile tinted with [tint]: a faint wash of the tint over the card in
+  /// dark mode, plain white in light mode.
+  Gradient tileFill(Color tint) => LinearGradient(
+    begin: AlignmentDirectional.topStart,
+    end: AlignmentDirectional.bottomEnd,
+    colors: glass
+        ? [Color.alphaBlend(tint.withValues(alpha: 0.16), card), card]
+        : [card, card],
+  );
+
+  /// Icon square fill for [tint].
+  Color iconWell(Color tint) => tint.withValues(alpha: glass ? 0.18 : 0.10);
+
+  @override
+  AppLook copyWith() => this;
+
+  @override
+  AppLook lerp(ThemeExtension<AppLook>? other, double t) =>
+      other is AppLook && t >= 0.5 ? other : this;
+}
+
 extension AppThemeContext on BuildContext {
   AppColors get appColors => Theme.of(this).extension<AppColors>()!;
   AppStatusColors get statusColors =>
@@ -658,12 +888,8 @@ extension AppThemeContext on BuildContext {
   AppSidebarPalette get sidebarPalette =>
       Theme.of(this).extension<AppSidebarPalette>()!;
   AppTextExtras get textExtras => Theme.of(this).extension<AppTextExtras>()!;
+  AppLook get look => Theme.of(this).extension<AppLook>()!;
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
 
-  List<BoxShadow> softShadow() {
-    if (isDark) return const [];
-    return const [
-      BoxShadow(color: Color(0x12172723), blurRadius: 12, offset: Offset(0, 3)),
-    ];
-  }
+  List<BoxShadow> softShadow() => look.cardShadow;
 }

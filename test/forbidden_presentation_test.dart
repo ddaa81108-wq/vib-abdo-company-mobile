@@ -212,9 +212,14 @@ Future<void> go(WidgetTester tester, String path) async {
 }
 
 Future<void> loadScreenshotFonts() async {
-  final cairo = File('assets/fonts/Cairo-Variable.ttf');
-  if (cairo.existsSync()) {
-    await ui.loadFontFromList(await cairo.readAsBytes(), fontFamily: 'Cairo');
+  for (final weight in const ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+    final file = File('assets/fonts/IBMPlexSansArabic-$weight.ttf');
+    if (file.existsSync()) {
+      await ui.loadFontFromList(
+        await file.readAsBytes(),
+        fontFamily: 'IBMPlexSansArabic',
+      );
+    }
   }
   final icons = File(Platform.resolvedExecutable).parent.parent.parent;
   final material = File(

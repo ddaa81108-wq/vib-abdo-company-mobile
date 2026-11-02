@@ -32,7 +32,9 @@ class MoneyText extends StatelessWidget {
   Widget build(BuildContext context) {
     final extras = context.textExtras;
     if (text == MoneyValue.invalidLabel) {
-      final labelStyle = (style ?? extras.amount).copyWith(fontFamily: 'Cairo');
+      final labelStyle = (style ?? extras.amount).copyWith(
+        fontFamily: kAppFont,
+      );
       return Semantics(
         label: MoneyValue.invalidLabel,
         child: LayoutBuilder(
@@ -78,10 +80,9 @@ class MoneyText extends StatelessWidget {
         textAlign: align,
         softWrap: true,
         style: (style ?? extras.amount).copyWith(
-          fontFamily: 'JetBrainsMono',
-          // Digits stay in JetBrains Mono. That face has no Arabic, so the
-          // currency letters (د.ل) come from Cairo instead of a missing-glyph box.
-          fontFamilyFallback: const ['Cairo'],
+          fontFamily: kAppFont,
+          // One face for digits and the currency letters (د.ل); its digits
+          // are already equal width.
         ),
       ),
     );
@@ -194,7 +195,7 @@ class EmptyPane extends StatelessWidget {
 /// backgrounds (the container shade matched the page); dark mode unchanged.
 Color skeletonColor(ThemeData theme) => theme.brightness == Brightness.dark
     ? theme.colorScheme.surfaceContainerHighest
-    : const Color(0xFFC9D4E2);
+    : const Color(0xFFE2E8F0);
 
 class SkeletonBox extends StatelessWidget {
   const SkeletonBox({super.key, this.height = 112, this.width});
@@ -648,7 +649,8 @@ class _ConnectionBannerState extends State<ConnectionBanner>
           decoration: BoxDecoration(
             color: look.background,
             borderRadius: StripLook.radius,
-            boxShadow: StripLook.shadow,
+            border: Border.all(color: look.border),
+            boxShadow: look.shadow,
           ),
           child: Padding(
             padding: EdgeInsetsDirectional.fromSTEB(

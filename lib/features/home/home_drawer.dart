@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../models/home_summary.dart';
-import '../../ui/bars_style.dart';
 import '../../ui/section_labels.dart';
 import '../../ui/strings.dart';
 import '../../ui/theme.dart';
+import '../../ui/tokens.dart';
 import 'home_shell.dart';
 
 const _sectionsTitle = 'الأقسام';
@@ -127,25 +127,24 @@ class StyledDrawer extends StatelessWidget {
     return name.isEmpty ? '؟' : name.characters.first;
   }
 
-  Widget _avatar() => Container(
+  Widget _avatar(BuildContext context) => Container(
     width: 44,
     height: 44,
     alignment: Alignment.center,
     decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      gradient: const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [kBrandBlue, kBrandNavy],
-      ),
-      border: Border.all(color: kBrandGold, width: 1.5),
+      borderRadius: BorderRadius.circular(14),
+      gradient: context.look.hero,
     ),
-    child: Text(_initial, style: cairo(18.5, 800, color: kBrandGoldIcon)),
+    child: Text(_initial, style: cairo(18.5, 700, color: context.look.onHero)),
   );
 
-  Widget _identity({required Color name, required Color role}) => Row(
+  Widget _identity(
+    BuildContext context, {
+    required Color name,
+    required Color role,
+  }) => Row(
     children: [
-      _avatar(),
+      _avatar(context),
       const SizedBox(width: 12),
       Expanded(
         child: Column(
@@ -186,9 +185,10 @@ class StyledDrawer extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: p.card,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(color: p.line),
             ),
-            child: _identity(name: p.ink, role: p.muted),
+            child: _identity(context, name: p.ink, role: p.muted),
           ),
         ),
       ],
@@ -296,14 +296,10 @@ class StyledDrawer extends StatelessWidget {
                 width: 30,
                 height: 30,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(7),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [kBrandBlue, kBrandNavy],
-                  ),
+                  borderRadius: BorderRadius.circular(9),
+                  color: context.look.iconWell(context.look.accent),
                 ),
-                child: Icon(item.icon, size: 18, color: kBrandGoldIcon),
+                child: Icon(item.icon, size: 18, color: context.look.accent),
               ),
               const SizedBox(width: 14),
               Expanded(child: title),
@@ -379,23 +375,23 @@ class _Palette {
 
   static _Palette of(BuildContext context, bool dark) => dark
       ? const _Palette(
-          background: Color(0xFF000000),
-          card: Color(0xFF1C1C1E),
-          ink: Color(0xFFF2F2F7),
-          muted: Color(0xFF8E8E93),
-          selectedInk: kBrandGoldIcon,
-          line: Color(0x33FFFFFF),
-          danger: Color(0xFFD93A3A),
-          dangerInk: Color(0xFFFF7A7A),
+          background: Color(0xFF0B1020),
+          card: Color(0xFF131A2C),
+          ink: Color(0xFFE5E7EB),
+          muted: Color(0xFF94A3B8),
+          selectedInk: Color(0xFF60A5FA),
+          line: Color(0xFF232C48),
+          danger: Color(0xFFDC2626),
+          dangerInk: Color(0xFFF87171),
         )
       : const _Palette(
-          background: Color(0xFFF2F2F7),
+          background: Color(0xFFF5F7FB),
           card: Colors.white,
-          ink: Color(0xFF1C1C1E),
-          muted: Color(0xFF8A8A8F),
-          selectedInk: kBrandBlue,
-          line: Color(0x22000000),
-          danger: Color(0xFFD93A3A),
-          dangerInk: Color(0xFFC62828),
+          ink: Color(0xFF0F172A),
+          muted: Color(0xFF5B6B80),
+          selectedInk: Color(0xFF2563EB),
+          line: Color(0xFFE4E8F1),
+          danger: Color(0xFFDC2626),
+          dangerInk: Color(0xFFDC2626),
         );
 }

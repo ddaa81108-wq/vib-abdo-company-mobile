@@ -1251,7 +1251,7 @@ class _RateCardState extends ConsumerState<_RateCard> {
                 _StartAlignedText(
                   money.formatDecimalOrDash(data.egpPerLyd),
                   style: context.textExtras.amountLarge.copyWith(
-                    fontFamily: 'JetBrainsMono',
+                    fontFamily: kAppFont,
                   ),
                   mono: true,
                 ),
@@ -1556,12 +1556,7 @@ class _StartAlignedText extends StatelessWidget {
         textDirection: TextDirection.ltr,
         textAlign: TextAlign.end,
         softWrap: true,
-        style: mono
-            ? style.copyWith(
-                fontFamily: 'JetBrainsMono',
-                fontFamilyFallback: const ['Cairo'],
-              )
-            : style,
+        style: mono ? style.copyWith(fontFamily: kAppFont) : style,
       ),
     );
   }
