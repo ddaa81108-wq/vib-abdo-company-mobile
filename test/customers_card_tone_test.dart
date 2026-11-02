@@ -23,17 +23,27 @@ void main() {
     expect(customerBalanceKind(null), CustomerBalanceKind.unknown);
   });
 
-  testWidgets('customer toolbar controls share one height', (tester) async {
-    for (final size in [const Size(430, 932), const Size(320, 900)]) {
-      await pumpFakeApp(tester, size: size);
-      await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      await go(tester, '/customers');
-      final heights = {
-        for (final key in ['add-account', 'account-search', 'assign-mode'])
-          tester.getSize(find.byKey(Key(key))).height.roundToDouble(),
-      };
-      expect(heights, hasLength(1), reason: '$size $heights');
-      expect(tester.takeException(), isNull);
-    }
-  });
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('customer toolbar controls share one height x$scale', (
+      tester,
+    ) async {
+      for (final size in [const Size(430, 932), const Size(320, 900)]) {
+        await pumpFakeApp(tester, size: size);
+        await signIn(tester, username: 'admin.demo', password: 'demo-only');
+        await go(tester, '/customers');
+        Finder drawn(String key) => key == 'account-search'
+            ? find.descendant(
+                of: find.byKey(Key(key)),
+                matching: find.byType(InputDecorator),
+              )
+            : find.byKey(Key(key));
+        final heights = {
+          for (final key in ['add-account', 'account-search', 'assign-mode'])
+            tester.getSize(drawn(key)).height.roundToDouble(),
+        };
+        expect(heights, hasLength(1), reason: '$size x$scale $heights');
+        expect(tester.takeException(), isNull);
+      }
+    });
+  }
 }

@@ -81,6 +81,10 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       key: const Key('account-search'),
       controller: _search,
       textInputAction: TextInputAction.search,
+      // Customers: fills the toolbar height like the two buttons.
+      expands: isCustomers,
+      maxLines: isCustomers ? null : 1,
+      textAlignVertical: isCustomers ? TextAlignVertical.center : null,
       decoration: InputDecoration(
         labelText: isCustomers ? null : AppStrings.filterSearch,
         hintText: isCustomers ? AppStrings.filterSearch : null,
