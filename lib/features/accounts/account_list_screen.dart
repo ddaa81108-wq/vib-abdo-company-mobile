@@ -664,62 +664,103 @@ class _SummaryStrip extends StatelessWidget {
       // Right: server netBalance (total debts minus credits). Left: server
       // activeCards. No client arithmetic (Ali, 2026-11-02).
       final count = summary.activeCards;
-      return Card(
+      // Light: headline gradient with white text (concept 3). Dark: glass
+      // card with a gradient top line and a blue total (concept 1).
+      final look = context.look;
+      final onHero = !look.glass;
+      final label = theme.textTheme.titleSmall?.copyWith(
+        color: onHero ? look.onHeroMuted : look.muted,
+        fontWeight: FontWeight.w500,
+      );
+      final figure = context.textExtras.amountLarge.copyWith(
+        color: onHero ? look.heroFigure : look.ink,
+      );
+      final radius = BorderRadius.circular(AppRadii.xxl);
+      return DecoratedBox(
         key: const Key('customers-summary'),
-        child: Padding(
-          padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      AppStrings.customersTotalDebt,
-                      style: theme.textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: AlignmentDirectional.centerStart,
-                      child: MoneyText(
-                        money.formatOrDash(summary.netBalanceUnits, currency),
-                        key: const Key('customers-summary-amount'),
-                        style: context.textExtras.amountLarge,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Flexible(
-                flex: 2,
-                // Scales down instead of breaking a word at large text.
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: AlignmentDirectional.topEnd,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        AppStrings.activeCardsCount,
-                        textAlign: TextAlign.end,
-                        style: theme.textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        count == null ? AppStrings.dash : '$count',
-                        key: const Key('customers-summary-count'),
-                        textDirection: TextDirection.ltr,
-                        style: context.textExtras.amountLarge,
-                      ),
-                    ],
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          gradient: onHero ? look.hero : null,
+          color: onHero ? null : look.card,
+          border: onHero ? null : Border.all(color: look.cardBorder),
+          boxShadow: onHero
+              ? [
+                  BoxShadow(
+                    color: look.heroEnd.withValues(alpha: 0.25),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
                   ),
-                ),
+                ]
+              : null,
+        ),
+        child: ClipRRect(
+          borderRadius: radius,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              border: onHero
+                  ? null
+                  : BorderDirectional(
+                      top: BorderSide(color: look.violet, width: 3),
+                    ),
+            ),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.all(AppSpacing.xl),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(AppStrings.customersTotalDebt, style: label),
+                        const SizedBox(height: AppSpacing.xs),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.centerStart,
+                          child: MoneyText(
+                            money.formatOrDash(
+                              summary.netBalanceUnits,
+                              currency,
+                            ),
+                            key: const Key('customers-summary-amount'),
+                            style: figure.copyWith(
+                              color: onHero ? look.heroFigure : look.accent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Flexible(
+                    flex: 2,
+                    // Scales down instead of breaking a word at large text.
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.topEnd,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            AppStrings.activeCardsCount,
+                            textAlign: TextAlign.end,
+                            style: label,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            count == null ? AppStrings.dash : '$count',
+                            key: const Key('customers-summary-count'),
+                            textDirection: TextDirection.ltr,
+                            style: figure,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       );
@@ -1124,11 +1165,11 @@ class _CustomersToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final look = context.look;
     final scale = MediaQuery.textScalerOf(context).scale(1);
     final height = heightFor(scale);
-    final radius = BorderRadius.circular(AppRadii.card);
-    final side = BorderSide(color: scheme.primary, width: 1.5);
+    final radius = BorderRadius.circular(AppRadii.lg);
+    final side = BorderSide(color: look.cardBorder);
     const padding = EdgeInsetsDirectional.symmetric(horizontal: AppSpacing.lg);
     final outline = OutlineInputBorder(borderRadius: radius, borderSide: side);
     final themed = theme.copyWith(
@@ -1136,8 +1177,10 @@ class _CustomersToolbar extends StatelessWidget {
         style: FilledButton.styleFrom(
           minimumSize: Size(0, height),
           padding: padding,
-          shape: RoundedRectangleBorder(borderRadius: radius, side: side),
-          textStyle: cairo(15, 800),
+          shape: RoundedRectangleBorder(borderRadius: radius),
+          backgroundColor: look.button,
+          foregroundColor: look.onButton,
+          textStyle: cairo(15, 700),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -1145,18 +1188,23 @@ class _CustomersToolbar extends StatelessWidget {
           minimumSize: Size(0, height),
           padding: padding,
           shape: RoundedRectangleBorder(borderRadius: radius, side: side),
-          foregroundColor: scheme.primary,
-          textStyle: cairo(15, 800),
+          foregroundColor: look.accent,
+          backgroundColor: look.card,
+          textStyle: cairo(15, 700),
         ),
       ),
       inputDecorationTheme: theme.inputDecorationTheme.copyWith(
         isDense: true,
+        filled: true,
+        fillColor: look.card,
         contentPadding: const EdgeInsetsDirectional.symmetric(
           horizontal: AppSpacing.md,
         ),
         border: outline,
         enabledBorder: outline,
-        focusedBorder: outline.copyWith(borderSide: side.copyWith(width: 2)),
+        focusedBorder: outline.copyWith(
+          borderSide: BorderSide(color: look.accent, width: 2),
+        ),
       ),
     );
     Widget sized(Widget child) => SizedBox(height: height, child: child);

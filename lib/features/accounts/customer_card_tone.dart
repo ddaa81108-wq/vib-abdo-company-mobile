@@ -36,32 +36,23 @@ class CustomerTone {
 }
 
 CustomerTone customerTone(BuildContext context, CustomerBalanceKind kind) {
-  final scheme = Theme.of(context).colorScheme;
-  final colors = context.statusColors;
-  final dark = Theme.of(context).brightness == Brightness.dark;
+  final look = context.look;
   if (kind == CustomerBalanceKind.zero) {
-    return dark
-        ? const CustomerTone(
-            background: Color(0xFF3A2B22),
-            border: Color(0xFF8D6E63),
-            ink: Color(0xFFEBD7C4),
-            amount: Color(0xFFD7B899),
-          )
-        : const CustomerTone(
-            background: Color(0xFFF1E4D4),
-            border: Color(0xFFB08968),
-            ink: Color(0xFF4E342E),
-            amount: Color(0xFF6D4C41),
-          );
+    return CustomerTone(
+      background: look.zeroCard,
+      border: look.zeroBorder,
+      ink: look.ink,
+      amount: look.zero,
+    );
   }
   return CustomerTone(
-    background: scheme.surface,
-    border: scheme.outlineVariant,
-    ink: scheme.onSurface,
+    background: look.card,
+    border: look.cardBorder,
+    ink: look.ink,
     amount: switch (kind) {
-      CustomerBalanceKind.debt => colors.debtText,
-      CustomerBalanceKind.credit => colors.creditText,
-      _ => scheme.onSurface,
+      CustomerBalanceKind.debt => look.danger,
+      CustomerBalanceKind.credit => look.success,
+      _ => look.ink,
     },
   );
 }
