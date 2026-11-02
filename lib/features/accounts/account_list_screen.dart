@@ -88,6 +88,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       decoration: InputDecoration(
         labelText: isCustomers ? null : AppStrings.filterSearch,
         hintText: isCustomers ? AppStrings.filterSearch : null,
+        hintMaxLines: 1,
         isDense: false,
         prefixIcon: const Icon(Icons.search),
         suffixIcon: ValueListenableBuilder<TextEditingValue>(
