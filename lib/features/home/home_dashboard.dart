@@ -63,6 +63,21 @@ IconData homeTileIcon(SectionKey section) => switch (section) {
   SectionKey.reports => Icons.insights,
 };
 
+/// Tile tint per section, as in concepts 1 and 3: blue, violet, green.
+/// Presentation only.
+Color homeTileTint(SectionKey? section, AppLook look) => switch (section) {
+  SectionKey.customers ||
+  SectionKey.libyanDeposits ||
+  SectionKey.treasury => look.accent,
+  SectionKey.companies ||
+  SectionKey.purchases ||
+  SectionKey.egyptianDeposits => look.violet,
+  SectionKey.collections ||
+  SectionKey.masraweya ||
+  SectionKey.reports => look.success,
+  null => look.muted,
+};
+
 /// Home: the icon grid only (Ali, 2026-11-01). One tile per visible section,
 /// name only, then «الإعدادات» for whoever can open settings.
 ///
@@ -93,14 +108,16 @@ class HomeDashboard extends ConsumerWidget {
           tileKey: HomeShell.sectionKey(section),
           labelKey: Key('home-tile-label-${section.key}'),
           icon: homeTileIcon(section),
+          tint: homeTileTint(section, context.look),
           label: sectionLabel(section),
           path: sectionPath(section),
         ),
       if (showsSettingsEntry(permissions))
-        const HomeTile(
+        HomeTile(
           tileKey: settingsTileKey,
-          labelKey: Key('home-tile-label-settings'),
+          labelKey: const Key('home-tile-label-settings'),
           icon: Icons.settings,
+          tint: homeTileTint(null, context.look),
           label: AppStrings.settings,
           path: '/settings',
         ),
@@ -163,12 +180,14 @@ class HomeDashboard extends ConsumerWidget {
   }
 }
 
-/// Deep blue tile with a gold bottom edge, a gold icon, and the white name.
+/// Section tile: a tinted glass card (dark) or a white card with a soft
+/// shadow (light), the icon in a tinted square, and the name in ink.
 class HomeTile extends StatelessWidget {
   const HomeTile({
     required this.tileKey,
     required this.labelKey,
     required this.icon,
+    required this.tint,
     required this.label,
     required this.path,
     super.key,
@@ -177,35 +196,23 @@ class HomeTile extends StatelessWidget {
   final Key tileKey;
   final Key labelKey;
   final IconData icon;
+  final Color tint;
   final String label;
   final String path;
 
-  static const _top = Color(0xFF1E3F9A);
-  static const _bottom = Color(0xFF0B2468);
-  static const _edge = Color(0xFFF2B705);
-  static const _icon = Color(0xFFFFC928);
-
   @override
   Widget build(BuildContext context) {
+    final look = context.look;
     final radius = BorderRadius.circular(AppRadii.xxl);
     return Semantics(
       button: true,
       label: label,
       excludeSemantics: true,
-      child: Container(
+      child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: radius,
-          color: _edge,
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x33000000),
-              blurRadius: 6,
-              offset: Offset(0, 3),
-            ),
-          ],
+          boxShadow: look.cardShadow,
         ),
-        // The gold shows only along the bottom edge.
-        padding: const EdgeInsetsDirectional.only(bottom: 4),
         child: Material(
           color: Colors.transparent,
           borderRadius: radius,
@@ -213,10 +220,14 @@ class HomeTile extends StatelessWidget {
           child: Ink(
             decoration: BoxDecoration(
               borderRadius: radius,
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [_top, _bottom],
+              gradient: look.tileFill(tint),
+              border: Border.all(
+                color: look.glass
+                    ? Color.alphaBlend(
+                        tint.withValues(alpha: 0.22),
+                        look.cardBorder,
+                      )
+                    : look.cardBorder,
               ),
             ),
             child: InkWell(
@@ -232,14 +243,22 @@ class HomeTile extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(icon, size: 40, color: _icon),
-                      const SizedBox(height: AppSpacing.sm),
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: look.iconWell(tint),
+                          borderRadius: BorderRadius.circular(AppRadii.xl),
+                        ),
+                        child: Icon(icon, size: 30, color: tint),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
                       Text(
                         label,
                         key: labelKey,
                         textAlign: TextAlign.center,
                         softWrap: true,
-                        style: cairo(16, 800, color: Colors.white),
+                        style: cairo(16, 700, color: look.ink),
                       ),
                     ],
                   ),
