@@ -152,7 +152,7 @@ void main() {
     fake.accountNextItems = [
       {'id': 'c_extra', 'name': 'صفحة ثانية', 'balanceUnits': 10, 'version': 1},
     ];
-    await go(tester, '/customers');
+    await go(tester, '/companies');
 
     expect(find.text('صفحة ثانية'), findsNothing);
     await tester.ensureVisible(find.text(AppStrings.loadMore));
@@ -180,7 +180,7 @@ void main() {
     fake.accountNextItems = [
       {'id': 'c_late', 'name': 'صفحة متأخرة', 'balanceUnits': 10, 'version': 1},
     ];
-    await go(tester, '/customers');
+    await go(tester, '/companies');
     final gate = Completer<void>();
     fake.pauseAccountLists = gate;
 
@@ -206,7 +206,7 @@ void main() {
       final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
       final fake = layer.client as FakeApiClient;
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      await go(tester, '/customers');
+      await go(tester, '/companies');
       expect(find.byKey(const Key('show-all-debts')), findsNothing);
 
       tester.view.physicalSize = const Size(360, 2400);
@@ -220,7 +220,7 @@ void main() {
           'version': 1,
         },
       ];
-      await go(tester, '/customers');
+      await go(tester, '/companies');
       expect(find.byType(ExpansionTile), findsOneWidget);
       await tester.tap(find.text(AppStrings.oldDebtsTitle));
       await settle(tester);
@@ -256,7 +256,7 @@ void main() {
           .skip(before)
           .where((query) => query.cursor != null);
       expect(paged, hasLength(1));
-      expect(paged.single.section, 'customers');
+      expect(paged.single.section, 'companies');
       expect(paged.single.filter, 'pinned');
       expect(paged.single.q, 'عميل');
       expect(paged.single.cursor, 'page-2');

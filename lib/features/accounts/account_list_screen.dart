@@ -66,9 +66,60 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     final canWrite = permissions.canWrite(section.sectionKey);
     final home = ref.watch(homeDashboardProvider);
     final width = MediaQuery.sizeOf(context).width;
-    final columns = accountListColumns(
+    final gridColumns = accountListColumns(
       width,
       textScale: MediaQuery.textScalerOf(context).scale(1),
+    );
+    // Customers: two equal cards per row on every phone (Ali, 2026-11-02).
+    final columns = section == AccountSection.customers && gridColumns < 2
+        ? 2
+        : gridColumns;
+
+    final isCustomers = section == AccountSection.customers;
+    final Widget searchField = TextField(
+      key: const Key('account-search'),
+      controller: _search,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        labelText: AppStrings.filterSearch,
+        isDense: false,
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _search,
+          builder: (context, value, _) {
+            if (value.text.isEmpty) return const SizedBox.shrink();
+            return IconButton(
+              key: const Key('clear-account-search'),
+              tooltip: AppStrings.clearSearch,
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                _search.clear();
+                ref.read(accountExtraCardsProvider(section).notifier).clear();
+                ref.read(accountQueryProvider(section).notifier).state = '';
+              },
+            );
+          },
+        ),
+      ),
+      onSubmitted: (value) {
+        ref.read(accountExtraCardsProvider(section).notifier).clear();
+        ref.read(accountQueryProvider(section).notifier).state = value;
+      },
+    );
+    final Widget addButton = GatedButton(
+      buttonKey: const Key('add-account'),
+      allowed: permissions.canWrite(section.sectionKey),
+      online: online,
+      label: _addLabel,
+      onPressed: () => _create(context),
+    );
+    final Widget assignButton = GatedButton(
+      buttonKey: const Key('assign-mode'),
+      allowed: _canAssign(permissions),
+      online: online,
+      filled: false,
+      label: AppStrings.assign,
+      onPressed: () => setState(() => _assigning = !_assigning),
     );
 
     return KeptData<AccountsPage>(
@@ -109,8 +160,11 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: pagePadding(width),
             children: [
-              ScreenTitle(sectionLabel(section.sectionKey)),
-              const SizedBox(height: AppSpacing.md),
+              // Customers: no page title (Ali, 2026-11-02).
+              if (!isCustomers) ...[
+                ScreenTitle(sectionLabel(section.sectionKey)),
+                const SizedBox(height: AppSpacing.md),
+              ],
               if (_showTicker)
                 _ticker(
                   home,
@@ -131,66 +185,26 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
               ),
               if (section == AccountSection.egyptianDeposits) const _RateCard(),
               const SizedBox(height: AppSpacing.md),
-              _Tabs(section: section, summary: data.summary),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                key: const Key('account-search'),
-                controller: _search,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  labelText: AppStrings.filterSearch,
-                  isDense: false,
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _search,
-                    builder: (context, value, _) {
-                      if (value.text.isEmpty) return const SizedBox.shrink();
-                      return IconButton(
-                        key: const Key('clear-account-search'),
-                        tooltip: AppStrings.clearSearch,
-                        icon: const Icon(Icons.close),
-                        onPressed: () {
-                          _search.clear();
-                          ref
-                              .read(accountExtraCardsProvider(section).notifier)
-                              .clear();
-                          ref
-                                  .read(accountQueryProvider(section).notifier)
-                                  .state =
-                              '';
-                        },
-                      );
-                    },
-                  ),
+              // Customers: no filter chips (Ali, 2026-11-02).
+              if (!isCustomers) ...[
+                _Tabs(section: section, summary: data.summary),
+                const SizedBox(height: AppSpacing.md),
+              ],
+              if (isCustomers)
+                _CustomersToolbar(
+                  add: addButton,
+                  search: searchField,
+                  assign: assignButton,
+                )
+              else ...[
+                searchField,
+                const SizedBox(height: AppSpacing.md),
+                Wrap(
+                  spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.md,
+                  children: [addButton, assignButton],
                 ),
-                onSubmitted: (value) {
-                  ref.read(accountExtraCardsProvider(section).notifier).clear();
-                  ref.read(accountQueryProvider(section).notifier).state =
-                      value;
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Wrap(
-                spacing: AppSpacing.md,
-                runSpacing: AppSpacing.md,
-                children: [
-                  GatedButton(
-                    buttonKey: const Key('add-account'),
-                    allowed: permissions.canWrite(section.sectionKey),
-                    online: online,
-                    label: _addLabel,
-                    onPressed: () => _create(context),
-                  ),
-                  GatedButton(
-                    buttonKey: const Key('assign-mode'),
-                    allowed: _canAssign(permissions),
-                    online: online,
-                    filled: false,
-                    label: AppStrings.assign,
-                    onPressed: () => setState(() => _assigning = !_assigning),
-                  ),
-                ],
-              ),
+              ],
               if (_assigning)
                 _AssignSubmit(
                   section: section,
@@ -221,23 +235,55 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                   child: NotificationListener<ScrollNotification>(
                     onNotification: (notification) =>
                         _onCardsScroll(notification, data.page.nextCursor),
-                    child: ListView.builder(
-                      key: const Key('account-cards-list'),
-                      itemCount: cards.length,
-                      itemBuilder: (context, index) {
-                        final card = cards[index];
-                        return Padding(
-                          padding: const EdgeInsetsDirectional.only(
-                            bottom: AppSpacing.md,
+                    child: isCustomers
+                        ? ListView.builder(
+                            key: const Key('account-cards-list'),
+                            itemCount: (cards.length + 1) ~/ 2,
+                            itemBuilder: (context, row) => Padding(
+                              padding: const EdgeInsetsDirectional.only(
+                                bottom: AppSpacing.md,
+                              ),
+                              child: SizedBox(
+                                height: customerCardHeight(context),
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    for (final i in [row * 2, row * 2 + 1]) ...[
+                                      if (i == row * 2 + 1)
+                                        const SizedBox(width: AppSpacing.md),
+                                      Expanded(
+                                        child: i < cards.length
+                                            ? _accountCard(
+                                                card: cards[i],
+                                                canWrite: canWrite,
+                                                permissions: permissions,
+                                              )
+                                            : const SizedBox.shrink(),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            key: const Key('account-cards-list'),
+                            itemCount: cards.length,
+                            itemBuilder: (context, index) {
+                              final card = cards[index];
+                              return Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  bottom: AppSpacing.md,
+                                ),
+                                child: _accountCard(
+                                  card: card,
+                                  canWrite: canWrite,
+                                  permissions: permissions,
+                                ),
+                              );
+                            },
                           ),
-                          child: _accountCard(
-                            card: card,
-                            canWrite: canWrite,
-                            permissions: permissions,
-                          ),
-                        );
-                      },
-                    ),
                   ),
                 ),
               if (_loadMoreCursor(data.page.nextCursor) != null)
@@ -294,6 +340,9 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             for (final card in cards)
               SizedBox(
                 width: cardWidth,
+                height: section == AccountSection.customers
+                    ? customerCardHeight(context)
+                    : null,
                 child: _accountCard(
                   card: card,
                   canWrite: canWrite,
@@ -340,8 +389,9 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   double _cardWidth(double maxWidth, int columns) {
     if (columns <= 1 || maxWidth <= 0) return maxWidth;
     final raw = (maxWidth - AppSpacing.md * (columns - 1)) / columns;
-    if (raw < 160) return maxWidth;
-    return raw.clamp(160.0, maxWidth);
+    final min = section == AccountSection.customers ? 120.0 : 160.0;
+    if (raw < min) return maxWidth;
+    return raw.clamp(min, maxWidth);
   }
 
   bool get _showTicker =>
@@ -604,15 +654,60 @@ class _SummaryStrip extends StatelessWidget {
     // Customers show only the server totalDebt, as the headline (Ali,
     // 2026-11-02). Other sections keep net and total.
     if (section == AccountSection.customers) {
+      // Right: server netBalance (total debts minus credits). Left: server
+      // activeCards. No client arithmetic (Ali, 2026-11-02).
+      final count = summary.activeCards;
       return Card(
-        key: const Key('summary-total-only'),
+        key: const Key('customers-summary'),
         child: Padding(
           padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-          child: _Metric(
-            label: AppStrings.totalDebt,
-            value: money.formatOrDash(summary.totalDebtUnits, currency),
-            valueStyle: theme.textTheme.titleSmall,
-            amountStyle: context.textExtras.amountLarge,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppStrings.customersTotalDebt,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: MoneyText(
+                        money.formatOrDash(summary.netBalanceUnits, currency),
+                        key: const Key('customers-summary-amount'),
+                        style: context.textExtras.amountLarge,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Flexible(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      AppStrings.activeCardsCount,
+                      textAlign: TextAlign.end,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      count == null ? AppStrings.dash : '$count',
+                      key: const Key('customers-summary-count'),
+                      textDirection: TextDirection.ltr,
+                      style: context.textExtras.amountLarge,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -707,6 +802,101 @@ class _AccountCard extends StatelessWidget {
   final Future<String?> Function(MutationMeta meta) onPin;
   final Future<String?> Function(MutationMeta meta)? onZero;
 
+  /// Customers: name, value under it, the assigned employee if any, and the
+  /// existing zero-review action as a check button (Ali, 2026-11-02).
+  Widget _customerBody(
+    BuildContext context, {
+    required Color fg,
+    required Color accent,
+    required bool showAssign,
+    required bool showZero,
+  }) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // The facts clip instead of overflowing when text is large.
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          card.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: cairo(16, 800, color: fg),
+                        ),
+                      ),
+                      if (card.systemManaged)
+                        Tooltip(
+                          message: AppStrings.systemCard,
+                          child: Icon(Icons.lock_outline, size: 16, color: fg),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: MoneyText(
+                        money.formatOrDash(card.balanceUnits, card.currency),
+                        style: context.textExtras.amountLarge.copyWith(
+                          color: fg,
+                          fontSize: 22,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (card.activeAssigneeName != null)
+                    Text(
+                      '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
+                      key: Key('account-assignee-${card.id}'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: cairo(12, 700, color: accent),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          if (showAssign || showZero)
+            Row(
+              children: [
+                if (showAssign)
+                  SizedBox.square(
+                    dimension: 32,
+                    child: Checkbox(
+                      value: selected,
+                      onChanged: (_) => onToggle(),
+                    ),
+                  ),
+                const Spacer(),
+                if (showZero)
+                  GuardedMutation(
+                    buttonKey: ValueKey('zero-review-${card.id}'),
+                    inputs: 'zero:${card.id}:${card.version}',
+                    expectedVersion: card.version,
+                    label: AppStrings.zeroReview,
+                    tooltip: AppStrings.zeroReview,
+                    icon: Icons.check_circle_outline,
+                    onSubmit: (meta) => onZero!(meta),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
@@ -756,107 +946,171 @@ class _AccountCard extends StatelessWidget {
         ),
         child: InkWell(
           onTap: onOpen,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 118),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (age != null)
-                    Text(
-                      age,
-                      key: Key('account-age-${card.id}'),
-                      style: cairo(11, 800, color: accent),
-                    ),
-                  Text(card.name, style: cairo(16, 800, color: fg)),
-                  if (card.phone != null)
-                    _StartAlignedText(
-                      card.phone!,
-                      style: cairo(12, 500, color: accent),
-                    ),
-                  const SizedBox(height: AppSpacing.sm),
-                  MoneyText(
-                    money.formatOrDash(card.balanceUnits, card.currency),
-                    style: context.textExtras.amountLarge.copyWith(color: fg),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    '${AppStrings.lastActivity}: ${formatIsoDate(card.lastActivityAt)}',
-                    style: cairo(11, 500, color: accent),
-                  ),
-                  if (card.activeAssigneeName != null)
-                    Text(
-                      '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
-                      style: cairo(11, 600, color: accent),
-                    ),
-                  if (card.systemManaged)
-                    Row(
+          child: section == AccountSection.customers
+              ? _customerBody(
+                  context,
+                  fg: fg,
+                  accent: accent,
+                  showAssign: showAssign,
+                  showZero: showZero,
+                )
+              : ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 118),
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.lock_outline, size: 16, color: fg),
-                        const SizedBox(width: AppSpacing.xs),
-                        Expanded(
-                          child: Text(
-                            AppStrings.systemCard,
-                            style: cairo(11, 800, color: fg),
+                        if (age != null)
+                          Text(
+                            age,
+                            key: Key('account-age-${card.id}'),
+                            style: cairo(11, 800, color: accent),
+                          ),
+                        Text(card.name, style: cairo(16, 800, color: fg)),
+                        if (card.phone != null)
+                          _StartAlignedText(
+                            card.phone!,
+                            style: cairo(12, 500, color: accent),
+                          ),
+                        const SizedBox(height: AppSpacing.sm),
+                        MoneyText(
+                          money.formatOrDash(card.balanceUnits, card.currency),
+                          style: context.textExtras.amountLarge.copyWith(
+                            color: fg,
                           ),
                         ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          '${AppStrings.lastActivity}: ${formatIsoDate(card.lastActivityAt)}',
+                          style: cairo(11, 500, color: accent),
+                        ),
+                        if (card.activeAssigneeName != null)
+                          Text(
+                            '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
+                            style: cairo(11, 600, color: accent),
+                          ),
+                        if (card.systemManaged)
+                          Row(
+                            children: [
+                              Icon(Icons.lock_outline, size: 16, color: fg),
+                              const SizedBox(width: AppSpacing.xs),
+                              Expanded(
+                                child: Text(
+                                  AppStrings.systemCard,
+                                  style: cairo(11, 800, color: fg),
+                                ),
+                              ),
+                            ],
+                          ),
+                        if (showActions) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          Divider(
+                            height: 1,
+                            color: colored
+                                ? colors.onStatus.withValues(alpha: 0.24)
+                                : scheme.outlineVariant,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Wrap(
+                            spacing: AppSpacing.xs,
+                            runSpacing: AppSpacing.xs,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              if (showAssign)
+                                Checkbox(
+                                  value: selected,
+                                  onChanged: (_) => onToggle(),
+                                ),
+                              if (showPin)
+                                GuardedMutation(
+                                  buttonKey: Key('pin-${card.id}'),
+                                  inputs:
+                                      'pin:${card.id}:${card.pinned}:${card.version}',
+                                  expectedVersion: card.version,
+                                  label: card.pinned
+                                      ? AppStrings.unpin
+                                      : AppStrings.pin,
+                                  tooltip: card.pinned
+                                      ? AppStrings.unpin
+                                      : AppStrings.pin,
+                                  icon: card.pinned
+                                      ? Icons.push_pin
+                                      : Icons.push_pin_outlined,
+                                  onSubmit: (meta) => onPin(meta),
+                                ),
+                              if (showZero)
+                                GuardedMutation(
+                                  buttonKey: ValueKey('zero-review-${card.id}'),
+                                  inputs: 'zero:${card.id}:${card.version}',
+                                  expectedVersion: card.version,
+                                  label: AppStrings.zeroReview,
+                                  filled: false,
+                                  onSubmit: (meta) => onZero!(meta),
+                                ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
-                  if (showActions) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    Divider(
-                      height: 1,
-                      color: colored
-                          ? colors.onStatus.withValues(alpha: 0.24)
-                          : scheme.outlineVariant,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Wrap(
-                      spacing: AppSpacing.xs,
-                      runSpacing: AppSpacing.xs,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (showAssign)
-                          Checkbox(
-                            value: selected,
-                            onChanged: (_) => onToggle(),
-                          ),
-                        if (showPin)
-                          GuardedMutation(
-                            buttonKey: Key('pin-${card.id}'),
-                            inputs:
-                                'pin:${card.id}:${card.pinned}:${card.version}',
-                            expectedVersion: card.version,
-                            label: card.pinned
-                                ? AppStrings.unpin
-                                : AppStrings.pin,
-                            tooltip: card.pinned
-                                ? AppStrings.unpin
-                                : AppStrings.pin,
-                            icon: card.pinned
-                                ? Icons.push_pin
-                                : Icons.push_pin_outlined,
-                            onSubmit: (meta) => onPin(meta),
-                          ),
-                        if (showZero)
-                          GuardedMutation(
-                            buttonKey: ValueKey('zero-review-${card.id}'),
-                            inputs: 'zero:${card.id}:${card.version}',
-                            expectedVersion: card.version,
-                            label: AppStrings.zeroReview,
-                            filled: false,
-                            onSubmit: (meta) => onZero!(meta),
-                          ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
+                  ),
+                ),
         ),
       ),
+    );
+  }
+}
+
+/// One height for every customer card, grown with the text scale.
+double customerCardHeight(BuildContext context) {
+  final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
+  return 128 * scale;
+}
+
+/// Customers: add on the right, search in the middle, assign on the left.
+/// Very narrow or large-text screens put the buttons above the search.
+class _CustomersToolbar extends StatelessWidget {
+  const _CustomersToolbar({
+    required this.add,
+    required this.search,
+    required this.assign,
+  });
+
+  final Widget add;
+  final Widget search;
+  final Widget assign;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      key: const Key('customers-toolbar'),
+      builder: (context, constraints) {
+        final scale = MediaQuery.textScalerOf(context).scale(1);
+        if (constraints.maxWidth / scale >= 330) {
+          return Row(
+            children: [
+              add,
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: search),
+              const SizedBox(width: AppSpacing.sm),
+              assign,
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [add, assign],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            search,
+          ],
+        );
+      },
     );
   }
 }

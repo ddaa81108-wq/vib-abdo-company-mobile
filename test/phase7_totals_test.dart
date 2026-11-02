@@ -107,7 +107,7 @@ void main() {
   testWidgets('P7-06 the zero card shows the server age label', (tester) async {
     await pumpFakeApp(tester, size: const Size(800, 2200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers');
+    await go(tester, '/companies');
 
     expect(find.text('منذ 0 أيام'), findsWidgets);
     expect(find.text(AppStrings.zeroAccount), findsNothing);

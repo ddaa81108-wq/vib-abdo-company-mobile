@@ -50,7 +50,9 @@ void main() {
       expect(_text('عميل سليم'), findsWidgets);
       expect(_text('320 د.ل'), findsWidgets);
       expect(_text('0 د.ل'), findsWidgets);
-      expect(_text('10,635 د.ل'), findsWidgets);
+      // Customers summary shows only server netBalance now (Ali, 2026-11-02),
+      // so the invalid net replaces the figure instead of totalDebt.
+      expect(_text('10,635 د.ل'), findsNothing);
       expect(_text(MoneyValue.invalidLabel), findsWidgets);
       expect(_icon(), findsWidgets);
       expect(_text('10 د.ل'), findsNothing);

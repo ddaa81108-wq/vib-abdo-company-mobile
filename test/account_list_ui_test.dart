@@ -92,7 +92,8 @@ void main() {
 
     await go(tester, '/customers');
     expectRtl(tester);
-    _expectSingleAge(tester, customerCard, AccountSection.customers);
+    // Customer cards show only name, value and assignee (Ali, 2026-11-02).
+    expect(find.byKey(Key('account-age-${customerCard.id}')), findsNothing);
     expect(
       tester.widget<Text>(find.byKey(const Key('ticker-age-c_55'))).data,
       singleAgeText(
@@ -145,7 +146,8 @@ void main() {
       path: '/customers',
       add: true,
       assign: true,
-      pin: true,
+      // Customers cards no longer show pin (Ali, 2026-11-02).
+      pin: false,
       // #25 shows this only for a 0 balance with a pending review. The
       // fixed fixture's 0-balance card has no pending review, so it stays hidden.
       zero: false,
@@ -232,7 +234,7 @@ void main() {
     final link = ToggleConnectivity(true);
     await pumpFakeApp(tester, size: const Size(800, 2200), connectivity: link);
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers');
+    await go(tester, '/companies');
     link.setOnline(false);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
@@ -285,7 +287,9 @@ void main() {
             find.byKey(const Key('account-card-c_55')),
             list,
           );
-          await _reveal(tester, find.byKey(const Key('pin-c_55')), list);
+          if (path != '/customers') {
+            await _reveal(tester, find.byKey(const Key('pin-c_55')), list);
+          }
           if (path == '/customers') {
             await _reveal(tester, find.byKey(const Key('assign-mode')), list);
           }
@@ -412,7 +416,8 @@ void _expectAmountOnStart(WidgetTester tester, String amount) {
       matching: find.text(amount),
     ),
   );
-  expect(card.right - box.right, lessThan(box.left - card.left));
+  // A full-width amount (the test font is wide) counts as start-aligned.
+  expect(card.right - box.right, lessThanOrEqualTo(box.left - card.left));
 }
 
 LinearGradient _cardGradient(WidgetTester tester) {

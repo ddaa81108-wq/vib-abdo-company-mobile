@@ -79,6 +79,8 @@ abstract final class AppStrings {
   static const loadMore = 'تحميل المزيد';
   static const netDebt = 'صافي إجمالي الديون';
   static const totalDebt = 'إجمالي الديون';
+  static const customersTotalDebt = 'إجمالي ديون العملاء';
+  static const activeCardsCount = 'البطاقات النشطة';
   static const lastActivity = 'آخر حركة';
   static const withEmployee = 'لدى';
   static const systemCard = 'نظامي';
