@@ -376,7 +376,8 @@ void main() {
     expect(find.text(AppStrings.emptyLedger), findsOneWidget);
     expect(find.byKey(const Key('edit-account-card')), findsOneWidget);
     expect(find.byKey(const Key('add-debt')), findsOneWidget);
-    expect(find.text(AppStrings.statementHidden), findsOneWidget);
+    // Ali, 2026-11-03: no explanatory notes in the footer.
+    expect(find.text(AppStrings.statementHidden), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

@@ -781,12 +781,18 @@ class UnitsField extends StatelessWidget {
     super.key,
     this.dense,
     this.showHint = true,
+    this.autofocus = false,
+    this.focusNode,
   });
+
+  /// The ledger's add row opens with the cursor here (Ali, 2026-11-03).
+  final bool autofocus;
+  final FocusNode? focusNode;
 
   final TextEditingController controller;
   final String label;
 
-  /// False in compact inline rows; the hint is then shown once nearby.
+  /// False in the ledger's compact add row (Ali asked for no notes there).
   final bool showHint;
 
   /// Overrides the theme density. Null keeps the theme value.
@@ -795,6 +801,8 @@ class UnitsField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextField(
+      autofocus: autofocus,
+      focusNode: focusNode,
       controller: controller,
       keyboardType: TextInputType.number,
       textDirection: TextDirection.ltr,

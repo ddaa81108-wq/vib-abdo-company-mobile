@@ -157,10 +157,22 @@ void main() {
     await pumpFakeApp(tester, size: const Size(800, 1800));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
-    await tester.tap(find.byKey(const Key('add-debt')));
+    // Ali, 2026-11-03: the ledger's add row carries no notes.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('ledger-composer')),
+        matching: find.text(AppStrings.unitsHint),
+      ),
+      findsNothing,
+    );
+    // The correction form keeps the explanation under its amount field.
+    final correct = find.byKey(const Key('correct-tx_1'));
+    await tester.ensureVisible(correct);
     await settle(tester);
-
+    await tester.tap(correct);
+    await settle(tester);
     expect(find.text(AppStrings.unitsHint), findsWidgets);
+    await tester.pump(const Duration(seconds: 1));
   });
 }
 

@@ -74,6 +74,60 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   final _rows = ScrollController();
   final _innerRows = ScrollController();
   final _columnsScroll = ScrollController();
+  final _headerScroll = ScrollController();
+  var _syncingColumns = false;
+  var _showJumpTop = false;
+  var _showJumpBottom = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _columnsScroll.addListener(
+      () => _syncColumns(_columnsScroll, _headerScroll),
+    );
+    _headerScroll.addListener(
+      () => _syncColumns(_headerScroll, _columnsScroll),
+    );
+    _rows.addListener(_updateJumpButtons);
+    _innerRows.addListener(_updateJumpButtons);
+  }
+
+  /// The sticky names and the rows scroll sideways as one table.
+  void _syncColumns(ScrollController from, ScrollController to) {
+    if (_syncingColumns || !from.hasClients || !to.hasClients) return;
+    final position = to.position;
+    final target = from.offset.clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if ((to.offset - target).abs() < 0.5) return;
+    _syncingColumns = true;
+    to.jumpTo(target);
+    _syncingColumns = false;
+  }
+
+  static bool _atTop(ScrollController controller) =>
+      !controller.hasClients || controller.position.pixels <= 8;
+
+  /// Small up/down buttons once the user is away from either end.
+  void _updateJumpButtons() {
+    if (!mounted) return;
+    final top = !(_atTop(_rows) && _atTop(_innerRows));
+    final bottom = !(_atBottom(_rows) && _atBottom(_innerRows));
+    if (top == _showJumpTop && bottom == _showJumpBottom) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _showJumpTop = top;
+        _showJumpBottom = bottom;
+      });
+    });
+  }
+
+  void _jumpToTop() {
+    if (_innerRows.hasClients) _innerRows.jumpTo(0);
+    if (_rows.hasClients) _rows.jumpTo(0);
+  }
 
   AccountSection get section => widget.section;
   String get id => widget.id;
@@ -83,6 +137,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     _rows.dispose();
     _innerRows.dispose();
     _columnsScroll.dispose();
+    _headerScroll.dispose();
     super.dispose();
   }
 
@@ -387,8 +442,12 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final viewport = constraints.maxWidth - padding.horizontal;
+        // Pinned when there is room for it; on a very short screen (e.g.
+        // 320x568 at text x2) the names scroll with the rows instead.
+        final sticky =
+            page.page.items.isNotEmpty && constraints.maxHeight >= 220;
         final table = <Widget>[
-          _LedgerColumnHeader(columns: columns),
+          if (!sticky) _LedgerColumnHeader(columns: columns),
           if (!complete)
             _OlderStatus(
               busy: _olderBusy,
@@ -408,7 +467,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               ),
             ),
         ];
-        return RefreshIndicator(
+        final list = RefreshIndicator(
           key: const Key('ledger-refresh'),
           onRefresh: () async {
             ref.invalidate(ledgerProvider((section, id)));
@@ -419,13 +478,13 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
             key: const Key('ledger-scroll'),
             controller: _rows,
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: padding.copyWith(top: AppSpacing.sm),
+            padding: padding.copyWith(top: sticky ? 0 : AppSpacing.sm),
             children: [
               _LedgerTable(
                 controller: _columnsScroll,
                 width: columns.width,
                 viewport: viewport,
-                footnote: showBalance ? null : AppStrings.statementHidden,
+                attachedTop: sticky,
                 composer: composer,
                 children: page.page.items.isEmpty
                     ? const [EmptyPane(message: AppStrings.emptyLedger)]
@@ -434,6 +493,46 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               const SizedBox(height: AppSpacing.md),
             ],
           ),
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // The column names stay on screen while the rows scroll, and
+            // follow the rows sideways (Ali, 2026-11-03).
+            if (sticky)
+              Padding(
+                padding: padding.copyWith(top: AppSpacing.sm, bottom: 0),
+                child: _StickyColumnHeader(
+                  controller: _headerScroll,
+                  width: columns.width,
+                  viewport: viewport,
+                  columns: columns,
+                ),
+              ),
+            Expanded(
+              child: Stack(
+                children: [
+                  NotificationListener<ScrollMetricsNotification>(
+                    onNotification: (_) {
+                      _updateJumpButtons();
+                      return false;
+                    },
+                    child: list,
+                  ),
+                  PositionedDirectional(
+                    end: AppSpacing.lg,
+                    top: AppSpacing.md,
+                    child: _JumpButtons(
+                      showTop: _showJumpTop,
+                      showBottom: _showJumpBottom,
+                      onTop: _jumpToTop,
+                      onBottom: _jumpToEntry,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );
@@ -714,6 +813,8 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       label: AppStrings.ledgerColValue,
       dense: true,
       showHint: false,
+      // Ready to type on entry and after each save (Ali, 2026-11-03).
+      autofocus: true,
     );
     final rate = TextField(
       key: const Key('movement-factor'),
@@ -816,9 +917,6 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
               save,
             ],
           ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(AppStrings.unitsHint, style: cairo(11, 500, color: look.muted)),
-        Text(AppStrings.noPreview, style: cairo(11, 500, color: look.muted)),
         if (watchedCard.hasError)
           Semantics(
             container: true,
@@ -1427,7 +1525,7 @@ class _LedgerTable extends StatelessWidget {
     required this.viewport,
     required this.children,
     this.composer,
-    this.footnote,
+    this.attachedTop = false,
   });
 
   final ScrollController controller;
@@ -1435,12 +1533,17 @@ class _LedgerTable extends StatelessWidget {
   final double viewport;
   final List<Widget> children;
   final Widget? composer;
-  final String? footnote;
+
+  /// The sticky column names sit right above, so the top is square.
+  final bool attachedTop;
 
   @override
   Widget build(BuildContext context) {
     final look = context.look;
-    final radius = BorderRadius.circular(AppRadii.card);
+    final corner = Radius.circular(AppRadii.card);
+    final radius = attachedTop
+        ? BorderRadius.vertical(bottom: corner)
+        : BorderRadius.all(corner);
     final tableWidth = width > viewport ? width : viewport;
     final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
@@ -1477,48 +1580,44 @@ class _LedgerTable extends StatelessWidget {
                 ),
               ),
             ),
-            Container(
-              color: look.strip,
-              padding: const EdgeInsetsDirectional.symmetric(
-                horizontal: AppSpacing.sm,
-                vertical: AppSpacing.xs,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      footnote ?? '',
-                      style: cairo(10.5, 500, color: look.muted),
-                    ),
-                  ),
-                  if (width > viewport)
-                    Flexible(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsetsDirectional.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: 2,
+            if (width > viewport)
+              Container(
+                color: look.strip,
+                padding: const EdgeInsetsDirectional.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
+                child: Row(
+                  children: [
+                    const Spacer(),
+                    if (width > viewport)
+                      Flexible(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            borderRadius: BorderRadius.circular(999),
                           ),
-                          child: Text(
-                            AppStrings.ledgerSwipeMore,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: cairo(
-                              10.5,
-                              800,
-                              color: Theme.of(context).colorScheme.onPrimary,
+                          child: Padding(
+                            padding: const EdgeInsetsDirectional.symmetric(
+                              horizontal: AppSpacing.sm,
+                              vertical: 2,
+                            ),
+                            child: Text(
+                              AppStrings.ledgerSwipeMore,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: cairo(
+                                10.5,
+                                800,
+                                color: Theme.of(context).colorScheme.onPrimary,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
             if (composer != null) ...[
               Divider(height: 1, color: look.cardBorder),
               composer!,
@@ -1526,6 +1625,107 @@ class _LedgerTable extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The column names, pinned above the scrolling rows. Its own sideways
+/// scroll follows the rows' scroll (and the other way round).
+class _StickyColumnHeader extends StatelessWidget {
+  const _StickyColumnHeader({
+    required this.controller,
+    required this.width,
+    required this.viewport,
+    required this.columns,
+  });
+
+  final ScrollController controller;
+  final double width;
+  final double viewport;
+  final _LedgerColumns columns;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final radius = BorderRadius.vertical(top: Radius.circular(AppRadii.card));
+    return DecoratedBox(
+      key: const Key('ledger-sticky-header'),
+      decoration: BoxDecoration(
+        color: look.card,
+        borderRadius: radius,
+        border: Border.all(color: look.cardBorder),
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: SingleChildScrollView(
+          key: const Key('ledger-header-scroll'),
+          controller: controller,
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: width > viewport ? width : viewport,
+            child: _LedgerColumnHeader(columns: columns),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small "first movement" / "latest movement" buttons, shown only when the
+/// list is away from that end. Navigation only.
+class _JumpButtons extends StatelessWidget {
+  const _JumpButtons({
+    required this.showTop,
+    required this.showBottom,
+    required this.onTop,
+    required this.onBottom,
+  });
+
+  final bool showTop;
+  final bool showBottom;
+  final VoidCallback onTop;
+  final VoidCallback onBottom;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!showTop && !showBottom) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    Widget button(Key key, IconData icon, String tip, VoidCallback onTap) =>
+        Padding(
+          padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.xs),
+          child: Material(
+            color: scheme.primary,
+            shape: const CircleBorder(),
+            elevation: 3,
+            child: IconButton(
+              key: key,
+              tooltip: tip,
+              visualDensity: VisualDensity.compact,
+              iconSize: 20,
+              color: scheme.onPrimary,
+              onPressed: onTap,
+              icon: Icon(icon),
+            ),
+          ),
+        );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showTop)
+          button(
+            const Key('ledger-jump-top'),
+            Icons.vertical_align_top_rounded,
+            AppStrings.ledgerJumpTop,
+            onTop,
+          ),
+        if (showBottom)
+          button(
+            const Key('ledger-jump-bottom'),
+            Icons.vertical_align_bottom_rounded,
+            AppStrings.ledgerJumpBottom,
+            onBottom,
+          ),
+      ],
     );
   }
 }
@@ -2048,7 +2248,11 @@ class _InlineComposerState extends State<_InlineComposer> {
         id: widget.accountId,
         type: _type,
         onSaved: (posted) {
-          setState(() => _round++);
+          // A fresh row, back on ديون (Ali, 2026-11-03).
+          setState(() {
+            _round++;
+            _type = 'debt';
+          });
           widget.onPosted(posted);
         },
       );

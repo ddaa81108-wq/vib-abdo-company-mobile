@@ -768,6 +768,7 @@ Future<void> _openPayment(WidgetTester tester, String amount) async {
   );
   final save = find.byKey(const Key('save-movement'));
   await tester.ensureVisible(save);
+  await tester.pump();
   await tester.tap(save);
   const warning = Key('overpayment-warning');
   for (var i = 0; i < 30; i++) {

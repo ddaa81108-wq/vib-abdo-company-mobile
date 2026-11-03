@@ -3,6 +3,8 @@ import 'package:flutter_api_layer/data/fake/fake_fixtures.dart';
 import 'package:flutter_api_layer/data/fake/fake_large_catalog.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
+import 'package:vib_abdo_company_mobile/performance/history_window.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'package:vib_abdo_company_mobile/ui/theme.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
@@ -294,4 +296,154 @@ void main() {
     expect(find.byKey(const Key('load-older')), findsNothing);
     await tester.pump(const Duration(seconds: 1));
   });
+
+  testWidgets('entry: ديون is chosen and the value field has the cursor', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(430, 932));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    await settle(tester);
+    expect(find.byKey(const ValueKey('movement-debt-0')), findsOneWidget);
+    final field = find.descendant(
+      of: find.byKey(const Key('movement-amount')),
+      matching: find.byType(EditableText),
+    );
+    expect(tester.widget<EditableText>(field).focusNode.hasFocus, isTrue);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('after a save the row is fresh and back on ديون', (tester) async {
+    await pumpFakeApp(tester, size: const Size(430, 1400));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    await settle(tester);
+    await tester.ensureVisible(find.byKey(const Key('add-payment')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('add-payment')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('movement-payment-0')), findsOneWidget);
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(const Key('movement-amount')),
+        matching: find.byType(TextField),
+      ),
+      '10',
+    );
+    await tester.pump();
+    final save = find.byKey(const Key('save-movement'));
+    await tester.ensureVisible(save);
+    await tester.pump();
+    await tester.tap(save);
+    await settle(tester);
+    // GuardedMutation asks to confirm; accept when it does.
+    final confirm = find.byKey(const Key('confirm-mutation'));
+    if (confirm.evaluate().isNotEmpty) {
+      await tester.tap(confirm);
+      await settle(tester);
+    }
+    expect(find.byKey(const ValueKey('movement-debt-1')), findsOneWidget);
+    final field = find.descendant(
+      of: find.byKey(const Key('movement-amount')),
+      matching: find.byType(EditableText),
+    );
+    expect(tester.widget<EditableText>(field).controller.text, isEmpty);
+    expect(tester.widget<EditableText>(field).focusNode.hasFocus, isTrue);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('the column names stay pinned and follow the sideways scroll', (
+    tester,
+  ) async {
+    await pumpFakeApp(
+      tester,
+      fakeDataset: FakeDataset.large,
+      size: const Size(430, 932),
+    );
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/${FakeLargeCatalog.longLedgerAccountId}');
+    for (var i = 0; i < 200; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+      if (find.byKey(const Key('ledger-loading-older')).evaluate().isEmpty &&
+          HistoryWindowTrace.ledgerExtra.isNotEmpty) {
+        break;
+      }
+    }
+    final header = find.byKey(const Key('ledger-sticky-header'));
+    expect(header, findsOneWidget);
+    final before = tester.getRect(header);
+    // Scroll the rows up a long way: the names do not move.
+    await tester.drag(
+      find.byKey(const Key('ledger-entries-list')),
+      const Offset(0, 600),
+    );
+    await tester.pump();
+    expect(tester.getRect(header), before);
+    // Sideways: the names follow the rows.
+    final rows = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byKey(const Key('ledger-columns-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    rows.position.jumpTo(rows.position.maxScrollExtent);
+    await tester.pump();
+    final names = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byKey(const Key('ledger-header-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(names.position.pixels, rows.position.pixels);
+    // Away from the ends: the jump buttons show and work.
+    await tester.pump();
+    expect(find.byKey(const Key('ledger-jump-top')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('ledger-jump-top')));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('ledger-jump-bottom')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('ledger-jump-bottom')));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('ledger-jump-bottom')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  for (final dark in [false, true]) {
+    testWidgets(
+      'with the keyboard up the value field and the names stay visible '
+      '(${dark ? 'dark' : 'light'})',
+      (tester) async {
+        await pumpFakeApp(tester, size: const Size(430, 932));
+        if (dark) {
+          await tester.tap(find.byKey(LoginScreen.themeKey));
+          await settle(tester);
+        }
+        await signIn(tester, username: 'admin.demo', password: 'demo-only');
+        await go(tester, '/customers/c_55');
+        await settle(tester);
+        // A phone keyboard: about a third of the screen.
+        tester.view.viewInsets = FakeViewPadding(
+          bottom: 320 * tester.view.devicePixelRatio,
+        );
+        addTearDown(tester.view.resetViewInsets);
+        await settle(tester);
+        final visibleBottom = 932 - 320.0;
+        final field = find.byKey(const Key('movement-amount'));
+        expect(tester.getRect(field).bottom, lessThanOrEqualTo(visibleBottom));
+        expect(tester.getRect(field).top, greaterThanOrEqualTo(0));
+        final names = find.byKey(const Key('ledger-sticky-header'));
+        expect(names, findsOneWidget);
+        expect(tester.getRect(names).bottom, lessThan(visibleBottom));
+        expect(find.byKey(const Key('ledger-header')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pump(const Duration(seconds: 1));
+      },
+    );
+  }
 }
