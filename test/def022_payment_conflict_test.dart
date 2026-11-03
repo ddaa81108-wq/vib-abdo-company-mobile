@@ -47,8 +47,11 @@ void main() {
     expect(_header('319 د.ل'), findsOneWidget);
     expect(_header('320 د.ل'), findsNothing);
 
-    Navigator.of(tester.element(find.byType(Dialog))).pop();
-    await settle(tester);
+    // The add row is inline now; close the sheet only when one is open.
+    if (find.byType(Dialog).evaluate().isNotEmpty) {
+      Navigator.of(tester.element(find.byType(Dialog))).pop();
+      await settle(tester);
+    }
     final stored = await tester.runAsync(
       () => layer.accounts.get(AccountSection.customers, 'c_55'),
     );

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/data/fake/fake_large_catalog.dart';
+import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/state/section_providers.dart';
+import 'package:vib_abdo_company_mobile/ui/theme.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import 'support/phase7_ui.dart';
@@ -146,6 +149,88 @@ void main() {
     await settle(tester);
     expect(inline, findsNothing);
     expect(find.byKey(const Key('screen-ledger-customers')), findsOneWidget);
+    await settle(tester);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  for (final (units, word) in [(320, 'دين'), (-80, 'أمانة'), (0, 'صفر')]) {
+    testWidgets('the total card is glossy for $word', (tester) async {
+      await pumpFakeApp(
+        tester,
+        size: const Size(430, 932),
+        overrides: [
+          accountCardProvider.overrideWith((ref, key) async {
+            return AccountCardDto.fromJson({
+              'id': key.$2,
+              'name': 'عميل تجريبي',
+              'balanceUnits': units,
+              'version': 2,
+            }, key.$1);
+          }),
+        ],
+      );
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/customers/c_55');
+      final card = find.byKey(const Key('ledger-header'));
+      final look = tester.element(card).look;
+      final gloss = switch (units) {
+        > 0 => look.glossDebt,
+        < 0 => look.glossCredit,
+        _ => look.glossZero,
+      };
+      final ink = tester.widget<Ink>(
+        find.descendant(of: card, matching: find.byType(Ink)).first,
+      );
+      final decoration = ink.decoration! as BoxDecoration;
+      expect(
+        (decoration.gradient! as LinearGradient).colors,
+        gloss.fill.colors,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('ledger-header-kind')),
+          matching: find.text(word),
+        ),
+        findsOneWidget,
+      );
+      final shown = find.descendant(
+        of: find.byKey(const Key('ledger-header-balance')),
+        matching: find.textContaining('-'),
+      );
+      expect(shown, findsNothing);
+      expect(tester.takeException(), isNull);
+      await settle(tester);
+      await tester.pump(const Duration(seconds: 1));
+    });
+  }
+
+  testWidgets('the add row sits under the table with the three types', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(430, 932));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    final table = find.byKey(const Key('ledger-table'));
+    for (final key in ['add-debt', 'add-payment', 'composer-full']) {
+      expect(
+        find.descendant(of: table, matching: find.byKey(Key(key))),
+        findsOneWidget,
+        reason: key,
+      );
+    }
+    expect(find.text(AppStrings.debtMovement), findsWidgets);
+    expect(find.text(AppStrings.paymentMovement), findsWidgets);
+    expect(find.text(AppStrings.fullPayment), findsWidgets);
+    // Debt is chosen first, so its fields are open.
+    expect(find.byKey(const Key('movement-amount')), findsOneWidget);
+    expect(find.byKey(const Key('full-payment')), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('composer-full')));
+    await tester.pump();
+    expect(find.byKey(const Key('full-payment')), findsOneWidget);
+    expect(find.byKey(const Key('movement-amount')), findsNothing);
+    expect(tester.takeException(), isNull);
     await settle(tester);
     await tester.pump(const Duration(seconds: 1));
   });

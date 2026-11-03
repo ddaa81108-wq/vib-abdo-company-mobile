@@ -371,10 +371,9 @@ void main() {
     await tester.tap(find.byKey(const Key('add-debt')));
     await settle(tester);
     await tester.enterText(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is TextField &&
-            widget.decoration?.labelText == AppStrings.amount,
+      find.descendant(
+        of: find.byKey(const Key('movement-amount')),
+        matching: find.byType(TextField),
       ),
       '10',
     );
@@ -482,6 +481,12 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
 
+    // The add row: choose دفع كلي, then its save button.
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.tap(find.byKey(const Key('composer-full')));
+    await tester.pump();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('full-payment')));
     await tester.tap(find.byKey(const Key('full-payment')));
     await settle(tester);
     final ledgerBody = jsonDecode(fake.mutationBodies.single) as Map;

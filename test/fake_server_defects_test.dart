@@ -72,7 +72,7 @@ void main() {
       await go(tester, '/');
       await go(tester, '/customers/c_55');
       expect(find.byKey(const Key('add-debt')), findsOneWidget);
-      expect(find.byKey(const Key('full-payment')), findsOneWidget);
+      expect(find.byKey(const Key('composer-full')), findsOneWidget);
       expect(find.text('مرّ عليه 3 أيام'), findsNothing);
       expect(find.text('منذ 4 أيام'), findsWidgets);
     },

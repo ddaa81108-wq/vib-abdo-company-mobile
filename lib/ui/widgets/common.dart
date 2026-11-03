@@ -780,10 +780,14 @@ class UnitsField extends StatelessWidget {
     required this.label,
     super.key,
     this.dense,
+    this.showHint = true,
   });
 
   final TextEditingController controller;
   final String label;
+
+  /// False in compact inline rows; the hint is then shown once nearby.
+  final bool showHint;
 
   /// Overrides the theme density. Null keeps the theme value.
   final bool? dense;
@@ -797,7 +801,7 @@ class UnitsField extends StatelessWidget {
       textAlign: TextAlign.start,
       decoration: InputDecoration(
         labelText: label,
-        helperText: AppStrings.unitsHint,
+        helperText: showHint ? AppStrings.unitsHint : null,
         helperMaxLines: 12,
         isDense: dense,
       ),

@@ -122,7 +122,7 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
 
     await go(tester, '/customers/c_55');
-    expect(find.byKey(const Key('full-payment')), findsOneWidget);
+    expect(find.byKey(const Key('composer-full')), findsOneWidget);
     expect(find.byKey(const Key('add-debt')), findsOneWidget);
 
     await go(tester, '/libyan-deposits/c_55');

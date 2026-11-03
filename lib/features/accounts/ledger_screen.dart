@@ -129,35 +129,58 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
           final padding = pagePadding(MediaQuery.sizeOf(context).width);
           // The total card stays on top while the table scrolls (Ali,
           // 2026-11-03).
+          final customers = section == AccountSection.customers;
+          final bar = Row(
+            children: [
+              IconButton(
+                tooltip: AppStrings.back,
+                onPressed: () => context.canPop()
+                    ? context.pop()
+                    : context.go('/${section.path}'),
+                icon: const Icon(Icons.arrow_back),
+              ),
+              Expanded(
+                child: Text(
+                  _ledgerTitle(section),
+                  key: const Key('ledger-title'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: cairo(18, 800, color: context.look.ink),
+                ),
+              ),
+              EditAccountCardButton(
+                section: section,
+                card: loadedCard,
+                compact: true,
+              ),
+            ],
+          );
           final pinned = Padding(
-            padding: padding.copyWith(top: AppSpacing.sm, bottom: 0),
+            padding: padding.copyWith(top: AppSpacing.xs, bottom: 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    IconButton(
-                      tooltip: AppStrings.back,
-                      onPressed: () => context.canPop()
-                          ? context.pop()
-                          : context.go('/${section.path}'),
-                      icon: const Icon(Icons.arrow_back),
-                    ),
-                    Expanded(
-                      child: _Header(
-                        section: section,
-                        card: loadedCard,
-                        money: money,
-                        title: _ledgerTitle(section),
-                        awaitingServerBalance: _balanceAwaitingReload,
-                        ackBalance: _ackBalance,
-                        reloadError: reloadError,
-                      ),
-                    ),
-                  ],
-                ),
-                EditAccountCardButton(section: section, card: loadedCard),
+                bar,
+                const SizedBox(height: AppSpacing.xs),
+                if (customers)
+                  _TotalCard(
+                    card: loadedCard,
+                    money: money,
+                    awaitingServerBalance: _balanceAwaitingReload,
+                    ackBalance: _ackBalance,
+                    reloadError: reloadError,
+                  )
+                else
+                  _Header(
+                    section: section,
+                    card: loadedCard,
+                    money: money,
+                    title: _ledgerTitle(section),
+                    awaitingServerBalance: _balanceAwaitingReload,
+                    ackBalance: _ackBalance,
+                    reloadError: reloadError,
+                    showTitle: false,
+                  ),
               ],
             ),
           );
@@ -227,42 +250,18 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     ];
     final rows = _oldestFirst(page.page.items);
     final cardReady = _cardReadyForWrite(card);
-    final writes = <Widget>[
-      GatedButton(
-        buttonKey: const Key('add-debt'),
-        allowed: cardReady,
-        online: online,
-        label: section == AccountSection.libyanDeposits
-            ? AppStrings.depositIn
-            : section == AccountSection.egyptianDeposits
-            ? AppStrings.egpIn
-            : AppStrings.debtMovement,
-        onPressed: () => _movement(context, ref, type: 'debt'),
-      ),
-      GatedButton(
-        buttonKey: const Key('add-payment'),
-        allowed: cardReady,
-        online: online,
-        label: section == AccountSection.libyanDeposits
-            ? AppStrings.depositOut
-            : section == AccountSection.egyptianDeposits
-            ? AppStrings.egpOut
-            : AppStrings.paymentMovement,
-        onPressed: () => _movement(context, ref, type: 'payment'),
-      ),
-      GuardedMutation(
-        buttonKey: const Key('full-payment'),
-        allowed:
-            cardReady &&
-            section != AccountSection.libyanDeposits &&
-            section != AccountSection.egyptianDeposits,
-        filled: false,
-        inputs: 'full:${card.asData?.value.version}',
-        expectedVersion: card.asData?.value.version,
-        label: AppStrings.fullPayment,
-        onSubmit: (meta) => _full(context, ref, meta),
-      ),
-    ];
+    final composer = canWrite
+        ? _InlineComposer(
+            key: const Key('ledger-composer'),
+            section: section,
+            accountId: id,
+            cardReady: cardReady,
+            online: online,
+            cardVersion: card.asData?.value.version,
+            onPosted: _posted,
+            onFull: (meta) => _full(context, ref, meta),
+          )
+        : null;
     final columns = _LedgerColumns(showBalance: showBalance);
     Widget row(LedgerEntryDto entry) => _EntryTile(
       key: ValueKey('ledger-row-${entry.id}'),
@@ -321,33 +320,16 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: padding.copyWith(top: AppSpacing.sm),
             children: [
-              Text(
-                AppStrings.noPreview,
-                style: Theme.of(context).textTheme.bodySmall,
+              _LedgerTable(
+                controller: _columnsScroll,
+                width: columns.width,
+                viewport: viewport,
+                footnote: showBalance ? null : AppStrings.statementHidden,
+                composer: composer,
+                children: page.page.items.isEmpty
+                    ? const [EmptyPane(message: AppStrings.emptyLedger)]
+                    : table,
               ),
-              if (!showBalance)
-                Text(
-                  AppStrings.statementHidden,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              const SizedBox(height: AppSpacing.xs),
-              if (page.page.items.isEmpty)
-                const EmptyPane(message: AppStrings.emptyLedger)
-              else
-                _LedgerTable(
-                  controller: _columnsScroll,
-                  width: columns.width,
-                  viewport: viewport,
-                  editingInline: _editingId != null,
-                  children: table,
-                ),
-              if (canWrite) ...[
-                const SizedBox(height: AppSpacing.sm),
-                _EntryComposer(
-                  key: const Key('ledger-composer'),
-                  children: writes,
-                ),
-              ],
               const SizedBox(height: AppSpacing.md),
             ],
           ),
@@ -388,25 +370,17 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     ref.invalidate(accountsProvider(section));
   }
 
-  Future<void> _movement(
-    BuildContext context,
-    WidgetRef ref, {
-    required String type,
-  }) async {
-    final saved = await showAppForm<PostedMovement>(
-      context,
-      _MovementForm(section: section, id: id, type: type),
-    );
-    if (saved != null) {
-      setState(() {
-        _balanceAwaitingReload = true;
-        _ackBalance = saved.balanceUnits;
-      });
-      ref.invalidate(ledgerProvider((section, id)));
-      ref.invalidate(accountCardProvider((section, id)));
-      ref.invalidate(accountsProvider(section));
-      ref.invalidate(homeDashboardProvider);
-    }
+  /// After the inline row saved a movement: same refresh as the sheet had.
+  void _posted(PostedMovement saved) {
+    if (!mounted) return;
+    setState(() {
+      _balanceAwaitingReload = true;
+      _ackBalance = saved.balanceUnits;
+    });
+    ref.invalidate(ledgerProvider((section, id)));
+    ref.invalidate(accountCardProvider((section, id)));
+    ref.invalidate(accountsProvider(section));
+    ref.invalidate(homeDashboardProvider);
   }
 
   Future<String?> _full(
@@ -487,11 +461,17 @@ class _MovementForm extends ConsumerStatefulWidget {
     required this.section,
     required this.id,
     required this.type,
+    this.onSaved,
+    super.key,
   });
 
   final AccountSection section;
   final String id;
   final String type;
+
+  /// Inline use at the bottom of the ledger table: called after the server
+  /// accepted the movement, instead of closing a sheet. Same request.
+  final ValueChanged<PostedMovement>? onSaved;
 
   @override
   ConsumerState<_MovementForm> createState() => _MovementFormState();
@@ -530,6 +510,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
     final watchedCard = ref.watch(
       accountCardProvider((widget.section, widget.id)),
     );
+    if (widget.onSaved != null) return _inline(context, watchedCard);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -613,6 +594,144 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
     );
   }
 
+  /// The website's add row: البيان، القيمة، السعر، العملية، التاريخ، حفظ.
+  /// Same fields, checks, and request as the sheet.
+  Widget _inline(BuildContext context, AsyncValue<AccountCardDto> watchedCard) {
+    final look = context.look;
+    final tight = layoutIsTight(context);
+    final note = TextField(
+      key: const Key('movement-note'),
+      controller: _note,
+      decoration: const InputDecoration(
+        labelText: AppStrings.ledgerColNote,
+        isDense: true,
+      ),
+    );
+    final amount = UnitsField(
+      key: const Key('movement-amount'),
+      controller: _amount,
+      label: AppStrings.ledgerColValue,
+      dense: true,
+      showHint: false,
+    );
+    final rate = TextField(
+      key: const Key('movement-factor'),
+      controller: _factor,
+      enabled: _mode != CalculationMode.direct,
+      textDirection: TextDirection.ltr,
+      decoration: const InputDecoration(
+        labelText: AppStrings.ledgerColRate,
+        isDense: true,
+      ),
+    );
+    final date = TextField(
+      key: const Key('movement-date'),
+      controller: _date,
+      textDirection: TextDirection.ltr,
+      decoration: const InputDecoration(
+        labelText: AppStrings.date,
+        isDense: true,
+        prefixIcon: Icon(Icons.calendar_today_outlined, size: 16),
+      ),
+    );
+    final modes = Wrap(
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(
+          AppStrings.ledgerColOperation,
+          style: cairo(12, 700, color: look.muted),
+        ),
+        for (final mode in const [
+          CalculationMode.direct,
+          CalculationMode.divide,
+          CalculationMode.multiply,
+        ])
+          ChoiceChip(
+            key: Key('movement-mode-${mode.name}'),
+            label: Text(calculationLabel(mode)),
+            selected: _mode == mode,
+            visualDensity: VisualDensity.compact,
+            onSelected: (_) => setState(() => _mode = mode),
+          ),
+      ],
+    );
+    final save = GuardedMutation(
+      buttonKey: const Key('save-movement'),
+      allowed: _cardReadyForWrite(watchedCard),
+      inputs:
+          '${widget.type}|$_mode|${_amount.text}|${_factor.text}|${_date.text}|${_note.text}',
+      expectedVersion: watchedCard.asData?.value.version,
+      label: AppStrings.save,
+      onVersionConflict: () {
+        ref.invalidate(ledgerProvider((widget.section, widget.id)));
+        ref.invalidate(accountCardProvider((widget.section, widget.id)));
+        ref.invalidate(accountsProvider(widget.section));
+        ref.invalidate(homeDashboardProvider);
+      },
+      onSubmit: _submit,
+    );
+    const gap = SizedBox(width: AppSpacing.sm, height: AppSpacing.sm);
+    return Column(
+      key: const Key('movement-inline'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (tight) ...[
+          note,
+          gap,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: amount),
+              gap,
+              Expanded(child: rate),
+            ],
+          ),
+        ] else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 3, child: note),
+              gap,
+              Expanded(flex: 2, child: amount),
+              gap,
+              Expanded(flex: 2, child: rate),
+            ],
+          ),
+        gap,
+        modes,
+        gap,
+        if (tight) ...[
+          date,
+          gap,
+          save,
+        ] else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: date),
+              gap,
+              save,
+            ],
+          ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(AppStrings.unitsHint, style: cairo(11, 500, color: look.muted)),
+        Text(AppStrings.noPreview, style: cairo(11, 500, color: look.muted)),
+        if (watchedCard.hasError)
+          Semantics(
+            container: true,
+            excludeSemantics: true,
+            label: AppStrings.movementCardReloadFailed,
+            child: const Text(
+              AppStrings.movementCardReloadFailed,
+              key: Key('movement-reload-failed'),
+            ),
+          ),
+      ],
+    );
+  }
+
   Future<String?> _submit(MutationMeta meta) async {
     final units = parseUnits(_amount.text);
     if (units == null) return AppStrings.integerOnly;
@@ -673,7 +792,13 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
       );
-      Navigator.of(context).pop(PostedMovement(balanceUnits: ack.balanceUnits));
+      final posted = PostedMovement(balanceUnits: ack.balanceUnits);
+      final onSaved = widget.onSaved;
+      if (onSaved != null) {
+        onSaved(posted);
+      } else {
+        Navigator.of(context).pop(posted);
+      }
       return null;
     } catch (error) {
       // A returned string never reaches GuardedMutation's conflict path.
@@ -753,7 +878,11 @@ class _Header extends StatelessWidget {
     this.awaitingServerBalance = false,
     this.ackBalance,
     this.reloadError,
+    this.showTitle = true,
   });
+
+  /// False when the screen bar above already names the ledger.
+  final bool showTitle;
 
   final AccountSection section;
   final AccountCardDto? card;
@@ -843,7 +972,8 @@ class _Header extends StatelessWidget {
                 runSpacing: AppSpacing.xxs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Text(title, style: cairo(16, 800, color: foreground)),
+                  if (showTitle)
+                    Text(title, style: cairo(16, 800, color: foreground)),
                   if (visual.label != null)
                     Text(visual.label!, style: cairo(12, 700, color: accent)),
                 ],
@@ -908,6 +1038,162 @@ class _Header extends StatelessWidget {
                   style: cairo(12, 700, color: accent),
                 ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The customers' total card: glossy red for دين, green for أمانة (no
+/// minus sign), glossy black with white text for صفر, in both themes
+/// (Ali, 2026-11-03). The word and colour come from the sign of the server
+/// balance only.
+class _TotalCard extends StatelessWidget {
+  const _TotalCard({
+    required this.card,
+    required this.money,
+    this.awaitingServerBalance = false,
+    this.ackBalance,
+    this.reloadError,
+  });
+
+  final AccountCardDto card;
+  final MoneyFormatter money;
+  final bool awaitingServerBalance;
+  final MoneyValue? ackBalance;
+  final String? reloadError;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final shown = awaitingServerBalance ? ackBalance : card.balanceUnits;
+    final kind = customerBalanceKind(shown);
+    final gloss = switch (kind) {
+      CustomerBalanceKind.debt => look.glossDebt,
+      CustomerBalanceKind.credit => look.glossCredit,
+      CustomerBalanceKind.zero => look.glossZero,
+      CustomerBalanceKind.unknown => look.glossGrey,
+    };
+    final word = switch (kind) {
+      CustomerBalanceKind.debt => AppStrings.customerDebtWord,
+      CustomerBalanceKind.credit => AppStrings.customerCreditWord,
+      CustomerBalanceKind.zero => AppStrings.ledgerZeroWord,
+      CustomerBalanceKind.unknown => null,
+    };
+    final units = shown?.asInt;
+    final text = kind == CustomerBalanceKind.credit && units != null
+        ? money.format(-units, card.currency)
+        : money.formatOrDash(shown, card.currency);
+    final radius = BorderRadius.circular(AppRadii.card);
+    final subtitle = [
+      card.name,
+      if (card.phone != null && card.phone!.isNotEmpty) card.phone!,
+    ].join(' • ');
+    final age = card.ageStatusLabel;
+    return Material(
+      key: const Key('ledger-header'),
+      type: MaterialType.transparency,
+      child: Ink(
+        decoration: gloss
+            .decoration(radius)
+            .copyWith(boxShadow: gloss.glowShadow),
+        child: GlossSheen(
+          gloss: gloss,
+          radius: radius,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        AppStrings.ledgerTotal,
+                        style: cairo(12, 700, color: gloss.ink),
+                      ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: MoneyText(
+                          text,
+                          key: const Key('ledger-header-balance'),
+                          style: context.textExtras.amountLarge.copyWith(
+                            color: gloss.amount,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: cairo(
+                          12,
+                          600,
+                          color: gloss.ink.withValues(alpha: 0.85),
+                        ),
+                      ),
+                      if (age != null && age.isNotEmpty)
+                        Text(
+                          age,
+                          style: cairo(
+                            11.5,
+                            600,
+                            color: gloss.ink.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      if (reloadError != null)
+                        Semantics(
+                          container: true,
+                          excludeSemantics: true,
+                          label: AppStrings.ledgerReloadFailed,
+                          child: Text(
+                            AppStrings.ledgerReloadFailed,
+                            key: const Key('ledger-reload-failed'),
+                            style: cairo(12, 600, color: gloss.ink),
+                          ),
+                        ),
+                      if (card.systemManaged)
+                        Text(
+                          AppStrings.systemCard,
+                          key: ValueKey(
+                            'system-${card.systemLinkKey ?? 'managed'}',
+                          ),
+                          style: cairo(12, 700, color: gloss.ink),
+                        ),
+                    ],
+                  ),
+                ),
+                if (word != null) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  DecoratedBox(
+                    key: const Key('ledger-header-kind'),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: gloss.ink.withValues(alpha: 0.12),
+                      border: Border.all(
+                        color: gloss.ink.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.xs,
+                      ),
+                      child: Text(
+                        word,
+                        style: cairo(13, 800, color: gloss.amount),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1120,24 +1406,25 @@ List<LedgerEntryDto> _oldestFirst(List<LedgerEntryDto> items) {
   return [for (final pair in indexed) pair.$2];
 }
 
-/// Column widths of the ledger table, in the website's order.
+/// Column widths of the ledger table, in the website's order. Narrow
+/// enough that م to البيان fit a phone before the swipe.
 class _LedgerColumns {
   const _LedgerColumns({required this.showBalance});
 
   final bool showBalance;
 
-  static const seq = 48.0;
-  static const when = 128.0;
-  static const type = 104.0;
-  static const note = 168.0;
-  static const value = 88.0;
-  static const operation = 72.0;
-  static const rate = 76.0;
-  static const debt = 104.0;
-  static const paid = 104.0;
-  static const balance = 104.0;
-  static const edit = 128.0;
-  static const cancel = 128.0;
+  static const seq = 34.0;
+  static const when = 98.0;
+  static const type = 82.0;
+  static const note = 112.0;
+  static const value = 72.0;
+  static const operation = 58.0;
+  static const rate = 58.0;
+  static const debt = 88.0;
+  static const paid = 88.0;
+  static const balance = 88.0;
+  static const edit = 48.0;
+  static const cancel = 48.0;
 
   double get width =>
       seq +
@@ -1154,72 +1441,111 @@ class _LedgerColumns {
       cancel;
 }
 
-/// One horizontal scroll for the whole table, so every column lines up.
+/// The table card: one horizontal scroll for every row, the add row at the
+/// bottom inside the same card, and a footer strip.
 class _LedgerTable extends StatelessWidget {
   const _LedgerTable({
     required this.controller,
     required this.width,
     required this.viewport,
-    required this.editingInline,
     required this.children,
+    this.composer,
+    this.footnote,
   });
 
   final ScrollController controller;
   final double width;
   final double viewport;
-  final bool editingInline;
   final List<Widget> children;
+  final Widget? composer;
+  final String? footnote;
 
   @override
   Widget build(BuildContext context) {
     final look = context.look;
     final radius = BorderRadius.circular(AppRadii.card);
     final tableWidth = width > viewport ? width : viewport;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
       key: const Key('ledger-table'),
       decoration: BoxDecoration(
         color: look.card,
         borderRadius: radius,
         border: Border.all(color: look.cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: dark ? const Color(0x55000000) : const Color(0x140F172A),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: ClipRRect(
         borderRadius: radius,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Scrollbar(
+            SingleChildScrollView(
+              key: const Key('ledger-columns-scroll'),
               controller: controller,
-              child: SingleChildScrollView(
-                key: const Key('ledger-columns-scroll'),
-                controller: controller,
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: tableWidth,
-                  child: _InlineViewport(
-                    width: viewport,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: children,
-                    ),
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: tableWidth,
+                child: _InlineViewport(
+                  width: viewport,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: children,
                   ),
                 ),
               ),
             ),
-            if (width > viewport)
-              Container(
-                color: look.strip,
-                padding: const EdgeInsetsDirectional.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: AppSpacing.xxs,
-                ),
-                child: Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: Text(
-                    AppStrings.ledgerSwipeMore,
-                    style: cairo(11, 700, color: look.muted),
-                  ),
-                ),
+            Container(
+              color: look.strip,
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.xs,
               ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      footnote ?? '',
+                      style: cairo(10.5, 500, color: look.muted),
+                    ),
+                  ),
+                  if (width > viewport)
+                    Flexible(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsetsDirectional.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: 2,
+                          ),
+                          child: Text(
+                            AppStrings.ledgerSwipeMore,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: cairo(
+                              10.5,
+                              800,
+                              color: Theme.of(context).colorScheme.onPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (composer != null) ...[
+              Divider(height: 1, color: look.cardBorder),
+              composer!,
+            ],
           ],
         ),
       ),
@@ -1255,7 +1581,7 @@ class _Cell extends StatelessWidget {
       width: width,
       child: Padding(
         padding: const EdgeInsetsDirectional.symmetric(
-          horizontal: AppSpacing.xs,
+          horizontal: 3,
           vertical: AppSpacing.sm,
         ),
         child: Align(
@@ -1311,13 +1637,14 @@ class _EntryTile extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final muted = reversed ? scheme.onSurfaceVariant : scheme.onSurface;
     final strike = reversed ? TextDecoration.lineThrough : null;
-    final body = cairo(12, 500, color: muted).copyWith(decoration: strike);
+    final body = cairo(12, 600, color: muted).copyWith(decoration: strike);
     final small = cairo(
-      11,
+      10.5,
       500,
       color: look.muted,
     ).copyWith(decoration: strike);
     final number = context.textExtras.tableNumber.copyWith(
+      fontSize: 12.5,
       color: muted,
       decoration: strike,
     );
@@ -1335,7 +1662,7 @@ class _EntryTile extends ConsumerWidget {
       money.formatOrDash(entry.amountUnits, section.currency),
       key: Key('ledger-amount-${entry.id}'),
       style: context.textExtras.amount.copyWith(
-        fontSize: 14,
+        fontSize: 13,
         color: amountColor,
         decoration: strike,
       ),
@@ -1355,6 +1682,8 @@ class _EntryTile extends ConsumerWidget {
             expectedVersion: cardVersion,
             filled: false,
             label: AppStrings.cancelMovement,
+            icon: Icons.close_rounded,
+            tooltip: AppStrings.cancelMovement,
             confirmText: AppStrings.confirmCancel,
             onSubmit: onCancel,
           )
@@ -1364,6 +1693,7 @@ class _EntryTile extends ConsumerWidget {
       accountId: accountId,
       entry: entry,
       onOpen: onEdit,
+      compact: true,
     );
     final cells = <Widget>[
       _Cell(
@@ -1371,7 +1701,7 @@ class _EntryTile extends ConsumerWidget {
         _SequenceMark(
           key: Key('ledger-sequence-${entry.id}'),
           text: sequence,
-          style: number,
+          style: number.copyWith(fontWeight: FontWeight.w800),
         ),
       ),
       _Cell(
@@ -1400,7 +1730,7 @@ class _EntryTile extends ConsumerWidget {
             type: entry.type,
             paymentMode: entry.paymentMode,
           ),
-          gloss: _typeGloss(context, entry),
+          kind: _chipKind(entry),
           reversed: reversed,
         ),
       ),
@@ -1413,17 +1743,24 @@ class _EntryTile extends ConsumerWidget {
           children: [
             Text(
               (entry.note ?? '').trim().isEmpty ? AppStrings.dash : entry.note!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: body,
             ),
             if (entry.createdByName != null)
-              Text('${AppStrings.actor}: ${entry.createdByName}', style: small),
+              Text(
+                entry.createdByName!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: small,
+              ),
             if (reversed)
               Text(
                 AppStrings.reversed,
-                style: cairo(11, 800, color: scheme.onSurfaceVariant),
+                style: cairo(10.5, 800, color: scheme.onSurfaceVariant),
               ),
             if (entry.corrected)
-              Text(AppStrings.corrected, style: cairo(11, 800, color: muted)),
+              Text(AppStrings.corrected, style: cairo(10.5, 800, color: muted)),
           ],
         ),
       ),
@@ -1460,6 +1797,11 @@ class _EntryTile extends ConsumerWidget {
       _Cell(_LedgerColumns.cancel, cancel),
     ];
     final viewport = _InlineViewport.of(context);
+    // Zebra by the server sequence, so older pages stripe the same way.
+    final odd = (entry.sequence ?? 0).isOdd;
+    final zebra = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white.withValues(alpha: 0.025)
+        : const Color(0xFF0F172A).withValues(alpha: 0.025);
     return Column(
       key: Key('ledger-entry-${entry.id}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1470,7 +1812,9 @@ class _EntryTile extends ConsumerWidget {
                 ? scheme.surfaceContainerHighest
                 : editing
                 ? look.strip
-                : null,
+                : odd
+                ? null
+                : zebra,
             border: Border(bottom: BorderSide(color: look.cardBorder)),
           ),
           child: Row(
@@ -1526,42 +1870,70 @@ String _clock(DateTime value) {
   return '$hour:$minute $half';
 }
 
+enum _ChipKind { debt, partial, full }
+
 /// ديون red, دفع جزئي green, دفع كلي glossy black. From the server's type
 /// and paymentMode only.
-Gloss _typeGloss(BuildContext context, LedgerEntryDto entry) {
+_ChipKind _chipKind(LedgerEntryDto entry) {
+  if (entry.type != 'payment') return _ChipKind.debt;
+  if (entry.paymentMode == 'full') return _ChipKind.full;
+  return _ChipKind.partial;
+}
+
+/// Solid glossy chip colours, white text, in both themes (the mockup).
+LinearGradient _chipFill(BuildContext context, _ChipKind kind) {
   final look = context.look;
-  if (entry.type != 'payment') return look.glossDebt;
-  if (entry.paymentMode == 'full') return look.glossZero;
-  return look.glossCredit;
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  final status = context.statusColors;
+  Color lift(Color c) => Color.lerp(c, Colors.white, 0.18)!;
+  final colors = switch (kind) {
+    _ChipKind.full => [look.glossZero.top, look.glossZero.bottom],
+    _ChipKind.debt =>
+      dark
+          ? [look.glossDebt.top, look.glossDebt.bottom]
+          : [lift(status.debtText), status.debtText],
+    _ChipKind.partial =>
+      dark
+          ? [look.glossCredit.top, look.glossCredit.bottom]
+          : [lift(status.creditText), status.creditText],
+  };
+  return LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: colors,
+  );
 }
 
 class _TypeChip extends StatelessWidget {
   const _TypeChip({
     required this.label,
-    required this.gloss,
+    required this.kind,
     required this.reversed,
   });
 
   final String label;
-  final Gloss gloss;
+  final _ChipKind kind;
   final bool reversed;
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(999);
     return Opacity(
       opacity: reversed ? 0.55 : 1,
       child: DecoratedBox(
-        decoration: gloss.decoration(radius),
+        decoration: BoxDecoration(
+          gradient: _chipFill(context, kind),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        ),
         child: Padding(
           padding: const EdgeInsetsDirectional.symmetric(
             horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xxs,
+            vertical: 3,
           ),
           child: Text(
             label,
             textAlign: TextAlign.center,
-            style: cairo(12, 800, color: gloss.amount).copyWith(
+            style: cairo(11.5, 800, color: Colors.white).copyWith(
               decoration: reversed ? TextDecoration.lineThrough : null,
             ),
           ),
@@ -1571,50 +1943,158 @@ class _TypeChip extends StatelessWidget {
   }
 }
 
-/// The entry buttons under the last row, where the website keeps its
-/// add-movement row. Each opens the existing form.
-class _EntryComposer extends StatelessWidget {
-  const _EntryComposer({required this.children, super.key});
+/// The add row at the bottom of the table, like the website: choose
+/// ديون / دفع جزئي / دفع كلي, then the same fields and request as before.
+class _InlineComposer extends StatefulWidget {
+  const _InlineComposer({
+    required this.section,
+    required this.accountId,
+    required this.cardReady,
+    required this.online,
+    required this.cardVersion,
+    required this.onPosted,
+    required this.onFull,
+    super.key,
+  });
 
-  final List<Widget> children;
+  final AccountSection section;
+  final String accountId;
+  final bool cardReady;
+  final bool online;
+  final int? cardVersion;
+  final ValueChanged<PostedMovement> onPosted;
+  final Future<String?> Function(MutationMeta meta) onFull;
+
+  @override
+  State<_InlineComposer> createState() => _InlineComposerState();
+}
+
+class _InlineComposerState extends State<_InlineComposer> {
+  var _type = 'debt';
+
+  /// A new round after each accepted movement: fresh fields, new request id.
+  var _round = 0;
+
+  bool get _deposits =>
+      widget.section == AccountSection.libyanDeposits ||
+      widget.section == AccountSection.egyptianDeposits;
 
   @override
   Widget build(BuildContext context) {
     final look = context.look;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: look.card,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: look.cardBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              AppStrings.ledgerAddMovement,
-              style: cairo(14, 800, color: look.ink),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            LayoutBuilder(
-              builder: (context, constraints) => Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  for (final child in children)
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: constraints.maxWidth,
-                      ),
-                      child: child,
-                    ),
-                ],
-              ),
-            ),
-          ],
+    final enabled = widget.online;
+    Widget chip(Key key, String label, String type, _ChipKind kind) {
+      final selected = _type == type;
+      final fill = _chipFill(context, kind);
+      return FilledButton(
+        key: key,
+        style: FilledButton.styleFrom(
+          backgroundColor: selected ? fill.colors.last : look.card,
+          foregroundColor: selected ? Colors.white : look.ink,
+          side: BorderSide(
+            color: selected ? fill.colors.first : look.cardBorder,
+          ),
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: AppSpacing.md,
+          ),
         ),
+        onPressed: enabled ? () => setState(() => _type = type) : null,
+        child: Text(label, style: cairo(13, 800)),
+      );
+    }
+
+    final chips = widget.cardReady
+        ? Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              chip(
+                const Key('add-debt'),
+                _deposits
+                    ? (widget.section == AccountSection.libyanDeposits
+                          ? AppStrings.depositIn
+                          : AppStrings.egpIn)
+                    : AppStrings.debtMovement,
+                'debt',
+                _ChipKind.debt,
+              ),
+              chip(
+                const Key('add-payment'),
+                _deposits
+                    ? (widget.section == AccountSection.libyanDeposits
+                          ? AppStrings.depositOut
+                          : AppStrings.egpOut)
+                    : AppStrings.paymentMovement,
+                'payment',
+                _ChipKind.partial,
+              ),
+              if (!_deposits)
+                chip(
+                  const Key('composer-full'),
+                  AppStrings.fullPayment,
+                  'full',
+                  _ChipKind.full,
+                ),
+            ],
+          )
+        : const SizedBox.shrink();
+    final Widget body;
+    if (_type == 'full' && !_deposits) {
+      body = Row(
+        children: [
+          Expanded(
+            child: Text(
+              AppStrings.fullPaymentHint,
+              style: cairo(12, 500, color: look.muted),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          GuardedMutation(
+            buttonKey: const Key('full-payment'),
+            allowed: widget.cardReady,
+            inputs: 'full:${widget.cardVersion}',
+            expectedVersion: widget.cardVersion,
+            label: AppStrings.save,
+            onSubmit: widget.onFull,
+          ),
+        ],
+      );
+    } else {
+      body = _MovementForm(
+        key: ValueKey('movement-$_type-$_round'),
+        section: widget.section,
+        id: widget.accountId,
+        type: _type,
+        onSaved: (posted) {
+          setState(() => _round++);
+          widget.onPosted(posted);
+        },
+      );
+    }
+    return Container(
+      color: look.strip.withValues(alpha: 0.6),
+      padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.add_circle_outline, size: 18, color: look.accent),
+              const SizedBox(width: AppSpacing.xs),
+              Flexible(
+                child: Text(
+                  AppStrings.ledgerAddMovement,
+                  style: cairo(14, 800, color: look.ink),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          chips,
+          const SizedBox(height: AppSpacing.sm),
+          body,
+        ],
       ),
     );
   }

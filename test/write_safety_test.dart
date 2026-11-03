@@ -53,7 +53,19 @@ void main() {
 
     fake.failMutationsRemaining = 0;
     await hold(tester, fake, const Key('save-movement'));
-    expect(find.byKey(const Key('save-movement')), findsNothing);
+    // The inline add row starts a fresh, empty form after a save.
+    expect(
+      tester
+          .widget<TextField>(
+            find.descendant(
+              of: find.byKey(const Key('movement-amount')),
+              matching: find.byType(TextField),
+            ),
+          )
+          .controller
+          ?.text,
+      isEmpty,
+    );
 
     await tester.tap(find.byKey(const Key('add-payment')));
     await settle(tester);

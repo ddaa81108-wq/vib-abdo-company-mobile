@@ -24,8 +24,12 @@ class TransactionCorrectionLauncher extends ConsumerWidget {
     required this.accountId,
     required this.entry,
     this.onOpen,
+    this.compact = false,
     super.key,
   });
+
+  /// A pencil in the ledger table's تعديل column.
+  final bool compact;
 
   final AccountSection section;
   final String accountId;
@@ -61,6 +65,18 @@ class TransactionCorrectionLauncher extends ConsumerWidget {
     if (!visible) return const SizedBox.shrink();
 
     final online = ref.watch(onlineProvider);
+    if (compact) {
+      return Tooltip(
+        message: AppStrings.correctTransaction,
+        child: TextButton(
+          key: Key('correct-${entry.id}'),
+          onPressed: online
+              ? (onOpen ?? () => _open(context, ref, accountId))
+              : null,
+          child: const Icon(Icons.edit_outlined, size: 18),
+        ),
+      );
+    }
     return GatedButton(
       buttonKey: Key('correct-${entry.id}'),
       allowed: true,

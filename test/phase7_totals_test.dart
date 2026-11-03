@@ -135,6 +135,11 @@ void main() {
       await pumpFakeApp(tester, size: const Size(800, 2200));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/customers/c_55');
+      // The add row: choose دفع كلي, then its save button.
+      await tester.ensureVisible(find.byKey(const Key('composer-full')));
+      await tester.tap(find.byKey(const Key('composer-full')));
+      await tester.pump();
+      await tester.pump();
       await tester.ensureVisible(find.byKey(const Key('full-payment')));
       await tester.tap(find.byKey(const Key('full-payment')));
       await settle(tester);

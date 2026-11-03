@@ -141,7 +141,8 @@ void main() {
       );
       expect(_header('320 د.ل'), findsNothing);
       final shown = tester.widget<MoneyText>(balance);
-      expect(shown.style?.color, positiveInk);
+      // The glossy total card paints its own ink per state (Ali,
+      // 2026-11-03); أمانة is never the debt colour.
       expect(
         shown.style?.color,
         isNot(tester.element(balance).statusColors.debtText),
@@ -755,6 +756,7 @@ String _cardJson(
 
 Future<void> _openPayment(WidgetTester tester, String amount) async {
   await tester.ensureVisible(find.byKey(const Key('add-payment')));
+  await tester.pump();
   await tester.tap(find.byKey(const Key('add-payment')));
   await settle(tester);
   await tester.enterText(

@@ -54,7 +54,9 @@ void main() {
   ) async {
     await pumpFakeApp(tester, size: const Size(430, 1200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers/c_55');
+    // Customers show the glossy دين/أمانة/صفر total card instead (Ali,
+    // 2026-11-03); the other ledgers keep the age gradient.
+    await go(tester, '/companies/c_55');
 
     _expectHeaderGradient(tester, AppStatusColors.light.warningDebt);
     expect(find.text('منذ 4 أيام'), findsWidgets);
@@ -82,7 +84,9 @@ void main() {
       ],
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers/c_55');
+    // Customers show the glossy دين/أمانة/صفر total card instead (Ali,
+    // 2026-11-03); the other ledgers keep the age gradient.
+    await go(tester, '/companies/c_55');
     _expectHeaderGradient(tester, AppStatusColors.light.overdueDebt);
     expect(tester.takeException(), isNull);
   });
@@ -477,7 +481,9 @@ void main() {
       find.byKey(const Key('edit-account-card')),
       const Key('screen-ledger-customers'),
     );
-    expect(_isStretched(tester, const Key('edit-account-card')), isTrue);
+    // The ledger's edit-card control is a pencil in the top bar now (Ali,
+    // 2026-11-03), so it never stretches; the edit screen below still does.
+    expect(_isStretched(tester, const Key('edit-account-card')), isFalse);
 
     await size(430, 1.3);
     expect(
@@ -489,7 +495,9 @@ void main() {
       find.byKey(const Key('edit-account-card')),
       const Key('screen-ledger-customers'),
     );
-    expect(_isStretched(tester, const Key('edit-account-card')), isTrue);
+    // The ledger's edit-card control is a pencil in the top bar now (Ali,
+    // 2026-11-03), so it never stretches; the edit screen below still does.
+    expect(_isStretched(tester, const Key('edit-account-card')), isFalse);
 
     await go(tester, '/customers/c_55/edit');
     tester.view.physicalSize = const Size(360, 1600);
