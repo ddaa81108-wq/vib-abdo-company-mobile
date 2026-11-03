@@ -130,9 +130,11 @@ void main() {
         tester,
         () => layer.collections.overview(),
       );
+      // 537f073 sends no day total; the screen shows the server's
+      // collectedUnits and cashOutstandingUnits.
+      expect(collections.dayTotalUnits, isNull);
       for (final units in [
         collections.collectedUnits,
-        collections.dayTotalUnits,
         collections.cashOutstandingUnits,
       ]) {
         expect(
@@ -143,7 +145,7 @@ void main() {
           findsWidgets,
         );
       }
-      expect(_fmt(money, collections.dayTotalUnits, Currency.lyd), '100 د.ل');
+      expect(_fmt(money, collections.collectedUnits, Currency.lyd), '250 د.ل');
       expect(
         _fmt(money, collections.cashOutstandingUnits, Currency.lyd),
         '250 د.ل',

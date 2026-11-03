@@ -6,7 +6,6 @@ import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
-import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import 'support/pump_app.dart';
 
@@ -31,7 +30,9 @@ void main() {
 
       expect(find.text('هذا الإجراء للإدارة فقط'), findsNothing);
       expect(find.byKey(const Key('approve-sb_1')), findsNothing);
-      expect(find.text(AppStrings.approved), findsNWidgets(2));
+      // 537f073 history: an approved receipt waits for its cash.
+      expect(find.byKey(const ValueKey('awaiting-cash-sb_1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('awaiting-cash-sb_2')), findsOneWidget);
     },
   );
 
@@ -96,14 +97,16 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
 
-    expect(find.text(AppStrings.approved), findsOneWidget);
+    // 537f073: approved and no cash yet is «ينتظر استلام النقدية».
+    expect(find.byKey(const ValueKey('awaiting-cash-sb_2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('awaiting-cash-sb_1')), findsNothing);
     final approve = find.byKey(const Key('approve-sb_1'));
     await tester.ensureVisible(approve);
     await tester.tap(approve);
     await settle(tester);
 
     expect(find.byKey(const Key('approve-sb_1')), findsNothing);
-    expect(find.text(AppStrings.approved), findsNWidgets(2));
+    expect(find.byKey(const ValueKey('awaiting-cash-sb_1')), findsOneWidget);
   });
 
   testWidgets(
@@ -142,7 +145,8 @@ void main() {
         findsWidgets,
       );
       expect(find.byKey(const Key('approve-sb_1')), findsNothing);
-      expect(find.text(AppStrings.approved), findsNWidgets(2));
+      expect(find.byKey(const ValueKey('awaiting-cash-sb_1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('awaiting-cash-sb_2')), findsOneWidget);
       await settle(tester);
     },
   );

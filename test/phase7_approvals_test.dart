@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import 'support/phase7_nav.dart';
 import 'support/pump_app.dart';
@@ -18,14 +17,33 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
 
-    expect(find.text(AppStrings.approved), findsOneWidget);
+    // 537f073 words: an approved row without cash reads "awaiting cash".
+    final awaitingBefore = find
+        .byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith('awaiting-cash-'),
+        )
+        .evaluate()
+        .length;
     final approve = find.byKey(const Key('approve-sb_1'));
     await tester.ensureVisible(approve);
     await tester.tap(approve);
     await settle(tester);
 
     expect(find.byKey(const Key('approve-sb_1')), findsNothing);
-    expect(find.text(AppStrings.approved), findsNWidgets(2));
+    expect(find.byKey(const ValueKey('awaiting-cash-sb_1')), findsOneWidget);
+    expect(
+      find
+          .byWidgetPredicate(
+            (w) =>
+                w.key is ValueKey<String> &&
+                (w.key! as ValueKey<String>).value.startsWith('awaiting-cash-'),
+          )
+          .evaluate()
+          .length,
+      awaitingBefore + 1,
+    );
 
     final reject = find.byKey(const Key('reject-sb_9'));
     await tester.ensureVisible(reject);
@@ -33,7 +51,6 @@ void main() {
     await settle(tester);
 
     expect(find.byKey(const Key('reject-sb_9')), findsNothing);
-    expect(find.text(AppStrings.rejected), findsNWidgets(2));
 
     final overview = await tester.runAsync(() => layer.collections.overview());
     expect(

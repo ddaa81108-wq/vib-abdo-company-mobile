@@ -50,6 +50,7 @@ void main() {
 
           await _openLink(tester);
           await tester.enterText(find.byKey(const Key('link-customer')), 'ab');
+          await tester.tap(find.byKey(const Key('link-search')));
           await settle(tester);
 
           expect(find.byKey(const Key('link-candidate-eg_1')), findsNothing);
@@ -69,15 +70,16 @@ void main() {
             dark ? Brightness.dark : Brightness.light,
           );
 
-          await tester.enterText(
-            find.byKey(const Key('link-customer')),
-            'eg_1',
-          );
-          await settle(tester);
+          // Only a server candidate can be linked; there is no free id
+          // entry, so nothing is sent until one is chosen.
           await tester.ensureVisible(find.byKey(const Key('save-link')));
           await tester.tap(find.byKey(const Key('save-link')));
           await settle(tester);
           expect(fake.mutationPaths, hasLength(postsBefore));
+          expect(
+            find.text('اختر الكارت الأصلي أولًا أو أنشئ حسابًا جديدًا.'),
+            findsOneWidget,
+          );
           expect(find.text(AppStrings.egyptianLinkPaused), findsWidgets);
           expect(find.byKey(const Key('link-candidate-eg_1')), findsNothing);
 
@@ -93,6 +95,7 @@ void main() {
             final body =
                 jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
             expect(body['customerId'], 'c_55');
+            expect(body['entryType'], 'payment');
             expect(body.containsKey('rate'), isFalse);
             expect(body.containsKey('egpPerLyd'), isFalse);
             expect(find.byKey(const Key('unlinked-link-ur_1')), findsNothing);
@@ -124,6 +127,7 @@ void main() {
           );
           await _openLink(tester);
           await tester.enterText(find.byKey(const Key('link-customer')), 'ab');
+          await tester.tap(find.byKey(const Key('link-search')));
           await settle(tester);
           expect(find.byKey(const Key('link-candidate-eg_1')), findsNothing);
           expect(find.byKey(const Key('link-candidate-c_55')), findsOneWidget);

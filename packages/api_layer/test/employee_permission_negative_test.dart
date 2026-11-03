@@ -101,8 +101,7 @@ void main() {
           (row) => row['id'] == 'sb_1',
         );
     expect(submission['status'], 'pending');
-    // 537f073 collections routes are not replayed by the shared requestId
-    // store; the unlinked receipt keeps its own replay in the engine.
+    expect(employee.mutationRequestIds, [requestId]);
     expect(employee.collectionsEngine.unlinkedCount, 4);
 
     await expectLater(

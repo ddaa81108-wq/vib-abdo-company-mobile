@@ -1057,6 +1057,7 @@ class FakeApiClient implements ApiClient {
       // A shared replay here would hide the server's own rules.
       if (seg.isNotEmpty && seg.first == 'collections') {
         return _mutateWithoutRequestId(
+          b,
           method,
           path,
           seg,
@@ -1261,6 +1262,7 @@ class FakeApiClient implements ApiClient {
   /// and no `expectedVersion`. Session, permission, and the test failure gate
   /// still run. A second call is not a stored replay; the row status decides.
   Future<ApiResponse> _mutateWithoutRequestId(
+    Map b,
     String method,
     String path,
     List<String> seg,
@@ -1271,6 +1273,9 @@ class FakeApiClient implements ApiClient {
   ) async {
     ensureSession();
     _authorize(method, seg, head, query);
+    // Recorded for tests only; these routes do not replay by it.
+    final requestId = b['requestId'];
+    if (requestId != null) mutationRequestIds.add('$requestId');
     mutationPaths.add(path);
     if (lastWireBody != null) mutationBodies.add(lastWireBody!);
     final paused = pauseMutations;

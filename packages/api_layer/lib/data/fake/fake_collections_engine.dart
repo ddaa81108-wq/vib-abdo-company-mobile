@@ -131,12 +131,9 @@ class FakeCollectionsEngine {
       });
     }
 
-    assign('as_1', 'c_55', demoEmployeeId,
-        '2026-10-18T07:00:00.000Z');
-    assign('as_2', 'c_56', demoEmployeeId,
-        '2026-10-18T06:30:00.000Z');
-    assign('as_9', 'c_58', otherEmployeeId,
-        '2026-10-18T06:40:00.000Z');
+    assign('as_1', 'c_55', demoEmployeeId, '2026-10-18T07:00:00.000Z');
+    assign('as_2', 'c_56', demoEmployeeId, '2026-10-18T06:30:00.000Z');
+    assign('as_9', 'c_58', otherEmployeeId, '2026-10-18T06:40:00.000Z');
     void submit(String id, String assignmentId, String customerId,
         String collector, String mode, int amount, String status, String at,
         {String? decidedAt}) {
@@ -157,13 +154,13 @@ class FakeCollectionsEngine {
       });
     }
 
-    submit('sb_2', 'as_2', 'c_56', demoEmployeeId, 'partial', 250,
-        'approved', '2026-10-18T07:30:00.000Z',
+    submit('sb_2', 'as_2', 'c_56', demoEmployeeId, 'partial', 250, 'approved',
+        '2026-10-18T07:30:00.000Z',
         decidedAt: '2026-10-18T07:40:00.000Z');
-    submit('sb_1', 'as_2', 'c_56', demoEmployeeId, 'partial', 100,
-        'pending', '2026-10-18T10:00:00.000Z');
-    submit('sb_9', 'as_9', 'c_58', otherEmployeeId, 'partial',
-        900, 'pending', '2026-10-18T13:00:00.000Z');
+    submit('sb_1', 'as_2', 'c_56', demoEmployeeId, 'partial', 100, 'pending',
+        '2026-10-18T10:00:00.000Z');
+    submit('sb_9', 'as_9', 'c_58', otherEmployeeId, 'partial', 900, 'pending',
+        '2026-10-18T13:00:00.000Z');
     void receipt(String id, String name, int amount, String status,
         String collector, String at) {
       _unlinked.add({
@@ -184,12 +181,12 @@ class FakeCollectionsEngine {
       });
     }
 
-    receipt('ur_1', 'اسم غير مربوط تجريبي', 50, 'pending',
-        demoEmployeeId, '2026-10-18T09:00:00.000Z');
-    receipt('ur_2', 'استلام مرفوض تجريبي', 40, 'rejected',
-        demoEmployeeId, '2026-10-18T08:00:00.000Z');
-    receipt('ur_9', 'إيصال موظف آخر', 900, 'pending',
-        otherEmployeeId, '2026-10-18T11:00:00.000Z');
+    receipt('ur_1', 'اسم غير مربوط تجريبي', 50, 'pending', demoEmployeeId,
+        '2026-10-18T09:00:00.000Z');
+    receipt('ur_2', 'استلام مرفوض تجريبي', 40, 'rejected', demoEmployeeId,
+        '2026-10-18T08:00:00.000Z');
+    receipt('ur_9', 'إيصال موظف آخر', 900, 'pending', otherEmployeeId,
+        '2026-10-18T11:00:00.000Z');
 
     _payroll.addAll([
       {
@@ -257,7 +254,9 @@ class FakeCollectionsEngine {
 
   int _positiveWhole(Object? value, String field) {
     if (value is! int || value <= 0) {
-      _fail(400, 'INVALID_AMOUNT',
+      _fail(
+          400,
+          'INVALID_AMOUNT',
           'القيمة المالية يجب أن تكون رقمًا صحيحًا موجبًا بدون كسور.',
           {'field': field});
     }
@@ -266,8 +265,8 @@ class FakeCollectionsEngine {
 
   String _requestId(Object? value) {
     if (value is! String || value.length < 8 || value.length > 128) {
-      _fail(400, 'REQUEST_ID_REQUIRED',
-          'يلزم requestId ثابت وآمن لهذه العملية.');
+      _fail(
+          400, 'REQUEST_ID_REQUIRED', 'يلزم requestId ثابت وآمن لهذه العملية.');
     }
     return value;
   }
@@ -306,8 +305,8 @@ class FakeCollectionsEngine {
       final card = _cardOf(a);
       if (card == null) continue;
       final subs = _subsOf('${a['id']}')
-        ..sort((x, y) =>
-            '${y['submittedAt']}'.compareTo('${x['submittedAt']}'));
+        ..sort(
+            (x, y) => '${y['submittedAt']}'.compareTo('${x['submittedAt']}'));
       final latest = subs.isEmpty ? null : subs.first;
       final external = a['externalFinancialUpdatedAt'] ?? a['assignedAt'];
       assignments.add({
@@ -331,8 +330,8 @@ class FakeCollectionsEngine {
         'externalFinancialUpdatedAt': external,
         'latestSubmissionAt': latest?['submittedAt'],
         'cashOutstandingCount': subs
-            .where((s) =>
-                s['status'] == 'approved' && s['cashReceivedAt'] == null)
+            .where(
+                (s) => s['status'] == 'approved' && s['cashReceivedAt'] == null)
             .length,
         // App-side hint kept from the older fake: the section path.
         'section': a['section'],
@@ -351,8 +350,8 @@ class FakeCollectionsEngine {
         'collectorName': employees[s['collectorUserId']] ?? '',
       });
     }
-    submissions.sort(
-        (x, y) => '${y['submittedAt']}'.compareTo('${x['submittedAt']}'));
+    submissions
+        .sort((x, y) => '${y['submittedAt']}'.compareTo('${x['submittedAt']}'));
     final unlinked = <Map<String, dynamic>>[
       for (final r in _unlinked)
         if (r['status'] != 'rejected' && mine(r, 'collectorUserId'))
@@ -484,14 +483,16 @@ class FakeCollectionsEngine {
     final staged = <Map<String, dynamic>>[];
     for (final customerId in ids) {
       final card = _cards.card(section, customerId);
-      if (card == null) _notFound(section == 'companies' ? 'company' : 'customer');
+      if (card == null)
+        _notFound(section == 'companies' ? 'company' : 'customer');
       if (card.balanceUnits <= 0) {
         _fail(409, 'ASSIGNMENT_REQUIRES_POSITIVE_DEBT',
             'يمكن توجيه الكروت ذات الدين الموجب فقط. كارت الصفر أو الأمانة لا يقبل التوجيه.');
       }
       if (_assignments.any(
           (a) => a['customerId'] == customerId && a['status'] == 'active')) {
-        _fail(409, 'CUSTOMER_ALREADY_ASSIGNED', 'أحد الكروت محدد لموظف بالفعل.');
+        _fail(
+            409, 'CUSTOMER_ALREADY_ASSIGNED', 'أحد الكروت محدد لموظف بالفعل.');
       }
       final id = _id('as');
       staged.add({
@@ -535,8 +536,8 @@ class FakeCollectionsEngine {
     if (mode == 'full' && debt <= 0) {
       _fail(409, 'NO_POSITIVE_DEBT', 'لا يوجد دين موجب للاستلام الكلي.');
     }
-    final amount =
-        _positiveWhole(mode == 'full' ? debt : body['amountUnits'], 'amountUnits');
+    final amount = _positiveWhole(
+        mode == 'full' ? debt : body['amountUnits'], 'amountUnits');
     if (mode == 'full' &&
         body.containsKey('amountUnits') &&
         body['amountUnits'] != null &&
@@ -581,7 +582,8 @@ class FakeCollectionsEngine {
     final s = _submissions.firstWhere((x) => x['id'] == id,
         orElse: () => _notFound('submission'));
     if (s['status'] != 'pending') {
-      _fail(409, 'SUBMISSION_ALREADY_DECIDED', 'تمت مراجعة هذا الاستلام من قبل.');
+      _fail(
+          409, 'SUBMISSION_ALREADY_DECIDED', 'تمت مراجعة هذا الاستلام من قبل.');
     }
     final at = _now();
     final note = body['note'] is String ? '${body['note']}'.trim() : '';
@@ -712,9 +714,13 @@ class FakeCollectionsEngine {
   Map<String, dynamic> linkCandidates(String? query) {
     final q = (query ?? '').trim();
     if (q.length < 2) return {'items': <Map<String, dynamic>>[]};
+    // 537f073 reads one customers table, so an id appears once. The fake
+    // fixtures reuse ids across sections; keep the first.
+    final seen = <String>{};
     return {
       'items': [
-        for (final card in _cards.search(q).take(12))
+        for (final card
+            in _cards.search(q).where((c) => seen.add(c.id)).take(12))
           {
             'id': card.id,
             'name': card.name,
@@ -734,7 +740,8 @@ class FakeCollectionsEngine {
     final r = _unlinked.firstWhere((x) => x['id'] == id,
         orElse: () => _notFound('unlinked_collection_receipt'));
     if (r['status'] != 'pending') {
-      _fail(409, 'SUBMISSION_ALREADY_DECIDED', 'تمت مراجعة هذا الاستلام من قبل.');
+      _fail(
+          409, 'SUBMISSION_ALREADY_DECIDED', 'تمت مراجعة هذا الاستلام من قبل.');
     }
     final at = _now();
     final note = body['note'] is String ? '${body['note']}'.trim() : '';
@@ -836,7 +843,9 @@ class FakeCollectionsEngine {
       if (row['status'] == 'approved' && row['cashReceivedAt'] == null) cash++;
     }
     if (pending > 0 || cash > 0) {
-      _fail(409, 'COLLECTION_DAY_NOT_SETTLED',
+      _fail(
+          409,
+          'COLLECTION_DAY_NOT_SETTLED',
           'لا يمكن مسح اليوم قبل اعتماد جميع العمليات واستلام كل النقدية.',
           {'pendingCount': pending, 'cashPendingCount': cash});
     }
@@ -910,13 +919,12 @@ class FakeCollectionsEngine {
         ],
       };
 
-  Map<String, dynamic> _payrollRow(String employeeId) => _payroll.firstWhere(
-      (r) => r['employeeId'] == employeeId,
-      orElse: () => _notFound('collection_employee'));
+  Map<String, dynamic> _payrollRow(String employeeId) =>
+      _payroll.firstWhere((r) => r['employeeId'] == employeeId,
+          orElse: () => _notFound('collection_employee'));
 
   /// `POST /api/collections/payroll/entries` (admin).
-  Map<String, dynamic> addPayrollEntry(
-      FakeCollectionsCaller caller, Map body) {
+  Map<String, dynamic> addPayrollEntry(FakeCollectionsCaller caller, Map body) {
     if (!caller.seesEverything) _forbidden('collections.payroll.manage');
     final kind = body['kind'];
     if (kind != 'withdrawal' && kind != 'commission') {
@@ -1023,7 +1031,9 @@ String collectionCardTone(Map<String, dynamic> card) {
         : 'zero-collection-card';
   }
   if (hasAdministrativeMovement(card)) return 'collection-base';
-  return card['latestMode'] == 'partial' ? 'collection-yellow' : 'collection-base';
+  return card['latestMode'] == 'partial'
+      ? 'collection-yellow'
+      : 'collection-base';
 }
 
 bool hasAdministrativeMovement(Map<String, dynamic> card) {

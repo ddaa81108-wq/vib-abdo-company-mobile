@@ -318,39 +318,30 @@ void main() {
     (tester) async {
       final layer = await pumpFakeApp(tester, size: const Size(430, 1400));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      final unlinked = await tester.runAsync(
-        () => layer.collections.decideUnlinked(
-          'ur_1',
-          decision: CollectionDecision.approve,
-          meta: MutationMeta(requestId: 'ur-no-customer'),
-        ),
-      );
-      expect(unlinked!.balanceUnits, isNull);
-      expect(unlinked.raw.containsKey('balanceUnits'), isFalse);
-      expect(unlinked.raw['balanceUnits'], isNot(50));
-
-      final mismatch = await tester.runAsync(() async {
-        final assigned = await layer.collections.assign(
-          customerIds: const ['c_eg_08'],
-          assigneeUserId: 'u_12',
-          section: 'egyptian-deposits',
-          meta: MutationMeta(requestId: 'as-eg'),
-        );
-        final assignmentId = (assigned.raw['assignmentIds'] as List).single;
-        final submitted = await layer.collections.submit(
-          '$assignmentId',
-          mode: 'partial',
-          amountUnits: 400,
-          meta: MutationMeta(requestId: 'eg-submit'),
-        );
-        return layer.collections.decide(
-          submitted.id!,
-          CollectionDecision.approve,
-          meta: MutationMeta(requestId: 'eg-approve'),
+      // 537f073 refuses to approve a standalone receipt with no card or
+      // new-card choice, so there is no balance to show at all.
+      await tester.runAsync(() async {
+        await expectLater(
+          layer.collections.decideUnlinked(
+            'ur_1',
+            decision: CollectionDecision.approve,
+            meta: MutationMeta(requestId: 'ur-no-customer'),
+          ),
+          throwsA(
+            isA<BadRequestException>().having(
+              (error) => error.code,
+              'code',
+              'UNLINKED_RECEIPT_LINK_REQUIRED',
+            ),
+          ),
         );
       });
-      expect(mismatch!.balanceUnits, isNull);
-      expect(mismatch.raw.containsKey('balanceUnits'), isFalse);
+
+      // 537f073 only assigns customer and company cards, so an Egyptian
+      // deposit never gets a collection approval. The card write below
+      // still answers without a balance (currency mismatch on the server),
+      // which has to show a dash until the card reloads.
+      const mismatchRaw = <String, dynamic>{'ok': true};
       final stored = await tester.runAsync(
         () => layer.accounts.get(AccountSection.egyptianDeposits, 'c_eg_08'),
       );
@@ -371,7 +362,7 @@ void main() {
         'egyptian-deposits',
         'c_eg_08',
       )] = jsonEncode(
-        mismatch.raw,
+        mismatchRaw,
       );
 
       await tester.tap(find.byKey(const Key('overpayment-continue')));

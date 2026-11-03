@@ -17,27 +17,38 @@ import 'support/pump_app.dart';
 /// Those are not repeated here.
 void main() {
   testWidgets(
-    'P7-14 linking ur_1 approves it, stores customerId, and does not move money',
+    'P7-14 linking ur_1 to a found card approves it and posts the payment',
     (tester) async {
+      // 537f073: approving a standalone receipt links it to the chosen card
+      // and posts it with the chosen entry type (payment by default).
       final layer = await pumpFakeApp(tester, size: const Size(800, 2400));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/collections');
 
       expect(find.text('اسم غير مربوط تجريبي'), findsOneWidget);
-      expect(find.text(AppStrings.unlinked), findsWidgets);
       final link = find.byKey(const Key('unlinked-link-ur_1'));
       expect(link, findsOneWidget);
-      expect(find.byKey(const Key('unlinked-approve-ur_1')), findsOneWidget);
+      expect(find.byKey(const Key('unlinked-new-ur_1')), findsOneWidget);
       await tester.ensureVisible(link);
       await tester.tap(link);
       await settle(tester);
-      await tester.enterText(find.byKey(const Key('link-customer')), 'c_55');
-      await tester.tap(find.byKey(const Key('save-link')));
+      await tester.enterText(
+        find.byKey(const Key('link-customer')),
+        'عميل تجريبي',
+      );
+      await tester.tap(find.byKey(const Key('link-search')));
+      await settle(tester);
+      final candidate = find.byKey(const Key('link-candidate-c_55'));
+      await tester.ensureVisible(candidate);
+      await tester.tap(candidate);
+      await settle(tester);
+      final save = find.byKey(const Key('save-link'));
+      await tester.ensureVisible(save);
+      await tester.tap(save);
       await settle(tester);
 
       expect(find.byKey(const Key('unlinked-link-ur_1')), findsNothing);
-      expect(find.byKey(const Key('unlinked-approve-ur_1')), findsNothing);
-      expect(find.text(AppStrings.approved), findsWidgets);
+      expect(find.byKey(const Key('unlinked-new-ur_1')), findsNothing);
 
       final overview = await tester.runAsync(
         () => layer.collections.overview(),
@@ -46,14 +57,15 @@ void main() {
         (row) => row.id == 'ur_1',
       );
       expect(receipt.status, 'approved');
-      expect(receipt.raw['customerId'], 'c_55');
+      expect(receipt.raw['linkedCustomerId'], 'c_55');
+      expect(receipt.raw['entryType'], 'payment');
 
       await go(tester, '/customers/c_55');
-      expect(_header('320 د.ل'), findsOneWidget);
+      expect(_header('270 د.ل'), findsOneWidget);
       final card = await tester.runAsync(
         () => layer.accounts.get(AccountSection.customers, 'c_55'),
       );
-      expect(card!.balanceUnits?.units, 320);
+      expect(card!.balanceUnits?.units, 270);
     },
   );
 

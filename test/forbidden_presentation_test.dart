@@ -43,7 +43,10 @@ void main() {
 
     await go(tester, '/collections');
     expect(find.text(AppStrings.employeeTotals), findsNothing);
-    expect(find.byKey(const Key('collections-metrics')), findsNothing);
+    // 537f073 website: the employee sees the same metrics, scoped by the
+    // server to their own rows. Other employees' totals never show.
+    expect(find.byKey(const Key('collections-metrics')), findsOneWidget);
+    expect(find.byKey(const Key('employee-totals')), findsNothing);
     expect(find.text(AppStrings.approve), findsNothing);
     expect(find.text(AppStrings.reject), findsNothing);
     expect(find.byKey(const Key('approve-sb_1')), findsNothing);

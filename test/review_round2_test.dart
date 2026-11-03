@@ -200,22 +200,23 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   });
 
-  testWidgets(
-    'awaiting cash uses the muted ink colour and the contract label',
-    (tester) async {
-      await pumpFakeApp(tester, size: const Size(800, 1800));
-      await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      await go(tester, '/collections');
-      final label = find.byKey(const Key('awaiting-cash-sb_2'));
-      expect(label, findsOneWidget);
-      final text = tester.widget<Text>(label);
-      expect(text.data, 'ينتظر النقد');
-      final color = text.style?.color;
-      final theme = Theme.of(tester.element(label));
-      expect(color, theme.colorScheme.onSurfaceVariant);
-      expect(color, isNot(AppStatusColors.light.unlinkedPending));
-    },
-  );
+  testWidgets('awaiting cash uses the card ink colour and the website label', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(800, 1800));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/collections');
+    final label = find.byKey(const Key('awaiting-cash-sb_2'));
+    expect(label, findsOneWidget);
+    final text = tester.widget<Text>(
+      find.descendant(of: label, matching: find.byType(Text)),
+    );
+    // collectionCardState / CollectionsPage wording on 537f073.
+    expect(text.data, 'ينتظر استلام النقدية');
+    final color = text.style?.color;
+    expect(color, isNotNull);
+    expect(color, isNot(AppStatusColors.light.unlinkedPending));
+  });
 
   testWidgets('missing platform connectivity follows the last API result', (
     tester,

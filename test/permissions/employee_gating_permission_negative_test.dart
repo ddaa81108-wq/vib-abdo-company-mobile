@@ -21,7 +21,10 @@ void main() {
 
       expect(find.byKey(CollectionsScreen.screenKey), findsOneWidget);
       expect(find.text(AppStrings.employeeTotals), findsNothing);
-      expect(find.byKey(const Key('collections-metrics')), findsNothing);
+      // 537f073 website: own-scoped metrics show; other employees' totals
+      // never do.
+      expect(find.byKey(const Key('collections-metrics')), findsOneWidget);
+      expect(find.byKey(const Key('employee-totals')), findsNothing);
       expect(find.byKey(const Key('approve-sb_1')), findsNothing);
       expect(find.byKey(const Key('reject-sb_1')), findsNothing);
       expect(find.byKey(const Key('unlinked-approve-ur_1')), findsNothing);

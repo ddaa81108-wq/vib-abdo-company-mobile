@@ -14,13 +14,9 @@ import '../../ui/widgets/mutation_form.dart';
 /// Reject, and cash confirmation, for one unlinked receipt (استلام غير مربوط).
 ///
 /// Buttons are omitted entirely when the signed-in user lacks the action.
-/// Reject follows a pending server status. Cash follows the server cash flag
-/// on a receipt that is not rejected. A rejected receipt never shows
-/// «تم استلام النقدية», even when `cashStatus` is pending.
-///
-/// TODO(pending server answer): `cashStatus` / `cashPending` are proposed (🔶).
-/// Until the server sends `pending`, the cash button stays hidden. Do not
-/// infer it from `status == rejected`.
+/// Reject follows a pending server status. Cash follows the deployed server's
+/// own rule (537f073): approved and no `cashReceivedAt` yet. A rejected
+/// receipt never shows «تم استلام النقدية».
 class UnlinkedReceiptActions extends ConsumerWidget {
   const UnlinkedReceiptActions({required this.receipt, super.key});
 
@@ -35,7 +31,7 @@ class UnlinkedReceiptActions extends ConsumerWidget {
     final showCash =
         permissions.canDo(ManagementAction.collectionsCashReceived) &&
         receipt.status != 'rejected' &&
-        receipt.cashStatus == CashStatus.pending;
+        receipt.awaitingCash;
     if (!showReject && !showCash) return const SizedBox.shrink();
 
     return Column(
@@ -45,8 +41,7 @@ class UnlinkedReceiptActions extends ConsumerWidget {
         if (showReject)
           GuardedMutation(
             buttonKey: Key('unlinked-reject-${receipt.id}'),
-            inputs: 'ureject:${receipt.id}:${receipt.version}',
-            expectedVersion: receipt.version,
+            inputs: 'ureject:${receipt.id}',
             label: AppStrings.reject,
             filled: false,
             onSubmit: (meta) => _reject(context, ref, meta),
@@ -55,8 +50,7 @@ class UnlinkedReceiptActions extends ConsumerWidget {
         if (showCash)
           GuardedMutation(
             buttonKey: Key('unlinked-cash-${receipt.id}'),
-            inputs: 'ucash:${receipt.id}:${receipt.version}',
-            expectedVersion: receipt.version,
+            inputs: 'ucash:${receipt.id}',
             label: AppStrings.cashReceived,
             onSubmit: (meta) => _cash(context, ref, meta),
           ),

@@ -136,20 +136,17 @@ void main() {
     tags: ['pending-decision'],
   );
 
-  testWidgets(
-    'employee collections overview has no totals board (537f073)',
-    (tester) async {
-      // Resolved by the deployed server: 537f073 sends employeeTotals to
-      // admins only, so an employee sees no other employee's figures.
-      final layer = await pumpFakeApp(tester);
-      await signIn(tester, username: 'employee.demo', password: 'demo-only');
-      final overview = await tester.runAsync(
-        () => layer.collections.overview(),
-      );
-      expect(overview!.employeeTotals, isEmpty);
-      expect(overview.collectedUnits?.units, 250);
-    },
-  );
+  testWidgets('employee collections overview has no totals board (537f073)', (
+    tester,
+  ) async {
+    // Resolved by the deployed server: 537f073 sends employeeTotals to
+    // admins only, so an employee sees no other employee's figures.
+    final layer = await pumpFakeApp(tester);
+    await signIn(tester, username: 'employee.demo', password: 'demo-only');
+    final overview = await tester.runAsync(() => layer.collections.overview());
+    expect(overview!.employeeTotals, isEmpty);
+    expect(overview.collectedUnits?.units, 250);
+  });
 
   test('a 403 is not retried by the buildAppRoot callback', () async {
     // The closure is the one buildAppRoot installs. It is not reimplemented

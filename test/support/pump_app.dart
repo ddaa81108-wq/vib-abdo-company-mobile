@@ -3,6 +3,7 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/state/collection_request_journal.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/app.dart';
@@ -58,6 +59,11 @@ Future<ApiLayer> pumpFakeApp(
         apiLayerProvider.overrideWithValue(layer),
         pushSessionGateProvider.overrideWithValue(pushGate),
         deviceTokenStoreProvider.overrideWithValue(MemoryDeviceTokenStore()),
+        // The receipt journal persists in SharedPreferences on a device;
+        // tests keep it in memory (persistence has its own test).
+        collectionAttemptStoreProvider.overrideWithValue(
+          MemoryCollectionAttemptStore(),
+        ),
         connectivityPortProvider.overrideWithValue(
           connectivity ?? const FixedConnectivity(true),
         ),
