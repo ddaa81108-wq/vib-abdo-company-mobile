@@ -161,7 +161,11 @@ void main() {
         );
         expect(_text('اسم سري'), findsWidgets);
         expect(_text('دفع جزئي'), findsWidgets);
-        expect(_text('320 د.ل'), findsWidgets);
+        // The row amount still shows. الرصيد is computed like the website
+        // and hidden because the stored card balance is not usable
+        // (Ali, 2026-11-03).
+        expect(_text('180 د.ل'), findsWidgets);
+        expect(find.byKey(const Key('ledger-balance-tx_2')), findsNothing);
         expect(_text('10 د.ل'), findsNothing);
         expect(_text('1,500 د.ل'), findsNothing);
         expect(

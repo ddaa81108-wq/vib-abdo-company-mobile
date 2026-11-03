@@ -337,7 +337,19 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     // Like the website: cancelled (reversed) rows are not drawn. The server
     // keeps them for the audit trail.
     final rows = _oldestFirst(all.where(websiteShowsRow).toList());
-    final showBalance = all.any((entry) => entry.balanceAfterUnits != null);
+    // الرصيد: the website's running balance over every loaded row, shown
+    // only when the last row equals the server's stored card balance.
+    final balances = complete
+        ? websiteBalancesMatchingServer(
+            opening: _olderPages.isEmpty
+                ? page.pageOpeningBalanceUnits
+                : _olderPages.last.pageOpeningBalanceUnits,
+            items: all,
+            serverBalance:
+                page.account?.balanceUnits ?? card.asData?.value.balanceUnits,
+          )
+        : null;
+    final showBalance = balances != null;
     final cardReady = _cardReadyForWrite(card);
     final composer = canWrite
         ? _InlineComposer(
@@ -356,6 +368,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     Widget row(int index) => _EntryTile(
       key: ValueKey('ledger-row-${rows[index].id}'),
       ordinal: complete ? index + 1 : null,
+      balanceUnits: balances?[rows[index].id],
       section: section,
       accountId: id,
       entry: rows[index],
@@ -1581,8 +1594,12 @@ class _EntryTile extends ConsumerWidget {
     required this.onEditDone,
     required this.onCancel,
     this.ordinal,
+    this.balanceUnits,
     super.key,
   });
+
+  /// الرصيد after this row, from [websiteRunningBalances].
+  final int? balanceUnits;
 
   /// م: this row's place among the drawn rows, 1 = the first movement.
   /// Null while older pages are still loading.
@@ -1747,14 +1764,11 @@ class _EntryTile extends ConsumerWidget {
       if (columns.showBalance)
         _Cell(
           _LedgerColumns.balance,
-          entry.balanceAfterUnits == null
+          balanceUnits == null
               ? dash
               : _Fit(
                   MoneyText(
-                    money.formatOrDash(
-                      entry.balanceAfterUnits,
-                      section.currency,
-                    ),
+                    money.format(balanceUnits!, section.currency),
                     key: Key('ledger-balance-${entry.id}'),
                     style: number.copyWith(fontWeight: FontWeight.w800),
                   ),
