@@ -176,7 +176,7 @@ String movementLabel({
     return switch (paymentMode) {
       'full' => AppStrings.fullPayment,
       'partial' => AppStrings.partialPayment,
-      _ => AppStrings.paymentMovement,
+      _ => AppStrings.paymentUnknownMode,
     };
   }
   return AppStrings.debtMovement;

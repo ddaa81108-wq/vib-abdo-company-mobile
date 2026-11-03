@@ -194,10 +194,15 @@ abstract final class AppStrings {
     'السبت',
     'الأحد',
   ];
-  static const fullPayment = 'سداد كلي';
-  static const partialPayment = 'سداد جزئي';
-  static const debtMovement = 'دين';
-  static const paymentMovement = 'سداد';
+  // Movement types use the website's words (Ali, 2026-11-03). Labels only;
+  // the values sent stay debt / payment + partial / full.
+  static const fullPayment = 'دفع كلي';
+  static const partialPayment = 'دفع جزئي';
+  static const debtMovement = 'ديون';
+  static const paymentMovement = 'دفع جزئي';
+
+  /// A payment line whose server paymentMode is missing.
+  static const paymentUnknownMode = 'دفع';
   static const depositIn = 'دخول';
   static const depositOut = 'خروج';
   static const egpIn = 'إيداع مصري';

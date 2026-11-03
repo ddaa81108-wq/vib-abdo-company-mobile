@@ -160,7 +160,7 @@ void main() {
           findsOneWidget,
         );
         expect(_text('اسم سري'), findsWidgets);
-        expect(_text('سداد جزئي'), findsWidgets);
+        expect(_text('دفع جزئي'), findsWidgets);
         expect(_text('320 د.ل'), findsWidgets);
         expect(_text('10 د.ل'), findsNothing);
         expect(_text('1,500 د.ل'), findsNothing);

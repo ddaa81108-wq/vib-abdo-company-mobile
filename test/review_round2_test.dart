@@ -47,7 +47,7 @@ void main() {
     expect(find.text(MoneyValue.invalidLabel), findsWidgets);
     expect(find.text('125,000 د.ل'), findsNothing);
     expect(find.text('عميل'), findsWidgets);
-    expect(find.text('سداد جزئي'), findsWidgets);
+    expect(find.text('دفع جزئي'), findsWidgets);
     expect(find.byKey(const Key('add-debt')), findsOneWidget);
     expect(find.byKey(const Key('add-payment')), findsOneWidget);
     await settle(tester);
