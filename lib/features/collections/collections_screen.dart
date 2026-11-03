@@ -18,6 +18,7 @@ import 'collection_send.dart';
 import 'collections_forms.dart';
 import 'collections_payroll.dart';
 import 'collections_strings.dart';
+import 'phone_dialer.dart';
 import 'unlinked_receipt_actions.dart';
 
 /// استلامات الديون, matched to the deployed website server (537f073).
@@ -1012,6 +1013,10 @@ class _EmployeeActions extends ConsumerWidget {
           onPressed: inactive || phone == null || phone.isEmpty
               ? null
               : () async {
+                  // Opens the dialer (tel:), as the website's link does.
+                  // Without a dialer the number is copied instead.
+                  final dialed = await ref.read(phoneDialerProvider)(phone);
+                  if (dialed) return;
                   await Clipboard.setData(ClipboardData(text: phone));
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1022,7 +1027,7 @@ class _EmployeeActions extends ConsumerWidget {
                   }
                 },
           icon: const Icon(Icons.phone_outlined, size: 16),
-          label: const Text(CollectionsText.copyPhone),
+          label: const Text(CollectionsText.call),
         ),
       ],
     );

@@ -62,8 +62,8 @@ abstract final class CollectionsText {
   static const myCardsTitle = 'الكروت الموجهة إليك';
   static const noMyCards = 'لا توجد كروت موجهة حاليًا.';
   static const noPhone = 'لا يوجد رقم هاتف';
-  static const copyPhone = 'نسخ الرقم';
-  static const phoneCopied = 'تم نسخ الرقم.';
+  static const call = 'اتصال';
+  static const phoneCopied = 'تعذر فتح الاتصال، تم نسخ الرقم.';
   static String fullConfirm(String amount) =>
       'تسجيل استلام كلي بقيمة الرصيد الحالي $amount؟';
   static const amount = 'القيمة';
