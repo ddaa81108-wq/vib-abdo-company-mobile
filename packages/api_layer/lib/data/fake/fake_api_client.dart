@@ -15,6 +15,7 @@ import '../../core/permissions/permission_codes.dart';
 import '../../core/permissions/permission_service.dart';
 import '../models/profile_models.dart';
 import '../models/purchase_models.dart';
+import 'fake_collections_engine.dart';
 import 'fake_fixtures.dart';
 import 'fake_large_catalog.dart';
 
@@ -130,7 +131,7 @@ class FakeApiClient implements ApiClient {
 
   /// `POST .../cash-received` when the row is not approved.
   static const submissionNotApprovedMessage =
-      'استلام النقدية متاح للاستلام المعتمد فقط.';
+      'لا يمكن استلام النقدية قبل اعتماد الاستلام.';
 
   /// When set, a purchase day without a stored finalize or correction uses this
   /// status on the next GET (tests). `correction` is the contract flag
@@ -275,31 +276,11 @@ class FakeApiClient implements ApiClient {
   final Map<String, int> _txVersion = {};
   final Set<String> _reversedTx = {};
 
-  /// Submission fields changed by a decision or cash receipt. Keyed by id.
-  final Map<String, Map<String, dynamic>> _submissionState = {};
-
-  /// Unlinked receipt fields changed by a decision or cash receipt. Keyed by id.
-  final Map<String, Map<String, dynamic>> _unlinkedState = {};
-
-  /// Rows stored by assignment submit and unlinked-receipt submit.
-  ///
-  /// Each row keeps the fields the request sent. `status` is `pending` and
-  /// `version` is 1, matching an undecided fixture row. `submittedByUserId`
-  /// is the same owner id the fixture already stores so the caller still sees
-  /// their own row. `cashStatus` is not written: that wire field is proposed.
-  /// Overview metrics stay the stored literals; these rows are not summed.
-  final List<Map<String, dynamic>> _extraSubmissions = [];
-  final List<Map<String, dynamic>> _extraUnlinked = [];
-  final List<Map<String, dynamic>> _extraAssignments = [];
-
   /// Purchase day fields changed by finalize or correction. Keyed by book|day.
   final Map<String, Map<String, dynamic>> _purchaseDays = {};
 
   /// Opening amounts echoed on the next purchases GET. Keyed by book.
   final Map<String, Map<String, dynamic>> _openingByBook = {};
-
-  /// Collections day close. The next batch id is a stored successor.
-  Map<String, dynamic>? _batchState;
 
   /// Masraweya day after a successful PUT. Null until the first save.
   ///
@@ -678,7 +659,7 @@ class FakeApiClient implements ApiClient {
       return;
     }
     if (seg.length > 3 && seg[1] == 'payroll' && seg.last == 'confirm') {
-      _requireAction(ManagementAction.payrollManage);
+      _requireRead(SectionKey.collections);
       return;
     }
     if (method == 'GET' && seg.length > 1 && seg[1] == 'payroll') {
@@ -1071,9 +1052,10 @@ class FakeApiClient implements ApiClient {
     if (method != 'GET' &&
         head != 'notifications' &&
         head != 'notification-preferences') {
-      // Decision and cash-received have no requestId. A shared null replay
-      // key would collapse distinct calls onto one stored success.
-      if (_collectionStatusPath(seg)) {
+      // 537f073 collections routes do not replay by requestId (unlinked
+      // receipts and payroll entries do, inside the collections engine).
+      // A shared replay here would hide the server's own rules.
+      if (seg.isNotEmpty && seg.first == 'collections') {
         return _mutateWithoutRequestId(
           method,
           path,
@@ -1300,15 +1282,6 @@ class FakeApiClient implements ApiClient {
       _fail(400, 'MUTATION_FAILED', 'تعذر تنفيذ الطلب.');
     }
     return send();
-  }
-
-  /// `POST /api/collections/{submissions|unlinked-receipts}/{id}/{decision|cash-received}`.
-  bool _collectionStatusPath(List<String> seg) {
-    if (seg.length != 4 || seg.first != 'collections') return false;
-    final kind = seg[1];
-    final action = seg[3];
-    if (kind != 'submissions' && kind != 'unlinked-receipts') return false;
-    return action == 'decision' || action == 'cash-received';
   }
 
   Future<ApiResponse> _route(
@@ -1583,7 +1556,8 @@ class FakeApiClient implements ApiClient {
     if (method == 'GET' && seg.length == 1) {
       _requireRead(SectionKey.collections);
       collectionOverviewReads++;
-      return _ok(_collectionsForCaller(query));
+      if (_large) return _ok(_largeCollections(query));
+      return _engine(() => collectionsEngine.overview(_collectionsCaller));
     }
     if (method == 'GET' && _isSalaryPath(seg)) {
       return _ok(_salaryRecord(seg[3]));
@@ -1592,72 +1566,143 @@ class FakeApiClient implements ApiClient {
       if (!_managesPayroll && !_access.canWrite(SectionKey.collections)) {
         _fail(403, 'FORBIDDEN', _denied);
       }
-      return _ok(_payrollForCaller());
+      return _engine(() => collectionsEngine.payroll(_payrollCaller));
     }
     if (method == 'GET' && seg.length > 1 && seg[1] == 'assignees') {
       _requireAction(ManagementAction.collectionsAssign);
-      return _ok({
-        'items': [
-          {
-            'id': FakeFixtures.demoEmployeeId,
-            'displayName': 'موظف استلام تجريبي',
-          },
-          {
-            'id': FakeFixtures.otherEmployeeId,
-            'displayName': 'موظف آخر تجريبي',
-          },
-        ],
-      });
+      return _engine(collectionsEngine.assignees);
     }
     if (method == 'GET' && seg.length > 1 && seg[1] == 'link-candidates') {
       _requireAction(ManagementAction.collectionsDecide);
-      return _ok({
-        'items': [
-          {'id': 'c_55', 'name': 'عميل تجريبي'},
-        ],
-      });
+      return _engine(
+        () => collectionsEngine.linkCandidates(_queryText(query, 'q')),
+      );
     }
     if (method == 'GET' && seg.length == 2 && seg[1] == 'assignments') {
       _requireAction(ManagementAction.collectionsAssign);
-      return _ok({'items': _collectionsView()['assignments']});
+      return _engine(
+        () => {
+          'items': collectionsEngine.overview(_collectionsCaller)['assignments'],
+        },
+      );
     }
     if (method == 'GET') {
       _requireRead(SectionKey.collections);
-      return _ok({'items': []});
+      // 537f073 has no /workspace or /mine route.
+      _fail(404, 'ROUTE_NOT_FOUND', 'المسار المطلوب غير موجود.');
+    }
+    if (method == 'PUT' && _isSalaryPath(seg)) {
+      _requireAction(ManagementAction.payrollManage);
+      return _engine(
+        () => collectionsEngine.setSalary(_payrollCaller, seg[3], b),
+      );
     }
     _requireCollectionMutation(seg);
+    final engine = collectionsEngine;
     if (seg.length == 4 && seg[1] == 'submissions' && seg[3] == 'decision') {
-      return _applyDecision(seg[2], b);
+      return _engine(() => engine.decide(seg[2], b));
     }
     if (seg.length == 4 &&
         seg[1] == 'submissions' &&
         seg[3] == 'cash-received') {
-      return _applyCash(seg[2], unlinked: false);
+      return _engine(() => engine.cashReceived(seg[2]));
     }
     if (seg.length == 4 &&
         seg[1] == 'unlinked-receipts' &&
         seg[3] == 'decision') {
-      return _applyUnlinkedDecision(seg[2], b);
+      return _engine(() => engine.decideUnlinked(seg[2], b));
     }
     if (seg.length == 4 &&
         seg[1] == 'unlinked-receipts' &&
         seg[3] == 'cash-received') {
-      return _applyCash(seg[2], unlinked: true);
+      return _engine(() => engine.unlinkedCashReceived(seg[2]));
     }
     // CollectionsRepository.closeDay posts /api/collections/days/close.
     if (seg.length == 3 && seg[1] == 'days' && seg[2] == 'close') {
-      return _applyClose(b);
+      return _engine(() => engine.closeDay(b));
     }
     if (method == 'POST' && seg.length == 2 && seg[1] == 'assignments') {
-      return _applyAssignment(b);
+      return _engine(() => engine.assign(b));
     }
     if (seg.length == 4 && seg[1] == 'assignments' && seg[3] == 'submissions') {
-      return _applyAssignmentSubmission(seg[2], b);
+      return _engine(() => engine.submit(_collectionsCaller, seg[2], b));
     }
     if (seg.length == 2 && seg[1] == 'unlinked-receipts') {
-      return _applyUnlinkedCreate(b);
+      return _engine(() => engine.createUnlinked(_collectionsCaller, b));
     }
-    return _ok({'id': 'ok', 'version': 1});
+    if (seg.length == 3 && seg[1] == 'payroll' && seg[2] == 'entries') {
+      return _engine(() => engine.addPayrollEntry(_payrollCaller, b));
+    }
+    if (seg.length == 5 &&
+        seg[1] == 'payroll' &&
+        seg[2] == 'entries' &&
+        seg[4] == 'confirm') {
+      return _engine(
+        () => engine.confirmPayrollEntry(_payrollCaller, seg[3]),
+      );
+    }
+    _fail(404, 'ROUTE_NOT_FOUND', 'المسار المطلوب غير موجود.');
+  }
+
+  FakeCollectionCard? _collectionCard(String section, String id) {
+    final base = _cardOrNull(section, id);
+    if (base == null) return null;
+    final card = _cardView(section, id);
+    final balance = card['balanceUnits'];
+    if (balance is! int) return null;
+    return FakeCollectionCard(
+      id: id,
+      section: section,
+      name: '${card['name']}',
+      phone: card['phone'] as String?,
+      balanceUnits: balance,
+      version: card['version'] as int?,
+    );
+  }
+
+  int _postCollectionDelta(String section, String id, int delta) {
+    final card = _cardView(section, id);
+    final stored = (card['balanceUnits'] as int) + delta;
+    final version = card['version'];
+    _cardState['$section|$id'] = {
+      ...?_cardState['$section|$id'],
+      'balanceUnits': stored,
+      'version': version is int ? version + 1 : 1,
+    };
+    return stored;
+  }
+
+  /// The 537f073 collections rules (see [FakeCollectionsEngine]).
+  late final FakeCollectionsEngine collectionsEngine = FakeCollectionsEngine(
+    _FakeCollectionCardsBridge(this),
+    demoEmployeeId: FakeFixtures.demoEmployeeId,
+    otherEmployeeId: FakeFixtures.otherEmployeeId,
+  );
+
+  FakeCollectionsCaller get _collectionsCaller => FakeCollectionsCaller(
+    id: _userId,
+    name: _displayName() ?? '',
+    seesEverything: _seesEveryCollection,
+  );
+
+  /// Payroll is admin-scoped by the payroll manage action, not by decide.
+  FakeCollectionsCaller get _payrollCaller => FakeCollectionsCaller(
+    id: _userId,
+    name: _displayName() ?? '',
+    seesEverything: _managesPayroll,
+  );
+
+  ApiResponse _engine(Map<String, dynamic> Function() run) {
+    try {
+      return _ok(run());
+    } on FakeCollectionsFailure catch (failure) {
+      _fail(
+        failure.status,
+        failure.code,
+        failure.message,
+        details: failure.details,
+      );
+    }
   }
 
   void _requireCollectionMutation(List<String> seg) {
@@ -1671,7 +1716,8 @@ class FakeApiClient implements ApiClient {
       return;
     }
     if (seg.length > 3 && seg[1] == 'payroll' && last == 'confirm') {
-      _requireAction(ManagementAction.payrollManage);
+      // 537f073: the employee confirms their own entry; admin may not.
+      _requireRead(SectionKey.collections);
       return;
     }
     if (seg.length == 2 && seg[1] == 'assignments') {
@@ -1993,117 +2039,6 @@ class FakeApiClient implements ApiClient {
     });
   }
 
-  Map<String, dynamic> _collectionsView() {
-    final body = _copy(FakeFixtures.collections());
-    final items = <Map<String, dynamic>>[];
-    for (final raw in body['submissions'] as List) {
-      final item = Map<String, dynamic>.from(raw as Map);
-      final state = _submissionState['${item['id']}'];
-      if (state != null) item.addAll(state);
-      item.remove('version');
-      items.add(item);
-    }
-    for (final extra in _extraSubmissions) {
-      final item = Map<String, dynamic>.from(extra);
-      final state = _submissionState['${item['id']}'];
-      if (state != null) item.addAll(state);
-      item.remove('version');
-      items.add(item);
-    }
-    body['submissions'] = items;
-    final assignments = <Map<String, dynamic>>[
-      for (final raw in body['assignments'] as List)
-        Map<String, dynamic>.from(raw as Map),
-      for (final extra in _extraAssignments) Map<String, dynamic>.from(extra),
-    ];
-    body['assignments'] = assignments;
-    final receipts = <Map<String, dynamic>>[];
-    for (final raw in body['unlinkedReceipts'] as List) {
-      final item = Map<String, dynamic>.from(raw as Map);
-      final state = _unlinkedState['${item['id']}'];
-      if (state != null) item.addAll(state);
-      item.remove('version');
-      receipts.add(item);
-    }
-    for (final extra in _extraUnlinked) {
-      final item = Map<String, dynamic>.from(extra);
-      final state = _unlinkedState['${item['id']}'];
-      if (state != null) item.addAll(state);
-      item.remove('version');
-      receipts.add(item);
-    }
-    body['unlinkedReceipts'] = receipts;
-    final batch = _batchState;
-    if (batch != null) body.addAll(batch);
-    return body;
-  }
-
-  /// Stores one submission on an assignment the caller can see.
-  ///
-  /// An assignment outside that set is 404, the same body as a missing id.
-  /// The amount is the integer the request sent. This does not copy the
-  /// assignment balance and does not change overview metrics.
-  ApiResponse _applyAssignmentSubmission(String assignmentId, Map b) {
-    _requireVisibleAssignment(assignmentId);
-    final mode = b['mode'];
-    if (mode != 'full' && mode != 'partial') {
-      _fail(400, 'VALIDATION_ERROR', 'mode غير معروف');
-    }
-    int? amount;
-    if (mode == 'partial') {
-      final raw = b['amountUnits'];
-      if (raw is! int) _fail(400, 'VALIDATION_ERROR', 'amountUnits مطلوب');
-      amount = raw;
-    } else if (b['amountUnits'] is int) {
-      amount = b['amountUnits'] as int;
-    }
-    final id = 'sb_posted_${_extraSubmissions.length + 1}';
-    final name = _displayName();
-    final assignment = _assignmentRecord(assignmentId);
-    _extraSubmissions.add({
-      'id': id,
-      'mode': mode,
-      if (amount != null) 'amountUnits': amount,
-      'status': 'pending',
-      if (assignment?['customerId'] != null)
-        'customerId': assignment!['customerId'],
-      if (assignment?['section'] != null) 'section': assignment!['section'],
-      if (_userId != null) 'submittedByUserId': _userId,
-      if (name != null) 'submittedByName': name,
-    });
-    // Pending does not change the balance, so the ack has no balanceUnits.
-    return _ok({'id': id, 'version': 1});
-  }
-
-  /// Stores one unlinked receipt for the signed-in caller.
-  ApiResponse _applyUnlinkedCreate(Map b) {
-    final name = b['customerName'];
-    if (name is! String || name.trim().isEmpty) {
-      _fail(400, 'VALIDATION_ERROR', 'customerName مطلوب');
-    }
-    final amount = b['amountUnits'];
-    if (amount is! int) _fail(400, 'VALIDATION_ERROR', 'amountUnits مطلوب');
-    final id = 'ur_posted_${_extraUnlinked.length + 1}';
-    _extraUnlinked.add({
-      'id': id,
-      'customerName': name,
-      'amountUnits': amount,
-      'status': 'pending',
-      if (_userId != null) 'submittedByUserId': _userId,
-    });
-    return _ok({'id': id, 'version': 1});
-  }
-
-  void _requireVisibleAssignment(String id) {
-    final assignments = _collectionsForCaller()['assignments'];
-    if (assignments is List) {
-      for (final raw in assignments) {
-        if (raw is Map && raw['id'] == id) return;
-      }
-    }
-    _fail(404, 'NOT_FOUND', _notFound);
-  }
-
   String? _displayName() {
     final user = _me['user'];
     if (user is Map && user['displayName'] is String) {
@@ -2111,148 +2046,6 @@ class FakeApiClient implements ApiClient {
       if (name.isNotEmpty) return name;
     }
     return null;
-  }
-
-  /// Compares the stored batch version. A match stores the next batch id.
-  ApiResponse _applyClose(Map b) {
-    final current = _collectionsView();
-    _requireVersion(b['expectedVersion'], current['version']);
-    final version = (current['version'] as int) + 1;
-    _batchState = {'batchId': 'b_2', 'version': version};
-    return _ok({'id': 'ok', 'version': version});
-  }
-
-  ApiResponse _applyDecision(String id, Map b) {
-    Map<String, dynamic>? submission;
-    for (final raw in _collectionsView()['submissions'] as List) {
-      final item = raw as Map<String, dynamic>;
-      if (item['id'] == id) submission = item;
-    }
-    if (submission == null) _fail(404, 'NOT_FOUND', 'الاستلام غير موجود');
-    if (submission['status'] != 'pending') {
-      _fail(409, 'SUBMISSION_ALREADY_DECIDED', submissionAlreadyDecidedMessage);
-    }
-    final status = _decisionStatus(b['decision']);
-    final posted = status == 'approved' ? _postLinkedBalance(submission) : null;
-    final next = {...?_submissionState[id], 'status': status};
-    next.remove('version');
-    _submissionState[id] = next;
-    return _decisionAck(id, status, postedBalance: posted);
-  }
-
-  ApiResponse _applyCash(String id, {required bool unlinked}) {
-    final view = _collectionsView();
-    final items =
-        (unlinked ? view['unlinkedReceipts'] : view['submissions']) as List;
-    final current = _recordById(
-      items,
-      id,
-      unlinked ? 'الإيصال غير موجود' : 'الاستلام غير موجود',
-    );
-    if (current['status'] != 'approved') {
-      _fail(409, 'SUBMISSION_NOT_APPROVED', submissionNotApprovedMessage);
-    }
-    final store = unlinked ? _unlinkedState : _submissionState;
-    final receivedAt = current['cashReceivedAt'];
-    if (current['cashStatus'] == 'received' ||
-        (receivedAt is String && receivedAt.isNotEmpty)) {
-      return _ok({
-        'id': id,
-        'cashReceivedAt': receivedAt,
-        'eventSequences': <int>[4],
-        'replayed': true,
-      });
-    }
-    const at = '2026-10-22T22:00:00.000Z';
-    final next = {
-      ...?store[id],
-      'cashStatus': 'received',
-      'cashPending': false,
-      'cashReceivedAt': at,
-    };
-    next.remove('version');
-    store[id] = next;
-    return _ok({
-      'id': id,
-      'cashReceivedAt': at,
-      'eventSequences': <int>[4],
-    });
-  }
-
-  ApiResponse _applyUnlinkedDecision(String id, Map b) {
-    final current = _recordById(
-      _collectionsView()['unlinkedReceipts'] as List,
-      id,
-      'الإيصال غير موجود',
-    );
-    if (current['status'] != 'pending') {
-      _fail(409, 'SUBMISSION_ALREADY_DECIDED', submissionAlreadyDecidedMessage);
-    }
-    final status = _decisionStatus(b['decision']);
-    final customerId = b['customerId'];
-    int? posted;
-    if (status == 'approved' &&
-        b['entryType'] == 'payment' &&
-        customerId is String &&
-        current['amountUnits'] is int) {
-      final section = _unlinkedLinkSection(customerId);
-      if (section != null) {
-        // Standalone receipts are LYD until the company decides otherwise.
-        posted = _postLinkedBalance({
-          'section': section,
-          'customerId': customerId,
-          'mode': 'partial',
-          'amountUnits': current['amountUnits'],
-          'currency': 'LYD',
-        });
-      }
-    }
-    final next = {
-      ...?_unlinkedState[id],
-      'status': status,
-      if (customerId != null) 'customerId': customerId,
-    };
-    next.remove('version');
-    _unlinkedState[id] = next;
-    return _decisionAck(id, status, postedBalance: posted);
-  }
-
-  String _decisionStatus(Object? decision) {
-    final status = switch (decision) {
-      'approve' => 'approved',
-      'reject' => 'rejected',
-      _ => null,
-    };
-    if (status == null) _fail(400, 'VALIDATION_ERROR', 'قرار غير معروف');
-    return status;
-  }
-
-  /// Approve returns the contract decision shape. Reject is id, status, and
-  /// events only: no `transactionId` and no `balanceUnits`.
-  ///
-  /// [postedBalance] is the balance stored on the linked card, and may be
-  /// negative. A missing link is not a balance: the receipt amount is not
-  /// copied into `balanceUnits`, and the field is omitted rather than sent
-  /// as 0.
-  ApiResponse _decisionAck(
-    String id,
-    String status, {
-    int? postedBalance,
-  }) {
-    if (status != 'approved') {
-      return _ok({
-        'id': id,
-        'status': status,
-        'eventSequences': <int>[3],
-      });
-    }
-    return _ok({
-      'id': id,
-      'status': status,
-      'transactionId': 'collection-$id',
-      if (postedBalance != null) 'balanceUnits': postedBalance,
-      'eventSequences': <int>[3],
-    });
   }
 
   /// Open day after stored finalize, correction, fixture status, and opening.
@@ -2284,113 +2077,6 @@ class FakeApiClient implements ApiClient {
     }
     day['status'] = status;
     day['correctionOpen'] = false;
-  }
-
-  /// LYD card first. An id that exists only on Egyptian deposits is returned
-  /// so the currency check can refuse it. DEF-035: a standalone receipt is
-  /// not posted onto an Egyptian account.
-  String? _unlinkedLinkSection(String customerId) {
-    if (FakeFixtures.cardById('customers', customerId).isNotEmpty) {
-      return 'customers';
-    }
-    if (FakeFixtures.cardById('egyptian-deposits', customerId).isNotEmpty) {
-      return 'egyptian-deposits';
-    }
-    return null;
-  }
-
-  /// Stores one assignment the caller named. The ack keeps `id` and `version`
-  /// and also returns the contract `assignmentIds`.
-  ApiResponse _applyAssignment(Map b) {
-    final ids = b['customerIds'];
-    final section = b['section'];
-    final assignee = b['assigneeUserId'];
-    if (ids is! List || section is! String || assignee is! String) {
-      _fail(400, 'VALIDATION_ERROR', 'بيانات التوجيه ناقصة');
-    }
-    final created = <String>[];
-    for (final raw in ids) {
-      if (raw is! String || raw.isEmpty) {
-        _fail(400, 'VALIDATION_ERROR', 'customerId مطلوب');
-      }
-      if (FakeFixtures.cardById(section, raw).isEmpty) {
-        _fail(404, 'NOT_FOUND', 'الحساب غير موجود');
-      }
-      final id = 'as_posted_${_extraAssignments.length + 1}';
-      final card = FakeFixtures.cardById(section, raw);
-      _extraAssignments.add({
-        'id': id,
-        'customerId': raw,
-        'customerName': card['name'],
-        'section': section,
-        'balanceUnits': card['balanceUnits'],
-        'status': 'open',
-        'assigneeUserId': assignee,
-      });
-      created.add(id);
-    }
-    return _ok({
-      'id': 'ok',
-      'version': 1,
-      'assignmentIds': created,
-      'eventSequences': <int>[1],
-    });
-  }
-
-  /// Stores the balance after an approved collection and returns it.
-  ///
-  /// Partial subtracts the stored amount and may go negative. Full stores 0,
-  /// the same result as a full card payment. No link, or a balance that is
-  /// not an int, returns null and does not write the card.
-  ///
-  /// The receipt currency must match the linked account. Collections are LYD
-  /// unless the row itself carries `currency`. Egyptian deposits are EGP.
-  /// `error-catalog.json` has no code for this mismatch.
-  /// `INVALID_LEDGER_CURRENCY` belongs to the financial-ledger query, not to
-  /// a collection post, so it is not used. The card is left unchanged and
-  /// the caller omits `balanceUnits`.
-  int? _postLinkedBalance(Map submission) {
-    final section = submission['section'];
-    final customerId = submission['customerId'];
-    if (section is! String || customerId is! String) return null;
-    if (section.isEmpty || customerId.isEmpty) return null;
-    if (FakeFixtures.cardById(section, customerId).isEmpty) return null;
-    final card = _cardView(section, customerId);
-    final previous = card['balanceUnits'];
-    if (previous is! int) return null;
-    final paymentCurrency = submission['currency'] is String
-        ? submission['currency'] as String
-        : 'LYD';
-    final accountCurrency = section == 'egyptian-deposits' ? 'EGP' : 'LYD';
-    if (paymentCurrency != accountCurrency) return null;
-    final mode = submission['mode'];
-    final int stored;
-    if (mode == 'full') {
-      stored = 0;
-    } else if (mode == 'partial') {
-      final amount = submission['amountUnits'];
-      if (amount is! int) return null;
-      stored = previous - amount;
-    } else {
-      return null;
-    }
-    final version = card['version'];
-    _cardState['$section|$customerId'] = {
-      'balanceUnits': stored,
-      'version': version is int ? version + 1 : 1,
-    };
-    return stored;
-  }
-
-  Map<String, dynamic>? _assignmentRecord(String id) {
-    final assignments = _collectionsView()['assignments'];
-    if (assignments is! List) return null;
-    for (final raw in assignments) {
-      if (raw is Map && raw['id'] == id) {
-        return Map<String, dynamic>.from(raw);
-      }
-    }
-    return null;
   }
 
   Map<String, dynamic> _purchasesView(String book) {
@@ -2714,38 +2400,6 @@ class FakeApiClient implements ApiClient {
     return body;
   }
 
-  Map<String, dynamic> _collectionsForCaller([Map<String, dynamic>? query]) {
-    if (_large) return _largeCollections(query);
-    final body = _collectionsView();
-    if (_seesEveryCollection) return body;
-    final id = _userId;
-    body['assignments'] = _owned(body['assignments'], 'assigneeUserId', id);
-    body['submissions'] = _owned(body['submissions'], 'submittedByUserId', id);
-    body['unlinkedReceipts'] = _owned(
-      body['unlinkedReceipts'],
-      'submittedByUserId',
-      id,
-    );
-    body['employeeTotals'] = _owned(body['employeeTotals'], 'userId', id);
-    // 🔶 Own overview figures are stored literals, not a sum of the rows above.
-    if (id == FakeFixtures.demoEmployeeId) {
-      body['metrics'] = Map<String, dynamic>.from(
-        FakeFixtures.ownCollectionMetrics,
-      );
-      body['assignedCount'] = FakeFixtures.ownAssignedCount;
-    } else {
-      body['metrics'] = {
-        'collectedUnits': 0,
-        'dayTotalUnits': 0,
-        'pendingCount': 0,
-        'unlinkedPendingCount': 0,
-        'cashOutstandingUnits': 0,
-      };
-      body['assignedCount'] = 0;
-    }
-    return body;
-  }
-
   List<Map<String, dynamic>> _owned(Object? raw, String field, String? id) {
     if (raw is! List || id == null) return const [];
     return [
@@ -2753,13 +2407,6 @@ class FakeApiClient implements ApiClient {
         if (item is Map && '${item[field]}' == id)
           Map<String, dynamic>.from(item),
     ];
-  }
-
-  Map<String, dynamic> _payrollForCaller() {
-    final body = _copy(FakeFixtures.payroll());
-    if (_managesPayroll) return body;
-    body['employees'] = _owned(body['employees'], 'userId', _userId);
-    return body;
   }
 
   Map<String, dynamic> _salaryRecord(String employeeId) {
@@ -3019,13 +2666,6 @@ class FakeApiClient implements ApiClient {
     return {'id': id, 'displayName': name};
   }
 
-  Map<String, dynamic> _recordById(List items, String id, String missing) {
-    for (final raw in items) {
-      final item = raw as Map<String, dynamic>;
-      if (item['id'] == id) return item;
-    }
-    _fail(404, 'NOT_FOUND', missing);
-  }
 }
 
 /// One in-memory cookie session. Lifetime is not counted down locally.
@@ -3092,4 +2732,44 @@ class AccountSuggestionQuery {
 
   final String section;
   final String q;
+}
+
+class _FakeCollectionCardsBridge implements FakeCollectionCards {
+  _FakeCollectionCardsBridge(this._client);
+  final FakeApiClient _client;
+
+  static const _sections = [
+    'customers',
+    'companies',
+    'libyan-deposits',
+    'egyptian-deposits',
+  ];
+
+  @override
+  FakeCollectionCard? card(String section, String id) =>
+      _client._collectionCard(section, id);
+
+  @override
+  int post(String section, String id, int deltaUnits) =>
+      _client._postCollectionDelta(section, id, deltaUnits);
+
+  @override
+  List<FakeCollectionCard> search(String query) {
+    final tokens = query
+        .split(RegExp(r'\s+'))
+        .where((token) => token.length >= 2)
+        .toList();
+    final found = <FakeCollectionCard>[];
+    for (final section in _sections) {
+      final items = FakeFixtures.accountsFor(section)['items'] as List;
+      for (final raw in items) {
+        if (raw is! Map) continue;
+        final name = '${raw['name']}';
+        if (!tokens.any(name.contains)) continue;
+        final card = this.card(section, '${raw['id']}');
+        if (card != null) found.add(card);
+      }
+    }
+    return found;
+  }
 }

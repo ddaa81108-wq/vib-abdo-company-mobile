@@ -27,28 +27,25 @@ void main() {
 
     final overview = await employee.get('/api/collections');
     final collections = overview.data as Map;
-    expect(_ids(collections['employeeTotals']), [FakeFixtures.demoEmployeeId]);
+    // 537f073 sends employeeTotals to admins only.
+    expect(collections['employeeTotals'], isNull);
     expect(_ids(collections['assignments'], field: 'assigneeUserId'), [
       FakeFixtures.demoEmployeeId,
-    ]);
-    expect(_ids(collections['submissions'], field: 'submittedByUserId'), [
-      FakeFixtures.demoEmployeeId,
       FakeFixtures.demoEmployeeId,
     ]);
-    expect(_ids(collections['unlinkedReceipts'], field: 'submittedByUserId'), [
+    expect(_ids(collections['submissions'], field: 'collectorUserId'), [
       FakeFixtures.demoEmployeeId,
       FakeFixtures.demoEmployeeId,
     ]);
-    expect((collections['metrics'] as Map)['dayTotalUnits'], 40);
-    expect((collections['metrics'] as Map)['collectedUnits'], 0);
-    final names = [
-      for (final row in collections['employeeTotals'] as List)
-        (row as Map)['employeeName'],
-    ];
-    expect(names, isNot(contains('موظف آخر تجريبي')));
+    expect(_ids(collections['unlinkedReceipts'], field: 'collectorName'), [
+      'موظف استلام تجريبي',
+    ]);
+    expect((collections['metrics'] as Map)['collectedUnits'], 250);
+    expect((collections['metrics'] as Map)['pendingCount'], 1);
+    expect(collections.toString(), isNot(contains('موظف آخر تجريبي')));
 
     final payroll = await employee.get('/api/collections/payroll');
-    expect(_ids((payroll.data as Map)['employees']), [
+    expect(_ids((payroll.data as Map)['employees'], field: 'employeeId'), [
       FakeFixtures.demoEmployeeId,
     ]);
 
@@ -104,7 +101,9 @@ void main() {
           (row) => row['id'] == 'sb_1',
         );
     expect(submission['status'], 'pending');
-    expect(employee.mutationRequestIds, [requestId]);
+    // 537f073 collections routes are not replayed by the shared requestId
+    // store; the unlinked receipt keeps its own replay in the engine.
+    expect(employee.collectionsEngine.unlinkedCount, 4);
 
     await expectLater(
       employee.post(
@@ -127,6 +126,33 @@ void main() {
         },
       ),
       throwsA(_forbiddenMatcher(adminOnlyMessage)),
+    );
+  });
+
+  test('537f073: only the employee confirms an own payroll entry', () async {
+    final employee = FakeApiClient(latency: Duration.zero);
+    await _login(employee, 'employee.demo');
+    await expectLater(
+      employee.post(
+        '/api/collections/payroll/entries/pe_9/confirm',
+        body: _mutation('confirm-other'),
+      ),
+      throwsA(isA<ForbiddenException>()),
+    );
+    final ok = await employee.post(
+      '/api/collections/payroll/entries/pe_1/confirm',
+      body: _mutation('confirm'),
+    );
+    expect(ok.statusCode, 200);
+
+    final admin = FakeApiClient(latency: Duration.zero);
+    await _login(admin, 'admin.demo');
+    await expectLater(
+      admin.post(
+        '/api/collections/payroll/entries/pe_1/confirm',
+        body: _mutation('admin-confirm'),
+      ),
+      throwsA(isA<ForbiddenException>()),
     );
   });
 
@@ -167,7 +193,7 @@ void main() {
     expect((audit.data as Map)['items'], isNotEmpty);
     final payroll = await admin.get('/api/collections/payroll');
     expect(
-        _ids((payroll.data as Map)['employees']),
+        _ids((payroll.data as Map)['employees'], field: 'employeeId'),
         containsAll([
           FakeFixtures.demoEmployeeId,
           FakeFixtures.otherEmployeeId,
@@ -345,11 +371,6 @@ final _forbidden = <_Call>[
     'PUT',
     '/api/collections/payroll/employees/${FakeFixtures.demoEmployeeId}/salary',
     body: {..._mutation('own-salary'), 'baseSalaryUnits': 1500},
-  ),
-  _Call(
-    'POST',
-    '/api/collections/payroll/entries/pe_1/confirm',
-    body: _mutation('confirm'),
   ),
   const _Call('GET', '/api/collections/assignees'),
   const _Call('GET', '/api/collections/assignments'),

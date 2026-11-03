@@ -16,6 +16,13 @@ abstract interface class CollectionsRepository {
       required MutationMeta meta});
 
   /// Employee: full / partial receipt on an assigned card.
+  ///
+  /// 537f073 rules: one pending submission per card (409
+  /// PENDING_SUBMISSION_EXISTS); a full receipt sends the current debt as
+  /// [amountUnits] and the server refuses it if the debt changed
+  /// (FULL_AMOUNT_CHANGED). The server does not replay submissions by
+  /// `requestId`; the id is still sent and kept for a retry (see
+  /// `CollectionRequestJournal`), which is harmless on 537f073.
   Future<MutationAck> submit(String assignmentId,
       {required String mode, int? amountUnits, required MutationMeta meta});
 
@@ -34,6 +41,9 @@ abstract interface class CollectionsRepository {
       required int amountUnits,
       required MutationMeta meta});
   Future<List<Json>> linkCandidates(String q);
+
+  /// Typed [linkCandidates]. Linking only ever uses one of these rows.
+  Future<List<CollectionLinkCandidateDto>> linkCandidateRows(String q);
 
   /// Approve or reject an unlinked receipt. The contract body is `decision`
   /// plus optional `note`, `customerId`, `entryType`, and `newAccountKind`.
@@ -147,6 +157,12 @@ class RemoteCollectionsRepository implements CollectionsRepository {
       (await _api.get(ApiEndpoints.collectionLinkCandidates, query: {'q': q}))
           .data,
       (j) => j).items;
+
+  @override
+  Future<List<CollectionLinkCandidateDto>> linkCandidateRows(String q) async =>
+      (await linkCandidates(q))
+          .map(CollectionLinkCandidateDto.fromJson)
+          .toList(growable: false);
 
   @override
   Future<MutationAck> decideUnlinked(String receiptId,
