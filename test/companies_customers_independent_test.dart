@@ -46,6 +46,25 @@ void main() {
     expect(companyCardState(_card(-45, 'warning')), CompanyCardState.credit);
     expect(companyCardState(_card(0, 'warning')), CompanyCardState.zero);
     expect(companyCardWord(_card(0, 'zero')), AppStrings.zeroAccount);
+    // No server ageStatus (as on staging): the website's debtAgeDays split.
+    AccountCardDto days(int? d) => AccountCardDto.fromJson({
+      'id': 'd',
+      'name': 'ش',
+      'balanceUnits': 2000,
+      'debtAgeDays': d,
+      'version': 1,
+    }, AccountSection.companies);
+    expect(companyCardState(days(11)), CompanyCardState.overdue);
+    expect(companyCardState(days(7)), CompanyCardState.overdue);
+    expect(companyCardState(days(3)), CompanyCardState.warning);
+    expect(companyCardState(days(2)), CompanyCardState.newDebt);
+    expect(companyCardState(days(null)), CompanyCardState.newDebt);
+    expect(companyCardWord(days(11)), AppStrings.overdue);
+    // Customers keep their sign rule for the same card.
+    expect(
+      customerBalanceKind(days(11).balanceUnits),
+      CustomerBalanceKind.debt,
+    );
     // Ledger total heading: the company's trust label only for companies.
     expect(
       companyLedgerHeading(companyLedgerKind(const MoneyValue.known(-45))),

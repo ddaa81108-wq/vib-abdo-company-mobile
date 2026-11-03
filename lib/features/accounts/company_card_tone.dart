@@ -9,8 +9,10 @@ import '../../ui/theme.dart';
 ///
 /// The website's company card class (`DebtAccountsView` `te()`): a negative
 /// balance is `credit-balance`, zero is `zero-balance`, otherwise the debt
-/// age class. The app takes the age from the server's `ageStatus` (it does
-/// not apply the 3/7-day thresholds itself). Display only.
+/// age class. The server's `ageStatus` wins when it is sent; staging sends
+/// only `debtAgeDays`, so the website's own split applies then
+/// (`(debtAgeDays ?? 0) >= 7` overdue, `>= 3` warning, else new). Display
+/// only; no money is computed.
 enum CompanyCardState { newDebt, warning, overdue, credit, zero, unknown }
 
 CompanyCardState companyCardState(AccountCardDto card) {
@@ -18,12 +20,18 @@ CompanyCardState companyCardState(AccountCardDto card) {
   if (units == null) return CompanyCardState.unknown;
   if (units < 0) return CompanyCardState.credit;
   if (units == 0) return CompanyCardState.zero;
-  return switch (card.ageStatus) {
-    'overdue' => CompanyCardState.overdue,
-    'warning' => CompanyCardState.warning,
-    'new' => CompanyCardState.newDebt,
-    _ => CompanyCardState.unknown,
-  };
+  switch (card.ageStatus) {
+    case 'overdue':
+      return CompanyCardState.overdue;
+    case 'warning':
+      return CompanyCardState.warning;
+    case 'new':
+      return CompanyCardState.newDebt;
+  }
+  final days = card.debtAgeDays ?? 0;
+  if (days >= 7) return CompanyCardState.overdue;
+  if (days >= 3) return CompanyCardState.warning;
+  return CompanyCardState.newDebt;
 }
 
 /// The state word on a company card: the server's own label when it sent
