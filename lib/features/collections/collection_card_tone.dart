@@ -99,3 +99,13 @@ Gloss collectionToneGloss(BuildContext context, CollectionTone tone) {
 
 /// Test and screenshot label for a tone.
 String collectionToneName(CollectionTone tone) => tone.name;
+
+/// The website's card history: this card's submissions, oldest first,
+/// rejected ones left out.
+List<CollectionSubmissionDto> collectionCardHistory(
+  CollectionsOverviewDto data,
+  String assignmentId,
+) => [
+  for (final row in data.submissions.reversed)
+    if (row.assignmentId == assignmentId && row.status != 'rejected') row,
+];

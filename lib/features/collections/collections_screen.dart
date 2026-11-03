@@ -17,6 +17,7 @@ import 'collection_card_tone.dart';
 import 'collection_send.dart';
 import 'collections_forms.dart';
 import 'collections_payroll.dart';
+import 'collections_export.dart';
 import 'collections_strings.dart';
 import 'phone_dialer.dart';
 import 'unlinked_receipt_actions.dart';
@@ -73,6 +74,11 @@ class CollectionsScreen extends ConsumerWidget {
           builder: (data) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: CollectionsExportButton(data: data, admin: manage),
+              ),
+              const SizedBox(height: AppSpacing.sm),
               _Hero(data: data, money: money),
               const SizedBox(height: AppSpacing.md),
               _Metrics(
@@ -348,7 +354,7 @@ class _AdminBody extends ConsumerWidget {
           for (final assignment in data.assignments)
             _AssignmentCard(
               assignment: assignment,
-              history: _history(data, assignment.id),
+              history: collectionCardHistory(data, assignment.id),
               money: money,
               admin: true,
             ),
@@ -358,16 +364,6 @@ class _AdminBody extends ConsumerWidget {
     );
   }
 }
-
-/// The website's card history: this card's submissions, oldest first,
-/// rejected ones left out.
-List<CollectionSubmissionDto> _history(
-  CollectionsOverviewDto data,
-  String assignmentId,
-) => [
-  for (final row in data.submissions.reversed)
-    if (row.assignmentId == assignmentId && row.status != 'rejected') row,
-];
 
 class _EmployeeTotals extends StatelessWidget {
   const _EmployeeTotals({required this.rows, required this.money});
@@ -695,7 +691,7 @@ class _EmployeeBody extends ConsumerWidget {
           for (final assignment in data.assignments)
             _AssignmentCard(
               assignment: assignment,
-              history: _history(data, assignment.id),
+              history: collectionCardHistory(data, assignment.id),
               money: money,
               admin: false,
             ),
