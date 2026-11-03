@@ -11,6 +11,7 @@ import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/ui/presentation.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
+import 'package:vib_abdo_company_mobile/ui/theme.dart';
 
 import 'support/pump_app.dart';
 
@@ -70,10 +71,12 @@ void main() {
     final loaded = await tester.runAsync(() async {
       final customers = await layer.accounts.list(AccountSection.customers);
       final companies = await layer.accounts.list(AccountSection.companies);
+      final libyan = await layer.accounts.list(AccountSection.libyanDeposits);
       final home = await layer.home.fetch();
       return (
         customer: customers.page.items.firstWhere((card) => card.id == 'c_55'),
         company: companies.page.items.firstWhere((card) => card.id == 'c_55'),
+        libyan: libyan.page.items.firstWhere((card) => card.id == 'c_55'),
         ticker: home.oldDebts!.firstWhere(
           (debt) =>
               debt.id == 'c_55' &&
@@ -103,8 +106,19 @@ void main() {
       ),
     );
 
+    // Company cards use the customer card words too (Ali, 2026-11-03):
+    // دين, no age line.
     await go(tester, '/companies');
-    _expectSingleAge(tester, companyCard, AccountSection.companies);
+    expect(find.byKey(Key('account-age-${companyCard.id}')), findsNothing);
+    expect(
+      tester
+          .widget<Text>(find.byKey(Key('account-kind-${companyCard.id}')))
+          .data,
+      AppStrings.customerDebtWord,
+    );
+    // The deposit cards keep the single server age line.
+    await go(tester, '/libyan-deposits');
+    _expectSingleAge(tester, loaded.libyan, AccountSection.libyanDeposits);
   });
 
   testWidgets('amounts sit on the RTL start edge in light and dark', (
@@ -121,14 +135,12 @@ void main() {
       final theme = Theme.of(tester.element(find.byType(HomeShell)));
       expect(theme.brightness, dark ? Brightness.dark : Brightness.light);
       _expectAmountOnStart(tester, '320 د.ل');
-      // Customer cards use the debt/credit/zero tone (Ali, 2026-11-02);
-      // the age gradient is checked on companies.
+      // Customer and company cards use the debt/credit/zero gloss (Ali,
+      // 2026-11-02 / 2026-11-03): c_55 is a debt, so glossy red in both.
+      final look = tester.element(find.byType(HomeShell)).look;
+      expect(_cardGradient(tester).colors.first, look.glossDebt.top);
       await go(tester, '/companies');
-      final gradient = _cardGradient(tester);
-      expect(
-        gradient.colors.first,
-        dark ? const Color(0xFF78551E) : const Color(0xFFFF9A00),
-      );
+      expect(_cardGradient(tester).colors.first, look.glossDebt.top);
     }
   });
 

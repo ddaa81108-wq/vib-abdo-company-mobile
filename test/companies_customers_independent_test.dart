@@ -27,44 +27,26 @@ Finder _inside(Key key, String text) =>
     find.descendant(of: find.byKey(key), matching: find.text(text));
 
 void main() {
-  test('same card values: each section applies its own rule', () {
-    // A 320 debt three days old: customers see «دين» (sign rule), companies
-    // see the website's age state.
-    final debt = _card(320, 'warning');
-    expect(customerBalanceKind(debt.balanceUnits), CustomerBalanceKind.debt);
-    expect(companyCardState(debt), CompanyCardState.warning);
-    expect(companyCardWord(debt), AppStrings.warningAge);
-    expect(companyCardState(_card(320, 'overdue')), CompanyCardState.overdue);
-    expect(companyCardWord(_card(320, 'new')), AppStrings.newDebt);
-    // The server's label wins on a company card.
+  test('same card values: each section uses its own function', () {
+    // Same colours and words as customers (Ali, 2026-11-03), but the
+    // companies' own sign function, independent of age.
+    for (final age in ['new', 'warning', 'overdue', 'credit', 'zero']) {
+      final debt = _card(320, age);
+      expect(companyCardKind(debt.balanceUnits), CompanyCardKind.debt);
+      expect(customerBalanceKind(debt.balanceUnits), CustomerBalanceKind.debt);
+      expect(
+        companyCardKind(_card(-45, age).balanceUnits),
+        CompanyCardKind.credit,
+      );
+      expect(companyCardKind(_card(0, age).balanceUnits), CompanyCardKind.zero);
+    }
+    expect(companyCardWord(CompanyCardKind.debt), AppStrings.customerDebtWord);
     expect(
-      companyCardWord(_card(320, 'warning', label: 'منذ 4 أيام')),
-      'منذ 4 أيام',
+      companyCardWord(CompanyCardKind.credit),
+      AppStrings.customerCreditWord,
     );
-    // Sign decides credit and zero for companies, whatever the age says.
-    expect(companyCardState(_card(-45, 'credit')), CompanyCardState.credit);
-    expect(companyCardState(_card(-45, 'warning')), CompanyCardState.credit);
-    expect(companyCardState(_card(0, 'warning')), CompanyCardState.zero);
-    expect(companyCardWord(_card(0, 'zero')), AppStrings.zeroAccount);
-    // No server ageStatus (as on staging): the website's debtAgeDays split.
-    AccountCardDto days(int? d) => AccountCardDto.fromJson({
-      'id': 'd',
-      'name': 'ش',
-      'balanceUnits': 2000,
-      'debtAgeDays': d,
-      'version': 1,
-    }, AccountSection.companies);
-    expect(companyCardState(days(11)), CompanyCardState.overdue);
-    expect(companyCardState(days(7)), CompanyCardState.overdue);
-    expect(companyCardState(days(3)), CompanyCardState.warning);
-    expect(companyCardState(days(2)), CompanyCardState.newDebt);
-    expect(companyCardState(days(null)), CompanyCardState.newDebt);
-    expect(companyCardWord(days(11)), AppStrings.overdue);
-    // Customers keep their sign rule for the same card.
-    expect(
-      customerBalanceKind(days(11).balanceUnits),
-      CustomerBalanceKind.debt,
-    );
+    expect(companyCardWord(CompanyCardKind.zero), isNull);
+    expect(companyCardKind(null), CompanyCardKind.unknown);
     // Ledger total heading: the company's trust label only for companies.
     expect(
       companyLedgerHeading(companyLedgerKind(const MoneyValue.known(-45))),

@@ -859,7 +859,7 @@ class _AccountCard extends StatelessWidget {
     required bool showZero,
   }) {
     final word = section == AccountSection.companies
-        ? companyCardWord(card)
+        ? companyCardWord(companyCardKind(card.balanceUnits))
         : switch (customerBalanceKind(card.balanceUnits)) {
             CustomerBalanceKind.debt => AppStrings.customerDebtWord,
             CustomerBalanceKind.credit => AppStrings.customerCreditWord,
@@ -903,12 +903,7 @@ class _AccountCard extends StatelessWidget {
                   if (word != null)
                     Text(
                       word,
-                      // Companies: the age label, like the website card.
-                      key: Key(
-                        section == AccountSection.companies
-                            ? 'account-age-${card.id}'
-                            : 'account-kind-${card.id}',
-                      ),
+                      key: Key('account-kind-${card.id}'),
                       style: cairo(12, 800, color: tone.amount),
                     ),
                   Align(
@@ -1021,9 +1016,10 @@ class _AccountCard extends StatelessWidget {
         context,
         customerBalanceKind(card.balanceUnits),
       ),
-      // Companies: their own state and the website's age colours.
+      // Companies: the customers' colours from the company's own balance
+      // sign (Ali, 2026-11-03).
       AccountSection.companies => _companyTone(
-        companyCardGloss(context, companyCardState(card)),
+        companyCardGloss(context, companyCardKind(card.balanceUnits)),
       ),
       _ => null,
     };

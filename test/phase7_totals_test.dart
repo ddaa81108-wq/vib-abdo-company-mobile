@@ -104,15 +104,24 @@ void main() {
     );
   });
 
-  testWidgets('P7-06 the zero card shows the server age label', (tester) async {
+  testWidgets('P7-06 a zero company card shows 0 like a customer card', (
+    tester,
+  ) async {
     await pumpFakeApp(tester, size: const Size(800, 2200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    // Company cards use the customer card words (Ali, 2026-11-03): no age
+    // line and no word on a zero card, just the server 0.
     await go(tester, '/companies');
-
-    expect(find.text('منذ 0 أيام'), findsWidgets);
+    expect(find.text('منذ 0 أيام'), findsNothing);
     expect(find.text(AppStrings.zeroAccount), findsNothing);
-    expect(find.text('0 د.ل'), findsWidgets);
-  }, tags: ['pending-decision']);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('account-card-c_co_04')),
+        matching: find.text('0 د.ل'),
+      ),
+      findsOneWidget,
+    );
+  });
 
   testWidgets(
     'payroll remaining on the collections screen matches the server',
