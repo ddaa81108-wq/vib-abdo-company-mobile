@@ -735,7 +735,8 @@ class Gloss {
   );
 }
 
-/// Paints [Gloss.highlight] over [child] without taking taps.
+/// Paints [Gloss.highlight] behind [child] (over the card fill, under the
+/// text) without taking taps.
 class GlossSheen extends StatelessWidget {
   const GlossSheen({
     required this.gloss,
@@ -752,7 +753,6 @@ class GlossSheen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        child,
         Positioned.fill(
           child: IgnorePointer(
             child: DecoratedBox(
@@ -763,6 +763,7 @@ class GlossSheen extends StatelessWidget {
             ),
           ),
         ),
+        child,
       ],
     );
   }
