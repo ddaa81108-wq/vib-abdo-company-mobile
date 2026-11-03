@@ -208,7 +208,8 @@ void main() {
     );
     expect(ledgerReads, greaterThan(ledgerBefore));
     expect(cardReads, greaterThan(cardBefore));
-    expect(find.text('tx_1'), findsWidgets);
+    // The corrected line stays in place in the table.
+    expect(find.byKey(const ValueKey('ledger-row-tx_1')), findsOneWidget);
   });
 
   testWidgets('a version conflict refetches the card and resends with it', (

@@ -1381,10 +1381,12 @@ class _EntryTile extends ConsumerWidget {
           children: [
             if (date != null)
               Text(AppStrings.weekdays[date.weekday - 1], style: small),
-            LtrText(
-              formatIsoDate(date),
-              key: Key('ledger-date-${entry.id}'),
-              style: number,
+            _Fit(
+              LtrText(
+                formatIsoDate(date),
+                key: Key('ledger-date-${entry.id}'),
+                style: number,
+              ),
             ),
             if (date != null) LtrText(_clock(date), style: small),
           ],
@@ -1409,10 +1411,12 @@ class _EntryTile extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(entry.note ?? AppStrings.dash, style: body),
+            Text(
+              (entry.note ?? '').trim().isEmpty ? AppStrings.dash : entry.note!,
+              style: body,
+            ),
             if (entry.createdByName != null)
               Text('${AppStrings.actor}: ${entry.createdByName}', style: small),
-            LtrText(entry.id, style: small),
             if (reversed)
               Text(
                 AppStrings.reversed,
