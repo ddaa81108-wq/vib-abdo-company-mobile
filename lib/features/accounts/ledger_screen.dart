@@ -275,6 +275,13 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                   style: cairo(18, 800, color: context.look.ink),
                 ),
               ),
+              // In the bar, so they never cover a row (Ali, 2026-11-03).
+              _JumpButtons(
+                showTop: _showJumpTop,
+                showBottom: _showJumpBottom,
+                onTop: _jumpToTop,
+                onBottom: _jumpToEntry,
+              ),
               EditAccountCardButton(
                 section: section,
                 card: loadedCard,
@@ -510,26 +517,12 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                 ),
               ),
             Expanded(
-              child: Stack(
-                children: [
-                  NotificationListener<ScrollMetricsNotification>(
-                    onNotification: (_) {
-                      _updateJumpButtons();
-                      return false;
-                    },
-                    child: list,
-                  ),
-                  PositionedDirectional(
-                    end: AppSpacing.lg,
-                    top: AppSpacing.md,
-                    child: _JumpButtons(
-                      showTop: _showJumpTop,
-                      showBottom: _showJumpBottom,
-                      onTop: _jumpToTop,
-                      onBottom: _jumpToEntry,
-                    ),
-                  ),
-                ],
+              child: NotificationListener<ScrollMetricsNotification>(
+                onNotification: (_) {
+                  _updateJumpButtons();
+                  return false;
+                },
+                child: list,
               ),
             ),
           ],
@@ -1691,24 +1684,16 @@ class _JumpButtons extends StatelessWidget {
     if (!showTop && !showBottom) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
     Widget button(Key key, IconData icon, String tip, VoidCallback onTap) =>
-        Padding(
-          padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.xs),
-          child: Material(
-            color: scheme.primary,
-            shape: const CircleBorder(),
-            elevation: 3,
-            child: IconButton(
-              key: key,
-              tooltip: tip,
-              visualDensity: VisualDensity.compact,
-              iconSize: 20,
-              color: scheme.onPrimary,
-              onPressed: onTap,
-              icon: Icon(icon),
-            ),
-          ),
+        IconButton.filledTonal(
+          key: key,
+          tooltip: tip,
+          visualDensity: VisualDensity.compact,
+          iconSize: 20,
+          color: scheme.primary,
+          onPressed: onTap,
+          icon: Icon(icon),
         );
-    return Column(
+    return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (showTop)
