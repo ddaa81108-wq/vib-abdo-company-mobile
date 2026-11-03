@@ -855,7 +855,14 @@ class _SubmissionLine extends ConsumerWidget {
         status: pending
             ? _Badge(text: CollectionsText.awaitingApproval, gloss: gloss)
             : awaiting
-            ? _AwaitingCash(id: submission.id, gloss: gloss)
+            ? _AwaitingCash(
+                id: submission.id,
+                gloss: gloss,
+                // Employee wording from the website's employee section.
+                text: admin
+                    ? CollectionsText.awaitingCash
+                    : CollectionsText.waitingCashFromAdmin,
+              )
             : submission.cashReceivedAt != null
             ? _Badge(
                 key: Key('cash-done-${submission.id}'),
@@ -1159,16 +1166,21 @@ class _HistoryLine extends StatelessWidget {
 }
 
 class _AwaitingCash extends StatelessWidget {
-  const _AwaitingCash({required this.id, required this.gloss});
+  const _AwaitingCash({
+    required this.id,
+    required this.gloss,
+    this.text = CollectionsText.awaitingCash,
+  });
 
   final String id;
   final Gloss gloss;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     return _Badge(
       key: ValueKey('awaiting-cash-$id'),
-      text: CollectionsText.awaitingCash,
+      text: text,
       gloss: gloss,
       strong: true,
     );

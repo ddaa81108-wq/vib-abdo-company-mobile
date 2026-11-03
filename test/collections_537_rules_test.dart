@@ -342,6 +342,24 @@ void main() {
     expect(find.byKey(const Key('link-form')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('awaiting cash uses the website words for each role', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(430, 3200));
+    await signIn(tester, username: 'employee.demo', password: 'demo-only');
+    await go(tester, '/collections');
+    final label = find.byKey(const ValueKey('awaiting-cash-sb_2'));
+    await pumpUntilFound(tester, label);
+    expect(
+      find.descendant(
+        of: label,
+        matching: find.text('ينتظر استلام النقدية من الإدارة'),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _tapFull(WidgetTester tester, String id) async {
