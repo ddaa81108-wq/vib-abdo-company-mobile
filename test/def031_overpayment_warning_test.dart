@@ -93,7 +93,7 @@ void main() {
             isEmpty,
           );
           expect(_header(current), findsOneWidget);
-          expect(_header('-80 د.ل'), findsNothing);
+          expect(_header('80 د.ل'), findsNothing);
           expect(tester.takeException(), isNull);
         },
       );
@@ -129,7 +129,16 @@ void main() {
       final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
       expect(body['expectedVersion'], 4);
       expect(body['inputValue'], 400);
-      expect(_header('-80 د.ل'), findsOneWidget);
+      // أمانة shows without its minus sign, named by the word (Ali,
+      // 2026-11-03). The figure is still the server's -80.
+      expect(_header('80 د.ل'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('ledger-header-kind')),
+          matching: find.text('أمانة'),
+        ),
+        findsOneWidget,
+      );
       expect(_header('320 د.ل'), findsNothing);
       final shown = tester.widget<MoneyText>(balance);
       expect(shown.style?.color, positiveInk);
@@ -163,10 +172,10 @@ void main() {
     });
 
     await tester.tap(find.byKey(const Key('overpayment-continue')));
-    await _pumpUntilHeader(tester, '-50 د.ل');
+    await _pumpUntilHeader(tester, '50 د.ل');
 
-    expect(_header('-50 د.ل'), findsOneWidget);
-    expect(_header('-80 د.ل'), findsNothing);
+    expect(_header('50 د.ل'), findsOneWidget);
+    expect(_header('80 د.ل'), findsNothing);
     expect(_header('320 د.ل'), findsNothing);
     final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
     expect(body['inputValue'], 400);
@@ -174,8 +183,8 @@ void main() {
     fake.scriptedGetJson[_cardPath] = _cardJson(-50);
     gate.complete();
     await settle(tester);
-    expect(_header('-50 د.ل'), findsOneWidget);
-    expect(_header('-80 د.ل'), findsNothing);
+    expect(_header('50 د.ل'), findsOneWidget);
+    expect(_header('80 د.ل'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -208,7 +217,7 @@ void main() {
     );
     expect(_header(shown), findsOneWidget);
     expect(shown, isNot('20 د.ل'));
-    expect(_header('-80 د.ل'), findsNothing);
+    expect(_header('80 د.ل'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -232,7 +241,7 @@ void main() {
 
       expect(_header('—'), findsOneWidget);
       expect(_header('320 د.ل'), findsNothing);
-      expect(_header('-80 د.ل'), findsNothing);
+      expect(_header('80 د.ل'), findsNothing);
 
       fake.scriptedGetJson[_cardPath] = _cardJson(50);
       gate.complete();
@@ -265,7 +274,7 @@ void main() {
 
       expect(_header(MoneyValue.invalidLabel), findsOneWidget);
       expect(_header('320 د.ل'), findsNothing);
-      expect(_header('-80 د.ل'), findsNothing);
+      expect(_header('80 د.ل'), findsNothing);
 
       fake.scriptedGetJson[_cardPath] = _cardJson(50);
       gate.complete();
@@ -289,16 +298,16 @@ void main() {
       fake.pauseGets[_cardPath] = gate;
 
       await tester.tap(find.byKey(const Key('overpayment-continue')));
-      await _pumpUntilHeader(tester, '-80 د.ل');
+      await _pumpUntilHeader(tester, '80 د.ل');
 
-      expect(_header('-80 د.ل'), findsOneWidget);
+      expect(_header('80 د.ل'), findsOneWidget);
       expect(_header('320 د.ل'), findsNothing);
 
       fake.scriptedGetJson[_cardPath] = _cardJson(15);
       gate.complete();
       await settle(tester);
       expect(_header('15 د.ل'), findsOneWidget);
-      expect(_header('-80 د.ل'), findsNothing);
+      expect(_header('80 د.ل'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -437,7 +446,7 @@ void main() {
       await tester.tap(find.byKey(const Key('overpayment-continue')));
       await settle(tester);
 
-      expect(_header('-80 د.ل'), findsOneWidget);
+      expect(_header('80 د.ل'), findsOneWidget);
       expect(_header('320 د.ل'), findsNothing);
       expect(find.byKey(const Key('ledger-reload-failed')), findsOneWidget);
       expect(find.text(AppStrings.ledgerReloadFailed), findsOneWidget);

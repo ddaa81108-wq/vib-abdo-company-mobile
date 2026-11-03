@@ -32,20 +32,29 @@ void main() {
     );
     final trimmed = _ledgerIds();
     _expectNewestPrefix(trimmed, length: 120, dropped: 120);
-    expect(find.byKey(const Key('ledger-sequence-ltx_00000')), findsOneWidget);
+    // Rows run oldest first now (Ali, 2026-11-03); the lazy list may not
+    // build a row that is scrolled away, so the kept window is read from
+    // the trace.
+    expect(_ledgerIds(), contains('ltx_00000'));
 
     await _press(tester, const Key('load-older'));
     final reloaded = _ledgerIds();
     _expectNewestPrefix(reloaded, length: 160, dropped: 160);
     expect(_indexes(reloaded), contains(120));
-    expect(find.byKey(const Key('ledger-sequence-ltx_00000')), findsOneWidget);
+    // Rows run oldest first now (Ali, 2026-11-03); the lazy list may not
+    // build a row that is scrolled away, so the kept window is read from
+    // the trace.
+    expect(_ledgerIds(), contains('ltx_00000'));
 
     await _refresh(tester, const Key('ledger-refresh'));
     await _until(tester, const Key('ledger-retained-0'));
     expect(find.byKey(const Key('load-older')), findsOneWidget);
     final reset = _ledgerIds();
     _expectNewestPrefix(reset, length: FakeLargeCatalog.pageSize, dropped: 40);
-    expect(find.byKey(const Key('ledger-sequence-ltx_00000')), findsOneWidget);
+    // Rows run oldest first now (Ali, 2026-11-03); the lazy list may not
+    // build a row that is scrolled away, so the kept window is read from
+    // the trace.
+    expect(_ledgerIds(), contains('ltx_00000'));
     expect(tester.takeException(), isNull);
   });
 
@@ -67,7 +76,10 @@ void main() {
     expect(_indexes(reached), contains(0));
     expect(_indexes(reached), contains(120));
     _expectNoGaps(reached);
-    expect(find.byKey(const Key('ledger-sequence-ltx_00000')), findsOneWidget);
+    // Rows run oldest first now (Ali, 2026-11-03); the lazy list may not
+    // build a row that is scrolled away, so the kept window is read from
+    // the trace.
+    expect(_ledgerIds(), contains('ltx_00000'));
     expect(tester.takeException(), isNull);
   });
 
@@ -202,7 +214,13 @@ Future<void> _refresh(WidgetTester tester, Key key) async {
 Future<void> _scrollToEnd(WidgetTester tester, Key listKey) async {
   final list = find.byKey(listKey);
   expect(list, findsOneWidget);
-  final gesture = await tester.startGesture(tester.getCenter(list));
+  await tester.ensureVisible(list);
+  await tester.pump();
+  // The table is wider than the screen; start on its visible part.
+  final rect = tester.getRect(list);
+  final view = tester.view.physicalSize / tester.view.devicePixelRatio;
+  final visible = rect.intersect(Offset.zero & view);
+  final gesture = await tester.startGesture(visible.center);
   for (var step = 0; step < 30; step++) {
     await gesture.moveBy(const Offset(0, -700));
     await tester.pump(const Duration(milliseconds: 16));

@@ -468,7 +468,10 @@ void main() {
     expect(_isStretched(tester, const Key('edit-account-card')), isFalse);
 
     await size(320, 1);
-    expect(_amountIsStacked(tester), isTrue);
+    expect(
+      _amountIsStacked(tester),
+      isFalse,
+    ); // one table row at every width (Ali, 2026-11-03)
     await _reveal(
       tester,
       find.byKey(const Key('edit-account-card')),
@@ -477,7 +480,10 @@ void main() {
     expect(_isStretched(tester, const Key('edit-account-card')), isTrue);
 
     await size(430, 1.3);
-    expect(_amountIsStacked(tester), isTrue);
+    expect(
+      _amountIsStacked(tester),
+      isFalse,
+    ); // one table row at every width (Ali, 2026-11-03)
     await _reveal(
       tester,
       find.byKey(const Key('edit-account-card')),
@@ -603,7 +609,11 @@ void _expectAligned(WidgetTester tester) {
   final amount1 = tester.getRect(find.byKey(const Key('ledger-amount-tx_1')));
   final amount2 = tester.getRect(find.byKey(const Key('ledger-amount-tx_2')));
   expect((date1.left - date2.left).abs(), lessThan(1.5));
-  expect((amount1.right - amount2.right).abs(), lessThan(1.5));
+  // Table columns: a debt sits under دين مضاف and a payment under مدفوع,
+  // each on its own row (Ali, 2026-11-03).
+  expect((amount1.left - amount2.left).abs(), greaterThan(40));
+  expect(amount1.top, lessThan(date1.bottom));
+  expect(amount2.top, lessThan(date2.bottom));
 }
 
 Future<void> _scrollToTop(WidgetTester tester, Key screen) async {

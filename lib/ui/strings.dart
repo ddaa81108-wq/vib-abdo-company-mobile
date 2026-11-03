@@ -166,6 +166,34 @@ abstract final class AppStrings {
   static const vodafoneOurs = 'باقي فودافون لصالحنا';
   static const vodafoneOwed = 'استهلاك فودافون علينا';
   static const balanceAfter = 'الرصيد بعد الحركة';
+
+  // Ledger table columns, the website's labels (Ali, 2026-11-03).
+  static const ledgerColSeq = 'م';
+  static const ledgerColWhen = 'اليوم والتاريخ والوقت';
+  static const ledgerColType = 'نوع الحركة';
+  static const ledgerColNote = 'البيان';
+  static const ledgerColValue = 'القيمة';
+  static const ledgerColOperation = 'العملية';
+  static const ledgerColRate = 'السعر';
+  static const ledgerColDebt = 'دين مضاف';
+  static const ledgerColPaid = 'مدفوع';
+  static const ledgerColBalance = 'الرصيد';
+  static const ledgerColEdit = 'تعديل';
+  static const ledgerColCancel = 'إلغاء';
+  static const ledgerTotal = 'إجمالي الدين الحالي';
+  static const ledgerAddMovement = 'إضافة حركة';
+  static const ledgerSwipeMore = '← اسحب للمزيد';
+  static const ledgerZeroWord = 'صفر';
+  static const ledgerCloseEdit = 'إغلاق التعديل';
+  static const weekdays = [
+    'الاثنين',
+    'الثلاثاء',
+    'الأربعاء',
+    'الخميس',
+    'الجمعة',
+    'السبت',
+    'الأحد',
+  ];
   static const fullPayment = 'سداد كلي';
   static const partialPayment = 'سداد جزئي';
   static const debtMovement = 'دين';
