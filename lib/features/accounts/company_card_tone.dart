@@ -79,3 +79,24 @@ Gloss companyCardGloss(BuildContext context, CompanyCardState state) {
     CompanyCardState.unknown => look.glossGrey,
   };
 }
+
+/// The companies ledger total card: the state from the sign of the server
+/// balance only (the website's `ke()` footer: `< 0` is the company's trust,
+/// `0` zero, otherwise the current debt). Separate from the customers'
+/// rule on purpose.
+enum CompanyLedgerKind { debt, credit, zero, unknown }
+
+CompanyLedgerKind companyLedgerKind(MoneyValue? balance) {
+  final units = balance?.asInt;
+  if (units == null) return CompanyLedgerKind.unknown;
+  if (units > 0) return CompanyLedgerKind.debt;
+  if (units < 0) return CompanyLedgerKind.credit;
+  return CompanyLedgerKind.zero;
+}
+
+/// The heading over the figure: «أمانة للشركة» for a credit (website
+/// `trustLabel`), otherwise «إجمالي الدين الحالي».
+String companyLedgerHeading(CompanyLedgerKind kind) =>
+    kind == CompanyLedgerKind.credit
+    ? AppStrings.companyTrust
+    : AppStrings.ledgerTotal;

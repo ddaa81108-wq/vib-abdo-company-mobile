@@ -54,9 +54,9 @@ void main() {
   ) async {
     await pumpFakeApp(tester, size: const Size(430, 1200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    // Customers show the glossy دين/أمانة/صفر total card instead (Ali,
-    // 2026-11-03); the other ledgers keep the age gradient.
-    await go(tester, '/companies/c_55');
+    // Customers and companies show the glossy دين/أمانة/صفر total card
+    // instead (Ali, 2026-11-03); the deposit ledgers keep the age gradient.
+    await go(tester, '/libyan-deposits/c_55');
 
     _expectHeaderGradient(tester, AppStatusColors.light.warningDebt);
     expect(find.text('منذ 4 أيام'), findsWidgets);
@@ -84,9 +84,9 @@ void main() {
       ],
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    // Customers show the glossy دين/أمانة/صفر total card instead (Ali,
-    // 2026-11-03); the other ledgers keep the age gradient.
-    await go(tester, '/companies/c_55');
+    // Customers and companies show the glossy دين/أمانة/صفر total card
+    // instead (Ali, 2026-11-03); the deposit ledgers keep the age gradient.
+    await go(tester, '/libyan-deposits/c_55');
     _expectHeaderGradient(tester, AppStatusColors.light.overdueDebt);
     expect(tester.takeException(), isNull);
   });
@@ -107,7 +107,7 @@ void main() {
       ],
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/companies/c_55');
+    await go(tester, '/libyan-deposits/c_55');
     final ink = tester.widget<Ink>(
       find.descendant(
         of: find.byKey(const Key('ledger-header')),

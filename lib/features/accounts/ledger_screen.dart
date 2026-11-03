@@ -17,6 +17,7 @@ import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
+import 'company_card_tone.dart';
 import 'customer_card_tone.dart';
 import 'edit_account_card_screen.dart';
 import 'ledger_running_balance.dart';
@@ -256,7 +257,11 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
           final padding = pagePadding(MediaQuery.sizeOf(context).width);
           // The total card stays on top while the table scrolls (Ali,
           // 2026-11-03).
-          final customers = section == AccountSection.customers;
+          // Customers and companies share the total card design; each
+          // section reads its own balance rule (Ali, 2026-11-03).
+          final glossyTotal =
+              section == AccountSection.customers ||
+              section == AccountSection.companies;
           final bar = Row(
             children: [
               IconButton(
@@ -296,8 +301,9 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               children: [
                 bar,
                 const SizedBox(height: AppSpacing.xs),
-                if (customers)
+                if (glossyTotal)
                   _TotalCard(
+                    section: section,
                     card: loadedCard,
                     money: money,
                     awaitingServerBalance: _balanceAwaitingReload,
@@ -1243,6 +1249,7 @@ class _Header extends StatelessWidget {
 /// balance only.
 class _TotalCard extends StatelessWidget {
   const _TotalCard({
+    required this.section,
     required this.card,
     required this.money,
     this.awaitingServerBalance = false,
@@ -1250,6 +1257,7 @@ class _TotalCard extends StatelessWidget {
     this.reloadError,
   });
 
+  final AccountSection section;
   final AccountCardDto card;
   final MoneyFormatter money;
   final bool awaitingServerBalance;
@@ -1260,21 +1268,45 @@ class _TotalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final look = context.look;
     final shown = awaitingServerBalance ? ackBalance : card.balanceUnits;
-    final kind = customerBalanceKind(shown);
-    final gloss = switch (kind) {
-      CustomerBalanceKind.debt => look.glossDebt,
-      CustomerBalanceKind.credit => look.glossCredit,
-      CustomerBalanceKind.zero => look.glossZero,
-      CustomerBalanceKind.unknown => look.glossGrey,
-    };
-    final word = switch (kind) {
-      CustomerBalanceKind.debt => AppStrings.customerDebtWord,
-      CustomerBalanceKind.credit => AppStrings.customerCreditWord,
-      CustomerBalanceKind.zero => AppStrings.ledgerZeroWord,
-      CustomerBalanceKind.unknown => null,
-    };
+    final Gloss gloss;
+    final String? word;
+    final String heading;
+    final bool credit;
+    if (section == AccountSection.companies) {
+      final kind = companyLedgerKind(shown);
+      gloss = switch (kind) {
+        CompanyLedgerKind.debt => look.glossDebt,
+        CompanyLedgerKind.credit => look.glossCredit,
+        CompanyLedgerKind.zero => look.glossZero,
+        CompanyLedgerKind.unknown => look.glossGrey,
+      };
+      word = switch (kind) {
+        CompanyLedgerKind.debt => AppStrings.customerDebtWord,
+        CompanyLedgerKind.credit => AppStrings.customerCreditWord,
+        CompanyLedgerKind.zero => AppStrings.ledgerZeroWord,
+        CompanyLedgerKind.unknown => null,
+      };
+      heading = companyLedgerHeading(kind);
+      credit = kind == CompanyLedgerKind.credit;
+    } else {
+      final kind = customerBalanceKind(shown);
+      gloss = switch (kind) {
+        CustomerBalanceKind.debt => look.glossDebt,
+        CustomerBalanceKind.credit => look.glossCredit,
+        CustomerBalanceKind.zero => look.glossZero,
+        CustomerBalanceKind.unknown => look.glossGrey,
+      };
+      word = switch (kind) {
+        CustomerBalanceKind.debt => AppStrings.customerDebtWord,
+        CustomerBalanceKind.credit => AppStrings.customerCreditWord,
+        CustomerBalanceKind.zero => AppStrings.ledgerZeroWord,
+        CustomerBalanceKind.unknown => null,
+      };
+      heading = AppStrings.ledgerTotal;
+      credit = kind == CustomerBalanceKind.credit;
+    }
     final units = shown?.asInt;
-    final text = kind == CustomerBalanceKind.credit && units != null
+    final text = credit && units != null
         ? money.format(-units, card.currency)
         : money.formatOrDash(shown, card.currency);
     final radius = BorderRadius.circular(AppRadii.card);
@@ -1306,7 +1338,8 @@ class _TotalCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        AppStrings.ledgerTotal,
+                        heading,
+                        key: const Key('ledger-total-heading'),
                         style: cairo(12, 700, color: gloss.ink),
                       ),
                       FittedBox(

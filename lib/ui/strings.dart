@@ -297,6 +297,7 @@ abstract final class AppStrings {
   static const critical = 'مراجعة فورية';
   static const missingRate = 'سعر التحويل مفقود';
   static const trustCustomer = 'أمانة للعميل';
+  static const companyTrust = 'أمانة للشركة';
   static const debtOnCustomer = 'دين على العميل';
   static const forOrg = 'لصالح المنظومة — دين على العميل';
   static const debtOnOrg = 'دين علينا للعميل';
