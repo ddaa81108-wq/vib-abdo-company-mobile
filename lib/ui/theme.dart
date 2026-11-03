@@ -674,6 +674,100 @@ class AppTextExtras extends ThemeExtension<AppTextExtras> {
       other is AppTextExtras && t >= 0.5 ? other : this;
 }
 
+/// A glossy card finish (Ali, 2026-11-03): a vivid gradient of the card's
+/// own tone, a soft diagonal white sheen on top, a crisp brighter border and
+/// a soft glow of the same colour.
+@immutable
+class Gloss {
+  const Gloss({
+    required this.top,
+    required this.bottom,
+    required this.border,
+    required this.glow,
+    required this.ink,
+    required this.amount,
+    this.sheen = 0.14,
+  });
+
+  /// Gradient fill, top to bottom.
+  final Color top;
+  final Color bottom;
+
+  /// 1px border, a step brighter than the fill.
+  final Color border;
+
+  /// Shadow colour under the card (already carries its alpha).
+  final Color glow;
+
+  /// Name and secondary text.
+  final Color ink;
+
+  /// Status word and amount.
+  final Color amount;
+
+  /// Opacity of the white sheen at the top corner.
+  final double sheen;
+
+  LinearGradient get fill => LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [top, bottom],
+  );
+
+  /// Diagonal white highlight that fades out before the middle.
+  LinearGradient get highlight => LinearGradient(
+    begin: Alignment.topLeft,
+    end: const Alignment(0.35, 0.55),
+    colors: [
+      Colors.white.withValues(alpha: sheen),
+      Colors.white.withValues(alpha: 0),
+    ],
+  );
+
+  List<BoxShadow> get glowShadow => [
+    BoxShadow(color: glow, blurRadius: 18, offset: const Offset(0, 6)),
+  ];
+
+  BoxDecoration decoration(BorderRadius radius) => BoxDecoration(
+    borderRadius: radius,
+    gradient: fill,
+    border: Border.all(color: border),
+  );
+}
+
+/// Paints [Gloss.highlight] over [child] without taking taps.
+class GlossSheen extends StatelessWidget {
+  const GlossSheen({
+    required this.gloss,
+    required this.radius,
+    required this.child,
+    super.key,
+  });
+
+  final Gloss gloss;
+  final BorderRadius radius;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        child,
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: radius,
+                gradient: gloss.highlight,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Visual tokens shared by the redesigned screens: concept 1
 /// «زجاج كحلي نيون» (dark) and concept 3 «فنتك بسيط» (light), Ali 2026-11-03.
 @immutable
@@ -688,9 +782,6 @@ class AppLook extends ThemeExtension<AppLook> {
     required this.violet,
     required this.success,
     required this.danger,
-    required this.zero,
-    required this.zeroCard,
-    required this.zeroBorder,
     required this.button,
     required this.onButton,
     required this.heroStart,
@@ -704,6 +795,14 @@ class AppLook extends ThemeExtension<AppLook> {
     required this.barIdle,
     required this.strip,
     required this.glass,
+    required this.glossDebt,
+    required this.glossCredit,
+    required this.glossZero,
+    required this.glossHero,
+    required this.glossBlue,
+    required this.glossViolet,
+    required this.glossGreen,
+    required this.glossGrey,
   });
 
   /// Page canvas.
@@ -732,15 +831,6 @@ class AppLook extends ThemeExtension<AppLook> {
 
   /// Red accent and دين.
   final Color danger;
-
-  /// Brown ink for a zero balance.
-  final Color zero;
-
-  /// Zero-balance card fill.
-  final Color zeroCard;
-
-  /// Zero-balance card border.
-  final Color zeroBorder;
 
   /// Primary button fill.
   final Color button;
@@ -782,6 +872,17 @@ class AppLook extends ThemeExtension<AppLook> {
   /// with a soft shadow.
   final bool glass;
 
+  /// Glossy finishes: customer cards (دين, أمانة, zero), the summary card,
+  /// and the home tile tints.
+  final Gloss glossDebt;
+  final Gloss glossCredit;
+  final Gloss glossZero;
+  final Gloss glossHero;
+  final Gloss glossBlue;
+  final Gloss glossViolet;
+  final Gloss glossGreen;
+  final Gloss glossGrey;
+
   static const light = AppLook(
     page: Color(0xFFF5F7FB),
     card: Color(0xFFFFFFFF),
@@ -792,9 +893,6 @@ class AppLook extends ThemeExtension<AppLook> {
     violet: Color(0xFF7C3AED),
     success: Color(0xFF166534),
     danger: Color(0xFFDC2626),
-    zero: Color(0xFF7A5230),
-    zeroCard: Color(0xFFF7EEE3),
-    zeroBorder: Color(0xFFE6D3BC),
     button: Color(0xFF2563EB),
     onButton: Color(0xFFFFFFFF),
     heroStart: Color(0xFF1E3A8A),
@@ -808,6 +906,78 @@ class AppLook extends ThemeExtension<AppLook> {
     barIdle: Color(0xFF5B6B80),
     strip: Color(0xFFFFFFFF),
     glass: false,
+    glossDebt: Gloss(
+      top: Color(0xFFFFF5F5),
+      bottom: Color(0xFFFFE4E6),
+      border: Color(0xFFFCA5A5),
+      glow: Color(0x2EDC2626),
+      ink: Color(0xFF0F172A),
+      amount: Color(0xFFB91C1C),
+      sheen: 0.7,
+    ),
+    glossCredit: Gloss(
+      top: Color(0xFFF3FDF6),
+      bottom: Color(0xFFDCFCE7),
+      border: Color(0xFF86EFAC),
+      glow: Color(0x2E16A34A),
+      ink: Color(0xFF0F172A),
+      amount: Color(0xFF166534),
+      sheen: 0.7,
+    ),
+    glossZero: Gloss(
+      top: Color(0xFF2A2D35),
+      bottom: Color(0xFF0B0B0F),
+      border: Color(0xFF4B5060),
+      glow: Color(0x400B0B0F),
+      ink: Color(0xFFFFFFFF),
+      amount: Color(0xFFE5E7EB),
+      sheen: 0.16,
+    ),
+    glossHero: Gloss(
+      top: Color(0xFF1D4ED8),
+      bottom: Color(0xFF1E3A8A),
+      border: Color(0xFF3B82F6),
+      glow: Color(0x4D2563EB),
+      ink: Color(0xFFFFFFFF),
+      amount: Color(0xFFFFFFFF),
+      sheen: 0.12,
+    ),
+    glossBlue: Gloss(
+      top: Color(0xFFFFFFFF),
+      bottom: Color(0xFFEAF1FE),
+      border: Color(0xFFBFD3FA),
+      glow: Color(0x242563EB),
+      ink: Color(0xFF0F172A),
+      amount: Color(0xFF2563EB),
+      sheen: 0.8,
+    ),
+    glossViolet: Gloss(
+      top: Color(0xFFFFFFFF),
+      bottom: Color(0xFFF1EAFE),
+      border: Color(0xFFD8C6FB),
+      glow: Color(0x247C3AED),
+      ink: Color(0xFF0F172A),
+      amount: Color(0xFF7C3AED),
+      sheen: 0.8,
+    ),
+    glossGreen: Gloss(
+      top: Color(0xFFFFFFFF),
+      bottom: Color(0xFFE7F6EC),
+      border: Color(0xFFA7E3BC),
+      glow: Color(0x24166534),
+      ink: Color(0xFF0F172A),
+      amount: Color(0xFF166534),
+      sheen: 0.8,
+    ),
+    glossGrey: Gloss(
+      top: Color(0xFFFFFFFF),
+      bottom: Color(0xFFEEF1F6),
+      border: Color(0xFFD5DBE5),
+      glow: Color(0x1F0F172A),
+      ink: Color(0xFF0F172A),
+      amount: Color(0xFF475569),
+      sheen: 0.8,
+    ),
   );
 
   static const dark = AppLook(
@@ -820,9 +990,6 @@ class AppLook extends ThemeExtension<AppLook> {
     violet: Color(0xFFC084FC),
     success: Color(0xFF4ADE80),
     danger: Color(0xFFF87171),
-    zero: Color(0xFFD6B48C),
-    zeroCard: Color(0xFF211B1C),
-    zeroBorder: Color(0xFF4A3A2C),
     button: Color(0xFF2563EB),
     onButton: Color(0xFFFFFFFF),
     heroStart: Color(0xFF4F46E5),
@@ -836,6 +1003,78 @@ class AppLook extends ThemeExtension<AppLook> {
     barIdle: Color(0xFF94A3B8),
     strip: Color(0xFF131A2C),
     glass: true,
+    glossDebt: Gloss(
+      top: Color(0xFFB91C1C),
+      bottom: Color(0xFF7F1D1D),
+      border: Color(0xFFF87171),
+      glow: Color(0x66DC2626),
+      ink: Color(0xFFFFFFFF),
+      amount: Color(0xFFFFFFFF),
+      sheen: 0.14,
+    ),
+    glossCredit: Gloss(
+      top: Color(0xFF166534),
+      bottom: Color(0xFF0F3B22),
+      border: Color(0xFF4ADE80),
+      glow: Color(0x5922C55E),
+      ink: Color(0xFFFFFFFF),
+      amount: Color(0xFFFFFFFF),
+      sheen: 0.14,
+    ),
+    glossZero: Gloss(
+      top: Color(0xFF23262E),
+      bottom: Color(0xFF0B0B0F),
+      border: Color(0xFF6B7280),
+      glow: Color(0x99000000),
+      ink: Color(0xFFFFFFFF),
+      amount: Color(0xFFF1F5F9),
+      sheen: 0.18,
+    ),
+    glossHero: Gloss(
+      top: Color(0xFF4F46E5),
+      bottom: Color(0xFF5B21B6),
+      border: Color(0xFF818CF8),
+      glow: Color(0x664F46E5),
+      ink: Color(0xFFFFFFFF),
+      amount: Color(0xFFFFFFFF),
+      sheen: 0.14,
+    ),
+    glossBlue: Gloss(
+      top: Color(0xFF1D4ED8),
+      bottom: Color(0xFF172554),
+      border: Color(0xFF60A5FA),
+      glow: Color(0x592563EB),
+      ink: Color(0xFFFFFFFF),
+      amount: Color(0xFFFFFFFF),
+      sheen: 0.14,
+    ),
+    glossViolet: Gloss(
+      top: Color(0xFF6D28D9),
+      bottom: Color(0xFF3B0764),
+      border: Color(0xFFC084FC),
+      glow: Color(0x597C3AED),
+      ink: Color(0xFFFFFFFF),
+      amount: Color(0xFFFFFFFF),
+      sheen: 0.14,
+    ),
+    glossGreen: Gloss(
+      top: Color(0xFF166534),
+      bottom: Color(0xFF052E16),
+      border: Color(0xFF4ADE80),
+      glow: Color(0x5916A34A),
+      ink: Color(0xFFFFFFFF),
+      amount: Color(0xFFFFFFFF),
+      sheen: 0.14,
+    ),
+    glossGrey: Gloss(
+      top: Color(0xFF334155),
+      bottom: Color(0xFF0F172A),
+      border: Color(0xFF94A3B8),
+      glow: Color(0x59000000),
+      ink: Color(0xFFFFFFFF),
+      amount: Color(0xFFFFFFFF),
+      sheen: 0.14,
+    ),
   );
 
   LinearGradient get hero => LinearGradient(
@@ -859,16 +1098,6 @@ class AppLook extends ThemeExtension<AppLook> {
             offset: Offset(0, 8),
           ),
         ];
-
-  /// A tile tinted with [tint]: a faint wash of the tint over the card in
-  /// dark mode, plain white in light mode.
-  Gradient tileFill(Color tint) => LinearGradient(
-    begin: AlignmentDirectional.topStart,
-    end: AlignmentDirectional.bottomEnd,
-    colors: glass
-        ? [Color.alphaBlend(tint.withValues(alpha: 0.16), card), card]
-        : [card, card],
-  );
 
   /// Icon square fill for [tint].
   Color iconWell(Color tint) => tint.withValues(alpha: glass ? 0.18 : 0.10);

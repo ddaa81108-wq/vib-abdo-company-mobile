@@ -664,45 +664,28 @@ class _SummaryStrip extends StatelessWidget {
       // Right: server netBalance (total debts minus credits). Left: server
       // activeCards. No client arithmetic (Ali, 2026-11-02).
       final count = summary.activeCards;
-      // Light: headline gradient with white text (concept 3). Dark: glass
-      // card with a gradient top line and a blue total (concept 1).
+      // Glossy headline in both themes (Ali, 2026-11-03): vivid gradient,
+      // white sheen, bright border, coloured glow, white text.
       final look = context.look;
-      final onHero = !look.glass;
+      final gloss = look.glossHero;
       final label = theme.textTheme.titleSmall?.copyWith(
-        color: onHero ? look.onHeroMuted : look.muted,
+        color: look.onHeroMuted,
         fontWeight: FontWeight.w500,
       );
       final figure = context.textExtras.amountLarge.copyWith(
-        color: onHero ? look.heroFigure : look.ink,
+        color: look.heroFigure,
       );
       final radius = BorderRadius.circular(AppRadii.xxl);
       return DecoratedBox(
         key: const Key('customers-summary'),
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          gradient: onHero ? look.hero : null,
-          color: onHero ? null : look.card,
-          border: onHero ? null : Border.all(color: look.cardBorder),
-          boxShadow: onHero
-              ? [
-                  BoxShadow(
-                    color: look.heroEnd.withValues(alpha: 0.25),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : null,
-        ),
+        decoration: gloss
+            .decoration(radius)
+            .copyWith(boxShadow: gloss.glowShadow),
         child: ClipRRect(
           borderRadius: radius,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              border: onHero
-                  ? null
-                  : BorderDirectional(
-                      top: BorderSide(color: look.violet, width: 3),
-                    ),
-            ),
+          child: GlossSheen(
+            gloss: gloss,
+            radius: radius,
             child: Padding(
               padding: const EdgeInsetsDirectional.all(AppSpacing.xl),
               child: Row(
@@ -724,9 +707,7 @@ class _SummaryStrip extends StatelessWidget {
                               currency,
                             ),
                             key: const Key('customers-summary-amount'),
-                            style: figure.copyWith(
-                              color: onHero ? look.heroFigure : look.accent,
-                            ),
+                            style: figure.copyWith(color: look.heroFigure),
                           ),
                         ),
                       ],
@@ -868,7 +849,7 @@ class _AccountCard extends StatelessWidget {
       CustomerBalanceKind.credit => AppStrings.customerCreditWord,
       _ => null,
     };
-    return Padding(
+    final body = Padding(
       padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -966,6 +947,23 @@ class _AccountCard extends StatelessWidget {
         ],
       ),
     );
+    // Icons on the glossy card (lock, zero review) take the card ink.
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(
+        iconTheme: theme.iconTheme.copyWith(color: tone.ink),
+        iconButtonTheme: IconButtonThemeData(
+          style: IconButton.styleFrom(
+            minimumSize: const Size(48, 48),
+            foregroundColor: tone.ink,
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(foregroundColor: tone.ink),
+        ),
+      ),
+      child: body,
+    );
   }
 
   @override
@@ -1000,140 +998,178 @@ class _AccountCard extends StatelessWidget {
     final tone = section == AccountSection.customers
         ? customerTone(context, customerBalanceKind(card.balanceUnits))
         : null;
-    return Material(
-      key: Key('account-card-${card.id}'),
-      color:
-          tone?.background ??
-          (colored
-              ? (flat ? visual.flat : colors.neutralCard)
-              : scheme.surface),
-      borderRadius: BorderRadius.circular(AppRadii.card),
-      clipBehavior: Clip.antiAlias,
-      child: Ink(
-        decoration: BoxDecoration(
-          gradient: tone == null && colored && !flat ? visual.gradient : null,
-          color: tone?.background ?? (colored && flat ? visual.flat : null),
-          borderRadius: BorderRadius.circular(AppRadii.card),
-          border: Border.all(
-            color:
-                tone?.border ??
-                (card.ageStatus == 'zero'
-                    ? colors.zeroCardBorder
-                    : colored
-                    ? colors.onStatus.withValues(alpha: 0.2)
-                    : scheme.outline),
+    final look = context.look;
+    // Glossy finish (Ali, 2026-11-03): customers use their tone; a coloured
+    // age card keeps its gradient with a sheen and glow; a plain card uses
+    // the neutral gloss.
+    final Gloss gloss =
+        tone?.gloss ??
+        (colored
+            ? Gloss(
+                top: visual.flat ?? colors.neutralCard,
+                bottom: visual.flat ?? colors.neutralCard,
+                border: colors.onStatus.withValues(alpha: 0.3),
+                glow: (visual.flat ?? colors.neutralCard).withValues(
+                  alpha: 0.35,
+                ),
+                ink: fg,
+                amount: fg,
+              )
+            : look.glossGrey);
+    final radius = BorderRadius.circular(AppRadii.card);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: gloss.glowShadow,
+      ),
+      child: Material(
+        key: Key('account-card-${card.id}'),
+        color:
+            tone?.background ??
+            (colored
+                ? (flat ? visual.flat : colors.neutralCard)
+                : gloss.bottom),
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: tone?.gloss != null
+                ? tone!.gloss!.fill
+                : colored
+                ? (flat ? null : visual.gradient)
+                : gloss.fill,
+            color: tone == null && colored && flat ? visual.flat : null,
+            borderRadius: radius,
+            border: Border.all(
+              color:
+                  tone?.border ??
+                  (card.ageStatus == 'zero'
+                      ? colors.zeroCardBorder
+                      : colored
+                      ? colors.onStatus.withValues(alpha: 0.2)
+                      : gloss.border),
+            ),
           ),
-        ),
-        child: InkWell(
-          onTap: onOpen,
-          child: section == AccountSection.customers
-              ? _customerBody(
-                  context,
-                  tone: tone!,
-                  showAssign: showAssign,
-                  showZero: showZero,
-                )
-              : ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 118),
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (age != null)
-                          Text(
-                            age,
-                            key: Key('account-age-${card.id}'),
-                            style: cairo(11, 800, color: accent),
-                          ),
-                        Text(card.name, style: cairo(16, 800, color: fg)),
-                        if (card.phone != null)
-                          _StartAlignedText(
-                            card.phone!,
-                            style: cairo(12, 500, color: accent),
-                          ),
-                        const SizedBox(height: AppSpacing.sm),
-                        MoneyText(
-                          money.formatOrDash(card.balanceUnits, card.currency),
-                          style: context.textExtras.amountLarge.copyWith(
-                            color: fg,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          '${AppStrings.lastActivity}: ${formatIsoDate(card.lastActivityAt)}',
-                          style: cairo(11, 500, color: accent),
-                        ),
-                        if (card.activeAssigneeName != null)
-                          Text(
-                            '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
-                            style: cairo(11, 600, color: accent),
-                          ),
-                        if (card.systemManaged)
-                          Row(
-                            children: [
-                              Icon(Icons.lock_outline, size: 16, color: fg),
-                              const SizedBox(width: AppSpacing.xs),
-                              Expanded(
-                                child: Text(
-                                  AppStrings.systemCard,
-                                  style: cairo(11, 800, color: fg),
-                                ),
+          child: InkWell(
+            onTap: onOpen,
+            child: GlossSheen(
+              gloss: gloss,
+              radius: radius,
+              child: section == AccountSection.customers
+                  ? _customerBody(
+                      context,
+                      tone: tone!,
+                      showAssign: showAssign,
+                      showZero: showZero,
+                    )
+                  : ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 118),
+                      child: Padding(
+                        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (age != null)
+                              Text(
+                                age,
+                                key: Key('account-age-${card.id}'),
+                                style: cairo(11, 800, color: accent),
+                              ),
+                            Text(card.name, style: cairo(16, 800, color: fg)),
+                            if (card.phone != null)
+                              _StartAlignedText(
+                                card.phone!,
+                                style: cairo(12, 500, color: accent),
+                              ),
+                            const SizedBox(height: AppSpacing.sm),
+                            MoneyText(
+                              money.formatOrDash(
+                                card.balanceUnits,
+                                card.currency,
+                              ),
+                              style: context.textExtras.amountLarge.copyWith(
+                                color: fg,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              '${AppStrings.lastActivity}: ${formatIsoDate(card.lastActivityAt)}',
+                              style: cairo(11, 500, color: accent),
+                            ),
+                            if (card.activeAssigneeName != null)
+                              Text(
+                                '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
+                                style: cairo(11, 600, color: accent),
+                              ),
+                            if (card.systemManaged)
+                              Row(
+                                children: [
+                                  Icon(Icons.lock_outline, size: 16, color: fg),
+                                  const SizedBox(width: AppSpacing.xs),
+                                  Expanded(
+                                    child: Text(
+                                      AppStrings.systemCard,
+                                      style: cairo(11, 800, color: fg),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            if (showActions) ...[
+                              const SizedBox(height: AppSpacing.sm),
+                              Divider(
+                                height: 1,
+                                color: colored
+                                    ? colors.onStatus.withValues(alpha: 0.24)
+                                    : scheme.outlineVariant,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              Wrap(
+                                spacing: AppSpacing.xs,
+                                runSpacing: AppSpacing.xs,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  if (showAssign)
+                                    Checkbox(
+                                      value: selected,
+                                      onChanged: (_) => onToggle(),
+                                    ),
+                                  if (showPin)
+                                    GuardedMutation(
+                                      buttonKey: Key('pin-${card.id}'),
+                                      inputs:
+                                          'pin:${card.id}:${card.pinned}:${card.version}',
+                                      expectedVersion: card.version,
+                                      label: card.pinned
+                                          ? AppStrings.unpin
+                                          : AppStrings.pin,
+                                      tooltip: card.pinned
+                                          ? AppStrings.unpin
+                                          : AppStrings.pin,
+                                      icon: card.pinned
+                                          ? Icons.push_pin
+                                          : Icons.push_pin_outlined,
+                                      onSubmit: (meta) => onPin(meta),
+                                    ),
+                                  if (showZero)
+                                    GuardedMutation(
+                                      buttonKey: ValueKey(
+                                        'zero-review-${card.id}',
+                                      ),
+                                      inputs: 'zero:${card.id}:${card.version}',
+                                      expectedVersion: card.version,
+                                      label: AppStrings.zeroReview,
+                                      filled: false,
+                                      onSubmit: (meta) => onZero!(meta),
+                                    ),
+                                ],
                               ),
                             ],
-                          ),
-                        if (showActions) ...[
-                          const SizedBox(height: AppSpacing.sm),
-                          Divider(
-                            height: 1,
-                            color: colored
-                                ? colors.onStatus.withValues(alpha: 0.24)
-                                : scheme.outlineVariant,
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Wrap(
-                            spacing: AppSpacing.xs,
-                            runSpacing: AppSpacing.xs,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              if (showAssign)
-                                Checkbox(
-                                  value: selected,
-                                  onChanged: (_) => onToggle(),
-                                ),
-                              if (showPin)
-                                GuardedMutation(
-                                  buttonKey: Key('pin-${card.id}'),
-                                  inputs:
-                                      'pin:${card.id}:${card.pinned}:${card.version}',
-                                  expectedVersion: card.version,
-                                  label: card.pinned
-                                      ? AppStrings.unpin
-                                      : AppStrings.pin,
-                                  tooltip: card.pinned
-                                      ? AppStrings.unpin
-                                      : AppStrings.pin,
-                                  icon: card.pinned
-                                      ? Icons.push_pin
-                                      : Icons.push_pin_outlined,
-                                  onSubmit: (meta) => onPin(meta),
-                                ),
-                              if (showZero)
-                                GuardedMutation(
-                                  buttonKey: ValueKey('zero-review-${card.id}'),
-                                  inputs: 'zero:${card.id}:${card.version}',
-                                  expectedVersion: card.version,
-                                  label: AppStrings.zeroReview,
-                                  filled: false,
-                                  onSubmit: (meta) => onZero!(meta),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ],
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+            ),
+          ),
         ),
       ),
     );

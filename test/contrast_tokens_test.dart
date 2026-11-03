@@ -362,12 +362,11 @@ Future<void> _expectRenderedInk(
     ),
   );
   final look = theme.extension<AppLook>()!;
-  final tileColor = Color.alphaBlend(
-    tileIcon.color!.withValues(alpha: look.glass ? 0.16 : 0),
-    look.card,
-  );
-  _expectContrast(tileLabel.style!.color!, tileColor, 4.5);
-  _expectContrast(tileIcon.color!, tileColor, 3);
+  // Customers tile: glossy blue; check both ends of its gradient.
+  for (final tileColor in [look.glossBlue.top, look.glossBlue.bottom]) {
+    _expectContrast(tileLabel.style!.color!, tileColor, 4.5);
+    _expectContrast(tileIcon.color!, tileColor, 3);
+  }
   // «عرض الكل» left home; the primary ink is still checked on /purchases.
   expect(
     scheme.primary,

@@ -63,19 +63,19 @@ IconData homeTileIcon(SectionKey section) => switch (section) {
   SectionKey.reports => Icons.insights,
 };
 
-/// Tile tint per section, as in concepts 1 and 3: blue, violet, green.
-/// Presentation only.
-Color homeTileTint(SectionKey? section, AppLook look) => switch (section) {
+/// Glossy tile finish per section, as in concepts 1 and 3: blue, violet,
+/// green. Presentation only.
+Gloss homeTileGloss(SectionKey? section, AppLook look) => switch (section) {
   SectionKey.customers ||
   SectionKey.libyanDeposits ||
-  SectionKey.treasury => look.accent,
+  SectionKey.treasury => look.glossBlue,
   SectionKey.companies ||
   SectionKey.purchases ||
-  SectionKey.egyptianDeposits => look.violet,
+  SectionKey.egyptianDeposits => look.glossViolet,
   SectionKey.collections ||
   SectionKey.masraweya ||
-  SectionKey.reports => look.success,
-  null => look.muted,
+  SectionKey.reports => look.glossGreen,
+  null => look.glossGrey,
 };
 
 /// Home: the icon grid only (Ali, 2026-11-01). One tile per visible section,
@@ -108,7 +108,7 @@ class HomeDashboard extends ConsumerWidget {
           tileKey: HomeShell.sectionKey(section),
           labelKey: Key('home-tile-label-${section.key}'),
           icon: homeTileIcon(section),
-          tint: homeTileTint(section, context.look),
+          gloss: homeTileGloss(section, context.look),
           label: sectionLabel(section),
           path: sectionPath(section),
         ),
@@ -117,7 +117,7 @@ class HomeDashboard extends ConsumerWidget {
           tileKey: settingsTileKey,
           labelKey: const Key('home-tile-label-settings'),
           icon: Icons.settings,
-          tint: homeTileTint(null, context.look),
+          gloss: homeTileGloss(null, context.look),
           label: AppStrings.settings,
           path: '/settings',
         ),
@@ -180,14 +180,15 @@ class HomeDashboard extends ConsumerWidget {
   }
 }
 
-/// Section tile: a tinted glass card (dark) or a white card with a soft
-/// shadow (light), the icon in a tinted square, and the name in ink.
+/// Section tile: a glossy card in its section colour (vivid in dark, soft
+/// in light) with a sheen, bright border and glow; the icon sits in a
+/// translucent square.
 class HomeTile extends StatelessWidget {
   const HomeTile({
     required this.tileKey,
     required this.labelKey,
     required this.icon,
-    required this.tint,
+    required this.gloss,
     required this.label,
     required this.path,
     super.key,
@@ -196,7 +197,7 @@ class HomeTile extends StatelessWidget {
   final Key tileKey;
   final Key labelKey;
   final IconData icon;
-  final Color tint;
+  final Gloss gloss;
   final String label;
   final String path;
 
@@ -211,56 +212,51 @@ class HomeTile extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: radius,
-          boxShadow: look.cardShadow,
+          boxShadow: gloss.glowShadow,
         ),
         child: Material(
           color: Colors.transparent,
           borderRadius: radius,
           clipBehavior: Clip.antiAlias,
           child: Ink(
-            decoration: BoxDecoration(
-              borderRadius: radius,
-              gradient: look.tileFill(tint),
-              border: Border.all(
-                color: look.glass
-                    ? Color.alphaBlend(
-                        tint.withValues(alpha: 0.22),
-                        look.cardBorder,
-                      )
-                    : look.cardBorder,
-              ),
-            ),
+            decoration: gloss.decoration(radius),
             child: InkWell(
               key: tileKey,
               onTap: () => context.go(path),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 112),
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.symmetric(
-                    horizontal: AppSpacing.sm,
-                    vertical: AppSpacing.lg,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: look.iconWell(tint),
-                          borderRadius: BorderRadius.circular(AppRadii.xl),
+              child: GlossSheen(
+                gloss: gloss,
+                radius: radius,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 112),
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.lg,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: look.glass
+                                ? Colors.white.withValues(alpha: 0.16)
+                                : gloss.amount.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(AppRadii.xl),
+                          ),
+                          child: Icon(icon, size: 30, color: gloss.amount),
                         ),
-                        child: Icon(icon, size: 30, color: tint),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        label,
-                        key: labelKey,
-                        textAlign: TextAlign.center,
-                        softWrap: true,
-                        style: cairo(16, 700, color: look.ink),
-                      ),
-                    ],
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          label,
+                          key: labelKey,
+                          textAlign: TextAlign.center,
+                          softWrap: true,
+                          style: cairo(16, 700, color: gloss.ink),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

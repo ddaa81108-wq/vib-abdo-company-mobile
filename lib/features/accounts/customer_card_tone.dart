@@ -22,6 +22,7 @@ class CustomerTone {
     required this.border,
     required this.ink,
     required this.amount,
+    this.gloss,
   });
 
   final Color background;
@@ -33,26 +34,30 @@ class CustomerTone {
   /// The status word and the amount: red for debt, green for credit,
   /// brown for zero.
   final Color amount;
+
+  /// Glossy finish for the card, or null for a plain card.
+  final Gloss? gloss;
 }
+
+CustomerTone _fromGloss(Gloss gloss) => CustomerTone(
+  background: gloss.bottom,
+  border: gloss.border,
+  ink: gloss.ink,
+  amount: gloss.amount,
+  gloss: gloss,
+);
 
 CustomerTone customerTone(BuildContext context, CustomerBalanceKind kind) {
   final look = context.look;
-  if (kind == CustomerBalanceKind.zero) {
-    return CustomerTone(
-      background: look.zeroCard,
-      border: look.zeroBorder,
+  return switch (kind) {
+    CustomerBalanceKind.debt => _fromGloss(look.glossDebt),
+    CustomerBalanceKind.credit => _fromGloss(look.glossCredit),
+    CustomerBalanceKind.zero => _fromGloss(look.glossZero),
+    CustomerBalanceKind.unknown => CustomerTone(
+      background: look.card,
+      border: look.cardBorder,
       ink: look.ink,
-      amount: look.zero,
-    );
-  }
-  return CustomerTone(
-    background: look.card,
-    border: look.cardBorder,
-    ink: look.ink,
-    amount: switch (kind) {
-      CustomerBalanceKind.debt => look.danger,
-      CustomerBalanceKind.credit => look.success,
-      _ => look.ink,
-    },
-  );
+      amount: look.ink,
+    ),
+  };
 }
