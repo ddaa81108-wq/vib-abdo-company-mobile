@@ -101,6 +101,10 @@ class FakeApiClient implements ApiClient {
   /// The next N business mutations fail before they change fake state (tests).
   int failMutationsRemaining = 0;
 
+  /// The next N collections writes on the no-replay path are APPLIED, then
+  /// answer with a network error, as if the reply was lost (tests).
+  int loseCollectionRepliesRemaining = 0;
+
   /// When set, business mutations wait here after their requestId is recorded (tests).
   Completer<void>? pauseMutations;
 
@@ -399,6 +403,9 @@ class FakeApiClient implements ApiClient {
         body: _successWire(response.data),
         setCookie: setCookie,
       );
+    } on NetworkException {
+      // A simulated lost reply is a transport failure, not an HTTP answer.
+      rethrow;
     } on ApiException catch (error) {
       return FakeHttpResult(
         status: error.statusCode ?? 401,
@@ -1286,7 +1293,12 @@ class FakeApiClient implements ApiClient {
       failMutationsRemaining--;
       _fail(400, 'MUTATION_FAILED', 'تعذر تنفيذ الطلب.');
     }
-    return send();
+    final response = await send();
+    if (loseCollectionRepliesRemaining > 0) {
+      loseCollectionRepliesRemaining--;
+      throw const NetworkException();
+    }
+    return response;
   }
 
   Future<ApiResponse> _route(

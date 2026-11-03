@@ -483,8 +483,9 @@ class FakeCollectionsEngine {
     final staged = <Map<String, dynamic>>[];
     for (final customerId in ids) {
       final card = _cards.card(section, customerId);
-      if (card == null)
+      if (card == null) {
         _notFound(section == 'companies' ? 'company' : 'customer');
+      }
       if (card.balanceUnits <= 0) {
         _fail(409, 'ASSIGNMENT_REQUIRES_POSITIVE_DEBT',
             'يمكن توجيه الكروت ذات الدين الموجب فقط. كارت الصفر أو الأمانة لا يقبل التوجيه.');
