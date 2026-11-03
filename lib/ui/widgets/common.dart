@@ -963,3 +963,34 @@ bool historyDraggedToEnd(ScrollNotification notification) {
   if (metrics.maxScrollExtent <= 0) return false;
   return metrics.pixels >= metrics.maxScrollExtent - 24;
 }
+
+/// × / ÷ / «مباشر» for a calculation mode, read aloud and shown on long
+/// press as ضرب / قسمة / مباشر (Ali, 2026-11-03).
+class CalculationMark extends StatelessWidget {
+  const CalculationMark(this.mode, {super.key, this.style});
+
+  final CalculationMode? mode;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final word = calculationLabel(mode);
+    final symbol = calculationSymbol(mode);
+    final isSymbol = symbol != word;
+    final text = Text(
+      symbol,
+      style: isSymbol
+          ? (style ?? DefaultTextStyle.of(context).style).copyWith(
+              fontSize: ((style?.fontSize ?? 14) * 1.35),
+              fontWeight: FontWeight.w800,
+            )
+          : style,
+    );
+    if (!isSymbol) return text;
+    return Tooltip(
+      message: word,
+      excludeFromSemantics: true,
+      child: Semantics(label: word, excludeSemantics: true, child: text),
+    );
+  }
+}

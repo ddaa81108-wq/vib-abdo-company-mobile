@@ -238,6 +238,38 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
   });
 
+  testWidgets('multiply and divide show × and ÷, read as ضرب and قسمة', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await pumpFakeApp(tester, size: const Size(430, 932));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    final table = find.byKey(const Key('ledger-table'));
+    expect(
+      find.descendant(of: table, matching: find.text('\u00D7')),
+      findsWidgets,
+    );
+    expect(
+      find.descendant(of: table, matching: find.text('\u00F7')),
+      findsWidgets,
+    );
+    expect(
+      find.descendant(of: table, matching: find.text(AppStrings.multiply)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: table, matching: find.text(AppStrings.divide)),
+      findsNothing,
+    );
+    expect(find.bySemanticsLabel(AppStrings.multiply), findsWidgets);
+    expect(find.bySemanticsLabel(AppStrings.divide), findsWidgets);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+    await settle(tester);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
   testWidgets('a cancelled row is hidden like the website; corrected stays', (
     tester,
   ) async {

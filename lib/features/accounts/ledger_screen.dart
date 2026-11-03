@@ -729,11 +729,11 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
             ),
             DropdownMenuItem(
               value: CalculationMode.divide,
-              child: Text(AppStrings.divide),
+              child: CalculationMark(CalculationMode.divide),
             ),
             DropdownMenuItem(
               value: CalculationMode.multiply,
-              child: Text(AppStrings.multiply),
+              child: CalculationMark(CalculationMode.multiply),
             ),
           ],
           onChanged: (value) =>
@@ -845,7 +845,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
         ])
           ChoiceChip(
             key: Key('movement-mode-${mode.name}'),
-            label: Text(calculationLabel(mode)),
+            label: CalculationMark(mode),
             selected: _mode == mode,
             visualDensity: VisualDensity.compact,
             onSelected: (_) => setState(() => _mode = mode),
@@ -1936,7 +1936,7 @@ class _EntryTile extends ConsumerWidget {
       _Cell(_LedgerColumns.value, _Fit(_InputFigure(entry.inputValue, number))),
       _Cell(
         _LedgerColumns.operation,
-        _Fit(Text(calculationLabel(entry.calculationMode), style: body)),
+        _Fit(CalculationMark(entry.calculationMode, style: body)),
       ),
       _Cell(
         _LedgerColumns.rate,

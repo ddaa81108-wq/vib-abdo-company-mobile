@@ -120,7 +120,8 @@ class UnlinkedReceiptActions extends ConsumerWidget {
       final message = failure.code == 'VERSION_CONFLICT'
           ? AppStrings.versionConflict
           : failure.message;
-      final refresh = failure.code == 'VERSION_CONFLICT' ||
+      final refresh =
+          failure.code == 'VERSION_CONFLICT' ||
           failure.code == 'SUBMISSION_ALREADY_DECIDED' ||
           failure.code == 'SUBMISSION_NOT_APPROVED';
       if (!context.mounted) return refresh ? message : failureText(failure);

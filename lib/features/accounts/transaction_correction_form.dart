@@ -277,11 +277,11 @@ class _TransactionCorrectionFormState
               ),
               DropdownMenuItem(
                 value: CalculationMode.divide,
-                child: Text(AppStrings.divide),
+                child: CalculationMark(CalculationMode.divide),
               ),
               DropdownMenuItem(
                 value: CalculationMode.multiply,
-                child: Text(AppStrings.multiply),
+                child: CalculationMark(CalculationMode.multiply),
               ),
             ],
             onChanged: (value) =>

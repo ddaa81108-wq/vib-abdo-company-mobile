@@ -188,6 +188,14 @@ String calculationLabel(CalculationMode? mode) => switch (mode) {
   _ => AppStrings.direct,
 };
 
+/// The website's marks (LedgerWorkspace-BQxJagtI.js): `÷` (U+00F7) for
+/// divide, `×` (U+00D7) for multiply, «مباشر» stays a word. Labels only.
+String calculationSymbol(CalculationMode? mode) => switch (mode) {
+  CalculationMode.divide => '\u00F7',
+  CalculationMode.multiply => '\u00D7',
+  _ => AppStrings.direct,
+};
+
 String collectionStatusLabel(String status, {required bool unlinked}) {
   return switch (status) {
     'pending' => unlinked ? AppStrings.unlinked : AppStrings.pendingApproval,

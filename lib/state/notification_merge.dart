@@ -25,8 +25,9 @@ List<AppNotification> mergeAppNotifications({
   for (final item in incoming) {
     if (!_visible(item, currentUserId, source)) continue;
     final previous = merged[item.notificationId];
-    merged[item.notificationId] =
-        previous == null ? item : previous.mergeWith(item);
+    merged[item.notificationId] = previous == null
+        ? item
+        : previous.mergeWith(item);
   }
   final items = merged.values.toList(growable: false)..sort(_byCreatedDesc);
   return items;
