@@ -81,7 +81,11 @@ void main() {
 
     expect(find.byKey(const Key('correct-tx_1')), findsNothing);
     expect(find.byKey(const Key('correct-tx_2')), findsNothing);
-    expect(find.text(AppStrings.reversed), findsOneWidget);
+    // Like the website, a cancelled (reversed) row is not drawn at all
+    // (Ali, 2026-11-03). Other statuses stay on screen.
+    expect(find.byKey(const ValueKey('ledger-row-tx_1')), findsNothing);
+    expect(find.byKey(const ValueKey('ledger-row-tx_2')), findsOneWidget);
+    expect(find.text(AppStrings.reversed), findsNothing);
   });
 
   testWidgets('posted lines on every card section can open a correction', (

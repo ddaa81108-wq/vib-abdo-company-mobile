@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_api_layer/data/fake/fake_fixtures.dart';
 import 'package:flutter_api_layer/data/fake/fake_large_catalog.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -231,6 +232,31 @@ void main() {
     expect(find.byKey(const Key('full-payment')), findsOneWidget);
     expect(find.byKey(const Key('movement-amount')), findsNothing);
     expect(tester.takeException(), isNull);
+    await settle(tester);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('a cancelled row is hidden like the website; corrected stays', (
+    tester,
+  ) async {
+    await pumpFakeApp(
+      tester,
+      size: const Size(430, 1600),
+      overrides: [
+        ledgerProvider.overrideWith((ref, key) async {
+          final raw = FakeFixtures.ledger();
+          final items = raw['items'] as List;
+          (items[0] as Map)['status'] = 'reversed';
+          (items[1] as Map)['status'] = 'corrected';
+          return LedgerPage.fromData(raw, key.$1);
+        }),
+      ],
+    );
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    expect(find.byKey(const ValueKey('ledger-row-tx_1')), findsNothing);
+    expect(find.byKey(const ValueKey('ledger-row-tx_2')), findsOneWidget);
+    expect(find.text(AppStrings.reversed), findsNothing);
     await settle(tester);
     await tester.pump(const Duration(seconds: 1));
   });

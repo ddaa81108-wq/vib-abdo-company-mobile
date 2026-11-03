@@ -17,6 +17,7 @@ import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
 import 'customer_card_tone.dart';
 import 'edit_account_card_screen.dart';
+import 'ledger_running_balance.dart';
 import 'overpayment_warning.dart';
 import 'transaction_correction_form.dart';
 
@@ -248,7 +249,9 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     HistoryWindowTrace.ledgerPage = [
       for (final entry in page.page.items) entry.id,
     ];
-    final rows = _oldestFirst(page.page.items);
+    // Like the website: cancelled (reversed) rows are not drawn. The server
+    // keeps them for the audit trail.
+    final rows = _oldestFirst(page.page.items.where(websiteShowsRow).toList());
     final cardReady = _cardReadyForWrite(card);
     final composer = canWrite
         ? _InlineComposer(
@@ -1328,7 +1331,7 @@ class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
     HistoryWindowTrace.ledgerExtra = [for (final entry in _extra) entry.id];
     final scheme = Theme.of(context).colorScheme;
     // Older rows sit above the newest page, oldest first.
-    final shown = _oldestFirst(_extra);
+    final shown = _oldestFirst(_extra.where(websiteShowsRow).toList());
     final older = shown.length <= HistoryWindow.eagerLimit
         ? <Widget>[for (final entry in shown) widget.row(entry)]
         : <Widget>[
