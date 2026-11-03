@@ -238,8 +238,13 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/libyan-deposits/c_55');
     expect(find.text(AppStrings.libyanLedger), findsOneWidget);
-    expect(_textOf(tester, const Key('ledger-sequence-tx_1')), AppStrings.dash);
+    // م counts the drawn rows 1..n once every page is in (Ali,
+    // 2026-11-03); a row without a server sequence still gets its place.
+    await tester.pump(const Duration(milliseconds: 50));
+    await settle(tester);
+    expect(_textOf(tester, const Key('ledger-sequence-tx_old')), '1');
     expect(_textOf(tester, const Key('ledger-sequence-tx_2')), '2');
+    expect(_textOf(tester, const Key('ledger-sequence-tx_1')), '3');
     expect(
       Directionality.of(
         tester.element(
@@ -397,8 +402,10 @@ void main() {
     await tester.tap(find.text(AppStrings.retry));
     await settle(tester);
     expect(find.byKey(const Key('add-debt')), findsOneWidget);
-    expect(find.byKey(const Key('load-older')), findsOneWidget);
-    expect(find.text(AppStrings.loadOlder), findsOneWidget);
+    // Older pages load by themselves now (Ali, 2026-11-03).
+    await settle(tester);
+    expect(find.byKey(const ValueKey('ledger-row-tx_old')), findsOneWidget);
+    expect(find.byKey(const Key('load-older')), findsNothing);
     expect(gate.calls, greaterThanOrEqualTo(2));
     expect(tester.takeException(), isNull);
   });

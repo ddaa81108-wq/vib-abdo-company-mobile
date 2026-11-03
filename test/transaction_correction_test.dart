@@ -97,8 +97,7 @@ void main() {
 
     expect(find.byKey(const Key('correct-tx_1')), findsOneWidget);
     expect(find.byKey(const Key('correct-tx_2')), findsOneWidget);
-    await scrollTo(tester, const Key('load-older'), 'customers');
-    await tester.tap(find.byKey(const Key('load-older')));
+    // The older page loads by itself (Ali, 2026-11-03).
     await settle(tester);
     expect(find.byKey(const Key('correct-tx_old')), findsOneWidget);
 

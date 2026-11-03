@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -57,6 +59,18 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   /// The page the screen last opened at the entry buttons for.
   String? _openedAtBottomFor;
 
+  /// Older pages fetched automatically behind the newest page, newest
+  /// first, so row 1 is the first movement (Ali, 2026-11-03). Same GET
+  /// endpoint with `before`; display only.
+  final _olderPages = <LedgerPage>[];
+  String? _olderFor;
+  String? _olderCursor;
+  String? _olderError;
+  var _olderBusy = false;
+
+  /// A safety stop for very long records; the rest loads on request.
+  static const _autoPageLimit = 200;
+
   final _rows = ScrollController();
   final _innerRows = ScrollController();
   final _columnsScroll = ScrollController();
@@ -80,6 +94,63 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
       _ackBalance = null;
       _editingId = null;
       _openedAtBottomFor = null;
+      _olderFor = null;
+      _olderPages.clear();
+    }
+  }
+
+  static bool _atBottom(ScrollController controller) {
+    if (!controller.hasClients) return true;
+    final position = controller.position;
+    return position.pixels >= position.maxScrollExtent - 4;
+  }
+
+  /// Starts (or restarts, after a reload) fetching every older page.
+  void _syncOlder(String key, LedgerPage page) {
+    if (_olderFor == key) return;
+    _olderFor = key;
+    _olderPages.clear();
+    _olderCursor = page.page.nextCursor;
+    _olderError = null;
+    _olderBusy = false;
+    if (_olderCursor != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadOlder(key));
+    }
+  }
+
+  Future<void> _loadOlder(String key, {bool manual = false}) async {
+    if (!mounted || _olderFor != key || _olderBusy) return;
+    final cursor = _olderCursor;
+    if (cursor == null) return;
+    if (!manual && _olderPages.length >= _autoPageLimit) return;
+    setState(() {
+      _olderBusy = true;
+      _olderError = null;
+    });
+    try {
+      final older = await ref
+          .read(apiLayerProvider)
+          .accounts
+          .ledger(section, id, before: cursor);
+      if (!mounted || _olderFor != key) return;
+      final atBottom = _atBottom(_rows) && _atBottom(_innerRows);
+      if (atBottom) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToEntry());
+      }
+      setState(() {
+        _olderPages.add(older);
+        _olderCursor = older.page.nextCursor;
+        _olderBusy = false;
+      });
+      if (_olderCursor != null) unawaited(_loadOlder(key));
+    } catch (error) {
+      if (!mounted || _olderFor != key) return;
+      setState(() {
+        _olderBusy = false;
+        _olderError = failureText(
+          ref.read(errorHandlerProvider).toFailure(error),
+        );
+      });
     }
   }
 
@@ -243,15 +314,30 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     required bool canWrite,
     required EdgeInsetsDirectional padding,
   }) {
-    final showBalance = page.page.items.any(
-      (entry) => entry.balanceAfterUnits != null,
-    );
+    final resetKey = '${section.path}/$id/${identityHashCode(page)}';
+    _syncOlder(resetKey, page);
+    // The website's merge: older items first, then the newer page. A row
+    // already seen is not repeated.
+    final seen = <String>{};
+    final all = <LedgerEntryDto>[
+      for (final older in _olderPages.reversed)
+        for (final entry in older.page.items)
+          if (seen.add(entry.id)) entry,
+      for (final entry in page.page.items)
+        if (seen.add(entry.id)) entry,
+    ];
+    final complete = _olderCursor == null;
     HistoryWindowTrace.ledgerPage = [
       for (final entry in page.page.items) entry.id,
     ];
+    HistoryWindowTrace.ledgerExtra = [
+      for (final older in _olderPages)
+        for (final entry in older.page.items) entry.id,
+    ];
     // Like the website: cancelled (reversed) rows are not drawn. The server
     // keeps them for the audit trail.
-    final rows = _oldestFirst(page.page.items.where(websiteShowsRow).toList());
+    final rows = _oldestFirst(all.where(websiteShowsRow).toList());
+    final showBalance = all.any((entry) => entry.balanceAfterUnits != null);
     final cardReady = _cardReadyForWrite(card);
     final composer = canWrite
         ? _InlineComposer(
@@ -266,20 +352,21 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
           )
         : null;
     final columns = _LedgerColumns(showBalance: showBalance);
-    Widget row(LedgerEntryDto entry) => _EntryTile(
-      key: ValueKey('ledger-row-${entry.id}'),
+    // م counts the drawn rows 1..n, oldest first, once every page is in.
+    Widget row(int index) => _EntryTile(
+      key: ValueKey('ledger-row-${rows[index].id}'),
+      ordinal: complete ? index + 1 : null,
       section: section,
       accountId: id,
-      entry: entry,
+      entry: rows[index],
       money: money,
       columns: columns,
       canWrite: canWrite,
-      editing: _editingId == entry.id,
-      onEdit: () => _openInlineEdit(entry.id),
+      editing: _editingId == rows[index].id,
+      onEdit: () => _openInlineEdit(rows[index].id),
       onEditDone: _closeInlineEdit,
-      onCancel: (meta) => _cancel(context, ref, entry, meta),
+      onCancel: (meta) => _cancel(context, ref, rows[index], meta),
     );
-    final resetKey = '${section.path}/$id/${identityHashCode(page)}';
     if (_openedAtBottomFor != resetKey) {
       _openedAtBottomFor = resetKey;
       WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToEntry());
@@ -289,16 +376,14 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
         final viewport = constraints.maxWidth - padding.horizontal;
         final table = <Widget>[
           _LedgerColumnHeader(columns: columns),
-          if (page.page.nextCursor != null)
-            _LoadOlderLedger(
-              key: ObjectKey(page),
-              section: section,
-              id: id,
-              cursor: page.page.nextCursor!,
-              row: row,
+          if (!complete)
+            _OlderStatus(
+              busy: _olderBusy,
+              error: _olderError,
+              onRetry: () => _loadOlder(resetKey, manual: true),
             ),
           if (rows.length <= HistoryWindow.eagerLimit)
-            for (final entry in rows) row(entry)
+            for (var i = 0; i < rows.length; i++) row(i)
           else
             SizedBox(
               height: 560,
@@ -306,7 +391,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                 key: const Key('ledger-entries-list'),
                 controller: _innerRows,
                 itemCount: rows.length,
-                itemBuilder: (context, index) => row(rows[index]),
+                itemBuilder: (context, index) => row(index),
               ),
             ),
         ];
@@ -1204,192 +1289,68 @@ class _TotalCard extends StatelessWidget {
   }
 }
 
-class _LoadOlderLedger extends ConsumerStatefulWidget {
-  const _LoadOlderLedger({
-    super.key,
-    required this.section,
-    required this.id,
-    required this.cursor,
-    required this.row,
+/// While older pages are still arriving: a quiet progress line, or the
+/// error with a retry. The table has no م numbers until every page is in.
+class _OlderStatus extends StatelessWidget {
+  const _OlderStatus({
+    required this.busy,
+    required this.error,
+    required this.onRetry,
   });
 
-  final AccountSection section;
-  final String id;
-  final String cursor;
-
-  /// Builds one table row, the same as the newest page uses.
-  final Widget Function(LedgerEntryDto entry) row;
-
-  @override
-  ConsumerState<_LoadOlderLedger> createState() => _LoadOlderLedgerState();
-}
-
-class _LoadOlderLedgerState extends ConsumerState<_LoadOlderLedger> {
-  final _extra = <LedgerEntryDto>[];
-  String? _cursor;
-  String? _error;
-  var _busy = false;
-
-  /// The newest prefix is full and the next load should show the page that
-  /// was just dropped, without opening a gap in front of it.
-  var _replay = false;
-
-  /// The user already reloaded a dropped page, so later pages stay attached
-  /// to that newest prefix.
-  var _extend = false;
-  var _scrollArmed = true;
-
-  /// First page is already on screen. Each successful load-more adds one.
-  var _pagesLoaded = 1;
-
-  @override
-  void initState() {
-    super.initState();
-    _cursor = widget.cursor;
-  }
-
-  Future<void> _load() async {
-    final cursor = _cursor;
-    if (cursor == null || _busy) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final page = await ref
-          .read(apiLayerProvider)
-          .accounts
-          .ledger(widget.section, widget.id, before: cursor);
-      if (!mounted) return;
-      setState(() {
-        _applyPage(page);
-        _busy = false;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _error = failureText(ref.read(errorHandlerProvider).toFailure(error));
-      });
-    }
-  }
-
-  /// Newest rows stay. Overflow drops the oldest extras and remembers the
-  /// boundary so the next load can show that page again (DEF-027).
-  void _applyPage(LedgerPage page) {
-    final incoming = page.page.items;
-    if (!HistoryWindow.trimEnabled || _extend) {
-      _addFresh(incoming);
-      _cursor = page.page.nextCursor;
-      _pagesLoaded++;
-      return;
-    }
-    if (_replay) {
-      _addFresh(incoming);
-      _cursor = page.page.nextCursor;
-      _replay = false;
-      _extend = true;
-      _pagesLoaded++;
-      return;
-    }
-    _extra.addAll(incoming);
-    if (_extra.length > HistoryWindow.retainLimit) {
-      final boundary = _extra[HistoryWindow.retainLimit - 1];
-      _extra.removeRange(HistoryWindow.retainLimit, _extra.length);
-      _cursor = boundary.id;
-      _replay = true;
-    } else {
-      _cursor = page.page.nextCursor;
-    }
-    _pagesLoaded++;
-  }
-
-  void _addFresh(List<LedgerEntryDto> incoming) {
-    final known = {for (final entry in _extra) entry.id};
-    for (final entry in incoming) {
-      if (known.add(entry.id)) _extra.add(entry);
-    }
-  }
-
-  bool _onOlderScroll(ScrollNotification notification) {
-    if (notification is! ScrollUpdateNotification) return false;
-    final metrics = notification.metrics;
-    if (metrics.maxScrollExtent > 0 &&
-        metrics.pixels < metrics.maxScrollExtent - 24) {
-      _scrollArmed = true;
-      return false;
-    }
-    if (!historyDraggedToEnd(notification)) return false;
-    if (!_scrollArmed || _cursor == null || _busy) return false;
-    _scrollArmed = false;
-    _load();
-    return false;
-  }
+  final bool busy;
+  final String? error;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    HistoryWindowTrace.ledgerExtra = [for (final entry in _extra) entry.id];
+    final look = context.look;
     final scheme = Theme.of(context).colorScheme;
-    // Older rows sit above the newest page, oldest first.
-    final shown = _oldestFirst(_extra.where(websiteShowsRow).toList());
-    final older = shown.length <= HistoryWindow.eagerLimit
-        ? <Widget>[for (final entry in shown) widget.row(entry)]
-        : <Widget>[
-            SizedBox(
-              height: 560,
-              child: NotificationListener<ScrollNotification>(
-                onNotification: _onOlderScroll,
-                child: ListView.builder(
-                  key: const Key('ledger-older-list'),
-                  itemCount: shown.length,
-                  itemBuilder: (context, index) => widget.row(shown[index]),
-                ),
-              ),
-            ),
-          ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        KeyedSubtree(
-          key: Key('ledger-pages-$_pagesLoaded'),
-          child: const SizedBox.shrink(),
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
         ),
-        KeyedSubtree(
-          key: Key('ledger-retained-${_extra.length}'),
-          child: const SizedBox.shrink(),
-        ),
-        if (_cursor != null)
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: TextButton(
-              key: const Key('load-older'),
-              onPressed: _busy ? null : _load,
-              child: _busy
-                  ? SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: scheme.primary,
-                      ),
-                    )
-                  : Text(
-                      _error == null ? AppStrings.loadOlder : AppStrings.retry,
+        child: busy || error == null
+            ? Row(
+                key: const Key('ledger-loading-older'),
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: scheme.primary,
                     ),
-            ),
-          ),
-        if (_error != null)
-          Padding(
-            padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-            child: Text(
-              _error!,
-              key: const Key('load-older-error'),
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: scheme.error),
-            ),
-          ),
-        ...older,
-      ],
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    AppStrings.ledgerLoadingOlder,
+                    style: cairo(12, 600, color: look.muted),
+                  ),
+                ],
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      error!,
+                      key: const Key('load-older-error'),
+                      style: cairo(12, 600, color: scheme.error),
+                    ),
+                  ),
+                  TextButton(
+                    key: const Key('load-older'),
+                    onPressed: onRetry,
+                    child: const Text(AppStrings.retry),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }
@@ -1619,8 +1580,13 @@ class _EntryTile extends ConsumerWidget {
     required this.onEdit,
     required this.onEditDone,
     required this.onCancel,
+    this.ordinal,
     super.key,
   });
+
+  /// م: this row's place among the drawn rows, 1 = the first movement.
+  /// Null while older pages are still loading.
+  final int? ordinal;
 
   final AccountSection section;
   final String accountId;
@@ -1651,9 +1617,7 @@ class _EntryTile extends ConsumerWidget {
       color: muted,
       decoration: strike,
     );
-    final sequence = entry.sequence == null
-        ? AppStrings.dash
-        : '${entry.sequence}';
+    final sequence = ordinal == null ? AppStrings.dash : '$ordinal';
     final date = entry.date;
     final isPayment = entry.type == 'payment';
     final amountColor = _movementAmountColor(
@@ -1800,8 +1764,8 @@ class _EntryTile extends ConsumerWidget {
       _Cell(_LedgerColumns.cancel, cancel),
     ];
     final viewport = _InlineViewport.of(context);
-    // Zebra by the server sequence, so older pages stripe the same way.
-    final odd = (entry.sequence ?? 0).isOdd;
+    // Zebra by the row number, so every page stripes the same way.
+    final odd = (ordinal ?? entry.sequence ?? 0).isOdd;
     final zebra = Theme.of(context).brightness == Brightness.dark
         ? Colors.white.withValues(alpha: 0.025)
         : const Color(0xFF0F172A).withValues(alpha: 0.025);

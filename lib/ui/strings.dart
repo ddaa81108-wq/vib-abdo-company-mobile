@@ -185,6 +185,7 @@ abstract final class AppStrings {
   static const ledgerSwipeMore = '← اسحب للمزيد';
   static const ledgerZeroWord = 'صفر';
   static const ledgerCloseEdit = 'إغلاق التعديل';
+  static const ledgerLoadingOlder = 'جارٍ تحميل الحركات الأقدم…';
   static const fullPaymentHint = 'دفع كلي: الخادم يسدّد الرصيد الحالي كله.';
   static const weekdays = [
     'الاثنين',

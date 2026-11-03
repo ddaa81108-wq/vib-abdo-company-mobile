@@ -292,6 +292,8 @@ void main() {
       find.byKey(const Key('screen-ledger-libyan-deposits')),
       findsOneWidget,
     );
+    // The ledger fetches its older page by itself; let it finish.
+    await tester.pump(const Duration(seconds: 1));
   });
 
   testWidgets('the edit screen stays RTL on a small phone in both themes', (

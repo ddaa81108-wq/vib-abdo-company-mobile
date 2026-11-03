@@ -17,77 +17,46 @@ void main() {
     HistoryWindow.trimEnabled = HistoryWindow.trimEnabledFromEnvironment;
   });
 
-  testWidgets('P7-25 HISTORY_WINDOW_TRIM off keeps every loaded ledger row', (
-    tester,
-  ) async {
-    HistoryWindow.trimEnabled = false;
-    await pumpFakeApp(
-      tester,
-      fakeDataset: FakeDataset.large,
-      size: const Size(800, 1400),
+  // The ledger loads every older page by itself now, so row 1 is the
+  // first movement and the running balance is complete (Ali, 2026-11-03).
+  // The window trim no longer applies to the ledger; the list stays lazy.
+  for (final trim in [false, true]) {
+    testWidgets(
+      'P7-25 the ledger walks every page by itself (trim ${trim ? 'on' : 'off'})',
+      (tester) async {
+        HistoryWindow.trimEnabled = trim;
+        await pumpFakeApp(
+          tester,
+          fakeDataset: FakeDataset.large,
+          size: const Size(800, 1400),
+        );
+        await signIn(tester, username: 'admin.demo', password: 'demo-only');
+
+        HistoryWindowTrace.ledgerExtra = const [];
+        final clock = Stopwatch()..start();
+        GoRouter.of(tester.element(find.byKey(HomeShell.shellKey)))
+            .go('/customers/${FakeLargeCatalog.longLedgerAccountId}');
+        await _untilAllPages(tester);
+        clock.stop();
+
+        expect(find.byKey(const Key('load-older')), findsNothing);
+        final olderRows =
+            (FakeLargeCatalog.ledgerPageCount - 1) * FakeLargeCatalog.pageSize;
+        expect(HistoryWindowTrace.ledgerExtra, hasLength(olderRows));
+        final built = _keyedPrefix(tester, 'ledger-sequence-');
+        expect(built, greaterThan(0));
+        expect(built, lessThan(FakeLargeCatalog.pageSize));
+        expect(
+          clock.elapsed,
+          lessThan(const Duration(seconds: 8)),
+          reason:
+              'Engineering proposal: this widget walk stays under 8s. '
+              'Not an acceptance threshold. Ali sets acceptance.',
+        );
+        expect(tester.takeException(), isNull);
+      },
     );
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-
-    final clock = Stopwatch()..start();
-    GoRouter.of(tester.element(find.byKey(HomeShell.shellKey)))
-        .go('/customers/${FakeLargeCatalog.longLedgerAccountId}');
-    await _until(tester, const Key('load-older'));
-
-    var taps = 0;
-    while (find.byKey(const Key('load-older')).evaluate().isNotEmpty) {
-      taps++;
-      expect(taps, lessThanOrEqualTo(FakeLargeCatalog.ledgerPageCount));
-      await _pressLoadOlder(tester);
-    }
-    clock.stop();
-
-    expect(taps, FakeLargeCatalog.ledgerPageCount - 1);
-    expect(find.byKey(const Key('ledger-pages-20')), findsOneWidget);
-    final olderRows =
-        (FakeLargeCatalog.ledgerPageCount - 1) * FakeLargeCatalog.pageSize;
-    expect(find.byKey(Key('ledger-retained-$olderRows')), findsOneWidget);
-    final built = _keyedPrefix(tester, 'ledger-sequence-');
-    expect(built, greaterThan(0));
-    expect(built, lessThan(FakeLargeCatalog.pageSize));
-    expect(
-      clock.elapsed,
-      lessThan(const Duration(seconds: 8)),
-      reason:
-          'Engineering proposal: this widget walk stays under 8s. '
-          'Not an acceptance threshold. Ali sets acceptance.',
-    );
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets(
-    'P7-25 HISTORY_WINDOW_TRIM on still walks the ledger to the last page',
-    (tester) async {
-      HistoryWindow.trimEnabled = true;
-      await pumpFakeApp(
-        tester,
-        fakeDataset: FakeDataset.large,
-        size: const Size(800, 1400),
-      );
-      await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      GoRouter.of(tester.element(find.byKey(HomeShell.shellKey)))
-          .go('/customers/${FakeLargeCatalog.longLedgerAccountId}');
-      await _until(tester, const Key('load-older'));
-      var taps = 0;
-      while (find.byKey(const Key('load-older')).evaluate().isNotEmpty) {
-        taps++;
-        expect(taps, lessThanOrEqualTo(FakeLargeCatalog.ledgerPageCount + 1));
-        await _pressLoadOlder(tester);
-      }
-      // The trim replays the boundary page once, then the walk continues
-      // from the newest row through the last server page.
-      expect(taps, FakeLargeCatalog.ledgerPageCount);
-      expect(find.byKey(const Key('ledger-pages-21')), findsOneWidget);
-      final olderRows =
-          (FakeLargeCatalog.ledgerPageCount - 1) * FakeLargeCatalog.pageSize;
-      expect(find.byKey(Key('ledger-retained-$olderRows')), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+  }
 
   testWidgets('P7-24 P7-25 customer and notification lists stay lazy', (
     tester,
@@ -176,20 +145,16 @@ Future<void> _until(WidgetTester tester, Key key) async {
   fail('missing $key');
 }
 
-/// The wide shell rail covers the button's center, so a coordinate tap misses.
-/// This calls the same [TextButton.onPressed] the control shows.
-Future<void> _pressLoadOlder(WidgetTester tester) async {
-  final finder = find.byKey(const Key('load-older'));
-  await tester.ensureVisible(finder);
-  final button = tester.widget<TextButton>(finder);
-  expect(button.onPressed, isNotNull);
-  button.onPressed!();
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 1));
-  for (var i = 0; i < 20; i++) {
-    if (finder.evaluate().isEmpty) return;
-    final current = tester.widget<TextButton>(finder);
-    if (current.onPressed != null) return;
+Future<void> _untilAllPages(WidgetTester tester) async {
+  final loading = find.byKey(const Key('ledger-loading-older'));
+  for (var i = 0; i < 400; i++) {
     await tester.pump(const Duration(milliseconds: 20));
+    if (HistoryWindowTrace.ledgerExtra.length ==
+            (FakeLargeCatalog.ledgerPageCount - 1) *
+                FakeLargeCatalog.pageSize &&
+        loading.evaluate().isEmpty) {
+      return;
+    }
   }
+  fail('the ledger did not finish loading its older pages');
 }

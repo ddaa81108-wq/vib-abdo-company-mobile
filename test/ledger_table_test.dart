@@ -260,4 +260,38 @@ void main() {
     await settle(tester);
     await tester.pump(const Duration(seconds: 1));
   });
+
+  testWidgets('م runs 1..n over every page, oldest first, without gaps', (
+    tester,
+  ) async {
+    await pumpFakeApp(
+      tester,
+      size: const Size(430, 1600),
+      overrides: [
+        ledgerProvider.overrideWith((ref, key) async {
+          final raw = FakeFixtures.ledger();
+          ((raw['items'] as List)[0] as Map)['status'] = 'reversed';
+          return LedgerPage.fromData(raw, key.$1);
+        }),
+      ],
+    );
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    await settle(tester);
+    String mark(String id) => tester
+        .widget<Text>(
+          find.descendant(
+            of: find.byKey(Key('ledger-sequence-$id')),
+            matching: find.byType(Text),
+          ),
+        )
+        .data!;
+    // The older page loaded by itself; the cancelled tx_1 is not drawn
+    // and leaves no gap in the numbers.
+    expect(mark('tx_old'), '1');
+    expect(mark('tx_2'), '2');
+    expect(find.byKey(const Key('ledger-sequence-tx_1')), findsNothing);
+    expect(find.byKey(const Key('load-older')), findsNothing);
+    await tester.pump(const Duration(seconds: 1));
+  });
 }

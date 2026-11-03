@@ -154,6 +154,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
       expect(fake.mutationRequestIds, [requestId, requestId]);
+      // The ledger fetches its older page by itself; let it finish.
+      await tester.pump(const Duration(seconds: 1));
     },
   );
 }
