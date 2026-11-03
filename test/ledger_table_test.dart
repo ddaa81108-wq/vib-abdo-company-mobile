@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/data/fake/fake_fixtures.dart';
 import 'package:flutter_api_layer/data/fake/fake_large_catalog.dart';
 import 'package:flutter_api_layer/api_layer.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
+import 'package:vib_abdo_company_mobile/state/theme_controller.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/performance/history_window.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
@@ -269,6 +272,75 @@ void main() {
     await settle(tester);
     await tester.pump(const Duration(seconds: 1));
   });
+
+  for (final dark in [false, true]) {
+    testWidgets(
+      'grid: column lines and row lines (${dark ? 'dark' : 'light'})',
+      (tester) async {
+        await pumpFakeApp(tester, size: const Size(430, 932));
+        await signIn(tester, username: 'admin.demo', password: 'demo-only');
+        final home = find.byKey(HomeShell.shellKey);
+        final current = Theme.of(tester.element(home)).brightness;
+        if ((current == Brightness.dark) != dark) {
+          ProviderScope.containerOf(tester.element(home))
+              .read(themeModeProvider.notifier)
+              .toggle();
+          await settle(tester);
+        }
+        await go(tester, '/customers/c_55');
+        expect(
+          Theme.of(tester.element(find.byKey(const Key('ledger-table'))))
+              .brightness,
+          dark ? Brightness.dark : Brightness.light,
+        );
+        final line = dark ? const Color(0xFF2E3A57) : const Color(0xFFD3DCE8);
+        bool columnLine(Widget w) {
+          if (w is! Container) return false;
+          final d = w.decoration;
+          if (d is! BoxDecoration) return false;
+          final b = d.border;
+          return b is BorderDirectional && b.end.color == line;
+        }
+
+        final header = find.byKey(const Key('ledger-column-header'));
+        // Every column but the last has a divider: 12 columns -> 11 lines
+        // (11 -> 10 when الرصيد is hidden).
+        final headLines = find
+            .descendant(
+              of: header,
+              matching: find.byWidgetPredicate(columnLine),
+            )
+            .evaluate()
+            .length;
+        expect(headLines, anyOf(10, 11));
+        final row = find.byKey(const Key('ledger-entry-tx_1'));
+        expect(
+          find
+              .descendant(of: row, matching: find.byWidgetPredicate(columnLine))
+              .evaluate()
+              .length,
+          headLines,
+        );
+        // Row line along the bottom of each row.
+        final rowBox = tester.widget<DecoratedBox>(
+          find.descendant(of: row, matching: find.byType(DecoratedBox)).first,
+        );
+        final border = (rowBox.decoration as BoxDecoration).border as Border;
+        expect(border.bottom.color, line);
+        // Lines run the full row height.
+        final rowHeight = tester
+            .getSize(find.descendant(of: row, matching: find.byType(Row)).first)
+            .height;
+        final cell = find
+            .descendant(of: row, matching: find.byWidgetPredicate(columnLine))
+            .first;
+        expect(tester.getSize(cell).height, rowHeight);
+        expect(tester.takeException(), isNull);
+        await settle(tester);
+        await tester.pump(const Duration(seconds: 1));
+      },
+    );
+  }
 
   testWidgets('a cancelled row is hidden like the website; corrected stays', (
     tester,

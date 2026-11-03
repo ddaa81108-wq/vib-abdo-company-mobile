@@ -1544,7 +1544,7 @@ class _LedgerTable extends StatelessWidget {
       decoration: BoxDecoration(
         color: look.card,
         borderRadius: radius,
-        border: Border.all(color: look.cardBorder),
+        border: Border.all(color: _gridLine(context)),
         boxShadow: [
           BoxShadow(
             color: dark ? const Color(0x55000000) : const Color(0x140F172A),
@@ -1646,7 +1646,7 @@ class _StickyColumnHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: look.card,
         borderRadius: radius,
-        border: Border.all(color: look.cardBorder),
+        border: Border.all(color: _gridLine(context)),
       ),
       child: ClipRRect(
         borderRadius: radius,
@@ -1730,17 +1730,34 @@ class _InlineViewport extends InheritedWidget {
       oldWidget.width != width;
 }
 
+/// The ledger's grid lines: column dividers and row lines, like the website
+/// table (Ali, 2026-11-03). Subtle, but clearly visible in both themes.
+Color _gridLine(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+    ? const Color(0xFF2E3A57)
+    : const Color(0xFFD3DCE8);
+
 class _Cell extends StatelessWidget {
-  const _Cell(this.width, this.child, {this.alignment});
+  const _Cell(this.width, this.child, {this.alignment, this.divider = true});
 
   final double width;
   final Widget child;
   final AlignmentGeometry? alignment;
 
+  /// A vertical line on the cell's end side; off for the last column.
+  final bool divider;
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return Container(
       width: width,
+      decoration: divider
+          ? BoxDecoration(
+              border: BorderDirectional(
+                end: BorderSide(color: _gridLine(context)),
+              ),
+            )
+          : null,
       child: Padding(
         padding: const EdgeInsetsDirectional.symmetric(
           horizontal: 3,
@@ -1960,7 +1977,7 @@ class _EntryTile extends ConsumerWidget {
                 ),
         ),
       _Cell(_LedgerColumns.edit, correct),
-      _Cell(_LedgerColumns.cancel, cancel),
+      _Cell(_LedgerColumns.cancel, cancel, divider: false),
     ];
     final viewport = _InlineViewport.of(context);
     // Zebra by the row number, so every page stripes the same way.
@@ -1981,11 +1998,14 @@ class _EntryTile extends ConsumerWidget {
                 : odd
                 ? null
                 : zebra,
-            border: Border(bottom: BorderSide(color: look.cardBorder)),
+            border: Border(bottom: BorderSide(color: _gridLine(context))),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: cells,
+          // Full-height cells so the column lines run unbroken.
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: cells,
+            ),
           ),
         ),
         if (editing)
@@ -2319,30 +2339,42 @@ class _LedgerColumnHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final look = context.look;
     final style = cairo(11, 700, color: look.muted);
-    Widget head(double width, String text) =>
-        _Cell(width, Text(text, style: style, textAlign: TextAlign.center));
+    Widget head(double width, String text, {bool divider = true}) => _Cell(
+      width,
+      Text(text, style: style, textAlign: TextAlign.center),
+      divider: divider,
+    );
     return DecoratedBox(
       key: const Key('ledger-column-header'),
       decoration: BoxDecoration(
         color: look.strip,
-        border: Border(bottom: BorderSide(color: look.cardBorder)),
+        border: Border(
+          bottom: BorderSide(color: _gridLine(context), width: 1.5),
+        ),
       ),
-      child: Row(
-        children: [
-          head(_LedgerColumns.seq, AppStrings.ledgerColSeq),
-          head(_LedgerColumns.when, AppStrings.ledgerColWhen),
-          head(_LedgerColumns.type, AppStrings.ledgerColType),
-          head(_LedgerColumns.note, AppStrings.ledgerColNote),
-          head(_LedgerColumns.value, AppStrings.ledgerColValue),
-          head(_LedgerColumns.operation, AppStrings.ledgerColOperation),
-          head(_LedgerColumns.rate, AppStrings.ledgerColRate),
-          head(_LedgerColumns.debt, AppStrings.ledgerColDebt),
-          head(_LedgerColumns.paid, AppStrings.ledgerColPaid),
-          if (columns.showBalance)
-            head(_LedgerColumns.balance, AppStrings.ledgerColBalance),
-          head(_LedgerColumns.edit, AppStrings.ledgerColEdit),
-          head(_LedgerColumns.cancel, AppStrings.ledgerColCancel),
-        ],
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            head(_LedgerColumns.seq, AppStrings.ledgerColSeq),
+            head(_LedgerColumns.when, AppStrings.ledgerColWhen),
+            head(_LedgerColumns.type, AppStrings.ledgerColType),
+            head(_LedgerColumns.note, AppStrings.ledgerColNote),
+            head(_LedgerColumns.value, AppStrings.ledgerColValue),
+            head(_LedgerColumns.operation, AppStrings.ledgerColOperation),
+            head(_LedgerColumns.rate, AppStrings.ledgerColRate),
+            head(_LedgerColumns.debt, AppStrings.ledgerColDebt),
+            head(_LedgerColumns.paid, AppStrings.ledgerColPaid),
+            if (columns.showBalance)
+              head(_LedgerColumns.balance, AppStrings.ledgerColBalance),
+            head(_LedgerColumns.edit, AppStrings.ledgerColEdit),
+            head(
+              _LedgerColumns.cancel,
+              AppStrings.ledgerColCancel,
+              divider: false,
+            ),
+          ],
+        ),
       ),
     );
   }
