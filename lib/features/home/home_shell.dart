@@ -70,6 +70,26 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Back on a section reached from home (or a ledger opened by a link)
+    // goes home instead of closing the app. Home itself keeps the system
+    // behaviour. Ali, 2026-11-03.
+    final atHome = widget.location == '/';
+    return PopScope(
+      canPop: atHome,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || !mounted) return;
+        final router = GoRouter.of(context);
+        if (router.canPop()) {
+          router.pop();
+        } else {
+          router.go('/');
+        }
+      },
+      child: _shell(context),
+    );
+  }
+
+  Widget _shell(BuildContext context) {
     final summary = ref.watch(homeSummaryProvider);
     final unread = ref.watch(unreadNotificationsCountProvider);
     final online = ref.watch(onlineProvider);
