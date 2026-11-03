@@ -10,7 +10,9 @@ import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  testWidgets('retrying an unchanged account form reuses the request id', (tester) async {
+  testWidgets('retrying an unchanged account form reuses the request id', (
+    tester,
+  ) async {
     final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
@@ -32,126 +34,135 @@ void main() {
     expect(fake.mutationRequestIds, [first, first]);
   });
 
-  testWidgets('editing the amount or opening a new movement form changes the request id', (
-    tester,
-  ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
-    final fake = layer.client as FakeApiClient;
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers/c_55');
-    fake.failMutationsRemaining = 2;
+  testWidgets(
+    'editing the amount or opening a new movement form changes the request id',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
+      final fake = layer.client as FakeApiClient;
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/customers/c_55');
+      fake.failMutationsRemaining = 2;
 
-    await tester.tap(find.byKey(const Key('add-payment')));
-    await settle(tester);
-    await enterAmount(tester, '100');
-    await hold(tester, fake, const Key('save-movement'));
-    await enterAmount(tester, '180');
-    await hold(tester, fake, const Key('save-movement'));
+      await tester.tap(find.byKey(const Key('add-payment')));
+      await settle(tester);
+      await enterAmount(tester, '100');
+      await hold(tester, fake, const Key('save-movement'));
+      await enterAmount(tester, '180');
+      await hold(tester, fake, const Key('save-movement'));
 
-    expect(fake.mutationRequestIds, hasLength(2));
-    expect(fake.mutationRequestIds[0], isNot(fake.mutationRequestIds[1]));
+      expect(fake.mutationRequestIds, hasLength(2));
+      expect(fake.mutationRequestIds[0], isNot(fake.mutationRequestIds[1]));
 
-    fake.failMutationsRemaining = 0;
-    await hold(tester, fake, const Key('save-movement'));
-    // The inline add row starts a fresh, empty form after a save.
-    expect(
-      tester
-          .widget<TextField>(
-            find.descendant(
-              of: find.byKey(const Key('movement-amount')),
-              matching: find.byType(TextField),
-            ),
-          )
-          .controller
-          ?.text,
-      isEmpty,
-    );
+      fake.failMutationsRemaining = 0;
+      await hold(tester, fake, const Key('save-movement'));
+      // The inline add row starts a fresh, empty form after a save.
+      expect(
+        tester
+            .widget<TextField>(
+              find.descendant(
+                of: find.byKey(const Key('movement-amount')),
+                matching: find.byType(TextField),
+              ),
+            )
+            .controller
+            ?.text,
+        isEmpty,
+      );
 
-    await tester.tap(find.byKey(const Key('add-payment')));
-    await settle(tester);
-    // The accepted 180 left the stored balance at 140. This amount is still
-    // within that remaining, so the new form is sent and gets its own id.
-    await enterAmount(tester, '100');
-    await hold(tester, fake, const Key('save-movement'));
+      await tester.tap(find.byKey(const Key('add-payment')));
+      await settle(tester);
+      // The accepted 180 left the stored balance at 140. This amount is still
+      // within that remaining, so the new form is sent and gets its own id.
+      await enterAmount(tester, '100');
+      await hold(tester, fake, const Key('save-movement'));
 
-    expect(fake.mutationRequestIds, hasLength(4));
-    expect(fake.mutationRequestIds[3], isNot(fake.mutationRequestIds[1]));
-  });
+      expect(fake.mutationRequestIds, hasLength(4));
+      expect(fake.mutationRequestIds[3], isNot(fake.mutationRequestIds[1]));
+    },
+  );
 
-  testWidgets('a collection form ignores a second tap while the send is in flight', (tester) async {
-    final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
-    final fake = layer.client as FakeApiClient;
-    await signIn(tester, username: 'employee.demo', password: 'demo-only');
-    await go(tester, '/collections');
-    final gate = Completer<void>();
-    fake.pauseMutations = gate;
+  testWidgets(
+    'a collection form ignores a second tap while the send is in flight',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
+      final fake = layer.client as FakeApiClient;
+      await signIn(tester, username: 'employee.demo', password: 'demo-only');
+      await go(tester, '/collections');
+      final gate = Completer<void>();
+      fake.pauseMutations = gate;
 
-    await tester.tap(find.byKey(const Key('unlinked-collection')));
-    await settle(tester);
-    await tester.enterText(find.byKey(const Key('unlinked-name')), 'عميل');
-    await tester.enterText(
-      find.descendant(
-        of: find.byKey(const Key('unlinked-amount')),
-        matching: find.byType(TextField),
-      ),
-      '50',
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('save-unlinked')));
-    await tester.pump();
-    await tester.pump(Duration.zero);
+      await tester.tap(find.byKey(const Key('unlinked-collection')));
+      await settle(tester);
+      await tester.enterText(find.byKey(const Key('unlinked-name')), 'عميل');
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const Key('unlinked-amount')),
+          matching: find.byType(TextField),
+        ),
+        '50',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('save-unlinked')));
+      await tester.pump();
+      await tester.pump(Duration.zero);
 
-    final button = tester.widget<FilledButton>(find.byKey(const Key('save-unlinked')));
-    expect(button.onPressed, isNull);
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('save-unlinked')),
-        matching: find.byType(CircularProgressIndicator),
-      ),
-      findsOneWidget,
-    );
-    await tester.tap(find.byKey(const Key('save-unlinked')));
-    await tester.pump();
-    expect(fake.mutationRequestIds, hasLength(1));
+      final button = tester.widget<FilledButton>(
+        find.byKey(const Key('save-unlinked')),
+      );
+      expect(button.onPressed, isNull);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('save-unlinked')),
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('save-unlinked')));
+      await tester.pump();
+      expect(fake.mutationRequestIds, hasLength(1));
 
-    gate.complete();
-    fake.pauseMutations = null;
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-    expect(fake.mutationRequestIds, hasLength(1));
-  });
+      gate.complete();
+      fake.pauseMutations = null;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(fake.mutationRequestIds, hasLength(1));
+    },
+  );
 
-  testWidgets('a payment dialog ignores a second confirm while the send is in flight', (
-    tester,
-  ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
-    final fake = layer.client as FakeApiClient;
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers/c_55');
-    final gate = Completer<void>();
-    fake.pauseMutations = gate;
+  testWidgets(
+    'a payment dialog ignores a second confirm while the send is in flight',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
+      final fake = layer.client as FakeApiClient;
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/customers/c_55');
+      final gate = Completer<void>();
+      fake.pauseMutations = gate;
 
-    await tester.tap(find.byKey(const Key('add-payment')));
-    await settle(tester);
-    await enterAmount(tester, '100');
-    await tester.tap(find.byKey(const Key('save-movement')));
-    await tester.pump();
-    await tester.pump(Duration.zero);
+      await tester.tap(find.byKey(const Key('add-payment')));
+      await settle(tester);
+      await enterAmount(tester, '100');
+      await tester.tap(find.byKey(const Key('save-movement')));
+      await tester.pump();
+      await tester.pump(Duration.zero);
 
-    final button = tester.widget<FilledButton>(find.byKey(const Key('save-movement')));
-    expect(button.onPressed, isNull);
-    await tester.tap(find.byKey(const Key('save-movement')));
-    await tester.pump();
-    expect(fake.mutationRequestIds, hasLength(1));
+      final button = tester.widget<FilledButton>(
+        find.byKey(const Key('save-movement')),
+      );
+      expect(button.onPressed, isNull);
+      await tester.tap(find.byKey(const Key('save-movement')));
+      await tester.pump();
+      expect(fake.mutationRequestIds, hasLength(1));
 
-    gate.complete();
-    fake.pauseMutations = null;
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-    expect(fake.mutationRequestIds, hasLength(1));
-    // The ledger fetches its older page by itself; let it finish.
-    await tester.pump(const Duration(seconds: 1));
-  });
+      gate.complete();
+      fake.pauseMutations = null;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(fake.mutationRequestIds, hasLength(1));
+      // The ledger fetches its older page by itself; let it finish.
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
 
   testWidgets('amount fields explain the minor-unit format', (tester) async {
     await pumpFakeApp(tester, size: const Size(800, 1800));
@@ -178,7 +189,12 @@ void main() {
 
 Future<void> enterAmount(WidgetTester tester, String value) async {
   await tester.enterText(
-    find.descendant(of: find.byKey(const Key('movement-amount')), matching: find.byType(TextField)).hitTestable(),
+    find
+        .descendant(
+          of: find.byKey(const Key('movement-amount')),
+          matching: find.byType(TextField),
+        )
+        .hitTestable(),
     value,
   );
   await tester.pump();

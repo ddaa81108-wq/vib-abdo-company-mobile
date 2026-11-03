@@ -11,6 +11,12 @@ import '../../ui/widgets/common.dart';
 /// is not accepted here.
 const zeroReviewRecordAction = 'zero-review';
 
+/// Customers and companies use the same debt-card design (the website's
+/// `customers || companies` branch in DebtAccountsView). Layout only: each
+/// section keeps its own server data, labels and rules.
+bool isDebtLookSection(AccountSection section) =>
+    section == AccountSection.customers || section == AccountSection.companies;
+
 /// Which summary integer, if any, is printed on a filter chip.
 enum AccountFilterCount { activeCards, pendingReview }
 

@@ -19,6 +19,7 @@ import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
 import 'account_list_logic.dart';
 import 'account_name_suggestions.dart';
+import 'company_card_tone.dart';
 import 'customer_card_tone.dart';
 
 /// Customers, companies, Libyan deposits, and Egyptian deposits share this
@@ -71,23 +72,24 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       width,
       textScale: MediaQuery.textScalerOf(context).scale(1),
     );
-    // Customers: two equal cards per row on every phone (Ali, 2026-11-02).
-    final columns = section == AccountSection.customers && gridColumns < 2
-        ? 2
-        : gridColumns;
-
+    // Customers and companies share the debt-card design (the website's
+    // `customers || companies` layout): two equal cards per row on every
+    // phone (Ali, 2026-11-02; companies 2026-11-03). Each keeps its own data.
     final isCustomers = section == AccountSection.customers;
+    final debtLook = isDebtLookSection(section);
+    final columns = debtLook && gridColumns < 2 ? 2 : gridColumns;
+
     final Widget searchField = TextField(
       key: const Key('account-search'),
       controller: _search,
       textInputAction: TextInputAction.search,
-      // Customers: fills the toolbar height like the two buttons.
-      expands: isCustomers,
-      maxLines: isCustomers ? null : 1,
-      textAlignVertical: isCustomers ? TextAlignVertical.center : null,
+      // Fills the toolbar height like the two buttons.
+      expands: debtLook,
+      maxLines: debtLook ? null : 1,
+      textAlignVertical: debtLook ? TextAlignVertical.center : null,
       decoration: InputDecoration(
-        labelText: isCustomers ? null : AppStrings.filterSearch,
-        hintText: isCustomers ? AppStrings.filterSearch : null,
+        labelText: debtLook ? null : AppStrings.filterSearch,
+        hintText: debtLook ? AppStrings.filterSearch : null,
         hintMaxLines: 1,
         isDense: false,
         prefixIcon: const Icon(Icons.search),
@@ -167,8 +169,8 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: pagePadding(width),
             children: [
-              // Customers: no page title (Ali, 2026-11-02).
-              if (!isCustomers) ...[
+              // Customers and companies: no page title (Ali, 2026-11-02).
+              if (!debtLook) ...[
                 ScreenTitle(sectionLabel(section.sectionKey)),
                 const SizedBox(height: AppSpacing.md),
               ],
@@ -192,13 +194,16 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
               ),
               if (section == AccountSection.egyptianDeposits) const _RateCard(),
               const SizedBox(height: AppSpacing.md),
-              // Customers: no filter chips (Ali, 2026-11-02).
-              if (!isCustomers) ...[
+              // Customers and companies: no filter chips (Ali, 2026-11-02).
+              if (!debtLook) ...[
                 _Tabs(section: section, summary: data.summary),
                 const SizedBox(height: AppSpacing.md),
               ],
-              if (isCustomers)
+              if (debtLook)
                 _CustomersToolbar(
+                  toolbarKey: Key(
+                    isCustomers ? 'customers-toolbar' : 'companies-toolbar',
+                  ),
                   add: addButton,
                   search: searchField,
                   assign: assignButton,
@@ -242,7 +247,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                   child: NotificationListener<ScrollNotification>(
                     onNotification: (notification) =>
                         _onCardsScroll(notification, data.page.nextCursor),
-                    child: isCustomers
+                    child: debtLook
                         ? ListView.builder(
                             key: const Key('account-cards-list'),
                             itemCount: (cards.length + 1) ~/ 2,
@@ -347,7 +352,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             for (final card in cards)
               SizedBox(
                 width: cardWidth,
-                height: section == AccountSection.customers
+                height: isDebtLookSection(section)
                     ? customerCardHeight(context)
                     : null,
                 child: _accountCard(
@@ -396,7 +401,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   double _cardWidth(double maxWidth, int columns) {
     if (columns <= 1 || maxWidth <= 0) return maxWidth;
     final raw = (maxWidth - AppSpacing.md * (columns - 1)) / columns;
-    final min = section == AccountSection.customers ? 120.0 : 160.0;
+    final min = isDebtLookSection(section) ? 120.0 : 160.0;
     if (raw < min) return maxWidth;
     return raw.clamp(min, maxWidth);
   }
@@ -660,8 +665,10 @@ class _SummaryStrip extends StatelessWidget {
     final theme = Theme.of(context);
     // Customers show only the server totalDebt, as the headline (Ali,
     // 2026-11-02). Other sections keep net and total.
-    if (section == AccountSection.customers) {
-      // Right: server netBalance (total debts minus credits). Left: server
+    if (isDebtLookSection(section)) {
+      final isCustomers = section == AccountSection.customers;
+      final prefix = isCustomers ? 'customers' : 'companies';
+      // Right: this section's own server netBalance (total debts minus credits). Left: server
       // activeCards. No client arithmetic (Ali, 2026-11-02).
       final count = summary.activeCards;
       // Glossy headline in both themes (Ali, 2026-11-03): vivid gradient,
@@ -677,7 +684,7 @@ class _SummaryStrip extends StatelessWidget {
       );
       final radius = BorderRadius.circular(AppRadii.xxl);
       return DecoratedBox(
-        key: const Key('customers-summary'),
+        key: Key('$prefix-summary'),
         decoration: gloss
             .decoration(radius)
             .copyWith(boxShadow: gloss.glowShadow),
@@ -696,7 +703,12 @@ class _SummaryStrip extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(AppStrings.customersTotalDebt, style: label),
+                        Text(
+                          isCustomers
+                              ? AppStrings.customersTotalDebt
+                              : AppStrings.netDebt,
+                          style: label,
+                        ),
                         const SizedBox(height: AppSpacing.xs),
                         FittedBox(
                           fit: BoxFit.scaleDown,
@@ -706,7 +718,7 @@ class _SummaryStrip extends StatelessWidget {
                               summary.netBalanceUnits,
                               currency,
                             ),
-                            key: const Key('customers-summary-amount'),
+                            key: Key('$prefix-summary-amount'),
                             style: figure.copyWith(color: look.heroFigure),
                           ),
                         ),
@@ -724,14 +736,16 @@ class _SummaryStrip extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            AppStrings.activeCardsCount,
+                            isCustomers
+                                ? AppStrings.activeCardsCount
+                                : AppStrings.companiesActiveCards,
                             textAlign: TextAlign.end,
                             style: label,
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
                             count == null ? AppStrings.dash : '$count',
-                            key: const Key('customers-summary-count'),
+                            key: Key('$prefix-summary-count'),
                             textDirection: TextDirection.ltr,
                             style: figure,
                           ),
@@ -844,11 +858,13 @@ class _AccountCard extends StatelessWidget {
     required bool showAssign,
     required bool showZero,
   }) {
-    final word = switch (customerBalanceKind(card.balanceUnits)) {
-      CustomerBalanceKind.debt => AppStrings.customerDebtWord,
-      CustomerBalanceKind.credit => AppStrings.customerCreditWord,
-      _ => null,
-    };
+    final word = section == AccountSection.companies
+        ? companyCardWord(card)
+        : switch (customerBalanceKind(card.balanceUnits)) {
+            CustomerBalanceKind.debt => AppStrings.customerDebtWord,
+            CustomerBalanceKind.credit => AppStrings.customerCreditWord,
+            _ => null,
+          };
     final body = Padding(
       padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
       child: Column(
@@ -887,7 +903,12 @@ class _AccountCard extends StatelessWidget {
                   if (word != null)
                     Text(
                       word,
-                      key: Key('account-kind-${card.id}'),
+                      // Companies: the age label, like the website card.
+                      key: Key(
+                        section == AccountSection.companies
+                            ? 'account-age-${card.id}'
+                            : 'account-kind-${card.id}',
+                      ),
                       style: cairo(12, 800, color: tone.amount),
                     ),
                   Align(
@@ -995,9 +1016,17 @@ class _AccountCard extends StatelessWidget {
     final showActions = showAssign || showPin || showZero;
     // Customers: debt / credit / zero tone from the balance sign (Ali,
     // 2026-11-02) instead of the age gradient.
-    final tone = section == AccountSection.customers
-        ? customerTone(context, customerBalanceKind(card.balanceUnits))
-        : null;
+    final tone = switch (section) {
+      AccountSection.customers => customerTone(
+        context,
+        customerBalanceKind(card.balanceUnits),
+      ),
+      // Companies: their own state and the website's age colours.
+      AccountSection.companies => _companyTone(
+        companyCardGloss(context, companyCardState(card)),
+      ),
+      _ => null,
+    };
     final look = context.look;
     // Glossy finish (Ali, 2026-11-03): customers use their tone; a coloured
     // age card keeps its gradient with a sheen and glow; a plain card uses
@@ -1055,7 +1084,7 @@ class _AccountCard extends StatelessWidget {
             child: GlossSheen(
               gloss: gloss,
               radius: radius,
-              child: section == AccountSection.customers
+              child: isDebtLookSection(section)
                   ? _customerBody(
                       context,
                       tone: tone!,
@@ -1176,6 +1205,14 @@ class _AccountCard extends StatelessWidget {
   }
 }
 
+CustomerTone _companyTone(Gloss gloss) => CustomerTone(
+  background: gloss.bottom,
+  border: gloss.border,
+  ink: gloss.ink,
+  amount: gloss.amount,
+  gloss: gloss,
+);
+
 /// One height for every customer card, grown with the text scale.
 double customerCardHeight(BuildContext context) {
   final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
@@ -1186,11 +1223,13 @@ double customerCardHeight(BuildContext context) {
 /// Very narrow or large-text screens put the buttons above the search.
 class _CustomersToolbar extends StatelessWidget {
   const _CustomersToolbar({
+    required this.toolbarKey,
     required this.add,
     required this.search,
     required this.assign,
   });
 
+  final Key toolbarKey;
   final Widget add;
   final Widget search;
   final Widget assign;
@@ -1247,7 +1286,7 @@ class _CustomersToolbar extends StatelessWidget {
     return Theme(
       data: themed,
       child: LayoutBuilder(
-        key: const Key('customers-toolbar'),
+        key: toolbarKey,
         builder: (context, constraints) {
           if (constraints.maxWidth / scale >= 330) {
             return Row(

@@ -67,11 +67,20 @@ void main() {
     await pumpFakeApp(tester, size: const Size(390, 2400));
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
 
-    expect(find.byKey(HomeShell.sectionKey(SectionKey.customers)), findsNothing);
-    expect(find.byKey(HomeShell.sectionKey(SectionKey.collections)), findsOneWidget);
+    expect(
+      find.byKey(HomeShell.sectionKey(SectionKey.customers)),
+      findsNothing,
+    );
+    expect(
+      find.byKey(HomeShell.sectionKey(SectionKey.collections)),
+      findsOneWidget,
+    );
     expect(find.byKey(HomeShell.sectionKey(SectionKey.treasury)), findsNothing);
     expect(find.byKey(HomeShell.sectionKey(SectionKey.reports)), findsNothing);
-    expect(find.byKey(HomeShell.sectionKey(SectionKey.companies)), findsNothing);
+    expect(
+      find.byKey(HomeShell.sectionKey(SectionKey.companies)),
+      findsNothing,
+    );
 
     await go(tester, '/collections');
     expect(find.text(AppStrings.employeeTotals), findsNothing);

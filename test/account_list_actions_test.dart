@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/accounts/account_list_logic.dart';
@@ -152,7 +153,9 @@ void main() {
     fake.accountNextItems = [
       {'id': 'c_extra', 'name': 'صفحة ثانية', 'balanceUnits': 10, 'version': 1},
     ];
-    await go(tester, '/companies');
+    // Companies have no filter chips now (Ali, 2026-11-03); a section
+    // that still shows them.
+    await go(tester, '/libyan-deposits');
 
     expect(find.text('صفحة ثانية'), findsNothing);
     await tester.ensureVisible(find.text(AppStrings.loadMore));
@@ -180,7 +183,9 @@ void main() {
     fake.accountNextItems = [
       {'id': 'c_late', 'name': 'صفحة متأخرة', 'balanceUnits': 10, 'version': 1},
     ];
-    await go(tester, '/companies');
+    // Companies have no filter chips now (Ali, 2026-11-03); a section
+    // that still shows them.
+    await go(tester, '/libyan-deposits');
     final gate = Completer<void>();
     fake.pauseAccountLists = gate;
 
@@ -229,10 +234,12 @@ void main() {
       await tester.enterText(find.byKey(const Key('account-search')), 'عميل');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await settle(tester);
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('account-filter-pinned')),
-      );
-      await tester.tap(find.byKey(const ValueKey('account-filter-pinned')));
+      // Companies have no filter chips (Ali, 2026-11-03); the filter
+      // provider is still the one the list reads.
+      ProviderScope.containerOf(tester.element(find.byKey(HomeShell.shellKey)))
+              .read(accountFilterProvider(AccountSection.companies).notifier)
+              .state =
+          'pinned';
       await settle(tester);
 
       // Ten cards make the phone list taller than the viewport, so opening

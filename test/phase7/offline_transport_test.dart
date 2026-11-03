@@ -33,7 +33,10 @@ void main() {
       await _pumpList(tester, layer, connectivity);
 
       expect(find.text('زبون القراءة'), findsWidgets);
-      await tester.enterText(find.byKey(const Key('account-search')), 'مسودة بحث');
+      await tester.enterText(
+        find.byKey(const Key('account-search')),
+        'مسودة بحث',
+      );
       await tester.pump();
 
       final seen = transport.calls.length;
@@ -77,7 +80,10 @@ void main() {
 
       await tester.tap(find.byKey(const Key('add-account')));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const Key('create-name')), 'مسودة زبون');
+      await tester.enterText(
+        find.byKey(const Key('create-name')),
+        'مسودة زبون',
+      );
       await tester.pump();
 
       final hold = Completer<void>();
@@ -99,7 +105,8 @@ void main() {
       expect(find.textContaining('DioException'), findsNothing);
       final posts = transport.calls.where(
         (call) =>
-            call.method == 'POST' && call.path == ApiEndpoints.accounts('customers'),
+            call.method == 'POST' &&
+            call.path == ApiEndpoints.accounts('customers'),
       );
       expect(posts, hasLength(1));
       expect(find.text('زبون القراءة'), findsWidgets);

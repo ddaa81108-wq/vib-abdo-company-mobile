@@ -162,7 +162,8 @@ void main() {
       path: '/companies',
       add: true,
       assign: true,
-      pin: true,
+      // Companies use the customers' card design (Ali, 2026-11-03).
+      pin: false,
       zero: false,
       rate: false,
     );
@@ -237,7 +238,7 @@ void main() {
     final link = ToggleConnectivity(true);
     await pumpFakeApp(tester, size: const Size(800, 2200), connectivity: link);
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/companies');
+    await go(tester, '/libyan-deposits');
     link.setOnline(false);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
@@ -290,10 +291,10 @@ void main() {
             find.byKey(const Key('account-card-c_55')),
             list,
           );
-          if (path != '/customers') {
+          if (path != '/customers' && path != '/companies') {
             await _reveal(tester, find.byKey(const Key('pin-c_55')), list);
           }
-          if (path == '/customers') {
+          if (path == '/customers' || path == '/companies') {
             await _reveal(tester, find.byKey(const Key('assign-mode')), list);
           }
           if (path == '/egyptian-deposits') {

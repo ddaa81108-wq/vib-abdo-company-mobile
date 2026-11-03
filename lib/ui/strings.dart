@@ -80,6 +80,10 @@ abstract final class AppStrings {
   static const netDebt = 'صافي إجمالي الديون';
   static const totalDebt = 'إجمالي الديون';
   static const customersTotalDebt = 'إجمالي ديون العملاء';
+
+  /// Website company summary labels (DebtAccountsView, debt-total-card and
+  /// active-cards-card).
+  static const companiesActiveCards = 'عدد الكروت النشطة';
   static const activeCardsCount = 'البطاقات النشطة';
   static const customerDebtWord = 'دين';
   static const customerCreditWord = 'أمانة';

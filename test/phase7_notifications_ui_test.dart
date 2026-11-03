@@ -299,12 +299,7 @@ class _ObservingGateway implements ApiClient {
     _note(method, path, body);
     return switch (method) {
       'GET' => _inner.get(path, query: query, options: options),
-      'POST' => _inner.post(
-        path,
-        body: body,
-        query: query,
-        options: options,
-      ),
+      'POST' => _inner.post(path, body: body, query: query, options: options),
       'PUT' => _inner.put(path, body: body, options: options),
       'PATCH' => _inner.patch(path, body: body, options: options),
       _ => _inner.delete(path, body: body, options: options),

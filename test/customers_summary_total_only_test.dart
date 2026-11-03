@@ -64,12 +64,48 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('companies keep net, total, title and filters', (tester) async {
+  testWidgets('companies: same design, their own summary and labels', (
+    tester,
+  ) async {
     await pumpFakeApp(tester, size: const Size(430, 1400));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/companies');
     expect(find.byKey(const Key('customers-summary')), findsNothing);
-    expect(find.text(AppStrings.netDebt), findsOneWidget);
-    expect(find.byKey(const ValueKey('account-filter-all')), findsOneWidget);
+    final card = find.byKey(const Key('companies-summary'));
+    expect(card, findsOneWidget);
+    // Website labels for companies (DebtAccountsView).
+    expect(
+      find.descendant(of: card, matching: find.text(AppStrings.netDebt)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: card,
+        matching: find.text(AppStrings.companiesActiveCards),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text(AppStrings.customersTotalDebt), findsNothing);
+    expect(find.byKey(const ValueKey('account-filter-all')), findsNothing);
+    expect(find.byKey(const Key('companies-toolbar')), findsOneWidget);
+    final add = tester.getCenter(find.byKey(const Key('add-account')));
+    final search = tester.getCenter(find.byKey(const Key('account-search')));
+    final assign = tester.getCenter(find.byKey(const Key('assign-mode')));
+    expect(add.dx, greaterThan(search.dx));
+    expect(search.dx, greaterThan(assign.dx));
+    final cards = find.byWidgetPredicate(
+      (w) =>
+          w.key is ValueKey<String> &&
+          (w.key! as ValueKey<String>).value.startsWith('account-card-'),
+    );
+    final rects = [
+      for (final e in cards.evaluate()) tester.getRect(find.byWidget(e.widget)),
+    ];
+    expect(rects.length, greaterThan(2));
+    expect(rects.map((r) => r.height.round()).toSet(), hasLength(1));
+    expect(rects[0].top, rects[1].top);
+    // No customers-only ✓ zero review on a company card.
+    expect(find.byKey(const ValueKey('zero-review-c_co_04')), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 }
