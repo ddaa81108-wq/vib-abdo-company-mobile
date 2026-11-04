@@ -557,10 +557,10 @@ Future<void> reveal(WidgetTester tester, Finder finder, Key screen) {
   return tester.scrollUntilVisible(
     finder,
     400,
-    scrollable: find.descendant(
-      of: find.byKey(screen),
-      matching: find.byType(Scrollable),
-    ),
+    // The page's own scroll (the cash grid has inner scrolls too).
+    scrollable: find
+        .descendant(of: find.byKey(screen), matching: find.byType(Scrollable))
+        .first,
   );
 }
 

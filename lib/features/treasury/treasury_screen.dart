@@ -52,13 +52,6 @@ class TreasuryScreen extends ConsumerWidget {
               ),
             ],
           ),
-          if (canWrite) ...[
-            const SizedBox(height: AppSpacing.sm),
-            _WriteActions(
-              online: online,
-              onEntry: (direction) => _entry(context, ref, direction),
-            ),
-          ],
           const SizedBox(height: AppSpacing.md),
           KeptData<TreasurySummaryDto>(
             value: summary,
@@ -75,11 +68,6 @@ class TreasuryScreen extends ConsumerWidget {
             builder: (data) => _Cards(data: data, money: money),
           ),
           const SizedBox(height: AppSpacing.lg),
-          const Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: PillTitle(AppStrings.cashMovements),
-          ),
-          const SizedBox(height: AppSpacing.sm),
           KeptData<Paged<CashEntryDto>>(
             value: ledger,
             resetKey: 'cash',
@@ -89,8 +77,17 @@ class TreasuryScreen extends ConsumerWidget {
             failureOf: (error) =>
                 ref.read(errorHandlerProvider).toFailure(error),
             loading: const SkeletonBox(height: 80),
-            builder: (page) =>
-                _Movements(page: page, money: money, online: online),
+            builder: (page) => _Movements(
+              page: page,
+              money: money,
+              online: online,
+              actions: canWrite
+                  ? _WriteActions(
+                      online: online,
+                      onEntry: (direction) => _entry(context, ref, direction),
+                    )
+                  : null,
+            ),
           ),
         ],
       ),
@@ -110,6 +107,7 @@ class TreasuryScreen extends ConsumerWidget {
   }
 }
 
+/// Compact دخول (green) / خروج (red) buttons in the ledger's header bar.
 class _WriteActions extends StatelessWidget {
   const _WriteActions({required this.online, required this.onEntry});
 
@@ -118,37 +116,57 @@ class _WriteActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth;
-        return Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          children: [
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth),
-              child: GatedButton(
-                buttonKey: const Key('cash-in'),
-                allowed: true,
-                online: online,
-                label: AppStrings.cashIn,
-                onPressed: () => onEntry(CashDirection.cashIn),
-              ),
-            ),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth),
-              child: GatedButton(
-                buttonKey: const Key('cash-out'),
-                allowed: true,
-                online: online,
-                destructive: true,
-                label: AppStrings.cashOut,
-                onPressed: () => onEntry(CashDirection.cashOut),
-              ),
-            ),
-          ],
-        );
-      },
+    final colors = context.statusColors;
+    ButtonStyle style(Color fill) => FilledButton.styleFrom(
+      backgroundColor: fill,
+      foregroundColor: Colors.white,
+      minimumSize: const Size(0, 34),
+      padding: const EdgeInsetsDirectional.symmetric(horizontal: 12),
+      visualDensity: VisualDensity.compact,
+      textStyle: cairo(12.5, 800),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+    );
+    Widget button(
+      Key key,
+      String label,
+      IconData icon,
+      Color fill,
+      CashDirection direction, {
+      bool destructive = false,
+    }) => Theme(
+      data: Theme.of(
+        context,
+      ).copyWith(filledButtonTheme: FilledButtonThemeData(style: style(fill))),
+      child: GatedButton(
+        buttonKey: key,
+        allowed: true,
+        online: online,
+        destructive: destructive,
+        label: label,
+        leading: icon,
+        onPressed: () => onEntry(direction),
+      ),
+    );
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.xs,
+      children: [
+        button(
+          const Key('cash-in'),
+          AppStrings.cashIn,
+          Icons.download_rounded,
+          colors.cashPositive,
+          CashDirection.cashIn,
+        ),
+        button(
+          const Key('cash-out'),
+          AppStrings.cashOut,
+          Icons.upload_rounded,
+          colors.cashNegative,
+          CashDirection.cashOut,
+          destructive: true,
+        ),
+      ],
     );
   }
 }
@@ -468,57 +486,42 @@ class _Egyptian extends StatelessWidget {
   }
 }
 
-class _Movements extends StatelessWidget {
+/// سجل الفلوس النشطة, as on the website: a header bar with the title and
+/// the دخول / خروج buttons, then a grid with pinned column names, oldest
+/// row at the top, opening at the newest (bottom). Rows are tinted by
+/// direction. الرصيد is the server's balanceAfterUnits; nothing is computed.
+class _Movements extends ConsumerStatefulWidget {
   const _Movements({
     required this.page,
     required this.money,
     required this.online,
+    this.actions,
   });
 
   final Paged<CashEntryDto> page;
   final MoneyFormatter money;
   final bool online;
+  final Widget? actions;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: const Key('treasury-movements'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (page.items.isEmpty)
-          const EmptyPane(
-            key: Key('treasury-empty'),
-            message: AppStrings.emptyLedger,
-          ),
-        for (final entry in page.items) _CashRow(entry: entry, money: money),
-        if (page.nextCursor != null)
-          _LoadOlderCash(
-            cursor: page.nextCursor!,
-            seed: page.items,
-            online: online,
-          ),
-      ],
-    );
-  }
+  ConsumerState<_Movements> createState() => _MovementsState();
 }
 
-class _LoadOlderCash extends ConsumerStatefulWidget {
-  const _LoadOlderCash({
-    required this.cursor,
-    required this.seed,
-    required this.online,
-  });
-
-  final String cursor;
-  final List<CashEntryDto> seed;
-  final bool online;
-
-  @override
-  ConsumerState<_LoadOlderCash> createState() => _LoadOlderCashState();
+class _CashColumns {
+  static const seq = 56.0;
+  static const when = 132.0;
+  static const move = 72.0;
+  static const value = 104.0;
+  static const note = 132.0;
+  static const by = 96.0;
+  static const balance = 112.0;
+  static const all = [seq, when, move, value, note, by, balance];
+  static double get width => all.fold(0.0, (a, b) => a + b);
 }
 
-class _LoadOlderCashState extends ConsumerState<_LoadOlderCash> {
+class _MovementsState extends ConsumerState<_Movements> {
   final _extra = <CashEntryDto>[];
+  final _sideways = ScrollController();
   String? _cursor;
   String? _error;
   var _busy = false;
@@ -526,16 +529,22 @@ class _LoadOlderCashState extends ConsumerState<_LoadOlderCash> {
   @override
   void initState() {
     super.initState();
-    _cursor = widget.cursor;
+    _cursor = widget.page.nextCursor;
   }
 
   @override
-  void didUpdateWidget(covariant _LoadOlderCash oldWidget) {
+  void dispose() {
+    _sideways.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _Movements oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.cursor != widget.cursor ||
-        !_sameSeed(oldWidget.seed, widget.seed)) {
+    if (oldWidget.page.nextCursor != widget.page.nextCursor ||
+        !_sameSeed(oldWidget.page.items, widget.page.items)) {
       _extra.clear();
-      _cursor = widget.cursor;
+      _cursor = widget.page.nextCursor;
       _error = null;
       _busy = false;
     }
@@ -555,7 +564,7 @@ class _LoadOlderCashState extends ConsumerState<_LoadOlderCash> {
           .cashLedger(before: cursor);
       if (!mounted) return;
       final seen = {
-        ...widget.seed.map((entry) => entry.id),
+        ...widget.page.items.map((entry) => entry.id),
         ..._extra.map((e) => e.id),
       };
       setState(() {
@@ -576,42 +585,146 @@ class _LoadOlderCashState extends ConsumerState<_LoadOlderCash> {
 
   @override
   Widget build(BuildContext context) {
-    final money = ref.watch(apiLayerProvider).money;
+    final look = context.look;
     final scheme = Theme.of(context).colorScheme;
+    // Server order is newest first; the grid shows oldest at the top.
+    final newestFirst = [...widget.page.items, ..._extra];
+    final complete = _cursor == null;
+    final total = newestFirst.length;
     final canTap = widget.online && !_busy;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final entry in _extra) _CashRow(entry: entry, money: money),
-        if (_error != null)
-          Padding(
-            padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-            child: Text(
-              _error!,
-              key: const Key('load-older-error'),
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: scheme.error),
-            ),
-          ),
-        if (_cursor != null)
-          SizedBox(
-            width: double.infinity,
-            child: TextButton(
-              key: const Key('load-older'),
-              onPressed: canTap ? _load : null,
-              child: _busy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(
-                      _error == null ? AppStrings.loadOlder : AppStrings.retry,
-                      textAlign: TextAlign.center,
+    final screen = MediaQuery.sizeOf(context);
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
+    final rowHeight = 52.0 * scale;
+    final bodyMax = (screen.height * 0.62).clamp(280.0, 900.0);
+    final body = (total * rowHeight + (complete ? 0 : 56)).clamp(
+      rowHeight,
+      bodyMax,
+    );
+    final header = Container(
+      decoration: BoxDecoration(
+        gradient: sectionStripGradient,
+        border: Border(bottom: BorderSide(color: sectionGold(context))),
+      ),
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: [const PillTitle(AppStrings.cashMovements), ?widget.actions],
+      ),
+    );
+    return Container(
+      key: const Key('treasury-movements'),
+      decoration: BoxDecoration(
+        color: look.card,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: sectionGold(context).withValues(alpha: 0.7)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          header,
+          if (newestFirst.isEmpty)
+            const Padding(
+              padding: EdgeInsetsDirectional.all(AppSpacing.md),
+              child: EmptyPane(
+                key: Key('treasury-empty'),
+                message: AppStrings.emptyLedger,
+              ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final viewport = constraints.maxWidth;
+                final stretch = viewport > _CashColumns.width
+                    ? viewport / _CashColumns.width
+                    : 1.0;
+                final widths = [for (final w in _CashColumns.all) w * stretch];
+                return Scrollbar(
+                  controller: _sideways,
+                  child: SingleChildScrollView(
+                    key: const Key('treasury-columns-scroll'),
+                    controller: _sideways,
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: _CashColumns.width * stretch,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _CashHeader(widths: widths),
+                          SizedBox(
+                            height: body,
+                            child: ListView(
+                              key: const Key('treasury-rows'),
+                              reverse: true,
+                              padding: EdgeInsets.zero,
+                              children: [
+                                for (var i = 0; i < total; i++)
+                                  _CashRow(
+                                    entry: newestFirst[i],
+                                    money: widget.money,
+                                    widths: widths,
+                                    height: rowHeight,
+                                    // A running number only once the whole
+                                    // history is here (row 1 = first).
+                                    sequence: complete ? '${total - i}' : null,
+                                  ),
+                                if (_cursor != null)
+                                  SizedBox(
+                                    height: 56,
+                                    child: Align(
+                                      alignment:
+                                          AlignmentDirectional.centerStart,
+                                      child: SizedBox(
+                                        width: viewport,
+                                        child: TextButton(
+                                          key: const Key('load-older'),
+                                          onPressed: canTap ? _load : null,
+                                          child: _busy
+                                              ? const SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                      ),
+                                                )
+                                              : Text(
+                                                  _error == null
+                                                      ? AppStrings.loadOlder
+                                                      : AppStrings.retry,
+                                                ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
+                );
+              },
             ),
-          ),
-      ],
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsetsDirectional.all(AppSpacing.sm),
+              child: Text(
+                _error!,
+                key: const Key('load-older-error'),
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: scheme.error),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -624,16 +737,78 @@ bool _sameSeed(List<CashEntryDto> a, List<CashEntryDto> b) {
   return true;
 }
 
-class _CashRow extends StatelessWidget {
-  const _CashRow({required this.entry, required this.money});
+Color _gridLine(BuildContext context) =>
+    sectionGold(context).withValues(alpha: 0.35);
 
-  final CashEntryDto entry;
-  final MoneyFormatter money;
+class _CashHeader extends StatelessWidget {
+  const _CashHeader({required this.widths});
+
+  final List<double> widths;
+
+  static const labels = [
+    AppStrings.ledgerColSeq,
+    AppStrings.cashColWhen,
+    AppStrings.cashColMove,
+    AppStrings.ledgerColValue,
+    AppStrings.ledgerColNote,
+    AppStrings.ledgerColBy,
+    AppStrings.ledgerColBalance,
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('treasury-sticky-header'),
+      decoration: const BoxDecoration(gradient: sectionStripGradient),
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++)
+            Container(
+              width: widths[i],
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                border: BorderDirectional(
+                  end: i == labels.length - 1
+                      ? BorderSide.none
+                      : BorderSide(color: _gridLine(context)),
+                ),
+              ),
+              padding: const EdgeInsetsDirectional.symmetric(horizontal: 4),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  labels[i],
+                  style: cairo(12, 800, color: sectionStripInk),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CashRow extends StatelessWidget {
+  const _CashRow({
+    required this.entry,
+    required this.money,
+    required this.widths,
+    required this.height,
+    this.sequence,
+  });
+
+  final CashEntryDto entry;
+  final MoneyFormatter money;
+  final List<double> widths;
+  final double height;
+  final String? sequence;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
     final colors = context.statusColors;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final incoming = entry.direction == 'in';
     final outgoing = entry.direction == 'out';
     final label = incoming
@@ -645,63 +820,95 @@ class _CashRow extends StatelessWidget {
         ? colors.cashPositiveText
         : outgoing
         ? colors.cashNegative
-        : scheme.onSurfaceVariant;
-    final theme = Theme.of(context);
-    return Card(
-      key: Key('cash-entry-${entry.id}'),
-      margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-      color: context.look.card,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.xl),
-        side: BorderSide(color: color.withValues(alpha: 0.55), width: 1.2),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        : look.muted;
+    final tint = (incoming ? colors.cashPositive : color).withValues(
+      alpha: dark ? 0.24 : 0.13,
+    );
+    final ink = cairo(12.5, 700, color: look.ink);
+    final small = cairo(10.5, 600, color: look.muted);
+    final date = entry.createdAt?.toLocal();
+    Widget fit(Widget child) => FittedBox(fit: BoxFit.scaleDown, child: child);
+    final cells = <Widget>[
+      fit(Text(sequence ?? AppStrings.dash, style: ink)),
+      fit(
+        Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  incoming ? Icons.arrow_downward : Icons.arrow_upward,
-                  color: color,
-                  textDirection: TextDirection.ltr,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(label, style: theme.textTheme.titleSmall),
-                      Text(entry.description ?? AppStrings.dash),
-                      Text(
-                        '${AppStrings.byActor} ${entry.createdByName ?? AppStrings.dash}',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                      LtrText(
-                        formatIsoDate(entry.createdAt),
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            LabeledMoney(
-              label: AppStrings.amount,
-              value: money.formatOrDash(entry.amountUnits, Currency.lyd),
-              valueStyle: context.textExtras.amount.copyWith(color: color),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            LabeledMoney(
-              label: AppStrings.balanceAfter,
-              value: money.formatOrDash(entry.balanceAfterUnits, Currency.lyd),
-            ),
+            if (date != null)
+              Text(AppStrings.weekdays[date.weekday - 1], style: small),
+            fit(LtrText(formatIsoDate(entry.createdAt), style: ink)),
+            if (date != null) LtrText(_clock(date), style: small),
           ],
         ),
       ),
+      fit(Text(label, style: cairo(12.5, 800, color: color))),
+      fit(
+        MoneyText(
+          money.formatOrDash(entry.amountUnits, Currency.lyd),
+          style: context.textExtras.amount.copyWith(color: color, fontSize: 13),
+        ),
+      ),
+      fit(
+        Text(
+          entry.description ?? AppStrings.dash,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: ink,
+        ),
+      ),
+      fit(
+        Text(
+          entry.createdByName ?? AppStrings.dash,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: small,
+        ),
+      ),
+      fit(
+        MoneyText(
+          money.formatOrDash(entry.balanceAfterUnits, Currency.lyd),
+          style: context.textExtras.amount.copyWith(
+            color: look.ink,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    ];
+    return Container(
+      key: Key('cash-entry-${entry.id}'),
+      height: height,
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(tint, look.card),
+        border: Border(bottom: BorderSide(color: _gridLine(context))),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < cells.length; i++)
+            Container(
+              width: widths[i],
+              alignment: Alignment.center,
+              padding: const EdgeInsetsDirectional.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                border: BorderDirectional(
+                  end: i == cells.length - 1
+                      ? BorderSide.none
+                      : BorderSide(color: _gridLine(context)),
+                ),
+              ),
+              child: cells[i],
+            ),
+        ],
+      ),
     );
   }
+}
+
+String _clock(DateTime value) {
+  final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
+  final minute = value.minute.toString().padLeft(2, '0');
+  final second = value.second.toString().padLeft(2, '0');
+  final half = value.hour < 12 ? 'ص' : 'م';
+  return '$hour:$minute:$second $half';
 }

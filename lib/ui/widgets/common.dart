@@ -328,11 +328,15 @@ class GatedButton extends StatelessWidget {
     this.destructive = false,
     this.filled = true,
     this.glyph,
+    this.leading,
   });
 
   /// Shown instead of the label text (the label stays as the tooltip and
   /// screen-reader name): actions as symbols (Ali, 2026-11-04).
   final IconData? glyph;
+
+  /// An icon before the label text (the label stays visible).
+  final IconData? leading;
 
   final bool allowed;
   final String label;
@@ -357,6 +361,15 @@ class GatedButton extends StatelessWidget {
         ? Tooltip(
             message: label,
             child: Icon(glyph, semanticLabel: label),
+          )
+        : leading != null
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(leading, size: 18),
+              const SizedBox(width: 6),
+              Flexible(child: Text(label)),
+            ],
           )
         : Text(label);
     if (!filled) {

@@ -176,6 +176,8 @@ abstract final class AppStrings {
 
   // Ledger table columns, the website's labels (Ali, 2026-11-03).
   static const ledgerColSeq = 'التسلسل';
+  static const cashColMove = 'الحركة';
+  static const cashColWhen = 'التاريخ';
   static const ledgerColBy = 'بواسطة';
   static const ledgerNewRow = 'جديد';
   static const ledgerClose = 'إغلاق';
