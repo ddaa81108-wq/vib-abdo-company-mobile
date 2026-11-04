@@ -6,6 +6,7 @@ import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
+import '../../ui/presentation.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
@@ -71,6 +72,7 @@ abstract final class _MText {
   static const noRows = 'لا توجد صفوف لهذا اليوم.';
   static const status = 'حالة اليوم';
   static const page = 'صفحة المصراوية';
+  static const addRow = 'إضافة صف';
   static const currentDayChip = 'يوم العمل الحالي';
   static const workDate = 'تاريخ العمل';
   static const result = 'الناتج';
@@ -169,14 +171,16 @@ class _DayView extends StatelessWidget {
           title: _MText.summary,
           note: _MText.summaryNote,
           trailing: canWrite
-              ? GatedButton(
-                  buttonKey: const Key('edit-masraweya'),
-                  allowed: true,
-                  online: online,
-                  label: AppStrings.save,
-                  glyph: Icons.edit_outlined,
-                  onPressed: () =>
-                      showAppForm<void>(context, _MasraweyaForm(day: data)),
+              ? _compact(
+                  GatedButton(
+                    buttonKey: const Key('edit-masraweya'),
+                    allowed: true,
+                    online: online,
+                    label: AppStrings.save,
+                    glyph: Icons.edit_outlined,
+                    onPressed: () =>
+                        showAppForm<void>(context, _MasraweyaForm(day: data)),
+                  ),
                 )
               : null,
           child: FigureBox(
@@ -231,7 +235,26 @@ class _DayView extends StatelessWidget {
         SectionCard(
           title: _MText.work,
           note: _MText.workNote,
+          // + صف: opens the day form with one more empty row; saved with the
+          // same PUT /api/masraweya/day entries list (Ali, 2026-11-04).
+          trailing: canWrite
+              ? _compact(
+                  GatedButton(
+                    buttonKey: const Key('masraweya-add-row'),
+                    allowed: true,
+                    online: online,
+                    label: _MText.addRow,
+                    glyph: Icons.add_rounded,
+                    onPressed: () => showAppForm<void>(
+                      context,
+                      _MasraweyaForm(day: data, addRow: true),
+                    ),
+                  ),
+                )
+              : null,
           child: GridTable(
+            numericFrom: 1,
+            footerFlex: const [10, 3],
             // الناتج: no per-row result from the server, so a dash (no
             // device arithmetic).
             headers: const [
@@ -262,21 +285,30 @@ class _DayView extends StatelessWidget {
             ],
             footer: [
               gridText(context, _MText.workToday, bold: true),
-              const SizedBox.shrink(),
-              const SizedBox.shrink(),
               gridMoney(context, _egp(data.workTotalUnits), bold: true),
             ],
           ),
         ),
-        SectionNote(
-          '${_MText.status}: ${data.status ?? AppStrings.dash}',
-          key: const Key('masraweya-status'),
-        ),
+        if (data.status != null && data.status!.isNotEmpty)
+          SectionNote(
+            '${_MText.status}: ${dayStatusLabel(data.status)}',
+            key: const Key('masraweya-status'),
+          ),
         const SizedBox(height: AppSpacing.md),
       ],
     );
   }
 }
+
+/// A small gold icon button, like the rest of the section's actions.
+Widget _compact(Widget child) => Builder(
+  builder: (context) => Theme(
+    data: Theme.of(context).copyWith(
+      filledButtonTheme: FilledButtonThemeData(style: sectionIconButtonStyle()),
+    ),
+    child: child,
+  ),
+);
 
 String _digits(MoneyValue? value) =>
     value != null && value.isValid ? '${value.units}' : '';
@@ -297,9 +329,12 @@ class _EntryFields {
 
 /// Raw inputs for one masraweya day. Totals stay on the server response.
 class _MasraweyaForm extends ConsumerStatefulWidget {
-  const _MasraweyaForm({required this.day});
+  const _MasraweyaForm({required this.day, this.addRow = false});
 
   final MasraweyaDayDto day;
+
+  /// Opens with one more, empty row (the screen's + صف).
+  final bool addRow;
 
   @override
   ConsumerState<_MasraweyaForm> createState() => _MasraweyaFormState();
@@ -324,6 +359,7 @@ class _MasraweyaFormState extends ConsumerState<_MasraweyaForm> {
           commission: entry.commissionUnits,
         ),
     ];
+    if (widget.addRow) _rows.add(_EntryFields());
     _previous.addListener(_changed);
     _purchases.addListener(_changed);
     for (final row in _rows) {
@@ -395,6 +431,21 @@ class _MasraweyaFormState extends ConsumerState<_MasraweyaForm> {
             label: AppStrings.commissions,
           ),
         ],
+        const SizedBox(height: AppSpacing.sm),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            key: const Key('masraweya-form-add-row'),
+            onPressed: () => setState(() {
+              final row = _EntryFields();
+              row.value.addListener(_changed);
+              row.commission.addListener(_changed);
+              _rows.add(row);
+            }),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text(_MText.addRow),
+          ),
+        ),
         const SizedBox(height: AppSpacing.md),
         GuardedMutation(
           buttonKey: const Key('save-masraweya'),

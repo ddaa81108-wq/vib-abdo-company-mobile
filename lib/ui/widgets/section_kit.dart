@@ -70,6 +70,21 @@ Color sectionGold(BuildContext context) =>
 Color onSectionGold(BuildContext context) =>
     context.look.glass ? const Color(0xFF1A1300) : Colors.white;
 
+/// Fill and ink of the gold section buttons, both themes.
+const sectionButtonGold = Color(0xFFF5C02E);
+const sectionButtonInk = Color(0xFF1A1300);
+
+/// A compact gold icon button style (edit, add row): 40×40, rounded.
+ButtonStyle sectionIconButtonStyle() => FilledButton.styleFrom(
+  backgroundColor: sectionButtonGold,
+  foregroundColor: sectionButtonInk,
+  minimumSize: const Size(40, 40),
+  fixedSize: const Size(40, 40),
+  padding: EdgeInsets.zero,
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  tapTargetSize: MaterialTapTargetSize.padded,
+);
+
 /// Buttons inside a section use the app's gold, not the default blue.
 /// Display only: wraps [child] in a theme with gold filled/elevated buttons.
 class SectionTheme extends StatelessWidget {
@@ -79,8 +94,9 @@ class SectionTheme extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gold = sectionGold(context);
-    final on = onSectionGold(context);
+    // The same bright gold in both themes (Ali, 2026-11-04), dark ink.
+    const gold = sectionButtonGold;
+    const on = sectionButtonInk;
     final theme = Theme.of(context);
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(AppRadii.xl),
@@ -198,10 +214,7 @@ class SectionCard extends StatelessWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.xs,
-                  children: [
-                    if (title != null) PillTitle(title!),
-                    ?trailing,
-                  ],
+                  children: [if (title != null) PillTitle(title!), ?trailing],
                 ),
                 if (note != null)
                   Padding(
@@ -243,16 +256,23 @@ class FigureRow extends StatelessWidget {
   final bool last;
   final bool money;
 
-  /// The value sits in a field-like box (display only).
+  /// The value slot has a field-like border (display only).
   final bool boxed;
+
+  /// One value column for every row: same width, at the left edge (RTL end).
+  static const valueWidth = 136.0;
 
   @override
   Widget build(BuildContext context) {
     final look = context.look;
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
     final figure = context.textExtras.amount.copyWith(
       color: highlight ?? look.ink,
-      fontSize: highlight == null ? 16 : 20,
+      fontSize: 16,
     );
+    final text = money
+        ? MoneyText(value, style: figure)
+        : Text(value, style: figure);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: highlight?.withValues(alpha: 0.10),
@@ -260,59 +280,56 @@ class FigureRow extends StatelessWidget {
             ? null
             : Border(bottom: BorderSide(color: look.cardBorder)),
       ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: cairo(14, 800, color: highlight ?? look.ink),
-                  ),
-                  if (hint != null)
-                    Text(hint!, style: cairo(11, 500, color: look.muted)),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Flexible(
-              child: boxed
-                  ? Container(
-                      constraints: const BoxConstraints(minWidth: 64),
-                      padding: const EdgeInsetsDirectional.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.xs,
-                      ),
-                      decoration: BoxDecoration(
-                        color: look.card,
-                        borderRadius: BorderRadius.circular(AppRadii.lg),
-                        border: Border.all(
-                          color: sectionGold(context).withValues(alpha: 0.6),
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: money
-                            ? MoneyText(value, style: figure)
-                            : Text(value, style: figure),
-                      ),
-                    )
-                  : FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: money
-                          ? MoneyText(value, style: figure)
-                          : Text(value, style: figure),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: 58 * scale),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: cairo(14, 800, color: highlight ?? look.ink),
                     ),
-            ),
-          ],
+                    if (hint != null)
+                      Text(hint!, style: cairo(11, 500, color: look.muted)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Flexible(
+                child: Container(
+                  width: valueWidth * scale,
+                  height: 40 * scale,
+                  padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: AppSpacing.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: boxed ? look.card : null,
+                    borderRadius: BorderRadius.circular(AppRadii.lg),
+                    border: Border.all(
+                      color: boxed
+                          ? sectionGold(context).withValues(alpha: 0.6)
+                          : Colors.transparent,
+                    ),
+                  ),
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: text,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -473,13 +490,22 @@ class GridTable extends StatelessWidget {
     required this.rows,
     this.flex,
     this.footer,
+    this.footerFlex,
     this.empty,
+    this.numericFrom,
     super.key,
   });
 
   final List<String> headers;
   final List<List<Widget>> rows;
   final List<int>? flex;
+
+  /// Footer cell widths when the footer spans columns (e.g. one label over
+  /// three columns, then the total under the last).
+  final List<int>? footerFlex;
+
+  /// Columns from this index hold numbers, aligned to the left (RTL end).
+  final int? numericFrom;
   final List<Widget>? footer;
   final String? empty;
 
@@ -488,36 +514,49 @@ class GridTable extends StatelessWidget {
     final look = context.look;
     final line = BorderSide(color: look.cardBorder);
     final radius = BorderRadius.circular(AppRadii.card);
-    Widget row(List<Widget> cells, {Color? color, bool head = false}) =>
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: color,
-            gradient: head ? sectionStripGradient : null,
-            border: Border(bottom: line),
-          ),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < cells.length; i++)
-                  Expanded(
-                    flex: flex?[i] ?? 1,
-                    child: Container(
-                      decoration: i == cells.length - 1
-                          ? null
-                          : BoxDecoration(border: BorderDirectional(end: line)),
-                      padding: const EdgeInsetsDirectional.symmetric(
-                        horizontal: 6,
-                        vertical: AppSpacing.sm,
-                      ),
-                      alignment: AlignmentDirectional.center,
-                      child: cells[i],
-                    ),
+    Widget row(
+      List<Widget> cells, {
+      Color? color,
+      bool head = false,
+      List<int>? widths,
+      bool spanFooter = false,
+    }) => DecoratedBox(
+      decoration: BoxDecoration(
+        color: color,
+        gradient: head ? sectionStripGradient : null,
+        border: Border(bottom: line),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < cells.length; i++)
+              Expanded(
+                flex: (widths ?? flex)?[i] ?? 1,
+                child: Container(
+                  decoration: i == cells.length - 1
+                      ? null
+                      : BoxDecoration(border: BorderDirectional(end: line)),
+                  padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: 6,
+                    vertical: AppSpacing.sm,
                   ),
-              ],
-            ),
-          ),
-        );
+                  alignment: head
+                      ? AlignmentDirectional.center
+                      : spanFooter && i == 0
+                      ? AlignmentDirectional.centerStart
+                      : !spanFooter && numericFrom != null && i >= numericFrom!
+                      ? AlignmentDirectional.centerEnd
+                      : spanFooter && numericFrom != null
+                      ? AlignmentDirectional.centerEnd
+                      : AlignmentDirectional.center,
+                  child: cells[i],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
@@ -547,7 +586,12 @@ class GridTable extends StatelessWidget {
               ),
             for (final r in rows) row(r),
             if (footer != null)
-              row(footer!, color: sectionGold(context).withValues(alpha: 0.10)),
+              row(
+                footer!,
+                color: sectionGold(context).withValues(alpha: 0.10),
+                widths: footerFlex,
+                spanFooter: footerFlex != null,
+              ),
           ],
         ),
       ),
@@ -566,6 +610,7 @@ Widget gridText(BuildContext context, String text, {bool bold = false}) => Text(
 Widget gridMoney(BuildContext context, String text, {bool bold = false}) =>
     FittedBox(
       fit: BoxFit.scaleDown,
+      alignment: AlignmentDirectional.centerEnd,
       child: MoneyText(
         text,
         style: context.textExtras.amount.copyWith(
