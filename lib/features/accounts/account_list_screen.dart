@@ -16,6 +16,7 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/mutation_form.dart';
 import 'account_list_logic.dart';
 import 'account_name_suggestions.dart';
@@ -134,7 +135,10 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       }),
     );
 
-    return KeptData<AccountsPage>(
+    final deposits =
+        section == AccountSection.libyanDeposits ||
+        section == AccountSection.egyptianDeposits;
+    final Widget body = KeptData<AccountsPage>(
       value: page,
       resetKey: section,
       expand: true,
@@ -329,6 +333,8 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
         );
       },
     );
+    // Deposits use the app's gold buttons (Ali's device shots).
+    return deposits ? SectionTheme(child: body) : body;
   }
 
   /// Approved by Ali on 2026-10-22, enabled by default.
@@ -772,26 +778,49 @@ class _SummaryStrip extends StatelessWidget {
         ),
       );
     }
-    return Card(
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: Wrap(
-          spacing: AppSpacing.xl,
-          runSpacing: AppSpacing.md,
-          children: [
-            _Metric(
-              label: AppStrings.netDebt,
-              value: money.formatOrDash(summary.netBalanceUnits, currency),
-              valueStyle: theme.textTheme.titleSmall,
-              amountStyle: context.textExtras.amountLarge,
+    // Deposits: the app's glossy gold headline (Ali's device shots).
+    // Same two server figures; display only.
+    const ink = Color(0xFF1A1300);
+    const gold = Gloss(
+      top: Color(0xFFFCD34D),
+      bottom: Color(0xFFD97706),
+      border: Color(0xFFFDE68A),
+      glow: Color(0x40D97706),
+      ink: ink,
+      amount: ink,
+      sheen: 0.22,
+    );
+    final radius = BorderRadius.circular(AppRadii.xxl);
+    return DecoratedBox(
+      decoration: gold.decoration(radius).copyWith(boxShadow: gold.glowShadow),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: GlossSheen(
+          gloss: gold,
+          radius: radius,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+            child: Wrap(
+              spacing: AppSpacing.xl,
+              runSpacing: AppSpacing.md,
+              children: [
+                _Metric(
+                  label: AppStrings.netDebt,
+                  value: money.formatOrDash(summary.netBalanceUnits, currency),
+                  valueStyle: theme.textTheme.titleSmall?.copyWith(color: ink),
+                  amountStyle: context.textExtras.amountLarge.copyWith(
+                    color: ink,
+                  ),
+                ),
+                _Metric(
+                  label: AppStrings.totalDebt,
+                  value: money.formatOrDash(summary.totalDebtUnits, currency),
+                  valueStyle: theme.textTheme.bodySmall?.copyWith(color: ink),
+                  amountStyle: context.textExtras.amount.copyWith(color: ink),
+                ),
+              ],
             ),
-            _Metric(
-              label: AppStrings.totalDebt,
-              value: money.formatOrDash(summary.totalDebtUnits, currency),
-              valueStyle: theme.textTheme.bodySmall,
-              amountStyle: context.textExtras.amount,
-            ),
-          ],
+          ),
         ),
       ),
     );
