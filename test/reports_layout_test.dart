@@ -55,10 +55,25 @@ void main() {
       await tester.pump();
       expect(tester.getRect(header), before);
       expect(find.text(RText.net5), findsWidgets);
-      // Staging sends no difference field: the column stays hidden.
+      // الفرق shown (display-only, Ali 2026-11-04) under «تفاصيل» header.
       expect(
         find.descendant(of: five, matching: find.text(RText.diff)),
-        findsNothing,
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: five, matching: find.text(RText.detailsHead)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(
+            const Key('report-five-am-diff-29'),
+            skipOffstage: false,
+          ),
+          matching: find.textContaining('+1,300', skipOffstage: false),
+          matchRoot: true,
+        ),
+        findsOneWidget,
       );
       expect(top('report-current'), lessThan(top('report-balances')));
       expect(top('report-balances'), lessThan(top('report-sources')));
@@ -128,6 +143,21 @@ void main() {
     );
     expect(find.text('2026-10-18 05:00'), findsOneWidget);
     expect(find.byKey(const Key('snapshot-no-breakdown')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('snapshot-diff')),
+        matching: find.textContaining('+1,300'),
+        matchRoot: true,
+      ),
+      findsOneWidget,
+    );
+    expect(find.text(RText.diffDisplayOnly), findsOneWidget);
+    // The sheet's last line clears the bottom tab bar.
+    final last = tester.getRect(find.byKey(const Key('snapshot-no-breakdown')));
+    final bar = find.byKey(const Key('bottom-tab-more'));
+    if (bar.evaluate().isNotEmpty) {
+      expect(last.bottom, lessThanOrEqualTo(tester.getRect(bar).top));
+    }
   });
 }
 

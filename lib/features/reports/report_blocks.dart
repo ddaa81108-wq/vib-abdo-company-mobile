@@ -14,6 +14,7 @@ import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/section_kit.dart';
+import 'five_am_diff.dart';
 
 class RText {
   static const heroTitle = 'صافي المركز — لنا';
@@ -50,11 +51,14 @@ class RText {
   static const fiveAm = 'مقارنة الخامسة صباحًا';
   static const fiveAmTag = 'بتوقيت ليبيا · د.ل';
   static const fiveAmSaved = 'لقطة محفوظة وثابتة';
-  static const fiveAmNote = 'آخر 20 لقطة مسجلة أمامك، دون إنشاء أيام مفقودة.';
+  static const fiveAmNote =
+      'آخر 20 لقطة مسجلة أمامك؛ الفرق عن آخر لقطة سابقة، دون إنشاء أيام مفقودة.';
   static const day = 'يوم العمل';
   static const net5 = 'صافي 05:00';
   static const open = 'فتح';
   static const diff = 'الفرق';
+  static const detailsHead = 'تفاصيل';
+  static const diffDisplayOnly = 'محسوب للعرض من صافي اللقطتين';
   static const net = 'الصافي';
   static const capturedAt = 'وقت التسجيل (ليبيا)';
   static const fiveAmFoot =
@@ -548,14 +552,14 @@ class ReportFiveAm extends StatelessWidget {
   Widget build(BuildContext context) {
     final snaps = [
       for (final row in rows)
-        if (row.fiveAmClosing?.netUnits != null) row,
+        if (recordedFiveAmNet(row) != null) row,
     ].take(20).toList();
     if (snaps.isEmpty) return const SizedBox.shrink();
     final look = context.look;
     final gold = sectionGold(context);
-    final colors = context.statusColors;
     final latest = snaps.first;
-    final showChange = snaps.any((r) => r.netChangeUnits != null);
+    // الفرق: server field when sent, else display-only (Ali, 2026-11-04).
+    final diffs = fiveAmDiffs(rows);
     final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
     final rowHeight = 46.0 * scale;
     Widget head(String t) => Text(
@@ -580,8 +584,8 @@ class ReportFiveAm extends StatelessWidget {
             children: [
               Expanded(flex: 4, child: head(RText.day)),
               Expanded(flex: 4, child: head(RText.net5)),
-              if (showChange) Expanded(flex: 4, child: head(RText.diff)),
-              Expanded(flex: 2, child: head(RText.details)),
+              Expanded(flex: 4, child: head(RText.diff)),
+              Expanded(flex: 2, child: head(RText.detailsHead)),
             ],
           ),
         ),
@@ -618,23 +622,14 @@ class ReportFiveAm extends StatelessWidget {
                           style: cairo(12.5, 700, color: look.ink),
                         ),
                       ),
-                      if (showChange)
-                        cell(
-                          4,
-                          MoneyText(
-                            money.formatOrDash(
-                              row.netChangeUnits,
-                              Currency.lyd,
-                            ),
-                            style: cairo(
-                              12.5,
-                              800,
-                              color: (row.netChangeUnits?.units ?? 0) < 0
-                                  ? colors.cashNegative
-                                  : colors.cashPositiveText,
-                            ),
-                          ),
+                      cell(
+                        4,
+                        DiffText(
+                          diff: diffs[row.sequence],
+                          money: money,
+                          key: Key('report-five-am-diff-${row.sequence}'),
                         ),
+                      ),
                       Expanded(
                         flex: 2,
                         child: Center(
@@ -655,8 +650,13 @@ class ReportFiveAm extends StatelessWidget {
                             onPressed: () => showModalBottomSheet<void>(
                               context: context,
                               showDragHandle: true,
-                              builder: (_) =>
-                                  SnapshotSheet(row: row, money: money),
+                              isScrollControlled: true,
+                              useSafeArea: true,
+                              builder: (_) => SnapshotSheet(
+                                row: row,
+                                money: money,
+                                diff: diffs[row.sequence],
+                              ),
                             ),
                           ),
                         ),
@@ -785,10 +785,16 @@ class ReportFiveAm extends StatelessWidget {
 
 /// The open-icon sheet: the snapshot's own server fields only.
 class SnapshotSheet extends StatelessWidget {
-  const SnapshotSheet({required this.row, required this.money, super.key});
+  const SnapshotSheet({
+    required this.row,
+    required this.money,
+    this.diff,
+    super.key,
+  });
 
   final DailyReportRowDto row;
   final MoneyFormatter money;
+  final FiveAmDiff? diff;
 
   @override
   Widget build(BuildContext context) {
@@ -815,7 +821,12 @@ class SnapshotSheet extends StatelessWidget {
     return SafeArea(
       child: SingleChildScrollView(
         key: const Key('report-day-sheet'),
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+        padding: EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg + _tabBarClearance,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -847,13 +858,20 @@ class SnapshotSheet extends StatelessWidget {
                 ),
               ),
             ),
-            if (row.netChangeUnits != null)
-              pair(
-                RText.diff,
-                MoneyText(
-                  money.formatOrDash(row.netChangeUnits, Currency.lyd),
-                  style: cairo(14, 800, color: look.ink),
-                ),
+            pair(
+              RText.diff,
+              DiffText(
+                diff: diff,
+                money: money,
+                size: 15,
+                key: const Key('snapshot-diff'),
+              ),
+            ),
+            if (diff?.source == FiveAmDiffSource.display)
+              Text(
+                RText.diffDisplayOnly,
+                key: const Key('snapshot-diff-display-only'),
+                style: cairo(11, 600, color: look.muted),
               ),
             const SizedBox(height: AppSpacing.sm),
             Text(
@@ -863,6 +881,53 @@ class SnapshotSheet extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Room for the floating bottom tab bar under a modal sheet on phones.
+const _tabBarClearance = 96.0;
+
+/// '+N' green, '−N' red, '0' neutral, '–' when there is no difference.
+class DiffText extends StatelessWidget {
+  const DiffText({
+    required this.diff,
+    required this.money,
+    this.size = 12.5,
+    super.key,
+  });
+
+  final FiveAmDiff? diff;
+  final MoneyFormatter money;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final colors = context.statusColors;
+    final d = diff;
+    if (d == null) {
+      return Text(AppStrings.dash, style: cairo(size, 800, color: look.muted));
+    }
+    final units = d.units;
+    final text = units > 0
+        ? '+${money.formatNumber(units)}'
+        : units < 0
+        ? '\u2212${money.formatNumber(-units)}'
+        : money.formatNumber(0);
+    return LtrText(
+      text,
+      style: cairo(
+        size,
+        800,
+        color: units > 0
+            ? colors.cashPositiveText
+            : units < 0
+            ? (Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFFFF7A7A) // readable red on dark cards
+                  : colors.cashNegative)
+            : look.ink,
       ),
     );
   }
