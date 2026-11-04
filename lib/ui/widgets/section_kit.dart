@@ -360,15 +360,13 @@ class PairGrid extends StatelessWidget {
               padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
               child: one || i + 1 >= children.length
                   ? children[i]
-                  : IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(child: children[i]),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(child: children[i + 1]),
-                        ],
-                      ),
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: children[i]),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(child: children[i + 1]),
+                      ],
                     ),
             ),
           );

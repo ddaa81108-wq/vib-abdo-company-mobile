@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,6 +12,7 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/mutation_form.dart';
 
 class PurchasesScreen extends ConsumerWidget {
@@ -33,10 +35,12 @@ class PurchasesScreen extends ConsumerWidget {
 
     return ListView(
       key: screenKey,
+      // One day's page: build it whole so the totals card at the end is
+      // ready (and readable by tests) without scrolling.
+      scrollCacheExtent: const ScrollCacheExtent.pixels(6000),
       padding: pagePadding(MediaQuery.sizeOf(context).width),
       children: [
-        const ScreenTitle(AppStrings.purchases),
-        const SizedBox(height: AppSpacing.md),
+        const SectionHeading(_PText.title),
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: SingleChildScrollView(
@@ -113,11 +117,6 @@ class PurchasesScreen extends ConsumerWidget {
                       canWrite: false,
                       online: online,
                     ),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  AppStrings.registerTotals,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
                 _RegisterTotals(totals: data.registerTotals, money: money),
               ],
             );
@@ -128,6 +127,31 @@ class PurchasesScreen extends ConsumerWidget {
   }
 }
 
+/// The website's words for المشتريات (display only).
+abstract final class _PText {
+  static const title = 'قسم المشتريات';
+  static const lifetime = 'إجماليات السجل من البداية';
+  static const lifeResult = 'إجمالي الناتج';
+  static const lifePaid = 'إجمالي المسدد';
+  static const lifeRemaining = 'الباقي الحالي';
+  static const lifeVodafone = 'إجمالي مستهلك فودافون';
+  static const previousValue = 'القيمة السابقة';
+  static const workToday = 'إجمالي شغل اليوم';
+  static const paidTotal = 'إجمالي المسدد';
+  static const vodafoneOurs = 'باقي فودافون لصالحنا';
+  static String day(String n) => 'يوم #$n';
+  static const operation = 'العملية';
+  static const rate = 'السعر';
+  static const result = 'الناتج';
+  static const remaining = 'الباقي';
+}
+
+Color _red(BuildContext c) => c.statusColors.debtText;
+Color _green(BuildContext c) => c.statusColors.creditText;
+Color _amber(BuildContext c) => Theme.of(c).brightness == Brightness.dark
+    ? const Color(0xFFFBBF24)
+    : const Color(0xFFB45309);
+
 class _RegisterTotals extends StatelessWidget {
   const _RegisterTotals({required this.totals, required this.money});
 
@@ -136,80 +160,38 @@ class _RegisterTotals extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final look = context.look;
+    String f(MoneyValue? v, Currency c) => money.formatOrDash(v, c);
+    return SectionCard(
       key: const Key('purchases-lifetime'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _AmountLine(
-          AppStrings.resultFromServer,
-          totals?.resultUnits,
-          Currency.lyd,
-          money,
-        ),
-        _AmountLine(AppStrings.paid, totals?.paidUnits, Currency.lyd, money),
-        _AmountLine(
-          AppStrings.remaining,
-          totals?.remainingUnits,
-          Currency.lyd,
-          money,
-        ),
-        _AmountLine(
-          AppStrings.vodafoneConsumed,
-          totals?.vodafoneConsumedUnits,
-          vodafoneCurrency,
-          money,
-        ),
-        _AmountLine(
-          AppStrings.vodafoneRemaining,
-          totals?.vodafoneRemainingUnits,
-          vodafoneCurrency,
-          money,
-        ),
-      ],
-    );
-  }
-}
-
-/// Label and server figure. They sit on one line and wrap instead of clipping.
-class _AmountLine extends StatelessWidget {
-  const _AmountLine(this.label, this.units, this.currency, this.money);
-
-  final String label;
-  final MoneyValue? units;
-  final Currency currency;
-  final MoneyFormatter money;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.xs),
-      child: Wrap(
-        spacing: AppSpacing.sm,
-        runSpacing: AppSpacing.xxs,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [Text(label), MoneyText(money.formatOrDash(units, currency))],
-      ),
-    );
-  }
-}
-
-class _RateLine extends StatelessWidget {
-  const _RateLine(this.label, this.value);
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.xs),
-      child: Wrap(
-        spacing: AppSpacing.sm,
-        runSpacing: AppSpacing.xxs,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      title: _PText.lifetime,
+      child: PairGrid(
         children: [
-          Text(label),
-          LtrText(value, style: context.textExtras.tableNumber),
+          EdgeSummary(
+            title: _PText.lifeResult,
+            value: f(totals?.resultUnits, Currency.lyd),
+            edge: look.accent,
+          ),
+          EdgeSummary(
+            title: _PText.lifePaid,
+            value: f(totals?.paidUnits, Currency.lyd),
+            edge: _green(context),
+          ),
+          EdgeSummary(
+            title: _PText.lifeRemaining,
+            value: f(totals?.remainingUnits, Currency.lyd),
+            edge: _red(context),
+          ),
+          EdgeSummary(
+            title: _PText.lifeVodafone,
+            value: f(totals?.vodafoneConsumedUnits, vodafoneCurrency),
+            edge: _amber(context),
+          ),
+          EdgeSummary(
+            title: AppStrings.vodafoneRemaining,
+            value: f(totals?.vodafoneRemainingUnits, vodafoneCurrency),
+            edge: _green(context),
+          ),
         ],
       ),
     );
@@ -243,39 +225,64 @@ class _DayCard extends ConsumerWidget {
     final correctionOpen = day.correctionOpen;
     final editable = day.status == 'draft' || correctionOpen;
     final caption = vodafoneCaption(day.vodafoneRemainingUnits);
+    String f(MoneyValue? v, Currency c) => money.formatOrDash(v, c);
     return Card(
       key: Key('purchase-day-$label'),
       color: band,
       margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        side: BorderSide(color: context.look.cardBorder),
+      ),
       child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+        padding: const EdgeInsetsDirectional.all(AppSpacing.md),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.xs,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Text(
-                  '${AppStrings.todayTab} $label',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
+                PillTitle(_PText.day(label)),
                 _CorrectionStatus(day: label, open: correctionOpen),
               ],
             ),
-            _line(AppStrings.previousDebt, day.previousDebtUnits, Currency.lyd),
-            _line(AppStrings.todayResult, day.todayResultUnits, Currency.lyd),
-            _line(AppStrings.todayPaid, day.todayPaidUnits, Currency.lyd),
-            _line(AppStrings.totalDebt, day.totalDebtUnits, Currency.lyd),
-            _line(
-              AppStrings.vodafoneRemaining,
-              day.vodafoneRemainingUnits,
-              vodafoneCurrency,
+            const SizedBox(height: AppSpacing.md),
+            PairGrid(
+              children: [
+                EdgeSummary(
+                  title: _PText.previousValue,
+                  value: f(day.previousDebtUnits, Currency.lyd),
+                  edge: _red(context),
+                ),
+                EdgeSummary(
+                  title: _PText.workToday,
+                  value: f(day.todayResultUnits, Currency.lyd),
+                  edge: context.look.accent,
+                ),
+                EdgeSummary(
+                  title: _PText.paidTotal,
+                  value: f(day.todayPaidUnits, Currency.lyd),
+                  edge: _green(context),
+                ),
+                EdgeSummary(
+                  title: AppStrings.totalDebt,
+                  value: f(day.totalDebtUnits, Currency.lyd),
+                  edge: _red(context),
+                ),
+              ],
             ),
-            if (caption != null) Text(caption),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            EdgeSummary(
+              title: _PText.vodafoneOurs,
+              value: f(day.vodafoneRemainingUnits, vodafoneCurrency),
+              edge: _green(context),
+              note: caption,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
               children: [
                 if (canWrite && editable && day.version != null)
                   GatedButton(
@@ -324,28 +331,25 @@ class _DayCard extends ConsumerWidget {
                   ),
               ],
             ),
-            for (final entry in entries)
+            for (var i = 0; i < entries.length; i++)
               _Entry(
-                entry: entry,
+                entry: entries[i],
+                seq: i + 1,
                 money: money,
                 book: book,
                 // The write names this row's day, not the open day's version.
-                version: entry.dayVersion,
+                version: entries[i].dayVersion,
                 canWrite:
                     canWrite &&
                     editable &&
-                    entry.dayId == day.id &&
-                    entry.dayVersion != null,
+                    entries[i].dayId == day.id &&
+                    entries[i].dayVersion != null,
                 online: online,
               ),
           ],
         ),
       ),
     );
-  }
-
-  Widget _line(String label, MoneyValue? units, Currency currency) {
-    return _AmountLine(label, units, currency, money);
   }
 
   Future<String?> _finalize(
@@ -604,65 +608,42 @@ class _OpeningCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return SectionCard(
       key: const Key('opening-card'),
-      margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              AppStrings.purchaseOpening,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            _MoneyLine(
-              AppStrings.previousDebt,
-              day?.previousDebtUnits,
-              Currency.lyd,
-              money,
-            ),
-            _MoneyLine(
-              AppStrings.previousVodafone,
-              day?.previousVodafoneUnits,
-              vodafoneCurrency,
-              money,
-            ),
-            if (canWrite && _openingWritable(day))
-              GatedButton(
-                buttonKey: const Key('set-opening'),
-                allowed: true,
-                online: online,
-                label: AppStrings.purchaseOpening,
-                onPressed: () => showAppForm<void>(
-                  context,
-                  _OpeningForm(book: book, day: day),
-                ),
+      title: AppStrings.purchaseOpening,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FigureBox(
+            rows: [
+              FigureRow(
+                label: AppStrings.previousDebt,
+                value: money.formatOrDash(day?.previousDebtUnits, Currency.lyd),
               ),
+              FigureRow(
+                label: AppStrings.previousVodafone,
+                value: money.formatOrDash(
+                  day?.previousVodafoneUnits,
+                  vodafoneCurrency,
+                ),
+                last: true,
+              ),
+            ],
+          ),
+          if (canWrite && _openingWritable(day)) ...[
+            const SizedBox(height: AppSpacing.sm),
+            GatedButton(
+              buttonKey: const Key('set-opening'),
+              allowed: true,
+              online: online,
+              label: AppStrings.purchaseOpening,
+              onPressed: () => showAppForm<void>(
+                context,
+                _OpeningForm(book: book, day: day),
+              ),
+            ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MoneyLine extends StatelessWidget {
-  const _MoneyLine(this.label, this.units, this.currency, this.money);
-
-  final String label;
-  final MoneyValue? units;
-  final Currency currency;
-  final MoneyFormatter money;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.xs),
-      child: Wrap(
-        spacing: AppSpacing.sm,
-        runSpacing: AppSpacing.xxs,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [Text(label), MoneyText(money.formatOrDash(units, currency))],
+        ],
       ),
     );
   }
@@ -812,6 +793,7 @@ class _Entry extends ConsumerWidget {
     required this.version,
     required this.canWrite,
     required this.online,
+    this.seq,
   });
 
   final PurchaseEntryDto entry;
@@ -820,57 +802,127 @@ class _Entry extends ConsumerWidget {
   final int? version;
   final bool canWrite;
   final bool online;
+  final int? seq;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
+    final look = context.look;
+    Widget cell(String label, Widget value, {Color? tint}) => Container(
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: tint?.withValues(alpha: 0.14) ?? look.strip,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: tint ?? look.cardBorder),
+      ),
+      child: Column(
+        children: [
+          Text(label, style: cairo(11, 700, color: look.muted)),
+          const SizedBox(height: 2),
+          FittedBox(fit: BoxFit.scaleDown, child: value),
+        ],
+      ),
+    );
+    final figure = context.textExtras.amount.copyWith(
+      fontSize: 14,
+      color: look.ink,
+    );
+    Widget amount(MoneyValue? v, Currency c) =>
+        MoneyText(money.formatOrDash(v, c), style: figure);
+    Widget row(List<Widget> cells) => Padding(
+      padding: const EdgeInsetsDirectional.only(top: AppSpacing.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < cells.length; i++) ...[
+            if (i > 0) const SizedBox(width: AppSpacing.xs),
+            Expanded(child: cells[i]),
+          ],
+        ],
+      ),
+    );
     return Padding(
       key: Key('purchase-entry-${entry.id}'),
       padding: const EdgeInsetsDirectional.only(top: AppSpacing.md),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: scheme.outlineVariant)),
+          borderRadius: BorderRadius.circular(AppRadii.xl),
+          border: Border.all(color: look.cardBorder),
         ),
         child: Padding(
-          padding: const EdgeInsetsDirectional.only(top: AppSpacing.sm),
+          padding: const EdgeInsetsDirectional.all(AppSpacing.sm),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                entry.itemLabel ?? AppStrings.dash,
-                style: Theme.of(context).textTheme.titleSmall,
+              Row(
+                children: [
+                  if (seq != null)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(
+                        end: AppSpacing.sm,
+                      ),
+                      child: Text(
+                        '$seq',
+                        style: cairo(14, 800, color: look.muted),
+                      ),
+                    ),
+                  Flexible(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: _red(context),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsetsDirectional.symmetric(
+                          horizontal: AppSpacing.sm,
+                          vertical: 3,
+                        ),
+                        child: Text(
+                          entry.itemLabel ?? AppStrings.dash,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: cairo(12.5, 800, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              _AmountLine(
-                AppStrings.egpValue,
-                entry.egpValueUnits,
-                Currency.egp,
-                money,
-              ),
-              _RateLine(
-                calculationLabel(entry.calculationMode),
-                entry.exchangeRate == null
-                    ? AppStrings.dash
-                    : money.formatDecimal(entry.exchangeRate!),
-              ),
-              _AmountLine(
-                AppStrings.resultFromServer,
-                entry.resultUnits,
-                Currency.lyd,
-                money,
-              ),
-              _AmountLine(
-                AppStrings.paid,
-                entry.paidUnits,
-                Currency.lyd,
-                money,
-              ),
-              _AmountLine(
-                AppStrings.remaining,
-                entry.remainingUnits,
-                Currency.lyd,
-                money,
-              ),
-              if (canWrite)
+              row([
+                cell(
+                  AppStrings.egpValue,
+                  amount(entry.egpValueUnits, Currency.egp),
+                ),
+                cell(
+                  _PText.operation,
+                  Text(
+                    calculationLabel(entry.calculationMode),
+                    style: cairo(13, 800, color: look.ink),
+                  ),
+                ),
+                cell(
+                  _PText.rate,
+                  LtrText(
+                    entry.exchangeRate == null
+                        ? AppStrings.dash
+                        : money.formatDecimal(entry.exchangeRate!),
+                    style: figure,
+                  ),
+                ),
+              ]),
+              row([
+                cell(_PText.result, amount(entry.resultUnits, Currency.lyd)),
+                cell(AppStrings.paid, amount(entry.paidUnits, Currency.lyd)),
+                cell(
+                  _PText.remaining,
+                  amount(entry.remainingUnits, Currency.lyd),
+                  tint: _amber(context),
+                ),
+              ]),
+              if (canWrite) ...[
+                const SizedBox(height: AppSpacing.xs),
                 Wrap(
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.xs,
@@ -902,6 +954,7 @@ class _Entry extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ],
             ],
           ),
         ),
