@@ -12,7 +12,6 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
-import '../../ui/widgets/labeled_money.dart';
 import '../../ui/widgets/mutation_form.dart';
 import '../../ui/widgets/section_kit.dart';
 
@@ -271,6 +270,9 @@ class _CashFormState extends ConsumerState<_CashForm> {
   }
 }
 
+/// The treasury totals (Ali, 2026-11-04): one framed panel; four equal
+/// cards (fixed height, same layout: title, big amount, one-line subtitle),
+/// then the gold صافي الخزينة الشامل full width. Figures are the server's.
 class _Cards extends StatelessWidget {
   const _Cards({required this.data, required this.money});
 
@@ -285,181 +287,42 @@ class _Cards extends StatelessWidget {
       SummaryTone.negative => colors.cashNegative,
       _ => null,
     };
-    final net = _tile(
-      context,
-      AppStrings.netTreasury,
-      money.formatOrDash(data.netUnits, Currency.lyd),
-      AppStrings.formulaCaption,
-      emphasize: true,
-      background: Color.alphaBlend(
-        sectionGold(context).withValues(alpha: 0.12),
-        context.look.card,
-      ),
-      foreground: context.look.ink,
-      edge: sectionGold(context),
-    );
-    final rest = [
-      _tile(
-        context,
-        AppStrings.receivables,
-        money.formatOrDash(data.receivablesUnits, Currency.lyd),
-        AppStrings.ourDebts,
-        edge: colors.creditText,
-      ),
-      _tile(
-        context,
-        AppStrings.liabilities,
-        money.formatOrDash(data.liabilitiesUnits, Currency.lyd),
-        AppStrings.owedDebts,
-        edge: colors.debtText,
-      ),
-      _tile(
-        context,
-        AppStrings.activeCash,
-        money.formatOrDash(data.activeCashUnits, Currency.lyd),
-        null,
-        background: cashColor,
-        foreground: cashColor == null ? null : colors.onStatus,
-      ),
-      _Egyptian(data: data, money: money),
-    ];
-    return LayoutBuilder(
-      key: const Key('treasury-summary'),
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final scale = MediaQuery.textScalerOf(context).scale(1);
-        final columns = _summaryColumns(width, scale);
-        final gap = AppSpacing.md;
-        final tileWidth = columns == 1
-            ? width
-            : ((width - gap * (columns - 1)) / columns).floorToDouble();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            net,
-            const SizedBox(height: AppSpacing.md),
-            Wrap(
-              spacing: gap,
-              runSpacing: gap,
-              children: [
-                for (final card in rest)
-                  SizedBox(width: tileWidth, child: card),
-              ],
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _tile(
-    BuildContext context,
-    String title,
-    String value,
-    String? caption, {
-    bool emphasize = false,
-    Color? background,
-    Color? foreground,
-    Color? edge,
-  }) {
-    final look = context.look;
-    final theme = Theme.of(context);
-    final titleStyle =
-        (emphasize ? theme.textTheme.titleSmall : theme.textTheme.labelLarge)
-            ?.copyWith(color: foreground);
-    final captionStyle = theme.textTheme.bodySmall?.copyWith(color: foreground);
-    return Card(
-      key: title == AppStrings.activeCash
-          ? const Key('active-cash-card')
-          : null,
-      color: background,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.xl),
-        side: BorderSide(
-          color: edge ?? look.cardBorder,
-          width: edge == null ? 1 : 1.5,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: titleStyle),
-            const SizedBox(height: AppSpacing.xs),
-            SizedBox(
-              width: double.infinity,
-              child: ScaledMoney(
-                value,
-                style: context.textExtras.amountLarge.copyWith(
-                  color: foreground,
-                ),
-                alignment: AlignmentDirectional.centerStart,
-              ),
-            ),
-            if (caption != null) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Text(caption, style: captionStyle),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// One column when two tiles would be too narrow for the text scale.
-int _summaryColumns(double width, double scale) {
-  final minTile = 156.0 * (scale < 1.2 ? 1.0 : scale);
-  final gap = AppSpacing.md;
-  if (width >= minTile * 4 + gap * 3) return 4;
-  if (width >= minTile * 3 + gap * 2) return 3;
-  if (width >= minTile * 2 + gap) return 2;
-  return 1;
-}
-
-class _Egyptian extends StatelessWidget {
-  const _Egyptian({required this.data, required this.money});
-
-  final TreasurySummaryDto data;
-  final MoneyFormatter money;
-
-  @override
-  Widget build(BuildContext context) {
-    // Absence of the server rate text. `rateMissing` is the same signal,
-    // derived in the model when `egyptianRate` is null. No other field is read.
     final missing = data.rateMissing || data.egyptianRate == null;
-    final scheme = Theme.of(context).colorScheme;
-    // The original EGP amount is the server field, with or without a rate.
     final source = money.formatOrDash(data.egyptianSourceUnits, Currency.egp);
-    return Card(
-      color: context.look.card,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.xl),
-        side: BorderSide(color: context.look.cardBorder),
+    final rate = money.formatDecimalOrDash(data.egyptianRate);
+    final scheme = Theme.of(context).colorScheme;
+    final small = [
+      _TotalCard(
+        title: AppStrings.receivables,
+        value: money.formatOrDash(data.receivablesUnits, Currency.lyd),
+        subtitle: Text(AppStrings.ourDebts),
       ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: PillTitle(AppStrings.egyptianTransfers),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            LabeledMoney(label: AppStrings.egyptianSource, value: source),
-            const SizedBox(height: AppSpacing.xs),
-            LabeledMoney(
-              label: AppStrings.rate,
-              value: money.formatDecimalOrDash(data.egyptianRate),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            if (missing)
-              Container(
+      _TotalCard(
+        title: AppStrings.liabilities,
+        value: money.formatOrDash(data.liabilitiesUnits, Currency.lyd),
+        subtitle: Text(AppStrings.owedDebts),
+      ),
+      _TotalCard(
+        cardKey: const Key('active-cash-card'),
+        title: AppStrings.activeCash,
+        value: money.formatOrDash(data.activeCashUnits, Currency.lyd),
+        subtitle: const Text(AppStrings.activeCashNote),
+        fill: cashColor,
+      ),
+      _TotalCard(
+        title: AppStrings.egyptianTransfers,
+        value: missing
+            ? null
+            : money.formatOrDash(data.egyptianConvertedUnits, Currency.lyd),
+        valueKey: const Key('egp-converted'),
+        // No rate: the note takes the amount's place, no د.ل figure.
+        missing: missing
+            ? Container(
                 key: const Key('rate-missing'),
-                width: double.infinity,
-                padding: const EdgeInsetsDirectional.all(AppSpacing.sm),
+                padding: const EdgeInsetsDirectional.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: 2,
+                ),
                 decoration: BoxDecoration(
                   color: scheme.errorContainer,
                   borderRadius: BorderRadius.circular(AppRadii.sm),
@@ -471,15 +334,163 @@ class _Egyptian extends StatelessWidget {
                       ?.copyWith(color: scheme.onErrorContainer),
                 ),
               )
-            else
-              LabeledMoney(
-                label: AppStrings.converted,
-                value: money.formatOrDash(
-                  data.egyptianConvertedUnits,
-                  Currency.lyd,
-                ),
-              ),
+            : null,
+        // «ج.م X ÷ rate» from the server's source amount and rate.
+        subtitle: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            MoneyText(source, key: const Key('egp-source')),
+            const Text(' ÷ '),
+            LtrText(rate, key: const Key('egp-rate')),
           ],
+        ),
+      ),
+    ];
+    final net = _TotalCard(
+      title: AppStrings.netTreasury,
+      value: money.formatOrDash(data.netUnits, Currency.lyd),
+      subtitle: const Text(AppStrings.formulaCaption),
+      gold: true,
+    );
+    return Container(
+      key: const Key('treasury-summary'),
+      padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        gradient: sectionStripGradient,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: sectionGold(context), width: 1.5),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final scale = MediaQuery.textScalerOf(context).scale(1);
+          final columns = _summaryColumns(width, scale);
+          const gap = AppSpacing.md;
+          final tileWidth = columns == 1
+              ? width
+              : ((width - gap * (columns - 1)) / columns).floorToDouble();
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  for (final card in small)
+                    SizedBox(width: tileWidth, child: card),
+                ],
+              ),
+              const SizedBox(height: gap),
+              net,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// 2 across on phones, 4 across when four fit; 1 at very large text.
+int _summaryColumns(double width, double scale) {
+  final minTile = 150.0 * (scale < 1.2 ? 1.0 : scale);
+  const gap = AppSpacing.md;
+  if (width >= minTile * 4 + gap * 3 && width >= 700) return 4;
+  if (width >= minTile * 2 + gap) return 2;
+  return 1;
+}
+
+/// One total card. Fixed height (scaled with the text), centred title,
+/// big amount, one-line subtitle; long text shrinks instead of growing.
+class _TotalCard extends StatelessWidget {
+  const _TotalCard({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    this.cardKey,
+    this.valueKey,
+    this.fill,
+    this.gold = false,
+    this.missing,
+  });
+
+  final String title;
+  final String? value;
+  final Widget subtitle;
+  final Key? cardKey;
+  final Key? valueKey;
+  final Color? fill;
+  final bool gold;
+  final Widget? missing;
+
+  static const gloss = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFF2A2A2E), Color(0xFF0B0B0F)],
+  );
+  static const goldGloss = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFFFFF2B0), Color(0xFFF5C02E), Color(0xFFE0A800)],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.statusColors;
+    final edge = sectionGold(context);
+    final ink = gold
+        ? sectionButtonInk
+        : fill != null
+        ? colors.onStatus
+        : Colors.white;
+    final soft = gold ? sectionButtonInk : ink.withValues(alpha: 0.82);
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
+    final height = (gold ? 128.0 : 120.0) * scale;
+    Widget line(Widget child) => SizedBox(
+      width: double.infinity,
+      child: FittedBox(fit: BoxFit.scaleDown, child: child),
+    );
+    return Card(
+      key: cardKey,
+      margin: EdgeInsets.zero,
+      color: fill,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        side: BorderSide(color: edge.withValues(alpha: 0.8), width: 1.2),
+      ),
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          gradient: fill != null ? null : (gold ? goldGloss : gloss),
+          border: Border(top: BorderSide(color: edge, width: 3)),
+        ),
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        child: DefaultTextStyle.merge(
+          style: cairo(11.5, 600, color: soft),
+          maxLines: 1,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              line(Text(title, style: cairo(14, 800, color: ink))),
+              if (missing != null)
+                line(missing!)
+              else
+                line(
+                  MoneyText(
+                    value ?? AppStrings.dash,
+                    key: valueKey,
+                    style: context.textExtras.amountLarge.copyWith(
+                      color: ink,
+                      fontSize: gold ? 30 : 24,
+                    ),
+                  ),
+                ),
+              line(subtitle),
+            ],
+          ),
         ),
       ),
     );

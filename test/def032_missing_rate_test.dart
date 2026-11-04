@@ -176,7 +176,13 @@ Future<void> _runMissingRate(
 
     final card = _egyptianCard();
     expect(_insideCard(card, converted), findsNothing);
-    expect(_insideCard(card, AppStrings.converted), findsNothing);
+    expect(
+      find.descendant(
+        of: card,
+        matching: find.byKey(const Key('egp-converted')),
+      ),
+      findsNothing,
+    );
     expect(_insideCard(card, '0'), findsNothing);
     expect(_insideCard(card, '0 د.ل'), findsNothing);
     expect(_insideCard(card, '0 ج.م'), findsNothing);
@@ -265,14 +271,20 @@ Finder _insideCard(Finder card, String text) {
   return find.descendant(of: card, matching: find.text(text));
 }
 
+/// The Egyptian card's figures by role (Ali, 2026-11-04 layout: big د.ل,
+/// subtitle «ج.م X ÷ rate»). [label] names which figure.
 Finder _labeled(Key screen, String label, String value) {
-  final row = find
-      .ancestor(
-        of: find.descendant(of: find.byKey(screen), matching: find.text(label)),
-        matching: find.byType(Row),
-      )
-      .first;
-  return find.descendant(of: row, matching: find.text(value));
+  final key = switch (label) {
+    AppStrings.egyptianSource => const Key('egp-source'),
+    AppStrings.rate => const Key('egp-rate'),
+    AppStrings.converted => const Key('egp-converted'),
+    _ => throw ArgumentError(label),
+  };
+  final slot = find.descendant(
+    of: find.byKey(screen),
+    matching: find.byKey(key),
+  );
+  return find.descendant(of: slot, matching: find.text(value), matchRoot: true);
 }
 
 Text _amountText(WidgetTester tester, String label, String value) {

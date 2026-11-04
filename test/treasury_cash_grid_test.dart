@@ -8,6 +8,47 @@ import 'support/pump_app.dart';
 
 // Ali, 2026-11-04: سجل الفلوس النشطة as the website's grid.
 void main() {
+  for (final (size, scale) in const [
+    (Size(430, 1400), 1.0),
+    (Size(1280, 900), 1.0),
+    (Size(430, 1800), 1.6),
+  ]) {
+    testWidgets('treasury total cards are equal and in Ali\'s order '
+        '(${size.width.toInt()} x$scale)', (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await pumpFakeApp(tester, size: size);
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/treasury');
+      await settle(tester);
+      Rect card(String title) => tester.getRect(
+        find.ancestor(of: find.text(title), matching: find.byType(Card)).first,
+      );
+      final rects = [
+        for (final t in const [
+          AppStrings.receivables,
+          AppStrings.liabilities,
+          AppStrings.activeCash,
+          AppStrings.egyptianTransfers,
+        ])
+          card(t),
+      ];
+      for (final r in rects) {
+        expect(r.size, rects.first.size);
+      }
+      // RTL order: لنا before علينا, النشطة before المصرية; gold below all.
+      if (rects[0].top == rects[1].top) {
+        expect(rects[0].left, greaterThan(rects[1].left));
+      }
+      expect(rects[2].top, greaterThanOrEqualTo(rects[0].top));
+      final net = card(AppStrings.netTreasury);
+      for (final r in rects) {
+        expect(net.top, greaterThan(r.top));
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final size in const [Size(430, 1400), Size(1280, 800)]) {
     testWidgets('treasury grid at ${size.width.toInt()}: header bar, pinned '
         'columns, oldest first, opening at the newest', (tester) async {

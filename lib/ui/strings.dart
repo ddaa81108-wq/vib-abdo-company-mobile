@@ -320,6 +320,7 @@ abstract final class AppStrings {
   static const reasons = 'الأسباب';
   static const netChange = 'الفرق عن اليوم السابق';
   static const ourDebts = 'ديون لنا';
+  static const activeCashNote = 'يتغير بالدخول والخروج فقط';
   static const activeFunds = 'الأموال النشطة';
   static const egyptian = 'المصري';
   static const egyptianLyd = 'المصري بالليبي';
