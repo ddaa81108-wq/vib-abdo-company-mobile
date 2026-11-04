@@ -187,11 +187,13 @@ void main() {
       tester,
       find.byKey(const Key('settings-link-employees')),
     );
-    expectChevronMirrors(tester, find.byKey(const Key('settings-link-audit')));
     expectChevronMirrors(
       tester,
-      find.byKey(const Key('settings-link-operations')),
+      find.byKey(const Key('settings-link-account')),
     );
+    // The empty admin stand-ins are no longer linked (Ali, 2026-11-04).
+    expect(find.byKey(const Key('settings-link-audit')), findsNothing);
+    expect(find.byKey(const Key('settings-link-operations')), findsNothing);
 
     await go(tester, '/');
     await tester.ensureVisible(find.byKey(const Key('bottom-tab-more')));
