@@ -136,4 +136,53 @@ abstract final class CollectionsText {
   static const reasonRequired = 'اكتب سبب الحركة بوضوح.';
   static const salaryRequired = 'اكتب مرتبًا ثابتًا صحيحًا غير سالب.';
   static const noEmployees = 'لا يوجد موظف استلام مفعّل حاليًا.';
+
+  // Layout from Ali's two pictures (2026-11-03).
+  static const filterBatch = 'دفعة العمل';
+  static const filterEmployee = 'الموظف';
+  static const allEmployees = 'كل الموظفين';
+  static const noOpenBatches = 'لا توجد دفعات مفتوحة';
+  static const searchView = 'بحث في العرض';
+  static const searchViewHint = 'اسم العميل أو الموظف أو الهاتف';
+  static const payrollButton = 'المرتبات';
+  static const payrollBack = 'رجوع إلى الاستلامات';
+  static const exportBatch = 'كشف PDF للدفعة';
+  static const exportDay = 'كشف PDF لليوم';
+  static const closeBatchTitle = 'إغلاق دفعة العمل';
+  static const closeScopeNote =
+      'الإغلاق يشمل الدفعة كاملة، مهما كان الموظف أو البحث المختار.';
+  static String reviewCount(int n) => 'مراجعة: $n';
+  static const cashNotReceived = 'نقدية غير مستلمة:';
+  static const sumApproved = 'المعتمد';
+  static const sumCashReceived = 'المستلم نقداً';
+  static const sumRemaining = 'المتبقي تسليمه';
+  static const sumPending = 'بانتظار الاعتماد';
+  static const operations = 'عملية';
+  static const cardsUnit = 'كارت';
+  static String unlinkedWithin(int n) => 'غير المربوط ضمن هذا العدد: $n';
+  static const summaryNote =
+      'الملخص للدفعة والموظف المختارين. البحث والتبويب لا يغيّران الإجماليات. النقدية السابقة منفصلة.';
+  static const tabAll = 'كل الكروت';
+  static const tabReview = 'بانتظار المراجعة';
+  static const tabCash = 'بانتظار تسليم النقدية';
+  static const tabPrevious = 'نقدية سابقة';
+  static const liveSync = 'متصل بالمزامنة الحية';
+  static const offlineSync = 'غير متصل — آخر بيانات محمّلة';
+  static const emptyReview = 'لا توجد عمليات بانتظار المراجعة.';
+  static const emptyCash = 'لا توجد نقدية بانتظار التسليم.';
+  static const emptyPrevious = 'لا توجد نقدية سابقة.';
+  static const noMatch = 'لا توجد نتائج مطابقة للبحث.';
+  static const cashToHand = 'النقدية المطلوب تسليمها';
+  static const cashToHandNote = 'تشمل أي نقدية سابقة لم تُسلّم';
+  static const tabMyCards = 'كروتي';
+  static const tabMyReceipts = 'تحصيلاتي';
+  static const tabMyCash = 'النقدية';
+  static const searchNameOrPhone = 'بحث بالاسم أو الهاتف';
+  static const searchNameOrPhoneHint = 'اسم العميل أو رقم الهاتف';
+  static const employeeSearchNote =
+      'البحث يغيّر العرض فقط؛ ملخصك يشمل كل تحصيلاتك. اعتماد التحصيل واستلام النقدية من اختصاص الإدارة.';
+  static const noMyReceipts = 'لا توجد تحصيلات مسجلة.';
+  static const approved = 'معتمد';
+  static const rejected = 'مرفوض';
+  static const previousCash = 'نقدية سابقة لم تُسلّم';
 }

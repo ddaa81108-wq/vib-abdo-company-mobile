@@ -275,6 +275,7 @@ void main() {
     final layer = await pumpFakeApp(tester, size: const Size(430, 3200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
+    await openPayroll(tester);
     await pumpUntilFound(tester, find.byKey(const Key('payroll-entry-pe_1')));
     expect(find.byKey(const Key('payroll-confirm-pe_1')), findsNothing);
     expect(find.byKey(const Key('payroll-awaiting-pe_1')), findsOneWidget);
@@ -295,6 +296,7 @@ void main() {
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
     await go(tester, '/collections');
+    await openPayroll(tester);
     final confirm = find.byKey(const Key('payroll-confirm-pe_1'));
     await pumpUntilFound(tester, confirm);
     expect(find.byKey(const Key('payroll-entry-pe_9')), findsNothing);
@@ -384,4 +386,13 @@ Future<void> _pumpDialog(WidgetTester tester) async {
   for (var i = 0; i < 6; i++) {
     await tester.pump(const Duration(milliseconds: 100));
   }
+}
+
+/// Payroll opens from «المرتبات» in the collections action bar.
+Future<void> openPayroll(WidgetTester tester) async {
+  final open = find.byKey(const Key('collections-payroll'));
+  await tester.ensureVisible(open);
+  await tester.tap(open);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 50));
 }

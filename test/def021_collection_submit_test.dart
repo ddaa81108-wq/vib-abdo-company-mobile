@@ -68,11 +68,14 @@ void main() {
         find.byKey(Key('submission-${posted.id}'), skipOffstage: false),
         findsOneWidget,
       );
+      // Standalone receipts are on «تحصيلاتي».
+      await openReceipts(tester);
       expect(
         find.byKey(Key('unlinked-card-${created.id}'), skipOffstage: false),
         findsOneWidget,
       );
       expect(find.text('زبون جديد', skipOffstage: false), findsOneWidget);
+      await openTab(tester, 'cards');
       // One pending receipt per card: both buttons are off now.
       expect(
         tester
@@ -89,12 +92,22 @@ void main() {
         find.byKey(Key('submission-${posted.id}'), skipOffstage: false),
         findsOneWidget,
       );
+      await openReceipts(tester);
       expect(
         find.byKey(Key('unlinked-card-${created.id}'), skipOffstage: false),
         findsOneWidget,
       );
     },
   );
+}
+
+Future<void> openReceipts(WidgetTester tester) => openTab(tester, 'receipts');
+
+Future<void> openTab(WidgetTester tester, String tab) async {
+  final chip = find.byKey(Key('collections-tab-$tab'));
+  await tester.ensureVisible(chip);
+  await tester.tap(chip);
+  await settle(tester);
 }
 
 Future<void> settle(WidgetTester tester) async {

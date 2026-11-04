@@ -52,11 +52,21 @@ class CollectionsExportButton extends ConsumerStatefulWidget {
   const CollectionsExportButton({
     required this.data,
     required this.admin,
+    this.batchId,
+    this.label = AppStrings.exportPdf,
+    this.icon = true,
     super.key,
   });
 
   final CollectionsOverviewDto data;
   final bool admin;
+
+  /// The batch the statement is for (an `openBatches` id), when known.
+  final String? batchId;
+  final String label;
+
+  /// False inside the collections action bar (text-only pills).
+  final bool icon;
 
   static const buttonKey = Key('collections-export-pdf');
   static const busyKey = Key('collections-export-busy');
@@ -72,18 +82,27 @@ class _CollectionsExportButtonState
 
   @override
   Widget build(BuildContext context) {
+    const spinner = SizedBox(
+      key: CollectionsExportButton.busyKey,
+      width: 16,
+      height: 16,
+      child: CircularProgressIndicator(strokeWidth: 2),
+    );
+    final text = Text(widget.label, maxLines: 2, textAlign: TextAlign.center);
+    if (!widget.icon) {
+      return OutlinedButton(
+        key: CollectionsExportButton.buttonKey,
+        onPressed: _busy ? null : _export,
+        child: _busy ? spinner : text,
+      );
+    }
     return OutlinedButton.icon(
       key: CollectionsExportButton.buttonKey,
       onPressed: _busy ? null : _export,
       icon: _busy
-          ? const SizedBox(
-              key: CollectionsExportButton.busyKey,
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
+          ? spinner
           : const Icon(Icons.picture_as_pdf_outlined, size: 18),
-      label: const Text(AppStrings.exportPdf),
+      label: text,
     );
   }
 

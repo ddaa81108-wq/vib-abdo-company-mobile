@@ -19,6 +19,9 @@ void main() {
     await pumpFakeApp(tester, size: const Size(800, 2400));
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
     await go(tester, '/collections');
+    // The employee's standalone receipts are on «تحصيلاتي».
+    await tester.tap(find.byKey(const Key('collections-tab-receipts')));
+    await settle(tester);
 
     expect(find.text('اسم غير مربوط تجريبي'), findsOneWidget);
     // 537f073 does not list a rejected standalone receipt.
@@ -255,10 +258,12 @@ Future<void> reveal(WidgetTester tester, Key key) async {
   await tester.scrollUntilVisible(
     find.byKey(key),
     400,
-    scrollable: find.descendant(
-      of: find.byKey(CollectionsScreen.screenKey),
-      matching: find.byType(Scrollable),
-    ),
+    scrollable: find
+        .descendant(
+          of: find.byKey(CollectionsScreen.screenKey),
+          matching: find.byType(Scrollable),
+        )
+        .first,
   );
   await tester.pump();
 }

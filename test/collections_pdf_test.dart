@@ -6,7 +6,7 @@ import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/features/collections/collections_export.dart';
 import 'package:vib_abdo_company_mobile/features/collections/collections_pdf.dart';
-import 'package:vib_abdo_company_mobile/ui/strings.dart';
+import 'package:vib_abdo_company_mobile/features/collections/collections_strings.dart';
 
 import 'support/phase7_nav.dart';
 import 'support/pump_app.dart';
@@ -39,7 +39,14 @@ void main() {
       final button = find.byKey(CollectionsExportButton.buttonKey);
       expect(button, findsOneWidget);
       expect(
-        find.descendant(of: button, matching: find.text(AppStrings.exportPdf)),
+        find.descendant(
+          of: button,
+          matching: find.text(
+            role == 'admin'
+                ? CollectionsText.exportBatch
+                : CollectionsText.exportDay,
+          ),
+        ),
         findsOneWidget,
       );
       final reads = fake.collectionOverviewReads;

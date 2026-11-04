@@ -129,6 +129,10 @@ void main() {
       await pumpFakeApp(tester, size: const Size(800, 2600));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/collections');
+      // Payroll opens from «المرتبات» in the collections bar.
+      await tester.ensureVisible(find.byKey(const Key('collections-payroll')));
+      await tester.tap(find.byKey(const Key('collections-payroll')));
+      await settle(tester);
 
       await tester.ensureVisible(find.byKey(const Key('payroll-u_12')));
       expect(_inside(const Key('payroll-u_12'), '1,250 د.ل'), findsOneWidget);

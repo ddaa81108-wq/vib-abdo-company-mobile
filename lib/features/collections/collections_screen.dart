@@ -19,24 +19,35 @@ import 'collections_forms.dart';
 import 'collections_payroll.dart';
 import 'collections_export.dart';
 import 'collections_strings.dart';
+import 'collections_view_model.dart';
 import 'phone_dialer.dart';
 import 'unlinked_receipt_actions.dart';
 
-/// استلامات الديون, matched to the deployed website server (537f073).
+/// استلامات الديون, matched to the deployed website server (537f073) and
+/// laid out after Ali's two pictures (2026-11-03), in the app's own dark and
+/// light theme.
 ///
-/// Admin (`collections.decide`): server metrics, employee totals, earlier
-/// cash still to hand over, standalone receipts to link, the employees'
-/// cards with their receipt history (approve / reject, then cash), and the
-/// normal close of a settled batch. Employee: the same metrics, own
-/// standalone receipts, own assigned cards with full / partial receipt.
-/// Payroll for both. Every figure and colour comes from server fields.
-class CollectionsScreen extends ConsumerWidget {
+/// Admin (`collections.decide`): filter card (batch, employee, search),
+/// action bar (payroll, close, PDF), the batch close note, four summary
+/// cards, four tabs with counts and the chosen tab's list. Employee: action
+/// bar (standalone receipt, payroll, PDF), own counts, the cash to hand
+/// over, three tabs, search and the list. Payroll opens from the bar.
+/// Every figure is a server field or derived from the server's lists; see
+/// `collections_view_model.dart`.
+class CollectionsScreen extends ConsumerStatefulWidget {
   const CollectionsScreen({super.key});
 
   static const screenKey = Key('screen-collections');
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CollectionsScreen> createState() => _CollectionsScreenState();
+}
+
+class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
+  var _payroll = false;
+
+  @override
+  Widget build(BuildContext context) {
     final permissions = permissionsOf(ref);
     if (!permissions.canRead(SectionKey.collections)) {
       return const ForbiddenPane();
@@ -48,10 +59,11 @@ class CollectionsScreen extends ConsumerWidget {
     final manage = permissions.canDo(ManagementAction.collectionsDecide);
     final write = permissions.canWrite(SectionKey.collections);
     final payroll = permissions.canDo(ManagementAction.payrollManage);
+    final showPayroll = write || payroll || manage;
     final width = MediaQuery.sizeOf(context).width;
 
     return ListView(
-      key: screenKey,
+      key: CollectionsScreen.screenKey,
       padding: pagePadding(width).copyWith(bottom: AppSpacing.xxl),
       children: [
         const ScreenTitle(CollectionsText.title),
@@ -63,37 +75,44 @@ class CollectionsScreen extends ConsumerWidget {
               ?.copyWith(color: context.look.muted),
         ),
         const SizedBox(height: AppSpacing.md),
-        KeptData<CollectionsOverviewDto>(
-          value: overview,
-          resetKey: 'collections',
-          onRetry: () => ref.invalidate(collectionsProvider),
-          messageOf: (error) =>
-              failureText(ref.read(errorHandlerProvider).toFailure(error)),
-          failureOf: (error) => ref.read(errorHandlerProvider).toFailure(error),
-          loading: const _CollectionsLoading(),
-          builder: (data) => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: CollectionsExportButton(data: data, admin: manage),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              _Hero(data: data, money: money),
-              const SizedBox(height: AppSpacing.md),
-              _Metrics(
-                key: const Key('collections-metrics'),
-                data: data,
-                money: money,
-              ),
-              if (manage)
-                _AdminBody(data: data, money: money)
-              else if (write)
-                _EmployeeBody(data: data, money: money),
-              if (write || payroll || manage) const CollectionsPayrollBlock(),
-            ],
+        if (_payroll && showPayroll) ...[
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: OutlinedButton.icon(
+              key: const Key('collections-payroll-back'),
+              onPressed: () => setState(() => _payroll = false),
+              icon: const Icon(Icons.arrow_forward, size: 18),
+              label: const Text(CollectionsText.payrollBack),
+            ),
           ),
-        ),
+          const CollectionsPayrollBlock(),
+        ] else
+          KeptData<CollectionsOverviewDto>(
+            value: overview,
+            resetKey: 'collections',
+            onRetry: () => ref.invalidate(collectionsProvider),
+            messageOf: (error) =>
+                failureText(ref.read(errorHandlerProvider).toFailure(error)),
+            failureOf: (error) =>
+                ref.read(errorHandlerProvider).toFailure(error),
+            loading: const _CollectionsLoading(),
+            builder: (data) => manage
+                ? _AdminView(
+                    data: data,
+                    money: money,
+                    onPayroll: showPayroll
+                        ? () => setState(() => _payroll = true)
+                        : null,
+                  )
+                : _EmployeeView(
+                    data: data,
+                    money: money,
+                    write: write,
+                    onPayroll: showPayroll
+                        ? () => setState(() => _payroll = true)
+                        : null,
+                  ),
+          ),
       ],
     );
   }
@@ -118,248 +137,299 @@ class _CollectionsLoading extends StatelessWidget {
   }
 }
 
-/// The glossy headline: the server's approved total (`metrics.collectedUnits`).
-class _Hero extends StatelessWidget {
-  const _Hero({required this.data, required this.money});
-
-  final CollectionsOverviewDto data;
-  final MoneyFormatter money;
-
-  @override
-  Widget build(BuildContext context) {
-    final look = context.look;
-    final gloss = look.glossHero;
-    final radius = BorderRadius.circular(AppRadii.xxl);
-    final batch = data.openBatches.isEmpty ? null : data.openBatches.first;
-    return DecoratedBox(
-      key: const Key('collections-hero'),
-      decoration: gloss
-          .decoration(radius)
-          .copyWith(boxShadow: gloss.glowShadow),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: GlossSheen(
-          gloss: gloss,
-          radius: radius,
-          child: Padding(
-            padding: const EdgeInsetsDirectional.all(AppSpacing.xl),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  CollectionsText.totalApproved,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: look.onHeroMuted,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: AlignmentDirectional.centerStart,
-                  child: MoneyText(
-                    money.formatOrDash(data.collectedUnits, Currency.lyd),
-                    key: const Key('collections-hero-amount'),
-                    style: context.textExtras.amountLarge.copyWith(
-                      color: look.heroFigure,
-                    ),
-                  ),
-                ),
-                if (batch != null) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    CollectionsText.batchLabel(
-                      batch.businessDate,
-                      batch.batchNumber,
-                    ),
-                    style: cairo(12, 600, color: look.onHeroMuted),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Metrics extends StatelessWidget {
-  const _Metrics({required this.data, required this.money, super.key});
-
-  final CollectionsOverviewDto data;
-  final MoneyFormatter money;
-
-  @override
-  Widget build(BuildContext context) {
-    final look = context.look;
-    final tiles = <(String, String, String, bool, Gloss)>[
-      (
-        'assigned',
-        CollectionsText.assigned,
-        _count(data.assignedCount),
-        false,
-        look.glossBlue,
-      ),
-      (
-        'executed',
-        CollectionsText.executed,
-        _count(data.executedCount),
-        false,
-        look.glossGreen,
-      ),
-      (
-        'pending',
-        CollectionsText.pending,
-        _count(data.pendingCount),
-        false,
-        look.glossViolet,
-      ),
-      (
-        'unlinked',
-        CollectionsText.unlinked,
-        _count(data.unlinkedPendingCount),
-        false,
-        look.glossGrey,
-      ),
-      (
-        'cash',
-        CollectionsText.cashOutstanding,
-        money.formatOrDash(data.cashOutstandingUnits, Currency.lyd),
-        true,
-        look.glossDebt,
-      ),
-    ];
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final columns = _tight(context, width) ? 1 : 2;
-        const gap = AppSpacing.sm;
-        final tileWidth = columns == 1 ? width : (width - gap) / 2;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
-          children: [
-            for (final tile in tiles)
-              SizedBox(
-                width: tile.$1 == 'cash' && columns == 2 ? width : tileWidth,
-                child: _MetricTile(
-                  key: Key('metric-${tile.$1}'),
-                  label: tile.$2,
-                  value: tile.$3,
-                  money: tile.$4,
-                  gloss: tile.$5,
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _MetricTile extends StatelessWidget {
-  const _MetricTile({
-    required this.label,
-    required this.value,
-    required this.money,
-    required this.gloss,
-    super.key,
-  });
-
-  final String label;
-  final String value;
-  final bool money;
-  final Gloss gloss;
-
-  @override
-  Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(AppRadii.xl);
-    final style = context.textExtras.amount.copyWith(color: gloss.amount);
-    return DecoratedBox(
-      decoration: gloss
-          .decoration(radius)
-          .copyWith(boxShadow: gloss.glowShadow),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: GlossSheen(
-          gloss: gloss,
-          radius: radius,
-          child: Padding(
-            padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: cairo(12, 600, color: gloss.ink)),
-                const SizedBox(height: AppSpacing.xs),
-                if (money)
-                  MoneyText(value, style: style)
-                else
-                  Text(value, textDirection: TextDirection.ltr, style: style),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ---------------------------------------------------------------- admin
 
-class _AdminBody extends ConsumerWidget {
-  const _AdminBody({required this.data, required this.money});
+class _AdminView extends ConsumerStatefulWidget {
+  const _AdminView({
+    required this.data,
+    required this.money,
+    required this.onPayroll,
+  });
 
   final CollectionsOverviewDto data;
   final MoneyFormatter money;
+  final VoidCallback? onPayroll;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_AdminView> createState() => _AdminViewState();
+}
+
+class _AdminViewState extends ConsumerState<_AdminView> {
+  String? _batchId;
+  String? _employee;
+  var _tab = AdminTab.all;
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = widget.data;
+    final money = widget.money;
+    final batches = data.openBatches;
+    // A batch that was closed meanwhile falls back to the newest open one.
+    final batch =
+        batches.where((b) => b.id == _batchId).firstOrNull ??
+        batches.firstOrNull;
+    final employees = employeeOptions(data);
+    final employee = employees.contains(_employee) ? _employee : null;
+    final filter = CollectionsFilter(
+      batchId: batch?.id,
+      employee: employee,
+      query: _search.text,
+    );
+    final summary = CollectionsSummary.of(data, filter);
+    final settlement = BatchSettlement.of(data, batch?.id);
+    final rows = {
+      for (final tab in AdminTab.values) tab: adminTabRows(data, filter, tab),
+    };
     final permissions = permissionsOf(ref);
-    final cash = permissions.canDo(ManagementAction.collectionsCashReceived);
     final close = permissions.canDo(ManagementAction.collectionsCloseDay);
+    final look = context.look;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (data.employeeTotals.isNotEmpty) ...[
-          const CollectionsHeading(
-            CollectionsText.employeeTotals,
-            note: CollectionsText.employeeTotalsNote,
+        CollectionsPanel(
+          key: const Key('collections-filter-card'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _FieldPair(
+                first: _LabeledField(
+                  label: CollectionsText.filterBatch,
+                  child: DropdownButtonFormField<String>(
+                    key: const Key('collections-filter-batch'),
+                    initialValue: batch?.id,
+                    isExpanded: true,
+                    hint: const Text(CollectionsText.noOpenBatches),
+                    items: [
+                      for (final b in batches)
+                        DropdownMenuItem(
+                          value: b.id,
+                          child: Text(
+                            CollectionsText.batchLabel(
+                              b.businessDate,
+                              b.batchNumber,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            style: cairo(13, 700, color: look.ink),
+                          ),
+                        ),
+                    ],
+                    onChanged: batches.isEmpty
+                        ? null
+                        : (id) => setState(() => _batchId = id),
+                  ),
+                ),
+                second: _LabeledField(
+                  label: CollectionsText.filterEmployee,
+                  child: DropdownButtonFormField<String?>(
+                    key: const Key('collections-filter-employee'),
+                    initialValue: employee,
+                    isExpanded: true,
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(
+                          CollectionsText.allEmployees,
+                          style: cairo(13, 700, color: look.ink),
+                        ),
+                      ),
+                      for (final name in employees)
+                        DropdownMenuItem<String?>(
+                          value: name,
+                          child: Text(
+                            name,
+                            overflow: TextOverflow.ellipsis,
+                            style: cairo(13, 700, color: look.ink),
+                          ),
+                        ),
+                    ],
+                    onChanged: (name) => setState(() => _employee = name),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _LabeledField(
+                label: CollectionsText.searchView,
+                child: TextField(
+                  key: const Key('collections-search'),
+                  controller: _search,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    hintText: CollectionsText.searchViewHint,
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _ActionBar(
+                key: const Key('collections-action-bar'),
+                children: [
+                  if (widget.onPayroll != null)
+                    _BarButton(
+                      buttonKey: const Key('collections-payroll'),
+                      label: CollectionsText.payrollButton,
+                      onPressed: widget.onPayroll,
+                    ),
+                  if (close) _CloseBatchButton(batch: batch),
+                  CollectionsExportButton(
+                    data: data,
+                    admin: true,
+                    batchId: batch?.id,
+                    label: CollectionsText.exportBatch,
+                    icon: false,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Divider(color: look.cardBorder, height: 1),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                CollectionsText.closeBatchTitle,
+                style: cairo(15, 800, color: look.ink),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                CollectionsText.closeScopeNote,
+                style: cairo(12, 500, color: look.muted),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Wrap(
+                key: const Key('close-batch-note'),
+                spacing: AppSpacing.lg,
+                runSpacing: AppSpacing.xxs,
+                children: [
+                  Text(
+                    CollectionsText.reviewCount(settlement.reviewCount),
+                    key: const Key('close-batch-review'),
+                    style: cairo(13, 600, color: look.ink),
+                  ),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        '${CollectionsText.cashNotReceived} ',
+                        style: cairo(13, 600, color: look.ink),
+                      ),
+                      MoneyText(
+                        _money(money, settlement.cashUnits),
+                        key: const Key('close-batch-cash'),
+                        style: cairo(13, 700, color: look.ink),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
           ),
-          _EmployeeTotals(rows: data.employeeTotals, money: money),
-        ],
-        if (data.outstandingCash.isNotEmpty) ...[
-          const CollectionsHeading(
-            CollectionsText.outstandingTitle,
-            note: CollectionsText.outstandingNote,
-          ),
-          for (final item in data.outstandingCash)
-            _OutstandingRow(item: item, money: money, cash: cash),
-        ],
-        if (data.unlinkedReceipts.isNotEmpty) ...[
-          const CollectionsHeading(
-            CollectionsText.unlinkedAdminTitle,
-            note: CollectionsText.unlinkedAdminNote,
-          ),
-          for (final receipt in data.unlinkedReceipts)
-            _AdminUnlinkedCard(receipt: receipt, money: money),
-        ],
-        const CollectionsHeading(CollectionsText.followTitle),
-        if (data.assignments.isEmpty)
-          const EmptyPane(
-            key: Key('collections-empty-assignments'),
-            message: CollectionsText.noCards,
-          )
-        else
-          for (final assignment in data.assignments)
-            _AssignmentCard(
-              assignment: assignment,
-              history: collectionCardHistory(data, assignment.id),
-              money: money,
-              admin: true,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _Grid2(
+          key: const Key('collections-metrics'),
+          children: [
+            _SummaryCard(
+              key: const Key('metric-approved'),
+              title: CollectionsText.sumApproved,
+              value: _money(money, summary.approvedUnits),
+              money: true,
+              edge: look.accent,
             ),
-        if (close && data.openBatches.isNotEmpty)
-          _CloseBatch(data: data, money: money),
+            _SummaryCard(
+              key: const Key('metric-cash-received'),
+              title: CollectionsText.sumCashReceived,
+              value: _money(money, summary.cashReceivedUnits),
+              money: true,
+              edge: look.success,
+            ),
+            _SummaryCard(
+              key: const Key('metric-remaining'),
+              title: CollectionsText.sumRemaining,
+              value: _money(money, summary.remainingUnits),
+              money: true,
+              edge: _amber(context),
+            ),
+            _SummaryCard(
+              key: const Key('metric-pending'),
+              title: CollectionsText.sumPending,
+              value: '${summary.pendingCount}',
+              unit: CollectionsText.operations,
+              note: CollectionsText.unlinkedWithin(
+                summary.unlinkedPendingCount,
+              ),
+              edge: look.violet,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          CollectionsText.summaryNote,
+          style: cairo(12, 500, color: look.muted),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _Grid2(
+          key: const Key('collections-tabs'),
+          tight: true,
+          children: [
+            for (final tab in AdminTab.values)
+              _TabChip(
+                key: Key('collections-tab-${tab.name}'),
+                countKey: Key('collections-tab-count-${tab.name}'),
+                label: _adminTabLabel(tab),
+                count: rows[tab]!.count,
+                selected: _tab == tab,
+                onTap: () => setState(() => _tab = tab),
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _ListCard(
+          key: const Key('collections-list'),
+          title: _adminTabLabel(_tab),
+          trailing: const _SyncStatus(),
+          child: _AdminList(
+            data: data,
+            rows: rows[_tab]!,
+            money: money,
+            empty: _search.text.trim().isNotEmpty
+                ? CollectionsText.noMatch
+                : switch (_tab) {
+                    AdminTab.all => CollectionsText.noCards,
+                    AdminTab.review => CollectionsText.emptyReview,
+                    AdminTab.cash => CollectionsText.emptyCash,
+                    AdminTab.previous => CollectionsText.emptyPrevious,
+                  },
+          ),
+        ),
+        if (data.employeeTotals.isNotEmpty)
+          _EmployeeTotalsSection(rows: data.employeeTotals, money: money),
+      ],
+    );
+  }
+}
+
+/// 537 `employeeTotals` (admin only), kept under the list as before.
+class _EmployeeTotalsSection extends StatelessWidget {
+  const _EmployeeTotalsSection({required this.rows, required this.money});
+
+  final List<EmployeeTotalDto> rows;
+  final MoneyFormatter money;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const CollectionsHeading(
+          CollectionsText.employeeTotals,
+          note: CollectionsText.employeeTotalsNote,
+        ),
+        _EmployeeTotals(rows: rows, money: money),
       ],
     );
   }
@@ -393,8 +463,8 @@ class _EmployeeTotals extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.xxs),
                       Text(
-                        '${CollectionsText.approvedShort} ${_count(row.approvedCount)} · '
-                        '${CollectionsText.waitingShort} ${_count(row.pendingCount)}',
+                        '${CollectionsText.approvedShort} ${row.approvedCount ?? AppStrings.dash} · '
+                        '${CollectionsText.waitingShort} ${row.pendingCount ?? AppStrings.dash}',
                         style: cairo(12, 500, color: look.muted),
                       ),
                     ],
@@ -407,6 +477,55 @@ class _EmployeeTotals extends StatelessWidget {
               ],
             ),
           ),
+      ],
+    );
+  }
+}
+
+String _adminTabLabel(AdminTab tab) => switch (tab) {
+  AdminTab.all => CollectionsText.tabAll,
+  AdminTab.review => CollectionsText.tabReview,
+  AdminTab.cash => CollectionsText.tabCash,
+  AdminTab.previous => CollectionsText.tabPrevious,
+};
+
+class _AdminList extends ConsumerWidget {
+  const _AdminList({
+    required this.data,
+    required this.rows,
+    required this.money,
+    required this.empty,
+  });
+
+  final CollectionsOverviewDto data;
+  final AdminTabRows rows;
+  final MoneyFormatter money;
+  final String empty;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cash = permissionsOf(ref)
+        .canDo(ManagementAction.collectionsCashReceived);
+    if (rows.isEmpty) {
+      return _EmptyLine(
+        key: const Key('collections-empty-assignments'),
+        text: empty,
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final assignment in rows.assignments)
+          _AssignmentCard(
+            assignment: assignment,
+            history: collectionCardHistory(data, assignment.id),
+            money: money,
+            admin: true,
+          ),
+        for (final receipt in rows.unlinked)
+          _AdminUnlinkedCard(receipt: receipt, money: money),
+        for (final item in rows.outstanding)
+          _OutstandingRow(item: item, money: money, cash: cash),
       ],
     );
   }
@@ -550,155 +669,801 @@ class _AdminUnlinkedCard extends ConsumerWidget {
   }
 }
 
-class _CloseBatch extends ConsumerStatefulWidget {
-  const _CloseBatch({required this.data, required this.money});
+// ------------------------------------------------------------- employee
+
+class _EmployeeView extends ConsumerStatefulWidget {
+  const _EmployeeView({
+    required this.data,
+    required this.money,
+    required this.write,
+    required this.onPayroll,
+  });
 
   final CollectionsOverviewDto data;
   final MoneyFormatter money;
+  final bool write;
+  final VoidCallback? onPayroll;
 
   @override
-  ConsumerState<_CloseBatch> createState() => _CloseBatchState();
+  ConsumerState<_EmployeeView> createState() => _EmployeeViewState();
 }
 
-class _CloseBatchState extends ConsumerState<_CloseBatch> {
-  String? _selected;
+class _EmployeeViewState extends ConsumerState<_EmployeeView> {
+  var _tab = EmployeeTab.cards;
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final batches = widget.data.openBatches;
-    final batch = batches.firstWhere(
-      (b) => b.id == _selected,
-      orElse: () => batches.first,
-    );
+    final data = widget.data;
+    final money = widget.money;
+    final online = ref.watch(onlineProvider);
     final look = context.look;
+    final rows = employeeTabRows(data, _search.text, _tab);
+    final title = switch (_tab) {
+      EmployeeTab.cards => CollectionsText.myCardsTitle,
+      EmployeeTab.receipts => CollectionsText.tabMyReceipts,
+      EmployeeTab.cash => CollectionsText.cashToHand,
+    };
+    final empty = _search.text.trim().isNotEmpty
+        ? CollectionsText.noMatch
+        : switch (_tab) {
+            EmployeeTab.cards => CollectionsText.noMyCards,
+            EmployeeTab.receipts => CollectionsText.noMyReceipts,
+            EmployeeTab.cash => CollectionsText.emptyCash,
+          };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const CollectionsHeading(CollectionsText.closeBatch),
-        CollectionsPanel(
-          key: const Key('close-batch-panel'),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (batches.length > 1)
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: [
-                    for (final b in batches)
-                      ChoiceChip(
-                        key: Key('close-batch-pick-${b.id}'),
-                        selected: b.id == batch.id,
-                        label: Text(
-                          CollectionsText.batchLabel(
-                            b.businessDate,
-                            b.batchNumber,
-                          ),
-                        ),
-                        onSelected: (_) => setState(() => _selected = b.id),
-                      ),
-                  ],
-                )
-              else
-                Text(
-                  CollectionsText.batchLabel(
-                    batch.businessDate,
-                    batch.batchNumber,
-                  ),
-                  style: cairo(13, 600, color: look.muted),
+        _ActionBar(
+          key: const Key('collections-action-bar'),
+          children: [
+            if (widget.write)
+              _BarButton(
+                buttonKey: const Key('unlinked-collection'),
+                label: CollectionsText.createStandalone,
+                onPressed: online
+                    ? () => showAppForm<void>(
+                        context,
+                        const UnlinkedReceiptForm(),
+                      )
+                    : null,
+              ),
+            if (widget.onPayroll != null)
+              _BarButton(
+                buttonKey: const Key('collections-payroll'),
+                label: CollectionsText.payrollButton,
+                onPressed: widget.onPayroll,
+              ),
+            CollectionsExportButton(
+              data: data,
+              admin: false,
+              batchId: data.openBatches.firstOrNull?.id,
+              label: CollectionsText.exportDay,
+              icon: false,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _Grid2(
+          key: const Key('collections-metrics'),
+          children: [
+            _SummaryCard(
+              key: const Key('metric-assigned'),
+              title: CollectionsText.myCardsTitle,
+              // 537 `assignedCount` (= the caller's active cards).
+              value: '${data.assignedCount ?? data.assignments.length}',
+              unit: CollectionsText.cardsUnit,
+              edge: _amber(context),
+            ),
+            _SummaryCard(
+              key: const Key('metric-pending'),
+              title: CollectionsText.sumPending,
+              // 537 metrics.pendingCount + metrics.unlinkedPendingCount.
+              value:
+                  '${(data.pendingCount ?? 0) + (data.unlinkedPendingCount ?? 0)}',
+              unit: CollectionsText.operations,
+              edge: look.violet,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _SummaryCard(
+          key: const Key('metric-cash'),
+          title: CollectionsText.cashToHand,
+          // 537 metrics.cashOutstandingUnits: own approved, cash not
+          // received, earlier batches and cancelled cards included.
+          value: money.formatOrDash(data.cashOutstandingUnits, Currency.lyd),
+          money: true,
+          note: CollectionsText.cashToHandNote,
+          edge: _amber(context),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Row(
+          key: const Key('collections-tabs'),
+          children: [
+            for (final tab in EmployeeTab.values) ...[
+              if (tab != EmployeeTab.values.first)
+                const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _TabChip(
+                  key: Key('collections-tab-${tab.name}'),
+                  label: switch (tab) {
+                    EmployeeTab.cards => CollectionsText.tabMyCards,
+                    EmployeeTab.receipts => CollectionsText.tabMyReceipts,
+                    EmployeeTab.cash => CollectionsText.tabMyCash,
+                  },
+                  selected: _tab == tab,
+                  onTap: () => setState(() => _tab = tab),
                 ),
-              const SizedBox(height: AppSpacing.sm),
-              GuardedMutation(
-                buttonKey: const Key('close-batch'),
-                inputs: 'close:${batch.id}',
-                label: CollectionsText.closeBatch,
-                confirmText: CollectionsText.closeConfirm,
-                destructive: true,
-                onVersionConflict: () => ref.invalidate(collectionsProvider),
-                onSubmit: (meta) => _close(batch.id, meta),
               ),
             ],
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _LabeledField(
+          label: CollectionsText.searchNameOrPhone,
+          child: TextField(
+            key: const Key('collections-search'),
+            controller: _search,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              hintText: CollectionsText.searchNameOrPhoneHint,
+              prefixIcon: Icon(Icons.search),
+            ),
           ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          CollectionsText.employeeSearchNote,
+          style: cairo(12, 500, color: look.muted),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _ListCard(
+          key: const Key('collections-list'),
+          title: title,
+          pill: true,
+          trailing: const _SyncStatus(),
+          child: rows.isEmpty
+              ? _EmptyLine(
+                  key: const Key('collections-empty-assignments'),
+                  text: empty,
+                  large: true,
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final assignment in rows.assignments)
+                      _AssignmentCard(
+                        assignment: assignment,
+                        history: collectionCardHistory(data, assignment.id),
+                        money: money,
+                        admin: false,
+                      ),
+                    for (final submission in rows.submissions)
+                      _ReceiptRow(submission: submission, money: money),
+                    for (final receipt in rows.unlinked)
+                      _EmployeeUnlinkedCard(receipt: receipt, money: money),
+                    for (final item in rows.outstanding)
+                      _OutstandingRow(item: item, money: money, cash: false),
+                  ],
+                ),
         ),
       ],
     );
   }
+}
 
-  Future<String?> _close(String batchId, MutationMeta meta) async {
-    try {
-      await ref
-          .read(apiLayerProvider)
-          .collections
-          .closeDay(batchId: batchId, meta: meta);
-    } on ConflictException catch (error) {
-      // COLLECTION_DAY_NOT_SETTLED: the server message names what is left.
-      ref.invalidate(collectionsProvider);
-      return error.message;
-    }
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(CollectionsText.batchClosed)),
-      );
-    }
-    ref.invalidate(collectionsProvider);
-    return null;
+/// One own receipt on «تحصيلاتي» / «النقدية»: customer, kind, amount and
+/// the server status (pending / approved / rejected, then cash).
+class _ReceiptRow extends StatelessWidget {
+  const _ReceiptRow({required this.submission, required this.money});
+
+  final CollectionSubmissionDto submission;
+  final MoneyFormatter money;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final gloss = switch (submission.status) {
+      'approved' => look.glossCredit,
+      'rejected' => look.glossGrey,
+      _ => look.glossViolet,
+    };
+    final state = switch (submission.status) {
+      'pending' => CollectionsText.awaitingApproval,
+      'approved' =>
+        submission.cashReceivedAt != null
+            ? CollectionsText.cashReceived
+            : CollectionsText.waitingCashFromAdmin,
+      _ => CollectionsText.rejected,
+    };
+    return Padding(
+      key: Key('my-receipt-${submission.id}'),
+      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
+      child: _HistoryLine(
+        gloss: gloss,
+        title: [
+          submission.customerName ?? '',
+          submission.mode == 'full'
+              ? CollectionsText.fullReceipt
+              : CollectionsText.partialReceipt,
+        ].where((s) => s.isNotEmpty).join(' — '),
+        amount: money.formatOrDash(submission.amountUnits, Currency.lyd),
+        trailing: submission.businessDate,
+        status: _Badge(text: state, gloss: gloss, strong: true),
+      ),
+    );
   }
 }
 
-// ------------------------------------------------------------- employee
+// --------------------------------------------------------------- layout
 
-class _EmployeeBody extends ConsumerWidget {
-  const _EmployeeBody({required this.data, required this.money});
+/// Two fields side by side, or stacked when the line is tight.
+class _FieldPair extends StatelessWidget {
+  const _FieldPair({required this.first, required this.second});
 
-  final CollectionsOverviewDto data;
-  final MoneyFormatter money;
+  final Widget first;
+  final Widget second;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (_tight(context, constraints.maxWidth)) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              first,
+              const SizedBox(height: AppSpacing.sm),
+              second,
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: first),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: second),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _LabeledField extends StatelessWidget {
+  const _LabeledField({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(label, style: cairo(13, 700, color: context.look.ink)),
+        const SizedBox(height: AppSpacing.xs),
+        child,
+      ],
+    );
+  }
+}
+
+/// The glossy bar of pill buttons (the website's green bar, in the app's
+/// hero gloss). Buttons inside take the bar's colours.
+class _ActionBar extends StatelessWidget {
+  const _ActionBar({required this.children, super.key});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final gloss = look.glossHero;
+    final radius = BorderRadius.circular(AppRadii.xl);
+    final on = look.onHero;
+    final pill = ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size.fromHeight(46)),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsetsDirectional.symmetric(horizontal: AppSpacing.sm),
+      ),
+      shape: const WidgetStatePropertyAll(StadiumBorder()),
+      foregroundColor: WidgetStateProperty.resolveWith(
+        (s) =>
+            s.contains(WidgetState.disabled) ? on.withValues(alpha: 0.5) : on,
+      ),
+      backgroundColor: WidgetStatePropertyAll(on.withValues(alpha: 0.12)),
+      side: WidgetStatePropertyAll(
+        BorderSide(color: on.withValues(alpha: 0.55)),
+      ),
+      textStyle: WidgetStatePropertyAll(cairo(13, 800)),
+      iconColor: WidgetStatePropertyAll(on),
+    );
+    final theme = Theme.of(context);
+    final barTheme = theme.copyWith(
+      filledButtonTheme: FilledButtonThemeData(style: pill),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: pill),
+      textButtonTheme: TextButtonThemeData(style: pill),
+      textTheme: theme.textTheme.apply(bodyColor: on, displayColor: on),
+    );
+    return DecoratedBox(
+      decoration: gloss
+          .decoration(radius)
+          .copyWith(boxShadow: gloss.glowShadow),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: GlossSheen(
+          gloss: gloss,
+          radius: radius,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.all(AppSpacing.sm),
+            child: Theme(
+              data: barTheme,
+              child: DefaultTextStyle.merge(
+                style: TextStyle(color: on),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final narrow =
+                        _tight(context, constraints.maxWidth) ||
+                        constraints.maxWidth / children.length < 104;
+                    if (narrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final child in children) ...[
+                            if (child != children.first)
+                              const SizedBox(height: AppSpacing.xs),
+                            child,
+                          ],
+                        ],
+                      );
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final child in children) ...[
+                          if (child != children.first)
+                            const SizedBox(width: AppSpacing.xs),
+                          Expanded(child: child),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BarButton extends StatelessWidget {
+  const _BarButton({
+    required this.buttonKey,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final Key buttonKey;
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      key: buttonKey,
+      onPressed: onPressed,
+      child: Text(label, maxLines: 2, textAlign: TextAlign.center),
+    );
+  }
+}
+
+/// «إغلاق ومسح الدفعة» for the chosen batch. 537 refuses an unsettled
+/// batch (COLLECTION_DAY_NOT_SETTLED); that message is shown, never hidden.
+class _CloseBatchButton extends ConsumerWidget {
+  const _CloseBatchButton({required this.batch});
+
+  final CollectionBatchDto? batch;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final batch = this.batch;
+    if (batch == null) {
+      return const OutlinedButton(
+        key: Key('close-batch'),
+        onPressed: null,
+        child: Text(CollectionsText.closeBatch, textAlign: TextAlign.center),
+      );
+    }
+    return GuardedMutation(
+      buttonKey: const Key('close-batch'),
+      inputs: 'close:${batch.id}',
+      label: CollectionsText.closeBatch,
+      confirmText: CollectionsText.closeConfirm,
+      destructive: true,
+      onVersionConflict: () => ref.invalidate(collectionsProvider),
+      onSubmit: (meta) async {
+        try {
+          await ref
+              .read(apiLayerProvider)
+              .collections
+              .closeDay(batchId: batch.id, meta: meta);
+        } on ConflictException catch (error) {
+          ref.invalidate(collectionsProvider);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text(error.message)));
+          }
+          return error.message;
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text(CollectionsText.batchClosed)),
+          );
+        }
+        ref.invalidate(collectionsProvider);
+        return null;
+      },
+    );
+  }
+}
+
+/// Two equal columns (one when tight); each row's cells share a height.
+class _Grid2 extends StatelessWidget {
+  const _Grid2({required this.children, this.tight = false, super.key});
+
+  final List<Widget> children;
+  final bool tight;
+
+  @override
+  Widget build(BuildContext context) {
+    final gap = tight ? AppSpacing.sm : AppSpacing.sm;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (_tight(context, constraints.maxWidth)) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final child in children) ...[
+                if (child != children.first) SizedBox(height: gap),
+                child,
+              ],
+            ],
+          );
+        }
+        final lines = <Widget>[];
+        for (var i = 0; i < children.length; i += 2) {
+          if (i > 0) lines.add(SizedBox(height: gap));
+          lines.add(
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: children[i]),
+                  SizedBox(width: gap),
+                  Expanded(
+                    child: i + 1 < children.length
+                        ? children[i + 1]
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: lines,
+        );
+      },
+    );
+  }
+}
+
+/// A summary card with a coloured start edge, as in the pictures.
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({
+    required this.title,
+    required this.value,
+    required this.edge,
+    this.money = false,
+    this.unit,
+    this.note,
+    super.key,
+  });
+
+  final String title;
+  final String value;
+  final Color edge;
+  final bool money;
+  final String? unit;
+  final String? note;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final radius = BorderRadius.circular(AppRadii.xl);
+    final figure = context.textExtras.amount.copyWith(color: look.ink);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: look.card,
+        borderRadius: radius,
+        border: Border.all(color: look.cardBorder),
+        boxShadow: look.glass
+            ? null
+            : const [
+                BoxShadow(
+                  color: Color(0x140F172A),
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
+                ),
+              ],
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: BorderDirectional(start: BorderSide(color: edge, width: 5)),
+          ),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: cairo(14, 800, color: look.ink)),
+                const SizedBox(height: AppSpacing.sm),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: money
+                      ? MoneyText(value, style: figure)
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              value,
+                              textDirection: TextDirection.ltr,
+                              style: figure,
+                            ),
+                            if (unit != null) ...[
+                              const SizedBox(width: AppSpacing.xs),
+                              Text(
+                                unit!,
+                                style: cairo(13, 600, color: look.muted),
+                              ),
+                            ],
+                          ],
+                        ),
+                ),
+                if (note != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(note!, style: cairo(11, 500, color: look.muted)),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A tab with an optional count; the chosen one wears the hero gloss.
+class _TabChip extends StatelessWidget {
+  const _TabChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.count,
+    this.countKey,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final int? count;
+  final Key? countKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final gloss = look.glossHero;
+    final radius = BorderRadius.circular(AppRadii.xl);
+    final ink = selected ? look.onHero : look.ink;
+    final body = Padding(
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.md,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: cairo(13, 800, color: ink),
+            ),
+          ),
+          if (count != null) ...[
+            const SizedBox(width: AppSpacing.xs),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: ink.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppRadii.sm),
+              ),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.symmetric(
+                  horizontal: AppSpacing.xs,
+                  vertical: 2,
+                ),
+                child: Text(
+                  '$count',
+                  key: countKey,
+                  textDirection: TextDirection.ltr,
+                  style: cairo(12, 800, color: ink),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          child: selected
+              ? DecoratedBox(
+                  decoration: gloss
+                      .decoration(radius)
+                      .copyWith(boxShadow: gloss.glowShadow),
+                  child: ClipRRect(
+                    borderRadius: radius,
+                    child: GlossSheen(
+                      gloss: gloss,
+                      radius: radius,
+                      child: body,
+                    ),
+                  ),
+                )
+              : DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: look.card,
+                    borderRadius: radius,
+                    border: Border.all(color: look.cardBorder),
+                  ),
+                  child: body,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The chosen tab's list, under its title (a gloss pill for the employee).
+class _ListCard extends StatelessWidget {
+  const _ListCard({
+    required this.title,
+    required this.child,
+    this.trailing,
+    this.pill = false,
+    super.key,
+  });
+
+  final String title;
+  final Widget child;
+  final Widget? trailing;
+  final bool pill;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final gloss = look.glossHero;
+    final radius = BorderRadius.circular(AppRadii.pill);
+    final heading = pill
+        ? DecoratedBox(
+            decoration: gloss.decoration(radius),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.sm,
+              ),
+              child: Text(title, style: cairo(16, 800, color: look.onHero)),
+            ),
+          )
+        : Text(title, style: cairo(18, 800, color: look.ink));
+    return CollectionsPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            children: [heading, ?trailing],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+/// The app polls `/api/events` while online and signed in, so «live» here
+/// is the connection the realtime refresh runs on.
+class _SyncStatus extends ConsumerWidget {
+  const _SyncStatus();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final online = ref.watch(onlineProvider);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final look = context.look;
+    return Row(
+      key: const Key('collections-sync-status'),
+      mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(height: AppSpacing.md),
-        GatedButton(
-          buttonKey: const Key('unlinked-collection'),
-          allowed: true,
-          online: online,
-          label: CollectionsText.createStandalone,
-          onPressed: () =>
-              showAppForm<void>(context, const UnlinkedReceiptForm()),
-        ),
-        if (data.outstandingCash.isNotEmpty) ...[
-          const CollectionsHeading(
-            CollectionsText.outstandingTitle,
-            note: CollectionsText.outstandingNote,
+        Icon(Icons.circle, size: 8, color: online ? look.success : look.danger),
+        const SizedBox(width: AppSpacing.xxs),
+        Flexible(
+          child: Text(
+            online ? CollectionsText.liveSync : CollectionsText.offlineSync,
+            style: cairo(12, 500, color: look.muted),
           ),
-          for (final item in data.outstandingCash)
-            _OutstandingRow(item: item, money: money, cash: false),
-        ],
-        if (data.unlinkedReceipts.isNotEmpty) ...[
-          const CollectionsHeading(CollectionsText.myUnlinkedTitle),
-          for (final receipt in data.unlinkedReceipts)
-            _EmployeeUnlinkedCard(receipt: receipt, money: money),
-        ],
-        const CollectionsHeading(CollectionsText.myCardsTitle),
-        if (data.assignments.isEmpty)
-          const EmptyPane(
-            key: Key('collections-empty-assignments'),
-            message: CollectionsText.noMyCards,
-          )
-        else
-          for (final assignment in data.assignments)
-            _AssignmentCard(
-              assignment: assignment,
-              history: collectionCardHistory(data, assignment.id),
-              money: money,
-              admin: false,
-            ),
+        ),
       ],
     );
   }
 }
+
+class _EmptyLine extends StatelessWidget {
+  const _EmptyLine({required this.text, this.large = false, super.key});
+
+  final String text;
+  final bool large;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.symmetric(vertical: AppSpacing.lg),
+      child: Text(
+        text,
+        style: cairo(large ? 18 : 14, 600, color: context.look.muted),
+      ),
+    );
+  }
+}
+
+String _money(MoneyFormatter money, int units) =>
+    money.formatOrDash(MoneyValue.known(units), Currency.lyd);
+
+/// The pictures' gold, as an amber that reads on both themes.
+Color _amber(BuildContext context) =>
+    context.look.glass ? const Color(0xFFFBBF24) : const Color(0xFFB45309);
 
 class _EmployeeUnlinkedCard extends StatelessWidget {
   const _EmployeeUnlinkedCard({required this.receipt, required this.money});
@@ -1337,8 +2102,6 @@ class CollectionsHeading extends StatelessWidget {
     );
   }
 }
-
-String _count(int? value) => value == null ? AppStrings.dash : '$value';
 
 /// One column when the line is narrow or the text scale would clip a pair.
 bool _tight(BuildContext context, double maxWidth) {

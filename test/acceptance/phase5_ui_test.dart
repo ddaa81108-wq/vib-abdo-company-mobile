@@ -24,11 +24,13 @@ void main() {
     expect(find.byKey(const Key('collections-metrics')), findsOneWidget);
     expect(find.text(AppStrings.employeeTotals), findsOneWidget);
     expect(find.text('موظف استلام تجريبي'), findsWidgets);
-    expect(find.text(AppStrings.payroll), findsOneWidget);
-    expect(find.byKey(const Key('payroll-u_12')), findsOneWidget);
-    expect(find.byKey(const Key('payroll-u_1')), findsNothing);
     expect(find.byKey(const Key('approve-sb_1')), findsOneWidget);
     expect(find.byKey(const Key('reject-sb_1')), findsOneWidget);
+    // Payroll opens from «المرتبات» in the collections bar.
+    await _openPayroll(tester);
+    expect(_heading(AppStrings.payroll), findsOneWidget);
+    expect(find.byKey(const Key('payroll-u_12')), findsOneWidget);
+    expect(find.byKey(const Key('payroll-u_1')), findsNothing);
 
     await go(tester, '/settings');
     expect(find.byKey(const Key('financial-ledger')), findsOneWidget);
@@ -48,12 +50,13 @@ void main() {
 
     expect(find.text(AppStrings.employeeTotals), findsOneWidget);
     expect(find.byKey(const Key('collections-metrics')), findsOneWidget);
-    expect(find.text(AppStrings.myPayroll), findsOneWidget);
-    expect(find.text(AppStrings.payroll), findsNothing);
     expect(find.byKey(const Key('approve-sb_1')), findsOneWidget);
     expect(find.byKey(const Key('reject-sb_1')), findsOneWidget);
     expect(find.byKey(const Key('cash-sb_2')), findsNothing);
     expect(find.byKey(const Key('close-batch')), findsNothing);
+    await _openPayroll(tester);
+    expect(_heading(AppStrings.myPayroll), findsOneWidget);
+    expect(_heading(AppStrings.payroll), findsNothing);
 
     for (final path in _adminPaths) {
       await go(tester, path);
@@ -88,12 +91,13 @@ void main() {
     // server to their own rows. Other employees' totals never show.
     expect(find.byKey(const Key('collections-metrics')), findsOneWidget);
     expect(find.byKey(const Key('employee-totals')), findsNothing);
-    expect(find.text(AppStrings.myPayroll), findsOneWidget);
-    expect(find.byKey(const Key('payroll-u_12')), findsOneWidget);
-    expect(find.byKey(const Key('payroll-u_1')), findsNothing);
     expect(find.byKey(const Key('approve-sb_1')), findsNothing);
     expect(find.byKey(const Key('reject-sb_1')), findsNothing);
     expect(find.byKey(const Key('submit-as_1')), findsOneWidget);
+    await _openPayroll(tester);
+    expect(_heading(AppStrings.myPayroll), findsOneWidget);
+    expect(find.byKey(const Key('payroll-u_12')), findsOneWidget);
+    expect(find.byKey(const Key('payroll-u_1')), findsNothing);
 
     await go(tester, '/customers/c_56');
     expect(find.byKey(HomeDashboard.screenKey), findsNothing);
@@ -252,3 +256,15 @@ Future<void> settle(WidgetTester tester) {
     const Duration(seconds: 20),
   );
 }
+
+Future<void> _openPayroll(WidgetTester tester) async {
+  final open = find.byKey(const Key('collections-payroll'));
+  await tester.ensureVisible(open);
+  await tester.tap(open);
+  await settle(tester);
+}
+
+Finder _heading(String text) => find.descendant(
+  of: find.byType(CollectionsHeading),
+  matching: find.text(text),
+);

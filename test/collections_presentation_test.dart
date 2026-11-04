@@ -27,10 +27,10 @@ void main() {
 
     // 537f073 admin: decide, cash, link from candidates, close. No receipt
     // buttons: the server refuses an admin's submit and standalone receipt.
+    // Ali's layout: filter card, summary, tabs; payroll behind its button.
+    expect(find.byKey(const Key('collections-filter-card')), findsOneWidget);
     expect(find.byKey(const Key('collections-metrics')), findsOneWidget);
-    expect(find.text(AppStrings.employeeTotals), findsOneWidget);
-    expect(find.text(AppStrings.payroll), findsOneWidget);
-    expect(find.text(AppStrings.myPayroll), findsNothing);
+    await expectPayroll(tester, AppStrings.payroll, AppStrings.myPayroll);
     await expectPresent(tester, const [
       Key('approve-sb_1'),
       Key('reject-sb_1'),
@@ -54,8 +54,7 @@ void main() {
     await relog(tester, 'limited.admin.demo');
     await go(tester, '/collections');
     expect(find.byKey(const Key('collections-metrics')), findsOneWidget);
-    expect(find.text(AppStrings.myPayroll), findsOneWidget);
-    expect(find.text(AppStrings.payroll), findsNothing);
+    await expectPayroll(tester, AppStrings.myPayroll, AppStrings.payroll);
     await expectPresent(tester, const [
       Key('approve-sb_1'),
       Key('reject-sb_1'),
@@ -79,9 +78,8 @@ void main() {
     await relog(tester, 'employee.demo');
     await go(tester, '/collections');
     expect(find.byKey(const Key('collections-metrics')), findsOneWidget);
-    expect(find.text(AppStrings.employeeTotals), findsNothing);
-    expect(find.text(AppStrings.myPayroll), findsOneWidget);
-    expect(find.text(AppStrings.payroll), findsNothing);
+    expect(find.byKey(const Key('collections-filter-card')), findsNothing);
+    await expectPayroll(tester, AppStrings.myPayroll, AppStrings.payroll);
     await expectPresent(tester, const [
       Key('full-as_1'),
       Key('submit-as_1'),
@@ -153,7 +151,7 @@ void main() {
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
 
-      Future<void> sweep(List<Key> keys) async {
+      Future<void> sweep(List<Key> keys, {Key? unlinkedTab}) async {
         for (final width in const [320.0, 360.0, 393.0, 430.0]) {
           for (final scale in const [1.0, 1.3, 2.0]) {
             tester.view.physicalSize = Size(width, 900);
@@ -176,12 +174,23 @@ void main() {
             expectAmountInside(tester, const Key('assignment-as_1'), '320 د.ل');
             await reveal(tester, const Key('submission-sb_2'));
             expectAmountInside(tester, const Key('submission-sb_2'), '250 د.ل');
+            if (unlinkedTab != null) {
+              await reveal(tester, unlinkedTab);
+              await tester.tap(find.byKey(unlinkedTab));
+              await settle(tester);
+            }
             await reveal(tester, const Key('unlinked-card-ur_1'));
             expectAmountInside(
               tester,
               const Key('unlinked-card-ur_1'),
               '50 د.ل',
             );
+            if (unlinkedTab != null) {
+              const cards = Key('collections-tab-cards');
+              await reveal(tester, cards);
+              await tester.tap(find.byKey(cards));
+              await settle(tester);
+            }
           }
         }
       }
@@ -195,12 +204,13 @@ void main() {
         Key('unlinked-reject-ur_1'),
       ]);
       await relog(tester, 'employee.demo');
+      // The employee's standalone receipts are on «تحصيلاتي».
       await sweep(const [
         Key('full-as_1'),
         Key('submit-as_1'),
         Key('call-as_1'),
         Key('unlinked-collection'),
-      ]);
+      ], unlinkedTab: const Key('collections-tab-receipts'));
     },
   );
 
@@ -263,16 +273,21 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('لا توجد كروت موجهة حاليًا.'), findsOneWidget);
-    expect(find.byKey(const Key('payroll-retry')), findsOneWidget);
     expect(find.byKey(const Key('close-batch')), findsNothing);
     expect(find.byKey(const Key('approve-sb_1')), findsNothing);
+    // Payroll opens from the bar; its failure shows a retry there.
+    await tester.tap(find.byKey(const Key('collections-payroll')));
+    await settle(tester);
+    expect(find.byKey(const Key('payroll-retry')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('collections-payroll-back')));
+    await settle(tester);
 
     link.setOnline(false);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.byKey(const Key('offline-banner')), findsOneWidget);
     expect(find.text(AppStrings.offline), findsWidgets);
-    final unlinked = tester.widget<FilledButton>(
+    final unlinked = tester.widget<OutlinedButton>(
       find.byKey(const Key('unlinked-collection')),
     );
     expect(unlinked.onPressed, isNull);
@@ -284,7 +299,7 @@ void main() {
     expect(find.byKey(const Key('online-banner')), findsOneWidget);
     expect(
       tester
-          .widget<FilledButton>(find.byKey(const Key('unlinked-collection')))
+          .widget<OutlinedButton>(find.byKey(const Key('unlinked-collection')))
           .onPressed,
       isNotNull,
     );
@@ -317,7 +332,13 @@ void main() {
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/collections');
       expect(find.byKey(const Key('unlinked-card-ur_ok')), findsOneWidget);
-      expect(find.text('15 د.ل'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('unlinked-card-ur_ok')),
+          matching: find.text('15 د.ل'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('تم الربط والاعتماد'), findsOneWidget);
       expect(find.byKey(const ValueKey('awaiting-cash-ur_ok')), findsOneWidget);
       expect(find.byKey(const Key('unlinked-cash-ur_ok')), findsOneWidget);
@@ -402,6 +423,28 @@ void expectAmountInside(WidgetTester tester, Key cardKey, String amount) {
   expect(Directionality.of(tester.element(figure)), TextDirection.ltr);
 }
 
+/// Payroll sits behind «المرتبات»: [heading] shows there, [other] never.
+Future<void> expectPayroll(
+  WidgetTester tester,
+  String heading,
+  String other,
+) async {
+  await reveal(tester, const Key('collections-payroll'));
+  await tester.tap(find.byKey(const Key('collections-payroll')));
+  await settle(tester);
+  expect(
+    find.descendant(
+      of: find.byType(CollectionsHeading),
+      matching: find.text(heading),
+    ),
+    findsOneWidget,
+  );
+  expect(find.text(other), findsNothing);
+  await tester.tap(find.byKey(const Key('collections-payroll-back')));
+  await settle(tester);
+  expect(find.byKey(const Key('collections-metrics')), findsOneWidget);
+}
+
 Future<void> expectPresent(WidgetTester tester, List<Key> keys) async {
   for (final key in keys) {
     await reveal(tester, key);
@@ -448,10 +491,13 @@ void expectFitsBox(WidgetTester tester, Key key, double width) {
 }
 
 Future<void> scrollEntireList(WidgetTester tester) async {
-  final scrollable = find.descendant(
-    of: find.byKey(CollectionsScreen.screenKey),
-    matching: find.byType(Scrollable),
-  );
+  // The page's own scrollable (search fields hold their own).
+  final scrollable = find
+      .descendant(
+        of: find.byKey(CollectionsScreen.screenKey),
+        matching: find.byType(Scrollable),
+      )
+      .first;
   final position = tester.state<ScrollableState>(scrollable).position;
   position.jumpTo(0);
   await tester.pump();
@@ -467,10 +513,13 @@ Future<void> scrollEntireList(WidgetTester tester) async {
 }
 
 Future<void> reveal(WidgetTester tester, Key key) async {
-  final scrollable = find.descendant(
-    of: find.byKey(CollectionsScreen.screenKey),
-    matching: find.byType(Scrollable),
-  );
+  // The page's own scrollable (search fields hold their own).
+  final scrollable = find
+      .descendant(
+        of: find.byKey(CollectionsScreen.screenKey),
+        matching: find.byType(Scrollable),
+      )
+      .first;
   final position = tester.state<ScrollableState>(scrollable).position;
   if (position.hasPixels) {
     position.jumpTo(0);

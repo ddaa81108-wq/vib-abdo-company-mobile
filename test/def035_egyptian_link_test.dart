@@ -151,6 +151,12 @@ void main() {
 
 Future<void> _openLink(WidgetTester tester) async {
   final link = find.byKey(const Key('unlinked-link-ur_1'));
+  // Narrow the list to this receipt with the view search.
+  await tester.enterText(
+    find.byKey(const Key('collections-search')),
+    'اسم غير مربوط',
+  );
+  await settle(tester);
   await tester.ensureVisible(link);
   await tester.tap(link);
   await settle(tester);
