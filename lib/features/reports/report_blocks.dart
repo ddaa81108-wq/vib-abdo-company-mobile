@@ -50,10 +50,17 @@ class RText {
   static const fiveAm = 'مقارنة الخامسة صباحًا';
   static const fiveAmTag = 'بتوقيت ليبيا · د.ل';
   static const fiveAmSaved = 'لقطة محفوظة وثابتة';
-  static const fiveAmNote = 'آخر اللقطات المسجلة أمامك، دون إنشاء أيام مفقودة.';
+  static const fiveAmNote = 'آخر 20 لقطة مسجلة أمامك، دون إنشاء أيام مفقودة.';
   static const day = 'يوم العمل';
   static const net5 = 'صافي 05:00';
   static const open = 'فتح';
+  static const diff = 'الفرق';
+  static const net = 'الصافي';
+  static const capturedAt = 'وقت التسجيل (ليبيا)';
+  static const fiveAmFoot =
+      'المقارنة لصافي الخامسة فقط: اللقطات ثابتة، وتُسجَّل عند تشغيل الخادم في الخامسة.';
+  static const snapshotOnlyNet =
+      'الخادم يحفظ صافي اللقطة فقط؛ تفاصيل الإجماليات عند الخامسة غير متاحة بعد.';
 }
 
 const _gloss = LinearGradient(
@@ -525,19 +532,17 @@ class ReportFollowUp extends StatelessWidget {
   }
 }
 
-/// مقارنة الخامسة صباحًا — the rows' recorded 05:00 snapshots. الفرق shows
-/// only the server's `netChangeUnits`; nothing is subtracted here.
+/// مقارنة الخامسة صباحًا — the most important block (Ali, 2026-11-04).
+/// Rows are the daily reports whose `fiveAmClosing` was recorded; the
+/// snapshot of business day D is taken at 05:00 Libya on D+1. Staging
+/// 537f073 sends only the snapshot net (no breakdown, no difference), so
+/// الفرق shows only a server `netChangeUnits` and is hidden otherwise;
+/// nothing is subtracted on the device.
 class ReportFiveAm extends StatelessWidget {
-  const ReportFiveAm({
-    required this.rows,
-    required this.money,
-    required this.onOpen,
-    super.key,
-  });
+  const ReportFiveAm({required this.rows, required this.money, super.key});
 
   final List<DailyReportRowDto> rows;
   final MoneyFormatter money;
-  final ValueChanged<DailyReportRowDto> onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -547,170 +552,317 @@ class ReportFiveAm extends StatelessWidget {
     ].take(20).toList();
     if (snaps.isEmpty) return const SizedBox.shrink();
     final look = context.look;
+    final gold = sectionGold(context);
     final colors = context.statusColors;
     final latest = snaps.first;
     final showChange = snaps.any((r) => r.netChangeUnits != null);
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
+    final rowHeight = 46.0 * scale;
     Widget head(String t) => Text(
       t,
       textAlign: TextAlign.center,
       style: cairo(12, 800, color: sectionStripInk),
     );
-    return SectionCard(
+    Widget cell(int flex, Widget child) => Expanded(
+      flex: flex,
+      child: Center(
+        child: FittedBox(fit: BoxFit.scaleDown, child: child),
+      ),
+    );
+    final table = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          key: const Key('report-five-am-header'),
+          decoration: const BoxDecoration(gradient: sectionStripGradient),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              Expanded(flex: 4, child: head(RText.day)),
+              Expanded(flex: 4, child: head(RText.net5)),
+              if (showChange) Expanded(flex: 4, child: head(RText.diff)),
+              Expanded(flex: 2, child: head(RText.details)),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: (snaps.length * rowHeight).clamp(rowHeight, 460.0 * scale),
+          child: ListView(
+            key: const Key('report-five-am-rows'),
+            padding: EdgeInsets.zero,
+            children: [
+              for (final row in snaps)
+                Container(
+                  key: Key('report-five-am-${row.sequence}'),
+                  height: rowHeight,
+                  decoration: BoxDecoration(
+                    color: row == latest ? gold.withValues(alpha: 0.10) : null,
+                    border: Border(bottom: BorderSide(color: look.cardBorder)),
+                  ),
+                  child: Row(
+                    children: [
+                      cell(
+                        4,
+                        LtrText(
+                          row.date ?? AppStrings.dash,
+                          style: cairo(12.5, 800, color: look.ink),
+                        ),
+                      ),
+                      cell(
+                        4,
+                        MoneyText(
+                          money.formatOrDash(
+                            row.fiveAmClosing!.netUnits,
+                            Currency.lyd,
+                          ),
+                          style: cairo(12.5, 700, color: look.ink),
+                        ),
+                      ),
+                      if (showChange)
+                        cell(
+                          4,
+                          MoneyText(
+                            money.formatOrDash(
+                              row.netChangeUnits,
+                              Currency.lyd,
+                            ),
+                            style: cairo(
+                              12.5,
+                              800,
+                              color: (row.netChangeUnits?.units ?? 0) < 0
+                                  ? colors.cashNegative
+                                  : colors.cashPositiveText,
+                            ),
+                          ),
+                        ),
+                      Expanded(
+                        flex: 2,
+                        child: Center(
+                          child: IconButton(
+                            key: Key('report-open-${row.sequence}'),
+                            tooltip: RText.open,
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                            icon: Icon(
+                              Icons.open_in_new_rounded,
+                              size: 18,
+                              color: gold,
+                            ),
+                            onPressed: () => showModalBottomSheet<void>(
+                              context: context,
+                              showDragHandle: true,
+                              builder: (_) =>
+                                  SnapshotSheet(row: row, money: money),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+    return Container(
       key: const Key('report-five-am'),
-      title: RText.fiveAm,
-      trailing: Text(RText.fiveAmTag, style: cairo(11, 700, color: look.muted)),
+      decoration: BoxDecoration(
+        color: look.card,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: gold, width: 2),
+        boxShadow: [
+          BoxShadow(color: gold.withValues(alpha: 0.18), blurRadius: 18),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            key: const Key('report-five-am-latest'),
+            decoration: const BoxDecoration(gradient: _gloss),
             padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: look.strip,
-              borderRadius: BorderRadius.circular(AppRadii.lg),
-              border: Border.all(color: look.cardBorder),
-            ),
             child: Row(
               children: [
+                Icon(Icons.schedule_rounded, color: gold),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      LtrText(
-                        latest.date ?? AppStrings.dash,
-                        style: cairo(12, 700, color: look.muted),
-                      ),
-                      Text(
-                        RText.fiveAmSaved,
-                        style: cairo(11, 600, color: look.muted),
-                      ),
-                    ],
+                  child: Text(
+                    RText.fiveAm,
+                    style: cairo(17, 900, color: Colors.white),
                   ),
                 ),
                 Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: MoneyText(
-                      money.formatOrDash(
-                        latest.fiveAmClosing!.netUnits,
-                        Currency.lyd,
-                      ),
-                      style: context.textExtras.amountLarge.copyWith(
-                        color: look.ink,
-                        fontSize: 24,
-                      ),
-                    ),
+                  child: Text(
+                    RText.fiveAmTag,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: cairo(11, 700, color: Colors.white70),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(RText.fiveAmNote, style: cairo(11, 600, color: look.muted)),
-          const SizedBox(height: AppSpacing.sm),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadii.lg),
+          Padding(
+            padding: const EdgeInsetsDirectional.all(AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Container(
-                  decoration: const BoxDecoration(
-                    gradient: sectionStripGradient,
+                  key: const Key('report-five-am-latest'),
+                  padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    gradient: _gloss,
+                    borderRadius: BorderRadius.circular(AppRadii.lg),
+                    border: Border.all(color: gold.withValues(alpha: 0.7)),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Row(
                     children: [
-                      Expanded(flex: 4, child: head(RText.day)),
-                      Expanded(flex: 4, child: head(RText.net5)),
-                      if (showChange)
-                        Expanded(flex: 4, child: head(AppStrings.netChange)),
-                      Expanded(flex: 2, child: head(RText.open)),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              RText.net,
+                              style: cairo(12, 700, color: Colors.white70),
+                            ),
+                            LtrText(
+                              latest.date ?? AppStrings.dash,
+                              style: cairo(13, 800, color: Colors.white),
+                            ),
+                            Text(
+                              RText.fiveAmSaved,
+                              style: cairo(11, 600, color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: MoneyText(
+                            money.formatOrDash(
+                              latest.fiveAmClosing!.netUnits,
+                              Currency.lyd,
+                            ),
+                            style: context.textExtras.amountLarge.copyWith(
+                              color: const Color(0xFFF5C02E),
+                              fontSize: 28,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                for (final row in snaps)
-                  Container(
-                    key: Key('report-five-am-${row.sequence}'),
-                    decoration: BoxDecoration(
-                      color: row == latest
-                          ? sectionGold(context).withValues(alpha: 0.10)
-                          : null,
-                      border: Border(
-                        bottom: BorderSide(color: look.cardBorder),
-                      ),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 4,
-                          child: Center(
-                            child: LtrText(
-                              row.date ?? AppStrings.dash,
-                              style: cairo(12.5, 700, color: look.ink),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 4,
-                          child: Center(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: MoneyText(
-                                money.formatOrDash(
-                                  row.fiveAmClosing!.netUnits,
-                                  Currency.lyd,
-                                ),
-                                style: cairo(12.5, 700, color: look.ink),
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (showChange)
-                          Expanded(
-                            flex: 4,
-                            child: Center(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: MoneyText(
-                                  money.formatOrDash(
-                                    row.netChangeUnits,
-                                    Currency.lyd,
-                                  ),
-                                  style: cairo(
-                                    12.5,
-                                    800,
-                                    color: (row.netChangeUnits?.units ?? 0) < 0
-                                        ? colors.cashNegative
-                                        : colors.cashPositiveText,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        Expanded(
-                          flex: 2,
-                          child: Center(
-                            child: IconButton(
-                              key: Key('report-open-${row.sequence}'),
-                              tooltip: RText.open,
-                              visualDensity: VisualDensity.compact,
-                              icon: Icon(
-                                Icons.open_in_new_rounded,
-                                size: 18,
-                                color: sectionGold(context),
-                              ),
-                              onPressed: () => onOpen(row),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  RText.fiveAmNote,
+                  style: cairo(11, 600, color: look.muted),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadii.lg),
+                  child: table,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  RText.fiveAmFoot,
+                  style: cairo(11, 600, color: look.muted),
+                ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The open-icon sheet: the snapshot's own server fields only.
+class SnapshotSheet extends StatelessWidget {
+  const SnapshotSheet({required this.row, required this.money, super.key});
+
+  final DailyReportRowDto row;
+  final MoneyFormatter money;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final snap = row.fiveAmClosing!;
+    String libya(DateTime? t) {
+      if (t == null) return AppStrings.dash;
+      final l = t.toUtc().add(const Duration(hours: 2));
+      String two(int n) => n.toString().padLeft(2, '0');
+      return '${l.year}-${two(l.month)}-${two(l.day)} ${two(l.hour)}:${two(l.minute)}';
+    }
+
+    Widget pair(String label, Widget value) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label, style: cairo(13, 700, color: look.muted)),
+          ),
+          value,
+        ],
+      ),
+    );
+    return SafeArea(
+      child: SingleChildScrollView(
+        key: const Key('report-day-sheet'),
+        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(RText.fiveAm, style: cairo(17, 900, color: look.ink)),
+            const SizedBox(height: AppSpacing.sm),
+            pair(
+              RText.day,
+              LtrText(
+                row.date ?? AppStrings.dash,
+                style: cairo(14, 800, color: look.ink),
+              ),
+            ),
+            pair(
+              RText.capturedAt,
+              LtrText(
+                libya(snap.capturedAt),
+                key: const Key('snapshot-captured'),
+                style: cairo(14, 800, color: look.ink),
+              ),
+            ),
+            pair(
+              RText.net5,
+              MoneyText(
+                money.formatOrDash(snap.netUnits, Currency.lyd),
+                key: const Key('snapshot-net'),
+                style: context.textExtras.amountLarge.copyWith(
+                  color: look.ink,
+                  fontSize: 22,
+                ),
+              ),
+            ),
+            if (row.netChangeUnits != null)
+              pair(
+                RText.diff,
+                MoneyText(
+                  money.formatOrDash(row.netChangeUnits, Currency.lyd),
+                  style: cairo(14, 800, color: look.ink),
+                ),
+              ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              RText.snapshotOnlyNet,
+              key: const Key('snapshot-no-breakdown'),
+              style: cairo(11.5, 600, color: look.muted),
+            ),
+          ],
+        ),
       ),
     );
   }

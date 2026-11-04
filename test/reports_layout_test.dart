@@ -30,6 +30,36 @@ void main() {
       ]) {
         expect(find.byKey(Key(key)), findsOneWidget, reason: key);
       }
+      // The 05:00 panel is the most prominent block (Ali, 2026-11-04).
+      final five = find.byKey(const Key('report-five-am'));
+      expect(five, findsOneWidget);
+      if (size.width >= 900) {
+        // Right half (RTL start); the hero sits on the left.
+        expect(
+          tester.getCenter(five).dx,
+          greaterThan(
+            tester.getCenter(find.byKey(const Key('report-current'))).dx,
+          ),
+        );
+      } else {
+        expect(top('report-current'), lessThan(top('report-five-am')));
+        expect(top('report-five-am'), lessThan(top('report-balances')));
+      }
+      // Header row stays put while the snapshot rows scroll.
+      final header = find.byKey(const Key('report-five-am-header'));
+      final before = tester.getRect(header);
+      await tester.drag(
+        find.byKey(const Key('report-five-am-rows')),
+        const Offset(0, -200),
+      );
+      await tester.pump();
+      expect(tester.getRect(header), before);
+      expect(find.text(RText.net5), findsWidgets);
+      // Staging sends no difference field: the column stays hidden.
+      expect(
+        find.descendant(of: five, matching: find.text(RText.diff)),
+        findsNothing,
+      );
       expect(top('report-current'), lessThan(top('report-balances')));
       expect(top('report-balances'), lessThan(top('report-sources')));
       // Hero shows the server net as-is.
@@ -80,13 +110,24 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/reports');
     final block = find.byKey(const Key('report-five-am'));
-    if (block.evaluate().isEmpty) return; // no snapshots in this dataset
-    final open = find.descendant(of: block, matching: find.byType(IconButton));
-    await tester.ensureVisible(open.first);
+    expect(block, findsOneWidget);
+    // 13 recorded snapshots in the fake, newest first (seq 29).
+    final open = find.byKey(const Key('report-open-29'));
+    await tester.ensureVisible(open);
     await tester.pump();
-    await tester.tap(open.first);
+    await tester.tap(open);
     await settle(tester);
     expect(find.byKey(const Key('report-day-sheet')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('snapshot-net')),
+        matching: find.text('48,500 د.ل'),
+        matchRoot: true,
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('2026-10-18 05:00'), findsOneWidget);
+    expect(find.byKey(const Key('snapshot-no-breakdown')), findsOneWidget);
   });
 }
 

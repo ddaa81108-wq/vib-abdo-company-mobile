@@ -1155,9 +1155,53 @@ class FakeFixtures {
         },
       };
 
+  /// 13 earlier days with a recorded 05:00 snapshot, same shape as staging
+  /// 537f073 (`fiveAmClosing.state = recorded`, `capturedAt`, `netUnits`;
+  /// no per-total breakdown, no difference field). Fake values only.
+  static List<Map<String, dynamic>> _recordedFiveAmRows() {
+    const nets = [
+      48500,
+      47200,
+      50100,
+      45900,
+      46650,
+      44000,
+      49300,
+      43800,
+      45250,
+      42100,
+      44700,
+      41900,
+      40600,
+    ];
+    return [
+      for (var i = 0; i < nets.length; i++)
+        () {
+          final day = DateTime.utc(2026, 10, 17 - i);
+          final next = day.add(const Duration(days: 1));
+          String d(DateTime t) =>
+              '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
+          return {
+            ..._reportRow()..remove('netChangeUnits'),
+            'sequence': 29 - i,
+            'date': d(day),
+            'businessDate': d(day),
+            'netUnits': nets[i],
+            'reasons': const [],
+            'fiveAmClosing': {
+              'state': 'recorded',
+              'scheduledAt': '${d(next)}T03:00:00.000Z',
+              'capturedAt': '${d(next)}T03:00:2${i % 10}.000Z',
+              'netUnits': nets[i],
+            },
+          };
+        }(),
+    ];
+  }
+
   static Map<String, dynamic> reports() => {
         'current': _reportRow(),
-        'items': [_reportRow()],
+        'items': [_reportRow(), ..._recordedFiveAmRows()],
         'methodology': {
           'formula': 'ديون لنا + النشط + المصري − ديون علينا',
           'note': 'نص من الخادم',

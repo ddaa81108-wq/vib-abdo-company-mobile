@@ -77,38 +77,20 @@ class ReportsScreen extends ConsumerWidget {
                 (row) => row.netChangeUnits != null,
               );
               final current = data.current ?? data.rows.first;
-              const gap = SizedBox(height: AppSpacing.md);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Arranged like the website (Ali, 2026-11-04).
-                  ReportHero(row: current, money: money),
-                  gap,
-                  ReportBalances(row: current, money: money),
-                  gap,
-                  ReportSources(row: current, money: money),
-                  gap,
-                  ReportToday(row: current, money: money),
-                  gap,
-                  ReportFollowUp(row: current, money: money),
-                  gap,
-                  ReportFiveAm(
-                    rows: data.rows,
-                    money: money,
-                    onOpen: (row) => showModalBottomSheet<void>(
-                      context: context,
-                      isScrollControlled: true,
-                      showDragHandle: true,
-                      builder: (context) => SingleChildScrollView(
-                        key: const Key('report-day-sheet'),
-                        padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-                        child: _ReportCard(
-                          row: row,
-                          money: money,
-                          showChange: showChange,
-                        ),
-                      ),
-                    ),
+                  // Arranged like the website (Ali, 2026-11-04); the
+                  // 05:00 panel is the most prominent block.
+                  _ReportLayout(
+                    fiveAm: ReportFiveAm(rows: data.rows, money: money),
+                    hero: ReportHero(row: current, money: money),
+                    rest: [
+                      ReportBalances(row: current, money: money),
+                      ReportSources(row: current, money: money),
+                      ReportToday(row: current, money: money),
+                      ReportFollowUp(row: current, money: money),
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   const Align(
@@ -145,6 +127,56 @@ class ReportsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Phone: hero, then the 05:00 panel, then the rest. Wide: the 05:00
+/// panel on the right half (RTL start), everything else on the left.
+class _ReportLayout extends StatelessWidget {
+  const _ReportLayout({
+    required this.fiveAm,
+    required this.hero,
+    required this.rest,
+  });
+
+  final Widget fiveAm;
+  final Widget hero;
+  final List<Widget> rest;
+
+  @override
+  Widget build(BuildContext context) {
+    const gap = SizedBox(height: AppSpacing.md);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 900) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              hero,
+              gap,
+              fiveAm,
+              for (final block in rest) ...[gap, block],
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: fiveAm),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  hero,
+                  for (final block in rest) ...[gap, block],
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
