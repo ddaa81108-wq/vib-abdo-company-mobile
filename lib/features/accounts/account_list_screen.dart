@@ -128,7 +128,10 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       online: online,
       filled: false,
       label: AppStrings.assign,
-      onPressed: () => setState(() => _assigning = !_assigning),
+      onPressed: () => setState(() {
+        _assigning = !_assigning;
+        _selected.clear();
+      }),
     );
 
     return KeptData<AccountsPage>(
@@ -222,6 +225,15 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                   section: section,
                   customerIds: assignmentTargetIds(_selected, cards),
                   online: online,
+                  onCancel: () => setState(() {
+                    _assigning = false;
+                    _selected.clear();
+                  }),
+                  onAssigned: (message) => setState(() {
+                    _assigning = false;
+                    _selected.clear();
+                    _reply = message;
+                  }),
                 ),
               if (_reply != null) ...[
                 const SizedBox(height: AppSpacing.sm),
@@ -943,6 +955,7 @@ class _AccountCard extends StatelessWidget {
                   SizedBox.square(
                     dimension: 32,
                     child: Checkbox(
+                      key: ValueKey('assign-select-${card.id}'),
                       value: selected,
                       onChanged: (_) => onToggle(),
                     ),
@@ -1155,6 +1168,7 @@ class _AccountCard extends StatelessWidget {
                                 children: [
                                   if (showAssign)
                                     Checkbox(
+                                      key: ValueKey('assign-select-${card.id}'),
                                       value: selected,
                                       onChanged: (_) => onToggle(),
                                     ),
@@ -1560,11 +1574,17 @@ class _AssignSubmit extends ConsumerStatefulWidget {
     required this.section,
     required this.customerIds,
     required this.online,
+    required this.onCancel,
+    required this.onAssigned,
   });
 
   final AccountSection section;
   final List<String> customerIds;
   final bool online;
+  final VoidCallback onCancel;
+
+  /// Called after a 201: the parent leaves assign mode and clears the ticks.
+  final ValueChanged<String> onAssigned;
 
   @override
   ConsumerState<_AssignSubmit> createState() => _AssignSubmitState();
@@ -1572,6 +1592,13 @@ class _AssignSubmit extends ConsumerStatefulWidget {
 
 class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
   String? _assignee;
+
+  /// Ids and names of the assignees on screen. The first one is chosen by
+  /// default, like the website (`items[0]?.id`).
+  List<(String, String)> _people = const [];
+
+  String? get _chosen =>
+      _assignee ?? (_people.isEmpty ? null : _people.first.$1);
 
   @override
   Widget build(BuildContext context) {
@@ -1585,10 +1612,22 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
       data: (rows) {
         final theme = Theme.of(context);
         final scheme = theme.colorScheme;
+        _people = [
+          for (final row in rows)
+            ('${row['id']}', '${row['displayName'] ?? row['id']}'),
+        ];
+        final chosen = _chosen;
         return Column(
           key: const Key('assignee-field'),
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text(
+              AppStrings.assignSelected(widget.customerIds.length),
+              key: const Key('assign-selected-count'),
+              style: theme.textTheme.titleSmall,
+            ),
+            Text(AppStrings.assignHint, style: theme.textTheme.bodySmall),
+            const SizedBox(height: AppSpacing.sm),
             Text(AppStrings.assignee, style: theme.textTheme.titleSmall),
             if (!widget.online) ...[
               const SizedBox(height: AppSpacing.xs),
@@ -1601,22 +1640,31 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
             if (rows.isEmpty)
               Text(AppStrings.noAssignees, style: theme.textTheme.bodyMedium)
             else
-              for (final row in rows)
+              for (final (id, label) in _people)
                 _AssigneeChoice(
-                  id: '${row['id']}',
-                  label: '${row['displayName'] ?? row['id']}',
-                  selected: _assignee == '${row['id']}',
+                  id: id,
+                  label: label,
+                  selected: chosen == id,
                   onSelected: (id) => setState(() => _assignee = id),
                 ),
             const SizedBox(height: AppSpacing.sm),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: GuardedMutation(
-                buttonKey: const Key('save-assignment'),
-                inputs: '${widget.customerIds.join(",")}|$_assignee',
-                label: AppStrings.assign,
-                onSubmit: _submit,
-              ),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              crossAxisAlignment: WrapCrossAlignment.start,
+              children: [
+                GuardedMutation(
+                  buttonKey: const Key('save-assignment'),
+                  inputs: '${widget.customerIds.join(",")}|$chosen',
+                  label: AppStrings.assign,
+                  onSubmit: _submit,
+                ),
+                TextButton(
+                  key: const Key('assign-cancel'),
+                  onPressed: widget.onCancel,
+                  child: const Text(AppStrings.assignCancel),
+                ),
+              ],
             ),
           ],
         );
@@ -1625,10 +1673,13 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
   }
 
   Future<String?> _submit(MutationMeta meta) async {
-    final assignee = _assignee;
-    if (assignee == null || widget.customerIds.isEmpty) {
-      return AppStrings.chooseAssignee;
-    }
+    final assignee = _chosen;
+    if (assignee == null) return _tell(AppStrings.chooseAssignee);
+    if (widget.customerIds.isEmpty) return _tell(AppStrings.chooseAssignCards);
+    final name = [
+      for (final (id, label) in _people)
+        if (id == assignee) label,
+    ].firstOrNull;
     try {
       final ack = await ref
           .read(apiLayerProvider)
@@ -1639,15 +1690,39 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
             section: widget.section.path,
             meta: meta,
           );
-      if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
+      // 537f073 answers 201 `{assignmentIds, eventSequences}`; there is no
+      // single `id`, so the count comes from `assignmentIds`.
+      final created = ack.raw['assignmentIds'];
+      final count = created is List
+          ? created.length
+          : widget.customerIds.length;
       ref.invalidate(accountsProvider(widget.section));
+      ref.invalidate(collectionsProvider);
+      if (!mounted) return null;
+      final message = AppStrings.assignDone(count, name ?? '');
+      _tell(message);
+      widget.onAssigned(message);
       return null;
     } catch (error) {
-      return failureText(ref.read(errorHandlerProvider).toFailure(error));
+      final text = failureText(ref.read(errorHandlerProvider).toFailure(error));
+      return _tell(text);
     }
+  }
+
+  /// Shows [message] in a snackbar as well as under the button, so a server
+  /// refusal is never missed. Returns it for the inline error line.
+  String _tell(String message) {
+    final messenger = mounted ? ScaffoldMessenger.maybeOf(context) : null;
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const Key('assign-snackbar'),
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    return message;
   }
 }
 

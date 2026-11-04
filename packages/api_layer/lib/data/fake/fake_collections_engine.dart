@@ -460,6 +460,19 @@ class FakeCollectionsEngine {
         ],
       };
 
+  /// The account list's `activeAssigneeName` on 537f073: the assignee of
+  /// the card's active assignment in [section], or null.
+  String? activeAssigneeName(String section, String customerId) {
+    for (final a in _assignments) {
+      if (a['status'] == 'active' &&
+          a['customerId'] == customerId &&
+          (a['section'] ?? 'customers') == section) {
+        return employees['${a['assigneeUserId']}'];
+      }
+    }
+    return null;
+  }
+
   /// `POST /api/collections/assignments`.
   Map<String, dynamic> assign(Map body) {
     final assignee =

@@ -131,10 +131,31 @@ void main() {
     expect(openingBalanceOrNull('12'), 12);
   });
 
-  test('a system card is not a routing target', () {
-    final cards = [_card(id: 'a'), _card(id: 'sys', systemManaged: true)];
+  test('routing targets follow the 537 website rule', () {
+    // `balanceUnits > 0 && !activeAssigneeName`, and never a system card.
+    final cards = [
+      _card(id: 'a', balanceUnits: 120),
+      _card(id: 'sys', balanceUnits: 50, systemManaged: true),
+      _card(id: 'zero', balanceUnits: 0),
+      _card(id: 'credit', balanceUnits: -30),
+      _card(id: 'unknown', balanceUnits: null),
+      _card(id: 'taken', balanceUnits: 80, assignee: 'محصل الاختبار'),
+      _card(id: 'blank', balanceUnits: 80, assignee: '  '),
+    ];
     expect(canSelectAccountForAssignment(cards[1]), isFalse);
-    expect(assignmentTargetIds(['a', 'sys', 'gone'], cards), ['a']);
+    expect(
+      assignmentTargetIds([
+        'a',
+        'sys',
+        'zero',
+        'credit',
+        'unknown',
+        'taken',
+        'blank',
+        'gone',
+      ], cards),
+      ['a', 'blank'],
+    );
   });
 
   test('zero review follows allowedActions, then server balance and state', () {
@@ -345,9 +366,11 @@ AccountCardDto _card({
   Map<String, dynamic>? zeroReview,
   List<String>? allowedActions,
   String? ageStatus,
+  String? assignee,
 }) {
   return AccountCardDto(
     id: id,
+    activeAssigneeName: assignee,
     name: id,
     balanceUnits: balanceUnits == null ? null : MoneyValue.known(balanceUnits),
     currency: Currency.lyd,

@@ -1639,7 +1639,8 @@ class FakeApiClient implements ApiClient {
       return _engine(() => engine.closeDay(b));
     }
     if (method == 'POST' && seg.length == 2 && seg[1] == 'assignments') {
-      return _engine(() => engine.assign(b));
+      // 537f073 answers 201 `{ok, data: {assignmentIds, eventSequences}}`.
+      return _engine(() => engine.assign(b), status: 201);
     }
     if (seg.length == 4 && seg[1] == 'assignments' && seg[3] == 'submissions') {
       return _engine(() => engine.submit(_collectionsCaller, seg[2], b));
@@ -1709,9 +1710,12 @@ class FakeApiClient implements ApiClient {
     seesEverything: _managesPayroll,
   );
 
-  ApiResponse _engine(Map<String, dynamic> Function() run) {
+  ApiResponse _engine(
+    Map<String, dynamic> Function() run, {
+    int status = 200,
+  }) {
     try {
-      return _ok(run());
+      return _ok(run(), status: status);
     } on FakeCollectionsFailure catch (failure) {
       _fail(
         failure.status,
@@ -1776,7 +1780,21 @@ class FakeApiClient implements ApiClient {
     final card = Map<String, dynamic>.from(_requireCard(section, id));
     final state = _cardState['$section|$id'];
     if (state != null) card.addAll(state);
+    _overlayAssignee(section, card);
     return card;
+  }
+
+  /// `activeAssigneeName` derived from the engine's active assignments, as
+  /// on 537f073 (the fixture does not hard-code it).
+  void _overlayAssignee(String section, Map<String, dynamic> card) {
+    if (section != 'customers' && section != 'companies') return;
+    final assignee =
+        collectionsEngine.activeAssigneeName(section, '${card['id']}');
+    if (assignee == null) {
+      card.remove('activeAssigneeName');
+    } else {
+      card['activeAssigneeName'] = assignee;
+    }
   }
 
   Map<String, dynamic> _accountsView(String section) {
@@ -1792,6 +1810,7 @@ class FakeApiClient implements ApiClient {
       final next = state?['balanceUnits'];
       if (previous is int && next is int) delta += next - previous;
       if (state != null) card.addAll(state);
+      _overlayAssignee(section, card);
       items.add(card);
     }
     body['items'] = items;
@@ -2682,7 +2701,6 @@ class FakeApiClient implements ApiClient {
     if (name == null) _fail(404, 'NOT_FOUND', _notFound);
     return {'id': id, 'displayName': name};
   }
-
 }
 
 /// One in-memory cookie session. Lifetime is not counted down locally.

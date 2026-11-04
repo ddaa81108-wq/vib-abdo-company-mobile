@@ -382,6 +382,14 @@ abstract final class AppStrings {
   static const chooseKind = 'اختر نوع العملية';
   static const assignee = 'الموظف';
   static const chooseAssignee = 'اختر الموظف.';
+  static const chooseAssignCards = 'اختر كارتًا واحدًا على الأقل من القائمة.';
+  static const assignHint =
+      'تظهر علامة الاختيار على الكروت ذات الدين غير الموجهة لموظف فقط.';
+  static String assignSelected(int n) => 'المحدد: $n كارت';
+  static String assignDone(int n, String name) => name.isEmpty
+      ? 'تم توجيه $n كارت إلى الموظف.'
+      : 'تم توجيه $n كارت إلى $name.';
+  static const assignCancel = 'إلغاء التوجيه';
   static const enterReference = 'أدخل المرجع.';
   static const edit = 'تعديل';
   static const editCard = 'تعديل الكارت';

@@ -599,7 +599,6 @@ class FakeFixtures {
         'name': name,
         'phone': phone,
         'balanceUnits': balanceUnits,
-        'activeAssigneeName': 'موظف استلام تجريبي',
         'lastActivityAt': '2026-10-18T14:03:00+02:00',
         'pinned': false,
         'version': 4,

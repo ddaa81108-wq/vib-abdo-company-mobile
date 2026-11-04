@@ -98,7 +98,11 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('assign-mode')));
     await tester.tap(find.byKey(const Key('assign-mode')));
     await settle(tester);
-    expect(find.byType(Checkbox), findsNWidgets(8));
+    // Only cards with a positive debt get a checkbox (537 website rule).
+    expect(find.byType(Checkbox), findsNWidgets(3));
+    for (final id in ['b', 'd', 'g']) {
+      expect(find.byKey(ValueKey('assign-select-$id')), findsOneWidget);
+    }
     final systemCard = find
         .ancestor(of: find.text('كارت النظام'), matching: find.byType(Material))
         .first;

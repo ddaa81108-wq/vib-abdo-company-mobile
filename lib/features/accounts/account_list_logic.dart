@@ -106,8 +106,17 @@ bool showCustomerZeroReview({
   return readZeroReview(card.zeroReview) == ZeroReviewRead.pending;
 }
 
-/// System-managed cards are read-only and cannot be chosen as a routing target.
-bool canSelectAccountForAssignment(AccountCardDto card) => !card.systemManaged;
+/// The website rule on 537f073 (`balanceUnits > 0 && !activeAssigneeName`),
+/// plus system-managed cards, which are read-only. The server refuses the
+/// whole request (409 ASSIGNMENT_REQUIRES_POSITIVE_DEBT or
+/// CUSTOMER_ALREADY_ASSIGNED) when any one card breaks it, so such a card
+/// gets no checkbox.
+bool canSelectAccountForAssignment(AccountCardDto card) {
+  if (card.systemManaged) return false;
+  final assignee = card.activeAssigneeName?.trim() ?? '';
+  if (assignee.isNotEmpty) return false;
+  return (card.balanceUnits?.asInt ?? 0) > 0;
+}
 
 /// Selected ids that are still on screen and are allowed routing targets.
 List<String> assignmentTargetIds(
