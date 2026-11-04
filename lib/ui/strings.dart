@@ -153,7 +153,7 @@ abstract final class AppStrings {
   static const correctionClosed = 'التصحيح مغلق';
   static const cashIn = 'دخول';
   static const cashOut = 'خروج';
-  static const cashMovements = 'حركات النقد';
+  static const cashMovements = 'سجل الفلوس النشطة';
   static const formulaCaption = 'ديون لنا + النشط + المصري − ديون علينا';
   static const pinnedColumn = 'التاريخ';
   static const changePassword = 'تغيير كلمة المرور';
