@@ -116,9 +116,14 @@ void main() {
           .data,
       AppStrings.customerDebtWord,
     );
-    // The deposit cards keep the single server age line.
+    // Deposit cards show the status word, never the day count (Ali,
+    // 2026-11-04).
     await go(tester, '/libyan-deposits');
-    _expectSingleAge(tester, loaded.libyan, AccountSection.libyanDeposits);
+    final depositAge = tester
+        .widget<Text>(find.byKey(Key('account-age-${loaded.libyan.id}')))
+        .data!;
+    expect(depositAge.startsWith(AppStrings.sinceDays), isFalse);
+    expect(find.textContaining(AppStrings.sinceDays), findsNothing);
   });
 
   testWidgets('amounts sit on the RTL start edge in light and dark', (
@@ -389,39 +394,6 @@ void main() {
       }
     }
   });
-}
-
-void _expectSingleAge(
-  WidgetTester tester,
-  AccountCardDto card,
-  AccountSection section,
-) {
-  final shown = singleAgeText(
-    serverLabel: card.ageStatusLabel,
-    ageStatus: card.ageStatus,
-    section: section,
-    debtAgeDays: card.debtAgeDays,
-  );
-  final finder = find.byKey(Key('account-card-${card.id}'));
-  final age = tester.widget<Text>(find.byKey(Key('account-age-${card.id}')));
-  expect(age.data, shown);
-  expect(shown, card.ageStatusLabel);
-  expect(
-    find.descendant(
-      of: finder,
-      matching: find.byKey(Key('account-age-${card.id}')),
-    ),
-    findsOneWidget,
-  );
-  expect(
-    find.descendant(of: finder, matching: find.text(shown!)),
-    findsOneWidget,
-  );
-  final days = card.debtAgeDays;
-  if (days == null) return;
-  final count = ageCountPhrase(days);
-  if (count == shown) return;
-  expect(find.descendant(of: finder, matching: find.text(count)), findsNothing);
 }
 
 void _expectAmountOnStart(WidgetTester tester, String amount) {
