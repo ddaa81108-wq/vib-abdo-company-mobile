@@ -31,7 +31,10 @@ void main() {
       expectRtl(tester);
       if (path == '/') _expectNoArabicDigits(tester);
       if (path == '/notifications') _expectNoticeDirection(tester);
-      if (path == '/customers/c_55') _expectBackArrow(tester);
+      // The ledger closes with a round × at the end of its name bar.
+      if (path == '/customers/c_55') {
+        expect(find.byKey(const Key('ledger-close')), findsOneWidget);
+      }
       if (path == '/signup-info') _expectBackArrow(tester);
       if (path == '/account') _expectLogoutMirrored(tester);
     });

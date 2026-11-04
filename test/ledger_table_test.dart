@@ -231,7 +231,10 @@ void main() {
     expect(find.byKey(const Key('movement-amount')), findsOneWidget);
     expect(find.byKey(const Key('full-payment')), findsNothing);
     await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('composer-full')));
     await tester.pump();
     expect(find.byKey(const Key('full-payment')), findsOneWidget);
@@ -423,7 +426,10 @@ void main() {
     await go(tester, '/customers/c_55');
     await settle(tester);
     await tester.ensureVisible(find.byKey(const Key('add-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('add-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('add-payment')));
     await tester.pump();
     expect(find.byKey(const ValueKey('movement-payment-0')), findsOneWidget);
@@ -436,7 +442,10 @@ void main() {
     );
     await tester.pump();
     final save = find.byKey(const Key('save-movement'));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
     await tester.ensureVisible(save);
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.pump();
     await tester.tap(save);
     await settle(tester);

@@ -115,9 +115,15 @@ void main() {
 
       final gate = Completer<void>();
       fake.pauseMutations = gate;
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('add-payment')));
       await settle(tester);
       await enterAmount(tester, '100');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+      await tester.ensureVisible(find.byKey(const Key('save-movement')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('save-movement')));
       await tester.pump();
       await tester.pump(Duration.zero);
@@ -140,11 +146,21 @@ void main() {
       expect(after.balanceUnits, before.balanceUnits);
       expect(after.version, before.version);
       await go(tester, '/customers/c_55');
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('add-payment')));
       await settle(tester);
       await enterAmount(tester, '100');
       await tester.pump();
       expect(fake.mutationRequestIds, [requestId]);
+
+      FocusManager.instance.primaryFocus?.unfocus();
+
+      await tester.pump();
+
+      await tester.ensureVisible(find.byKey(const Key('save-movement')));
+
+      await tester.pump(const Duration(milliseconds: 400));
 
       await tester.tap(find.byKey(const Key('save-movement')));
       await tester.pump();

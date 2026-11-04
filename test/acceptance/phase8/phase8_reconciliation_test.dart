@@ -163,6 +163,10 @@ void main() {
     await go(tester, '/customers/c_55');
 
     await tester.ensureVisible(find.byKey(const Key('add-payment')));
+
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(const Key('add-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('add-payment')));
     await settle(tester);
     await tester.enterText(
@@ -172,6 +176,10 @@ void main() {
       ),
       '100',
     );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('save-movement')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('save-movement')));
     await settle(tester);
 
@@ -192,10 +200,20 @@ void main() {
 
     // The add row: choose دفع كلي, then its save button.
     await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('composer-full')));
     await tester.pump();
     await tester.pump();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('full-payment')));
     await settle(tester);
     final afterFull = await _flushed(

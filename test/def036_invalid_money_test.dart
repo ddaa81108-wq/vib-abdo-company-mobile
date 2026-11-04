@@ -175,18 +175,36 @@ void main() {
 
         // The add row: choose دفع كلي, then its save button.
         await tester.ensureVisible(find.byKey(const Key('composer-full')));
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.ensureVisible(find.byKey(const Key('composer-full')));
+        await tester.pump(const Duration(milliseconds: 400));
         await tester.tap(find.byKey(const Key('composer-full')));
         await tester.pump();
         await tester.pump();
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pump();
         await tester.ensureVisible(find.byKey(const Key('full-payment')));
+        await tester.pump(const Duration(milliseconds: 400));
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pump();
+        await tester.ensureVisible(find.byKey(const Key('full-payment')));
+        await tester.pump(const Duration(milliseconds: 400));
         await tester.tap(find.byKey(const Key('full-payment')));
         await settle(tester);
         expect(fake.mutationRequestIds, isEmpty);
         expect(_errorTexts(tester), contains(MoneyValue.invalidLabel));
 
+        await tester.ensureVisible(find.byKey(const Key('add-payment')));
+
+        await tester.pump(const Duration(milliseconds: 400));
+
         await tester.tap(find.byKey(const Key('add-payment')));
         await settle(tester);
         await enterAmount(tester, '10');
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pump();
+        await tester.ensureVisible(find.byKey(const Key('save-movement')));
+        await tester.pump(const Duration(milliseconds: 400));
         await tester.tap(find.byKey(const Key('save-movement')));
         await settle(tester);
 

@@ -19,6 +19,8 @@ void main() {
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await _go(tester, '/customers/c_55');
+    await tester.ensureVisible(find.byKey(const Key('add-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('add-payment')));
     await _settle(tester);
     await tester.enterText(
@@ -32,9 +34,17 @@ void main() {
 
     final gate = Completer<void>();
     fake.pauseMutations = gate;
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('save-movement')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('save-movement')));
     await tester.pump();
     await tester.pump(Duration.zero);
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('save-movement')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('save-movement')));
     await tester.pump();
     expect(fake.mutationRequestIds, hasLength(1));
@@ -67,6 +77,8 @@ void main() {
       final fake = layer.client as FakeApiClient;
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await _go(tester, '/customers/c_55');
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('add-payment')));
       await _settle(tester);
       await tester.enterText(
@@ -79,11 +91,27 @@ void main() {
       await tester.pump();
       fake.failMutationsRemaining = 1;
 
+      FocusManager.instance.primaryFocus?.unfocus();
+
+      await tester.pump();
+
+      await tester.ensureVisible(find.byKey(const Key('save-movement')));
+
+      await tester.pump(const Duration(milliseconds: 400));
+
       await tester.tap(find.byKey(const Key('save-movement')));
       await _settle(tester);
       expect(find.text('تعذر تنفيذ الطلب.'), findsWidgets);
       expect(await _rows(tester, layer), 0);
       final requestId = fake.mutationRequestIds.single;
+
+      FocusManager.instance.primaryFocus?.unfocus();
+
+      await tester.pump();
+
+      await tester.ensureVisible(find.byKey(const Key('save-movement')));
+
+      await tester.pump(const Duration(milliseconds: 400));
 
       await tester.tap(find.byKey(const Key('save-movement')));
       await _settle(tester);

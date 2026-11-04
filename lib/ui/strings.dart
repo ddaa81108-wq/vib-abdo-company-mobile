@@ -172,7 +172,11 @@ abstract final class AppStrings {
   static const balanceAfter = 'الرصيد بعد الحركة';
 
   // Ledger table columns, the website's labels (Ali, 2026-11-03).
-  static const ledgerColSeq = 'م';
+  static const ledgerColSeq = 'التسلسل';
+  static const ledgerColBy = 'بواسطة';
+  static const ledgerNewRow = 'جديد';
+  static const ledgerClose = 'إغلاق';
+  static const ledgerEditCard = 'تعديل البيانات';
   static const ledgerColWhen = 'اليوم والتاريخ والوقت';
   static const ledgerColType = 'نوع الحركة';
   static const ledgerColNote = 'البيان';
@@ -211,8 +215,8 @@ abstract final class AppStrings {
 
   /// A payment line whose server paymentMode is missing.
   static const paymentUnknownMode = 'دفع';
-  static const depositIn = 'دخول';
-  static const depositOut = 'خروج';
+  static const depositIn = 'إيداع أمانة';
+  static const depositOut = 'سحب أمانة';
   static const egpIn = 'إيداع مصري';
   static const egpOut = 'سحب مصري';
   static const direct = 'مباشر';

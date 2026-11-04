@@ -26,6 +26,10 @@ void main() {
     expect(_header('320 د.ل'), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const Key('add-payment')));
+
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(const Key('add-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('add-payment')));
     await settle(tester);
     await tester.enterText(
@@ -39,6 +43,10 @@ void main() {
     final fake = layer.client as FakeApiClient;
     final gate = Completer<void>();
     fake.pauseMutations = gate;
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('save-movement')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('save-movement')));
     await pumpUntilFound(tester, find.byType(CircularProgressIndicator));
     expect(fake.mutationRequestIds, hasLength(1));
@@ -48,6 +56,10 @@ void main() {
           .onPressed,
       isNull,
     );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('save-movement')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('save-movement')));
     await tester.pump();
     expect(fake.mutationRequestIds, hasLength(1));
@@ -59,10 +71,20 @@ void main() {
 
     // The add row: choose دفع كلي, then its save button.
     await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('composer-full')));
     await tester.pump();
     await tester.pump();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('full-payment')));
     await settle(tester);
     expect(_header('0 د.ل'), findsOneWidget);

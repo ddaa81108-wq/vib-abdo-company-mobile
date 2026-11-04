@@ -472,6 +472,9 @@ void main() {
       final fake = layer.client as FakeApiClient;
       final postsBefore = fake.mutationPaths.length;
       await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('add-payment')));
       await settle(tester);
       await tester.enterText(
@@ -487,7 +490,10 @@ void main() {
         find.ancestor(of: save, matching: find.byType(GuardedMutation)),
       );
       expect(before.inputs, contains('|400|'));
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
       await tester.ensureVisible(save);
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(save);
       for (var i = 0; i < 30; i++) {
         if (find
@@ -516,7 +522,13 @@ void main() {
       expect(draft.expectedVersion, mutation.expectedVersion);
       expect(requestId, isNotEmpty);
 
+      FocusManager.instance.primaryFocus?.unfocus();
+
+      await tester.pump();
+
       await tester.ensureVisible(save);
+
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(save);
       for (var i = 0; i < 30; i++) {
         if (find
@@ -556,6 +568,10 @@ void main() {
       final fake = layer.client as FakeApiClient;
 
       await tester.ensureVisible(find.byKey(const Key('add-payment')));
+
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('add-payment')));
       await settle(tester);
       await tester.enterText(
@@ -578,7 +594,10 @@ void main() {
       );
 
       final save = find.byKey(const Key('save-movement'));
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
       await tester.ensureVisible(save);
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(save);
       await settle(tester);
 
@@ -588,7 +607,13 @@ void main() {
       expect(_header('220 د.ل'), findsOneWidget);
       expect(_header('320 د.ل'), findsNothing);
 
+      FocusManager.instance.primaryFocus?.unfocus();
+
+      await tester.pump();
+
       await tester.ensureVisible(save);
+
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(save);
       for (var i = 0; i < 30; i++) {
         if (find
@@ -632,6 +657,10 @@ void main() {
       final fake = layer.client as FakeApiClient;
 
       await tester.ensureVisible(find.byKey(const Key('add-payment')));
+
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('add-payment')));
       await settle(tester);
       await tester.enterText(
@@ -660,7 +689,10 @@ void main() {
       );
       fake.failGetPaths.add(_cardPath);
       final save = find.byKey(const Key('save-movement'));
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
       await tester.ensureVisible(save);
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(save);
       await settle(tester);
 
@@ -747,7 +779,10 @@ String _cardJson(
 
 Future<void> _openPayment(WidgetTester tester, String amount) async {
   await tester.ensureVisible(find.byKey(const Key('add-payment')));
+  await tester.pump(const Duration(milliseconds: 400));
   await tester.pump();
+  await tester.ensureVisible(find.byKey(const Key('add-payment')));
+  await tester.pump(const Duration(milliseconds: 400));
   await tester.tap(find.byKey(const Key('add-payment')));
   await settle(tester);
   await tester.enterText(
@@ -758,7 +793,10 @@ Future<void> _openPayment(WidgetTester tester, String amount) async {
     amount,
   );
   final save = find.byKey(const Key('save-movement'));
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tester.pump();
   await tester.ensureVisible(save);
+  await tester.pump(const Duration(milliseconds: 400));
   await tester.pump();
   await tester.tap(save);
   const warning = Key('overpayment-warning');

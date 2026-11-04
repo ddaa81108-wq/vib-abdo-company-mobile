@@ -128,10 +128,20 @@ void main() {
       findsOneWidget,
     );
     await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('composer-full')));
     await tester.pump();
     await tester.pump();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('full-payment')));
     await settle(tester);
     expect(

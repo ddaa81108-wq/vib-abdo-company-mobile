@@ -18,6 +18,10 @@ void main() {
     expect(_header('320 د.ل'), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const Key('add-payment')));
+
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(const Key('add-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('add-payment')));
     await settle(tester);
     await tester.enterText(
@@ -39,6 +43,10 @@ void main() {
         MutationMeta(expectedVersion: 4),
       ),
     );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('save-movement')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('save-movement')));
     await settle(tester);
 

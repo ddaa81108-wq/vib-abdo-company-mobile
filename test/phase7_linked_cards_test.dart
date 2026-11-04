@@ -43,7 +43,10 @@ void main() {
       await tester.tap(candidate);
       await settle(tester);
       final save = find.byKey(const Key('save-link'));
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
       await tester.ensureVisible(save);
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(save);
       await settle(tester);
 

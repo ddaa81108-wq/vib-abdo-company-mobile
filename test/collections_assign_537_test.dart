@@ -32,7 +32,10 @@ void main() {
 
   Future<void> press(WidgetTester tester) async {
     final save = find.byKey(const Key('save-assignment'));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
     await tester.ensureVisible(save);
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(save);
     await settle(tester);
   }
