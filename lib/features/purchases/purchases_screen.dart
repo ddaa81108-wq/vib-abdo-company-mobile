@@ -871,8 +871,11 @@ class _Entry extends ConsumerWidget {
                   Flexible(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: _red(context),
+                        color: _red(context).withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: _red(context).withValues(alpha: 0.5),
+                        ),
                       ),
                       child: Padding(
                         padding: const EdgeInsetsDirectional.symmetric(
@@ -883,7 +886,7 @@ class _Entry extends ConsumerWidget {
                           entry.itemLabel ?? AppStrings.dash,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: cairo(12.5, 800, color: Colors.white),
+                          style: cairo(12.5, 800, color: _red(context)),
                         ),
                       ),
                     ),
