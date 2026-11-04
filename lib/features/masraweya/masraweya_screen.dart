@@ -9,7 +9,8 @@ import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
-import '../../ui/widgets/labeled_money.dart';
+import '../../ui/theme.dart';
+import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/mutation_form.dart';
 
 class MasraweyaScreen extends ConsumerWidget {
@@ -31,7 +32,7 @@ class MasraweyaScreen extends ConsumerWidget {
       key: screenKey,
       padding: pagePadding(MediaQuery.sizeOf(context).width),
       children: [
-        const ScreenTitle('صفحة المصراوية'),
+        const SectionHeading('صفحة المصراوية'),
         day.when(
           loading: () => const SkeletonBox(height: 120),
           error: (error, _) => presentFailure(
@@ -50,6 +51,26 @@ class MasraweyaScreen extends ConsumerWidget {
   }
 }
 
+/// The website's words for المصراوية (display only).
+abstract final class _MText {
+  static const summary = 'ملخص اليوم';
+  static const summaryNote = 'القيم بالجنيه المصري';
+  static const box = 'المصراوية';
+  static const purchasesToday = 'مشتريات اليوم';
+  static const purchasesHint = 'أدخل المبلغ هنا';
+  static const workToday = 'إجمالي شغل اليوم';
+  static const workHint = 'القيم والعمولات';
+  static const remaining = 'الرصيد المتبقي';
+  static const remainingHint = 'السابق + المشتريات − الشغل';
+  static const work = 'شغل اليوم';
+  static const workNote = 'القيمة + العمولة = الناتج';
+  static const seq = 'التسلسل';
+  static const value = 'القيمة';
+  static const commission = 'العمولة';
+  static const noRows = 'لا توجد صفوف لهذا اليوم.';
+  static const status = 'حالة اليوم';
+}
+
 class _DayView extends StatelessWidget {
   const _DayView({
     required this.data,
@@ -63,77 +84,114 @@ class _DayView extends StatelessWidget {
   final bool canWrite;
   final bool online;
 
+  String _egp(MoneyValue? units) => money.formatOrDash(units, Currency.egp);
+
   @override
   Widget build(BuildContext context) {
+    final success =
+        Theme.of(context).extension<AppColors>()?.success ??
+        context.statusColors.creditText;
+    final adjustment = data.historicalAdjustmentUnits;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(data.businessDate),
+        SectionCard(
+          title: _MText.summary,
+          note: _MText.summaryNote,
+          trailing: canWrite
+              ? GatedButton(
+                  buttonKey: const Key('edit-masraweya'),
+                  allowed: true,
+                  online: online,
+                  label: AppStrings.save,
+                  onPressed: () =>
+                      showAppForm<void>(context, _MasraweyaForm(day: data)),
+                )
+              : null,
+          child: FigureBox(
+            title: _MText.box,
+            trailing: data.businessDate,
+            rows: [
+              FigureRow(
+                key: const Key('masraweya-previous'),
+                label: AppStrings.previousValue,
+                value: _egp(data.previousValueUnits),
+              ),
+              FigureRow(
+                key: const Key('masraweya-purchases'),
+                label: _MText.purchasesToday,
+                hint: _MText.purchasesHint,
+                value: _egp(data.purchasesUnits),
+              ),
+              FigureRow(
+                key: const Key('masraweya-work-total'),
+                label: _MText.workToday,
+                hint: _MText.workHint,
+                value: _egp(data.workTotalUnits),
+              ),
+              if (adjustment != null &&
+                  !(adjustment.isValid && adjustment.units == 0))
+                FigureRow(
+                  key: const Key('masraweya-adjustment'),
+                  label: AppStrings.adjustment,
+                  value: _egp(adjustment),
+                )
+              else
+                Offstage(
+                  child: FigureRow(
+                    key: const Key('masraweya-adjustment'),
+                    label: AppStrings.adjustment,
+                    value: _egp(adjustment),
+                  ),
+                ),
+              FigureRow(
+                key: const Key('masraweya-remaining'),
+                label: _MText.remaining,
+                hint: _MText.remainingHint,
+                value: _egp(data.remainingUnits),
+                highlight: success,
+                last: true,
+              ),
+            ],
+          ),
+        ),
+        SectionCard(
+          title: _MText.work,
+          note: _MText.workNote,
+          child: GridTable(
+            headers: const [_MText.seq, _MText.value, _MText.commission],
+            flex: const [2, 4, 4],
+            empty: _MText.noRows,
+            rows: [
+              for (var i = 0; i < data.entries.length; i++)
+                [
+                  gridText(context, '${i + 1}', bold: true),
+                  KeyedSubtree(
+                    key: Key('masraweya-entry-$i'),
+                    child: gridMoney(context, _egp(data.entries[i].valueUnits)),
+                  ),
+                  KeyedSubtree(
+                    key: Key('masraweya-entry-commission-$i'),
+                    child: gridMoney(
+                      context,
+                      _egp(data.entries[i].commissionUnits),
+                    ),
+                  ),
+                ],
+            ],
+            footer: [
+              gridText(context, _MText.workToday, bold: true),
+              const SizedBox.shrink(),
+              gridMoney(context, _egp(data.workTotalUnits), bold: true),
+            ],
+          ),
+        ),
+        SectionNote(
+          '${_MText.status}: ${data.status ?? AppStrings.dash}',
+          key: const Key('masraweya-status'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        _amount(
-          'masraweya-previous',
-          AppStrings.previousValue,
-          data.previousValueUnits,
-        ),
-        _amount(
-          'masraweya-purchases',
-          AppStrings.purchasesValue,
-          data.purchasesUnits,
-        ),
-        _amount(
-          'masraweya-work-total',
-          AppStrings.workTotal,
-          data.workTotalUnits,
-        ),
-        _amount(
-          'masraweya-remaining',
-          AppStrings.remaining,
-          data.remainingUnits,
-        ),
-        _amount(
-          'masraweya-adjustment',
-          AppStrings.adjustment,
-          data.historicalAdjustmentUnits,
-        ),
-        for (var i = 0; i < data.entries.length; i++) ...[
-          _amount(
-            'masraweya-entry-$i',
-            AppStrings.amount,
-            data.entries[i].valueUnits,
-          ),
-          _amount(
-            'masraweya-entry-commission-$i',
-            AppStrings.commissions,
-            data.entries[i].commissionUnits,
-          ),
-        ],
-        Text(data.status ?? AppStrings.dash),
-        if (canWrite) ...[
-          const SizedBox(height: AppSpacing.md),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: GatedButton(
-              buttonKey: const Key('edit-masraweya'),
-              allowed: true,
-              online: online,
-              label: AppStrings.save,
-              onPressed: () =>
-                  showAppForm<void>(context, _MasraweyaForm(day: data)),
-            ),
-          ),
-        ],
       ],
-    );
-  }
-
-  Widget _amount(String key, String label, MoneyValue? units) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-      child: LabeledMoney(
-        key: Key(key),
-        label: label,
-        value: money.formatOrDash(units, Currency.egp),
-      ),
     );
   }
 }
