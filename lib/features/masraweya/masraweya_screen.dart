@@ -28,25 +28,27 @@ class MasraweyaScreen extends ConsumerWidget {
     final money = ref.watch(apiLayerProvider).money;
     final canWrite = permissions.canWrite(SectionKey.masraweya);
     final online = ref.watch(onlineProvider);
-    return ListView(
-      key: screenKey,
-      padding: pagePadding(MediaQuery.sizeOf(context).width),
-      children: [
-        const SectionHeading('صفحة المصراوية'),
-        day.when(
-          loading: () => const SkeletonBox(height: 120),
-          error: (error, _) => presentFailure(
-            ref.read(errorHandlerProvider).toFailure(error),
-            onRetry: () => ref.invalidate(masraweyaProvider),
+    return SectionTheme(
+      child: ListView(
+        key: screenKey,
+        padding: pagePadding(MediaQuery.sizeOf(context).width),
+        children: [
+          const SectionHeading('صفحة المصراوية'),
+          day.when(
+            loading: () => const SkeletonBox(height: 120),
+            error: (error, _) => presentFailure(
+              ref.read(errorHandlerProvider).toFailure(error),
+              onRetry: () => ref.invalidate(masraweyaProvider),
+            ),
+            data: (data) => _DayView(
+              data: data,
+              money: money,
+              canWrite: canWrite,
+              online: online,
+            ),
           ),
-          data: (data) => _DayView(
-            data: data,
-            money: money,
-            canWrite: canWrite,
-            online: online,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

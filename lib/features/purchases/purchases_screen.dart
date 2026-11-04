@@ -33,96 +33,99 @@ class PurchasesScreen extends ConsumerWidget {
     final canWrite = permissions.canWrite(SectionKey.purchases);
     final canFinalize = permissions.canFinalizePurchases;
 
-    return ListView(
-      key: screenKey,
-      // One day's page: build it whole so the totals card at the end is
-      // ready (and readable by tests) without scrolling.
-      scrollCacheExtent: const ScrollCacheExtent.pixels(6000),
-      padding: pagePadding(MediaQuery.sizeOf(context).width),
-      children: [
-        const SectionHeading(_PText.title),
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SegmentedButton<PurchaseBook>(
-              key: const Key('purchase-books'),
-              segments: const [
-                ButtonSegment(
-                  value: PurchaseBook.alBayan,
-                  label: Text(AppStrings.alBayan),
-                ),
-                ButtonSegment(
-                  value: PurchaseBook.simsim,
-                  label: Text(AppStrings.simsim),
-                ),
-              ],
-              selected: {book},
-              onSelectionChanged: (value) =>
-                  ref.read(purchaseBookProvider.notifier).state = value.first,
+    return SectionTheme(
+      child: ListView(
+        key: screenKey,
+        // One day's page: build it whole so the totals card at the end is
+        // ready (and readable by tests) without scrolling.
+        scrollCacheExtent: const ScrollCacheExtent.pixels(6000),
+        padding: pagePadding(MediaQuery.sizeOf(context).width),
+        children: [
+          const SectionHeading(_PText.title),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SegmentedButton<PurchaseBook>(
+                key: const Key('purchase-books'),
+                segments: const [
+                  ButtonSegment(
+                    value: PurchaseBook.alBayan,
+                    label: Text(AppStrings.alBayan),
+                  ),
+                  ButtonSegment(
+                    value: PurchaseBook.simsim,
+                    label: Text(AppStrings.simsim),
+                  ),
+                ],
+                selected: {book},
+                onSelectionChanged: (value) =>
+                    ref.read(purchaseBookProvider.notifier).state = value.first,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        KeptData<PurchasesPage>(
-          value: page,
-          resetKey: book,
-          onRetry: () => ref.invalidate(purchasesProvider),
-          messageOf: (error) =>
-              failureText(ref.read(errorHandlerProvider).toFailure(error)),
-          failureOf: (error) => ref.read(errorHandlerProvider).toFailure(error),
-          loading: const Column(
-            key: Key('purchases-loading'),
-            children: [
-              SkeletonBox(),
-              SizedBox(height: AppSpacing.md),
-              SkeletonBox(),
-            ],
-          ),
-          builder: (data) {
-            final day = data.day;
-            final empty = day == null && data.entries.isEmpty;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          const SizedBox(height: AppSpacing.md),
+          KeptData<PurchasesPage>(
+            value: page,
+            resetKey: book,
+            onRetry: () => ref.invalidate(purchasesProvider),
+            messageOf: (error) =>
+                failureText(ref.read(errorHandlerProvider).toFailure(error)),
+            failureOf: (error) =>
+                ref.read(errorHandlerProvider).toFailure(error),
+            loading: const Column(
+              key: Key('purchases-loading'),
               children: [
-                _OpeningCard(
-                  book: book,
-                  day: day,
-                  money: money,
-                  canWrite: canWrite,
-                  online: online,
-                ),
-                if (empty)
-                  const EmptyPane(
-                    key: Key('purchases-empty'),
-                    message: AppStrings.emptyPurchases,
-                  ),
-                if (day != null)
-                  _DayCard(
+                SkeletonBox(),
+                SizedBox(height: AppSpacing.md),
+                SkeletonBox(),
+              ],
+            ),
+            builder: (data) {
+              final day = data.day;
+              final empty = day == null && data.entries.isEmpty;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _OpeningCard(
+                    book: book,
                     day: day,
-                    entries: data.entries,
                     money: money,
                     canWrite: canWrite,
-                    canFinalize: canFinalize,
                     online: online,
-                    book: book,
-                  )
-                else
-                  for (final entry in data.entries)
-                    _Entry(
-                      entry: entry,
-                      money: money,
-                      book: book,
-                      version: entry.dayVersion,
-                      canWrite: false,
-                      online: online,
+                  ),
+                  if (empty)
+                    const EmptyPane(
+                      key: Key('purchases-empty'),
+                      message: AppStrings.emptyPurchases,
                     ),
-                _RegisterTotals(totals: data.registerTotals, money: money),
-              ],
-            );
-          },
-        ),
-      ],
+                  if (day != null)
+                    _DayCard(
+                      day: day,
+                      entries: data.entries,
+                      money: money,
+                      canWrite: canWrite,
+                      canFinalize: canFinalize,
+                      online: online,
+                      book: book,
+                    )
+                  else
+                    for (final entry in data.entries)
+                      _Entry(
+                        entry: entry,
+                        money: money,
+                        book: book,
+                        version: entry.dayVersion,
+                        canWrite: false,
+                        online: online,
+                      ),
+                  _RegisterTotals(totals: data.registerTotals, money: money),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }
@@ -160,7 +163,6 @@ class _RegisterTotals extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final look = context.look;
     String f(MoneyValue? v, Currency c) => money.formatOrDash(v, c);
     return SectionCard(
       key: const Key('purchases-lifetime'),
@@ -170,7 +172,7 @@ class _RegisterTotals extends StatelessWidget {
           EdgeSummary(
             title: _PText.lifeResult,
             value: f(totals?.resultUnits, Currency.lyd),
-            edge: look.accent,
+            edge: sectionGold(context),
           ),
           EdgeSummary(
             title: _PText.lifePaid,
@@ -259,7 +261,7 @@ class _DayCard extends ConsumerWidget {
                 EdgeSummary(
                   title: _PText.workToday,
                   value: f(day.todayResultUnits, Currency.lyd),
-                  edge: context.look.accent,
+                  edge: sectionGold(context),
                 ),
                 EdgeSummary(
                   title: _PText.paidTotal,

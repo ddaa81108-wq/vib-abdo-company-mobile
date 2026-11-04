@@ -62,7 +62,61 @@ BoxDecoration sectionCardDecoration(BuildContext context, {Color? border}) {
   );
 }
 
-/// A title in a pill, like the collections list card.
+/// The app's gold (the collections amber), readable on both themes.
+Color sectionGold(BuildContext context) =>
+    context.look.glass ? const Color(0xFFFBBF24) : const Color(0xFFB45309);
+
+/// Ink on a solid gold fill.
+Color onSectionGold(BuildContext context) =>
+    context.look.glass ? const Color(0xFF1A1300) : Colors.white;
+
+/// Buttons inside a section use the app's gold, not the default blue.
+/// Display only: wraps [child] in a theme with gold filled/elevated buttons.
+class SectionTheme extends StatelessWidget {
+  const SectionTheme({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final gold = sectionGold(context);
+    final on = onSectionGold(context);
+    final theme = Theme.of(context);
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadii.xl),
+      side: BorderSide(color: Color.lerp(gold, Colors.white, 0.25)!),
+    );
+    ButtonStyle gild(ButtonStyle? base) =>
+        (base ?? const ButtonStyle()).copyWith(
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (s) => s.contains(WidgetState.disabled)
+                ? gold.withValues(alpha: 0.30)
+                : gold,
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (s) => s.contains(WidgetState.disabled)
+                ? on.withValues(alpha: 0.75)
+                : on,
+          ),
+          shape: WidgetStatePropertyAll(shape),
+          elevation: const WidgetStatePropertyAll(2),
+          shadowColor: WidgetStatePropertyAll(gold.withValues(alpha: 0.45)),
+        );
+    return Theme(
+      data: theme.copyWith(
+        filledButtonTheme: FilledButtonThemeData(
+          style: gild(theme.filledButtonTheme.style),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: gild(theme.elevatedButtonTheme.style),
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// A title in a gold-bordered pill, like the app's section headers.
 class PillTitle extends StatelessWidget {
   const PillTitle(this.text, {super.key});
 
@@ -71,21 +125,19 @@ class PillTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final look = context.look;
+    final gold = sectionGold(context);
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [look.glossHero.top, look.glossHero.bottom],
-        ),
+        color: Color.alphaBlend(gold.withValues(alpha: 0.10), look.card),
+        border: Border.all(color: gold, width: 1.5),
       ),
       child: Padding(
         padding: const EdgeInsetsDirectional.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.xs,
         ),
-        child: Text(text, style: cairo(14, 800, color: look.glossHero.ink)),
+        child: Text(text, style: cairo(14, 800, color: look.ink)),
       ),
     );
   }
@@ -231,12 +283,7 @@ class FigureRow extends StatelessWidget {
 /// Rows of [FigureRow] inside one bordered box with an optional dark
 /// header strip (title + date), like a statement.
 class FigureBox extends StatelessWidget {
-  const FigureBox({
-    required this.rows,
-    this.title,
-    this.trailing,
-    super.key,
-  });
+  const FigureBox({required this.rows, this.title, this.trailing, super.key});
 
   final String? title;
   final String? trailing;
@@ -442,14 +489,18 @@ class GridTable extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            row([
-              for (final h in headers)
-                Text(
-                  h,
-                  textAlign: TextAlign.center,
-                  style: cairo(11.5, 800, color: look.muted),
-                ),
-            ], color: look.strip, head: true),
+            row(
+              [
+                for (final h in headers)
+                  Text(
+                    h,
+                    textAlign: TextAlign.center,
+                    style: cairo(11.5, 800, color: look.muted),
+                  ),
+              ],
+              color: look.strip,
+              head: true,
+            ),
             if (rows.isEmpty && empty != null)
               Padding(
                 padding: const EdgeInsetsDirectional.all(AppSpacing.md),
@@ -461,7 +512,7 @@ class GridTable extends StatelessWidget {
               ),
             for (final r in rows) row(r),
             if (footer != null)
-              row(footer!, color: look.accent.withValues(alpha: 0.10)),
+              row(footer!, color: sectionGold(context).withValues(alpha: 0.10)),
           ],
         ),
       ),
@@ -470,12 +521,11 @@ class GridTable extends StatelessWidget {
 }
 
 /// A cell text for [GridTable].
-Widget gridText(BuildContext context, String text, {bool bold = false}) =>
-    Text(
-      text,
-      textAlign: TextAlign.center,
-      style: cairo(12.5, bold ? 800 : 600, color: context.look.ink),
-    );
+Widget gridText(BuildContext context, String text, {bool bold = false}) => Text(
+  text,
+  textAlign: TextAlign.center,
+  style: cairo(12.5, bold ? 800 : 600, color: context.look.ink),
+);
 
 /// A money cell for [GridTable].
 Widget gridMoney(BuildContext context, String text, {bool bold = false}) =>

@@ -14,6 +14,7 @@ import '../../state/theme_controller.dart';
 import '../../ui/presentation.dart';
 import '../../ui/strings.dart';
 import '../../ui/theme.dart';
+import '../../ui/widgets/section_kit.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/mutation_form.dart';
@@ -105,6 +106,22 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     _syncingColumns = true;
     to.jumpTo(target);
     _syncingColumns = false;
+  }
+
+  /// The table opens at its start (التسلسل, then the date in RTL), even
+  /// after focusing القيمة scrolled it sideways.
+  void _toTableStart([int frames = 12]) {
+    if (!mounted) return;
+    for (final c in [_columnsScroll, _headerScroll]) {
+      if (c.hasClients && c.offset != c.position.minScrollExtent) {
+        c.jumpTo(c.position.minScrollExtent);
+      }
+    }
+    if (frames > 0) {
+      WidgetsBinding.instance
+        ..addPostFrameCallback((_) => _toTableStart(frames - 1))
+        ..scheduleFrame();
+    }
   }
 
   static bool _atTop(ScrollController controller) =>
@@ -552,6 +569,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   /// First open: the newest rows and the entry buttons are on screen.
   void _jumpToEntry() {
     if (!mounted) return;
+    _toTableStart();
     if (_innerRows.hasClients) {
       _innerRows.jumpTo(_innerRows.position.maxScrollExtent);
     }
@@ -955,11 +973,25 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
                 if (columns.showBalance) _Cell(_LedgerColumns.balance, dash),
                 _Cell(
                   _LedgerColumns.edit + _LedgerColumns.cancel,
-                  FittedBox(fit: BoxFit.scaleDown, child: save),
+                  Icon(Icons.south_rounded, size: 18, color: look.muted),
                   divider: false,
                 ),
               ],
             ),
+          ),
+        ),
+        // Save stays in view under the entry row while the table scrolls
+        // sideways: no swipe needed on the phone.
+        _PinnedToViewport(
+          width: viewport,
+          child: Container(
+            color: look.accent.withValues(alpha: 0.10),
+            padding: const EdgeInsetsDirectional.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs,
+            ),
+            alignment: AlignmentDirectional.centerEnd,
+            child: SectionTheme(child: save),
           ),
         ),
         if (full || watchedCard.hasError)
@@ -1581,7 +1613,7 @@ class _LedgerColumns {
   final bool showBalance;
   final AccountSection section;
 
-  static const seq = 46.0;
+  static const seq = 56.0;
   static const when = 112.0;
   static const by = 96.0;
   static const type = 100.0;
@@ -1826,6 +1858,38 @@ class _JumpButtons extends StatelessWidget {
 }
 
 /// Gives rows the visible width so an inline form fits the screen.
+/// Keeps [child] at the visible start of a sideways-scrolling table.
+class _PinnedToViewport extends StatelessWidget {
+  const _PinnedToViewport({required this.width, required this.child});
+
+  final double? width;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scrollable = Scrollable.maybeOf(context, axis: Axis.horizontal);
+    final body = Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: SizedBox(width: width, child: child),
+    );
+    if (scrollable == null) return body;
+    final position = scrollable.position;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    return AnimatedBuilder(
+      animation: position,
+      builder: (context, child) {
+        final o = position.hasPixels ? position.pixels : 0.0;
+        return Transform.translate(
+          offset: Offset(rtl ? -o : o, 0),
+          transformHitTests: true,
+          child: child,
+        );
+      },
+      child: body,
+    );
+  }
+}
+
 class _InlineViewport extends InheritedWidget {
   const _InlineViewport({required this.width, required super.child});
 
