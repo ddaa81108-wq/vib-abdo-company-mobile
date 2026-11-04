@@ -229,7 +229,8 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
               if (section == AccountSection.egyptianDeposits) const _RateCard(),
               const SizedBox(height: AppSpacing.md),
               // Customers and companies: no filter chips (Ali, 2026-11-02).
-              if (!debtLook) ...[
+              // Deposits: no filter chips (Ali, 2026-11-04).
+              if (!debtLook && !deposits) ...[
                 _Tabs(section: section, summary: data.summary),
                 const SizedBox(height: AppSpacing.md),
               ],
@@ -1226,12 +1227,6 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final age = singleAgeText(
-      serverLabel: card.ageStatusLabel,
-      ageStatus: card.ageStatus,
-      section: section,
-      debtAgeDays: card.debtAgeDays,
-    );
     final showPin = canWrite;
     final showZero = onZero != null && !card.systemManaged;
     final showAssign = assigning && canSelectAccountForAssignment(card);
@@ -1293,14 +1288,18 @@ class _AccountCard extends StatelessWidget {
                       tone: tone,
                       // The status words (أمانة للعميل، دين على العميل،
                       // دين علينا للعميل، لصالح المنظومة) from the server.
-                      age:
-                          ageVisual(
-                            colors: context.statusColors,
-                            ageStatus: card.ageStatus,
-                            section: section,
-                            serverLabel: card.ageStatusLabel,
-                          ).label ??
-                          age,
+                      age: ageVisual(
+                        colors: context.statusColors,
+                        ageStatus: card.ageStatus,
+                        section: section,
+                        // A day count (منذ N أيام) is not a status word.
+                        serverLabel:
+                            (card.ageStatusLabel ?? '').startsWith(
+                              AppStrings.sinceDays,
+                            )
+                            ? null
+                            : card.ageStatusLabel,
+                      ).label,
                       showAssign: showAssign,
                       showPin: showPin,
                       showZero: showZero,
