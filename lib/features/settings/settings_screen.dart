@@ -10,6 +10,8 @@ import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/theme.dart';
+import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/export_pdf_button.dart';
 import '../../ui/widgets/soft_tile.dart';
 
@@ -60,32 +62,38 @@ class SettingsScreen extends ConsumerWidget {
     final ledger = permissions.canViewFinancialLedger;
     if (!manage && !ledger) return const ForbiddenPane();
     final width = MediaQuery.sizeOf(context).width;
-    return ListView(
-      key: screenKey,
-      padding: pagePadding(width),
-      children: [
-        const ScreenTitle(AppStrings.settings),
-        const SizedBox(height: AppSpacing.md),
-        if (manage)
-          for (final link in _adminLinks)
-            Card(
-              margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
-              clipBehavior: Clip.antiAlias,
-              child: SoftTile(
-                key: link.tileKey,
-                leading: Icon(link.icon),
-                title: link.title,
-                trailing: forwardChevron(context),
-                onTap: () => context.go(link.path),
+    return SectionTheme(
+      child: ListView(
+        key: screenKey,
+        padding: pagePadding(width),
+        children: [
+          const SectionHeading(AppStrings.settings),
+          const SizedBox(height: AppSpacing.md),
+          if (manage)
+            for (final link in _adminLinks)
+              Card(
+                margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
+                clipBehavior: Clip.antiAlias,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadii.xl),
+                  side: BorderSide(color: context.look.cardBorder),
+                ),
+                child: SoftTile(
+                  key: link.tileKey,
+                  leading: Icon(link.icon, color: sectionGold(context)),
+                  title: link.title,
+                  trailing: forwardChevron(context),
+                  onTap: () => context.go(link.path),
+                ),
               ),
-            ),
-        if (ledger) const _LedgerTile(),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          AppStrings.noLanguage,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      ],
+          if (ledger) const _LedgerTile(),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            AppStrings.noLanguage,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -110,15 +118,18 @@ class _LedgerTile extends ConsumerWidget {
     final page = ref.watch(financialLedgerProvider);
     final money = ref.watch(apiLayerProvider).money;
     final online = ref.watch(onlineProvider);
-    final theme = Theme.of(context);
     return Card(
       key: const Key('financial-ledger'),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        side: BorderSide(color: context.look.cardBorder),
+      ),
       child: Padding(
         padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(AppStrings.financialLedger, style: theme.textTheme.titleSmall),
+            const PillTitle(AppStrings.financialLedger),
             const ExportPdfButton(),
             page.when(
               loading: () => const SkeletonBox(height: 48),
