@@ -177,7 +177,10 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             padding: pagePadding(width),
             children: [
               // Customers and companies: no page title (Ali, 2026-11-02).
-              if (!debtLook) ...[
+              if (deposits) ...[
+                _DepositTitleBar(sectionLabel(section.sectionKey)),
+                const SizedBox(height: AppSpacing.md),
+              ] else if (!debtLook) ...[
                 ScreenTitle(sectionLabel(section.sectionKey)),
                 const SizedBox(height: AppSpacing.md),
               ],
@@ -193,12 +196,36 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                       ? HistoryWindow.retainLimit
                       : null,
                 ),
-              _SummaryStrip(
-                section: section,
-                summary: data.summary,
-                currency: section.currency,
-                money: money,
-              ),
+              // Deposits (Ali's device shots, 2026-11-04): one row with the
+              // section total, the active count and add; then the rate row.
+              if (deposits)
+                _DepositTopRow(
+                  summary: data.summary,
+                  currency: section.currency,
+                  money: money,
+                  add: addButton,
+                  assign: _canAssign(permissions)
+                      ? GatedButton(
+                          buttonKey: const Key('assign-mode'),
+                          allowed: true,
+                          online: online,
+                          filled: false,
+                          label: AppStrings.assign,
+                          glyph: Icons.assignment_ind_outlined,
+                          onPressed: () => setState(() {
+                            _assigning = !_assigning;
+                            _selected.clear();
+                          }),
+                        )
+                      : null,
+                )
+              else
+                _SummaryStrip(
+                  section: section,
+                  summary: data.summary,
+                  currency: section.currency,
+                  money: money,
+                ),
               if (section == AccountSection.egyptianDeposits) const _RateCard(),
               const SizedBox(height: AppSpacing.md),
               // Customers and companies: no filter chips (Ali, 2026-11-02).
@@ -217,12 +244,15 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                 )
               else ...[
                 searchField,
-                const SizedBox(height: AppSpacing.md),
-                Wrap(
-                  spacing: AppSpacing.md,
-                  runSpacing: AppSpacing.md,
-                  children: [addButton, assignButton],
-                ),
+                // Deposits: add and assign sit in the top row.
+                if (!deposits) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Wrap(
+                    spacing: AppSpacing.md,
+                    runSpacing: AppSpacing.md,
+                    children: [addButton, assignButton],
+                  ),
+                ],
               ],
               if (_assigning)
                 _AssignSubmit(
@@ -827,6 +857,176 @@ class _SummaryStrip extends StatelessWidget {
   }
 }
 
+/// The deposits' title band: dark glass with the title in gold.
+class _DepositTitleBar extends StatelessWidget {
+  const _DepositTitleBar(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final gold = sectionGold(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        gradient: LinearGradient(
+          begin: AlignmentDirectional.centerStart,
+          end: AlignmentDirectional.centerEnd,
+          colors: [
+            look.card,
+            Color.alphaBlend(gold.withValues(alpha: 0.10), look.card),
+          ],
+        ),
+        border: Border.all(color: look.cardBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
+        ),
+        child: Text(
+          title,
+          key: const Key('deposit-title'),
+          style: cairo(20, 800, color: gold),
+        ),
+      ),
+    );
+  }
+}
+
+/// One row: gold section total pill, النشطة N pill, then the actions.
+/// Server figures only (netBalance, activeCards).
+class _DepositTopRow extends StatelessWidget {
+  const _DepositTopRow({
+    required this.summary,
+    required this.currency,
+    required this.money,
+    required this.add,
+    this.assign,
+  });
+
+  final AccountsSummaryDto summary;
+  final Currency currency;
+  final MoneyFormatter money;
+  final Widget add;
+  final Widget? assign;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final gold = sectionGold(context);
+    final on = onSectionGold(context);
+    final count = summary.activeCards;
+    final total = DecoratedBox(
+      key: const Key('deposit-total-pill'),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color.lerp(gold, Colors.white, 0.25)!, gold],
+        ),
+        border: Border.all(color: Color.lerp(gold, Colors.white, 0.4)!),
+        boxShadow: [
+          BoxShadow(
+            color: gold.withValues(alpha: 0.35),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              AppStrings.depositSectionNet,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: cairo(11, 700, color: on),
+            ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: MoneyText(
+                money.formatOrDash(summary.netBalanceUnits, currency),
+                key: const Key('deposit-total'),
+                style: context.textExtras.amount.copyWith(
+                  color: on,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    final active = DecoratedBox(
+      key: const Key('deposit-active-pill'),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: look.card,
+        border: Border.all(color: gold, width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              AppStrings.activeShort,
+              style: cairo(12, 700, color: look.muted),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              count == null ? AppStrings.dash : '$count',
+              key: const Key('deposit-active-count'),
+              textDirection: TextDirection.ltr,
+              style: cairo(15, 800, color: look.ink),
+            ),
+          ],
+        ),
+      ),
+    );
+    final actions = [
+      active,
+      const SizedBox(width: AppSpacing.sm),
+      Flexible(child: add),
+      if (assign != null) ...[const SizedBox(width: AppSpacing.xs), assign!],
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scale = MediaQuery.textScalerOf(context).scale(1);
+        // Narrow or large text: the total on its own line.
+        if (constraints.maxWidth / scale < 400) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              total,
+              const SizedBox(height: AppSpacing.sm),
+              Row(children: actions),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: total),
+            const SizedBox(width: AppSpacing.sm),
+            ...actions,
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _Tabs extends ConsumerWidget {
   const _Tabs({required this.section, required this.summary});
 
@@ -1026,21 +1226,6 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final colors = context.statusColors;
-    final visual = ageVisual(
-      colors: colors,
-      ageStatus: card.ageStatus,
-      section: section,
-      serverLabel: card.ageStatusLabel,
-    );
-    final flat = useFlatAgeCard(width, Theme.of(context).brightness);
-    final colored = visual.colored;
-    final scheme = Theme.of(context).colorScheme;
-    final fg = colored ? colors.onStatus : scheme.onSurface;
-    final accent = colored
-        ? (visual.accent ?? colors.onStatus)
-        : scheme.onSurfaceVariant;
     final age = singleAgeText(
       serverLabel: card.ageStatusLabel,
       ageStatus: card.ageStatus,
@@ -1050,10 +1235,10 @@ class _AccountCard extends StatelessWidget {
     final showPin = canWrite;
     final showZero = onZero != null && !card.systemManaged;
     final showAssign = assigning && canSelectAccountForAssignment(card);
-    final showActions = showAssign || showPin || showZero;
+    final look0 = context.look;
     // Customers: debt / credit / zero tone from the balance sign (Ali,
     // 2026-11-02) instead of the age gradient.
-    final tone = switch (section) {
+    final CustomerTone tone = switch (section) {
       AccountSection.customers => customerTone(
         context,
         customerBalanceKind(card.balanceUnits),
@@ -1063,26 +1248,17 @@ class _AccountCard extends StatelessWidget {
       AccountSection.companies => _companyTone(
         companyCardGloss(context, companyCardKind(card.balanceUnits)),
       ),
-      _ => null,
+      // Deposits (Ali's device shots): red for the server's overdue status
+      // (دين على العميل / دين علينا للعميل), black for zero, green otherwise.
+      _ => _companyTone(switch (card.ageStatus) {
+        'overdue' => look0.glossDebt,
+        'zero' => look0.glossZero,
+        _ => look0.glossCredit,
+      }),
     };
-    final look = context.look;
-    // Glossy finish (Ali, 2026-11-03): customers use their tone; a coloured
-    // age card keeps its gradient with a sheen and glow; a plain card uses
-    // the neutral gloss.
-    final Gloss gloss =
-        tone?.gloss ??
-        (colored
-            ? Gloss(
-                top: visual.flat ?? colors.neutralCard,
-                bottom: visual.flat ?? colors.neutralCard,
-                border: colors.onStatus.withValues(alpha: 0.3),
-                glow: (visual.flat ?? colors.neutralCard).withValues(
-                  alpha: 0.35,
-                ),
-                ink: fg,
-                amount: fg,
-              )
-            : look.glossGrey);
+    // Every list card is glossy from its tone (customers, companies,
+    // deposits).
+    final Gloss gloss = tone.gloss ?? context.look.glossGrey;
     final radius = BorderRadius.circular(AppRadii.card);
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -1091,31 +1267,14 @@ class _AccountCard extends StatelessWidget {
       ),
       child: Material(
         key: Key('account-card-${card.id}'),
-        color:
-            tone?.background ??
-            (colored
-                ? (flat ? visual.flat : colors.neutralCard)
-                : gloss.bottom),
+        color: tone.background,
         borderRadius: radius,
         clipBehavior: Clip.antiAlias,
         child: Ink(
           decoration: BoxDecoration(
-            gradient: tone?.gloss != null
-                ? tone!.gloss!.fill
-                : colored
-                ? (flat ? null : visual.gradient)
-                : gloss.fill,
-            color: tone == null && colored && flat ? visual.flat : null,
+            gradient: gloss.fill,
             borderRadius: radius,
-            border: Border.all(
-              color:
-                  tone?.border ??
-                  (card.ageStatus == 'zero'
-                      ? colors.zeroCardBorder
-                      : colored
-                      ? colors.onStatus.withValues(alpha: 0.2)
-                      : gloss.border),
-            ),
+            border: Border.all(color: tone.border),
           ),
           child: InkWell(
             onTap: onOpen,
@@ -1125,116 +1284,26 @@ class _AccountCard extends StatelessWidget {
               child: isDebtLookSection(section)
                   ? _customerBody(
                       context,
-                      tone: tone!,
+                      tone: tone,
                       showAssign: showAssign,
                       showZero: showZero,
                     )
-                  : ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 118),
-                      child: Padding(
-                        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (age != null)
-                              Text(
-                                age,
-                                key: Key('account-age-${card.id}'),
-                                style: cairo(11, 800, color: accent),
-                              ),
-                            Text(card.name, style: cairo(16, 800, color: fg)),
-                            if (card.phone != null)
-                              _StartAlignedText(
-                                card.phone!,
-                                style: cairo(12, 500, color: accent),
-                              ),
-                            const SizedBox(height: AppSpacing.sm),
-                            MoneyText(
-                              money.formatOrDash(
-                                card.balanceUnits,
-                                card.currency,
-                              ),
-                              style: context.textExtras.amountLarge.copyWith(
-                                color: fg,
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Text(
-                              '${AppStrings.lastActivity}: ${formatIsoDate(card.lastActivityAt)}',
-                              style: cairo(11, 500, color: accent),
-                            ),
-                            if (card.activeAssigneeName != null)
-                              Text(
-                                '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
-                                style: cairo(11, 600, color: accent),
-                              ),
-                            if (card.systemManaged)
-                              Row(
-                                children: [
-                                  Icon(Icons.lock_outline, size: 16, color: fg),
-                                  const SizedBox(width: AppSpacing.xs),
-                                  Expanded(
-                                    child: Text(
-                                      AppStrings.systemCard,
-                                      style: cairo(11, 800, color: fg),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            if (showActions) ...[
-                              const SizedBox(height: AppSpacing.sm),
-                              Divider(
-                                height: 1,
-                                color: colored
-                                    ? colors.onStatus.withValues(alpha: 0.24)
-                                    : scheme.outlineVariant,
-                              ),
-                              const SizedBox(height: AppSpacing.xs),
-                              Wrap(
-                                spacing: AppSpacing.xs,
-                                runSpacing: AppSpacing.xs,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  if (showAssign)
-                                    Checkbox(
-                                      key: ValueKey('assign-select-${card.id}'),
-                                      value: selected,
-                                      onChanged: (_) => onToggle(),
-                                    ),
-                                  if (showPin)
-                                    GuardedMutation(
-                                      buttonKey: Key('pin-${card.id}'),
-                                      inputs:
-                                          'pin:${card.id}:${card.pinned}:${card.version}',
-                                      expectedVersion: card.version,
-                                      label: card.pinned
-                                          ? AppStrings.unpin
-                                          : AppStrings.pin,
-                                      tooltip: card.pinned
-                                          ? AppStrings.unpin
-                                          : AppStrings.pin,
-                                      icon: card.pinned
-                                          ? Icons.push_pin
-                                          : Icons.push_pin_outlined,
-                                      onSubmit: (meta) => onPin(meta),
-                                    ),
-                                  if (showZero)
-                                    GuardedMutation(
-                                      buttonKey: ValueKey(
-                                        'zero-review-${card.id}',
-                                      ),
-                                      inputs: 'zero:${card.id}:${card.version}',
-                                      expectedVersion: card.version,
-                                      label: AppStrings.zeroReview,
-                                      filled: false,
-                                      onSubmit: (meta) => onZero!(meta),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
+                  : _depositBody(
+                      context,
+                      tone: tone,
+                      // The status words (أمانة للعميل، دين على العميل،
+                      // دين علينا للعميل، لصالح المنظومة) from the server.
+                      age:
+                          ageVisual(
+                            colors: context.statusColors,
+                            ageStatus: card.ageStatus,
+                            section: section,
+                            serverLabel: card.ageStatusLabel,
+                          ).label ??
+                          age,
+                      showAssign: showAssign,
+                      showPin: showPin,
+                      showZero: showZero,
                     ),
             ),
           ),
@@ -1242,6 +1311,161 @@ class _AccountCard extends StatelessWidget {
       ),
     );
   }
+}
+
+extension on _AccountCard {
+  /// Deposit card (Ali's device shots): pin at the corner, status label,
+  /// name, amount, then «آخر حركة» under a thin line. Server values only.
+  Widget _depositBody(
+    BuildContext context, {
+    required CustomerTone tone,
+    required String? age,
+    required bool showAssign,
+    required bool showPin,
+    required bool showZero,
+  }) {
+    final ink = tone.ink;
+    final gold = const Color(0xFFFBBF24);
+    final last = card.lastActivityAt;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 150),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(10, 8, 10, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    age ?? '',
+                    key: Key('account-age-${card.id}'),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: cairo(11, 800, color: ink.withValues(alpha: 0.9)),
+                  ),
+                ),
+                if (showPin)
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF1A1300).withValues(alpha: 0.7),
+                      border: Border.all(color: gold.withValues(alpha: 0.8)),
+                    ),
+                    child: IconTheme.merge(
+                      data: IconThemeData(color: gold, size: 18),
+                      child: SizedBox(
+                        width: 34,
+                        height: 34,
+                        child: FittedBox(
+                          child: GuardedMutation(
+                            buttonKey: Key('pin-${card.id}'),
+                            inputs:
+                                'pin:${card.id}:${card.pinned}:${card.version}',
+                            expectedVersion: card.version,
+                            label: card.pinned
+                                ? AppStrings.unpin
+                                : AppStrings.pin,
+                            tooltip: card.pinned
+                                ? AppStrings.unpin
+                                : AppStrings.pin,
+                            icon: card.pinned
+                                ? Icons.push_pin
+                                : Icons.push_pin_outlined,
+                            onSubmit: (meta) => onPin(meta),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            Text(
+              card.name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: cairo(16, 800, color: ink),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: MoneyText(
+                  money.formatOrDash(card.balanceUnits, card.currency),
+                  style: context.textExtras.amountLarge.copyWith(
+                    color: tone.amount,
+                  ),
+                ),
+              ),
+            ),
+            if (card.systemManaged)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.lock_outline, size: 14, color: ink),
+                  const SizedBox(width: AppSpacing.xxs),
+                  Flexible(
+                    child: Text(
+                      AppStrings.systemCard,
+                      style: cairo(10.5, 800, color: ink),
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: AppSpacing.xs),
+            Divider(height: 1, color: ink.withValues(alpha: 0.25)),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              '${AppStrings.lastActivity}: ${formatIsoDate(last)}'
+              '${last == null ? '' : '، ${_clockText(last)}'}',
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: cairo(10.5, 700, color: ink.withValues(alpha: 0.9)),
+            ),
+            if (card.activeAssigneeName != null)
+              Text(
+                '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
+                textAlign: TextAlign.center,
+                style: cairo(10.5, 600, color: ink.withValues(alpha: 0.85)),
+              ),
+            if (showAssign || showZero)
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: AppSpacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (showAssign)
+                    Checkbox(
+                      key: ValueKey('assign-select-${card.id}'),
+                      value: selected,
+                      onChanged: (_) => onToggle(),
+                    ),
+                  if (showZero)
+                    GuardedMutation(
+                      buttonKey: ValueKey('zero-review-${card.id}'),
+                      inputs: 'zero:${card.id}:${card.version}',
+                      expectedVersion: card.version,
+                      label: AppStrings.zeroReview,
+                      filled: false,
+                      onSubmit: (meta) => onZero!(meta),
+                    ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _clockText(DateTime value) {
+  final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
+  final minute = value.minute.toString().padLeft(2, '0');
+  return '$hour:$minute ${value.hour < 12 ? 'ص' : 'م'}';
 }
 
 CustomerTone _companyTone(Gloss gloss) => CustomerTone(
@@ -1394,8 +1618,16 @@ class _RateCardState extends ConsumerState<_RateCard> {
     return Card(
       key: const Key('exchange-rate-card'),
       margin: const EdgeInsetsDirectional.only(top: AppSpacing.md),
+      color: context.look.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        side: BorderSide(color: sectionGold(context).withValues(alpha: 0.6)),
+      ),
       child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
         child: rate.when(
           loading: () => const SkeletonBox(height: 72),
           error: (error, _) => presentFailure(
@@ -1405,46 +1637,70 @@ class _RateCardState extends ConsumerState<_RateCard> {
           data: (data) {
             final canEdit = permissions.canWrite(SectionKey.egyptianDeposits);
             final theme = Theme.of(context);
+            final look = context.look;
+            final current = money.formatDecimalOrDash(data.egpPerLyd);
+            // One row (Ali's device shot): «سعر التحويل 1 د.ل =» [rate] ج.م
+            // and a save symbol. The current server rate is the hint.
             return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(AppStrings.rateTitle, style: theme.textTheme.titleSmall),
-                const SizedBox(height: AppSpacing.xs),
-                _StartAlignedText(
-                  money.formatDecimalOrDash(data.egpPerLyd),
-                  style: context.textExtras.amountLarge.copyWith(
-                    fontFamily: kAppFont,
-                  ),
-                  mono: true,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  '${AppStrings.date}: ${formatIsoDate(data.updatedAt)}',
-                  style: theme.textTheme.bodySmall,
-                ),
-                if (canEdit) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  TextField(
-                    key: const Key('rate-field'),
-                    controller: _rate,
-                    textDirection: TextDirection.ltr,
-                    textAlign: TextAlign.start,
-                    decoration: const InputDecoration(
-                      labelText: AppStrings.rate,
-                      isDense: false,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        AppStrings.rateRowLabel,
+                        maxLines: 2,
+                        style: cairo(13, 800, color: look.ink),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  GuardedMutation(
-                    buttonKey: const Key('save-rate'),
-                    inputs: _rate.text,
-                    expectedVersion: data.version,
-                    label: AppStrings.save,
-                    confirmText: AppStrings.confirm,
-                    normalizedValue: DecimalString.tryParse(_rate.text)?.value,
-                    onSubmit: _save,
-                  ),
-                ],
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: canEdit
+                          ? TextField(
+                              key: const Key('rate-field'),
+                              controller: _rate,
+                              textDirection: TextDirection.ltr,
+                              textAlign: TextAlign.center,
+                              style: cairo(15, 800, color: look.ink),
+                              decoration: InputDecoration(
+                                hintText: current,
+                                isDense: true,
+                                filled: true,
+                                fillColor: look.page,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadii.lg,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : _StartAlignedText(
+                              current,
+                              style: context.textExtras.amount,
+                              mono: true,
+                            ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      Currency.egp.symbol,
+                      style: cairo(13, 800, color: look.muted),
+                    ),
+                    if (canEdit) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      GuardedMutation(
+                        buttonKey: const Key('save-rate'),
+                        inputs: _rate.text,
+                        expectedVersion: data.version,
+                        label: AppStrings.save,
+                        glyph: Icons.save_outlined,
+                        confirmText: AppStrings.confirm,
+                        normalizedValue: DecimalString.tryParse(_rate.text)
+                            ?.value,
+                        onSubmit: _save,
+                      ),
+                    ],
+                  ],
+                ),
                 if (_message != null) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(_message!, style: theme.textTheme.bodyMedium),

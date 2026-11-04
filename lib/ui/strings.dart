@@ -85,6 +85,9 @@ abstract final class AppStrings {
   /// active-cards-card).
   static const companiesActiveCards = 'عدد الكروت النشطة';
   static const activeCardsCount = 'البطاقات النشطة';
+  static const activeShort = 'النشطة';
+  static const depositSectionNet = 'صافي إجمالي القسم';
+  static const rateRowLabel = 'سعر التحويل 1 د.ل =';
   static const customerDebtWord = 'دين';
   static const customerCreditWord = 'أمانة';
   static const lastActivity = 'آخر حركة';
