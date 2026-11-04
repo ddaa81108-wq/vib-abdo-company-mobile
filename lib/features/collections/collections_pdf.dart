@@ -1,75 +1,23 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-import 'collection_card_tone.dart';
-import 'collections_strings.dart';
-
-/// Words used only in the exported report.
+/// Words used only in the exported statement.
 abstract final class CollectionsPdfText {
-  static const title = 'تقرير استلامات الديون';
-  static const adminScope = 'تقرير الإدارة';
-  static String employeeScope(String name) => 'تقرير الموظف: $name';
-  static const exportedAt = 'تاريخ التصدير';
-  static const source = 'المصدر';
-  static const batch = 'الدفعة';
-  static const totals = 'الإجماليات';
-  static const item = 'البند';
-  static const value = 'القيمة';
-  static const employee = 'الموظف';
-  static const approvedCount = 'معتمد';
-  static const pendingCount = 'ينتظر';
-  static const collected = 'المحصل المعتمد';
-  static const cards = 'الكروت الموجهة';
-  static const myCards = 'الكروت الموجهة إليك';
-  static const customer = 'العميل';
-  static const balance = 'الرصيد الحالي';
-  static const lastState = 'آخر حالة';
-  static const receiptsCount = 'الاستلامات';
-  static const receipts = 'سجل الاستلامات';
-  static const kind = 'النوع';
-  static const amount = 'المبلغ';
-  static const state = 'الحالة';
-  static const date = 'التاريخ';
-  static const unlinked = 'استلامات بلا كارت موجه';
-  static const myUnlinked = 'استلامات سجلتها بدون كارت موجه';
+  static const title = 'كشف استلامات الديون';
+  static String workDay(String date) => 'يوم العمل: \u2066$date\u2069';
+  static String employee(String name) => 'الموظف: $name';
   static const name = 'الاسم';
-  static const collector = 'المحصل';
-  static const cash = 'النقدية';
-  static const outstanding = 'نقدية دفعات سابقة لم تُستلم';
-  static const none = 'لا يوجد.';
-  static const noReceipt = 'بلا استلام';
-  static const rejected = 'مرفوض';
-  static const approved = 'معتمد';
-  static const footer =
-      'أُنشئ في التطبيق من بيانات الخادم المحمّلة وقت التصدير. للقراءة فقط.';
+  static const received = 'القيمة المستلمة';
+  static const total = 'الإجمالي';
+  static const none = 'لا توجد استلامات معتمدة في هذه الدفعة.';
   static String page(int n, int of) => 'صفحة $n من $of';
   static const failed = 'تعذر إنشاء ملف PDF.';
-}
-
-/// The four IBM Plex Sans Arabic weights the app bundles.
-class CollectionsPdfFonts {
-  const CollectionsPdfFonts({
-    required this.regular,
-    required this.medium,
-    required this.bold,
-  });
-
-  final pw.Font regular;
-  final pw.Font medium;
-  final pw.Font bold;
-
-  static Future<CollectionsPdfFonts> load([AssetBundle? bundle]) async {
-    final b = bundle ?? rootBundle;
-    Future<pw.Font> font(String file) async =>
-        pw.Font.ttf(await b.load('assets/fonts/$file'));
-    return CollectionsPdfFonts(
-      regular: await font('IBMPlexSansArabic-Regular.ttf'),
-      medium: await font('IBMPlexSansArabic-Medium.ttf'),
-      bold: await font('IBMPlexSansArabic-Bold.ttf'),
-    );
-  }
 }
 
 String collectionsPdfFileName(DateTime at) =>
@@ -77,406 +25,294 @@ String collectionsPdfFileName(DateTime at) =>
 
 String _two(int n) => n.toString().padLeft(2, '0');
 String _date(DateTime t) => '${t.year}-${_two(t.month)}-${_two(t.day)}';
-String _stamp(DateTime t) => '${_date(t)} ${_two(t.hour)}:${_two(t.minute)}';
 
-final _ltrWord = RegExp(r'[0-9A-Za-z]');
-final _arabicLetter = RegExp(r'[\u0600-\u06FF]');
-
-/// Text for an RTL page that may hold numbers, dates or Latin words.
-///
-/// The pdf package reorders mixed Arabic / number text unreliably (a date
-/// like 2026-11-03 comes out as 03-11-2026, an amount swaps with «د.ل»). So
-/// words with digits or Latin letters are grouped and drawn as their own
-/// left-to-right runs, and the runs are laid out right to left.
-pw.Widget pdfBidiText(String text, {pw.TextStyle? style, bool fill = false}) {
-  if (!_ltrWord.hasMatch(text)) return pw.Text(text, style: style);
-  final runs = <(bool, String)>[];
-  for (final word in text.split(' ')) {
-    if (word.isEmpty) continue;
-    final ltr = _ltrWord.hasMatch(word) && !_arabicLetter.hasMatch(word);
-    if (runs.isNotEmpty && runs.last.$1 == ltr) {
-      runs[runs.length - 1] = (ltr, '${runs.last.$2} $word');
-    } else {
-      runs.add((ltr, word));
-    }
-  }
-  // pw.Row follows the page's RTL direction (pw.Wrap does not).
-  return pw.Row(
-    mainAxisSize: fill ? pw.MainAxisSize.max : pw.MainAxisSize.min,
-    children: [
-      for (var i = 0; i < runs.length; i++) ...[
-        if (i > 0) pw.SizedBox(width: 3.5),
-        pw.Text(
-          runs[i].$2,
-          style: style,
-          textDirection: runs[i].$1
-              ? pw.TextDirection.ltr
-              : pw.TextDirection.rtl,
-        ),
-      ],
-    ],
-  );
+/// One line of the statement: who paid and how much was received.
+class DailyStatementRow {
+  const DailyStatementRow(this.name, this.units);
+  final String name;
+  final int units;
 }
 
-/// Builds the collections report from the overview the screen already has.
-///
-/// No request is made: 537f073 has no export route, so every figure here is
-/// the server's own (`metrics`, `employeeTotals`, the card and receipt rows).
-/// [admin] adds the per-employee totals and earlier outstanding cash; an
-/// employee's overview is already scoped by the server to their own rows.
-Future<Uint8List> buildCollectionsPdf({
-  required CollectionsOverviewDto data,
-  required bool admin,
-  required String userName,
-  required String environmentLabel,
-  required DateTime exportedAt,
-  required MoneyFormatter money,
-  required CollectionsPdfFonts fonts,
-}) async {
-  String lyd(MoneyValue? v) => money.formatOrDash(v, Currency.lyd);
-  String count(int? v) => v == null ? '—' : '$v';
+/// The daily statement, as the 537f073 website builds it
+/// (`AdminCollectionsSection.exportPdf`): the batch's `approved`
+/// submissions, then its `approved` standalone receipts. Only the name and
+/// the received value are kept.
+class DailyStatement {
+  const DailyStatement({
+    required this.businessDate,
+    required this.rows,
+    this.employeeName,
+  });
 
-  const ink = PdfColor.fromInt(0xFF1B1F3B);
-  const muted = PdfColor.fromInt(0xFF5B6177);
-  const line = PdfColor.fromInt(0xFFD5D9E6);
-  const head = PdfColor.fromInt(0xFFEEF0FA);
-  const accent = PdfColor.fromInt(0xFF2B3BD6);
+  final String businessDate;
+  final List<DailyStatementRow> rows;
 
-  final theme = pw.ThemeData.withFont(base: fonts.regular, bold: fonts.bold)
-      .copyWith(
-        // The pdf package draws Arabic without the font's kerning, so the long
-        // tails of ر / ت reach into the next word; a little word spacing keeps
-        // the words apart as on screen.
-        defaultTextStyle: pw.TextStyle(
-          fontSize: 9.5,
-          color: ink,
-          wordSpacing: 2.4,
-          font: fonts.regular,
-          fontBold: fonts.bold,
-        ),
-      );
+  /// Set on an employee's statement.
+  final String? employeeName;
 
-  pw.Widget heading(String text) => pw.Padding(
-    padding: const pw.EdgeInsets.only(top: 14, bottom: 6),
-    child: pw.Text(
-      text,
-      style: pw.TextStyle(font: fonts.bold, fontSize: 12.5, color: accent),
-    ),
-  );
+  int get totalUnits => rows.fold(0, (sum, r) => sum + r.units);
 
-  pw.Widget table(
-    List<String> headers,
-    List<List<String>> rows, {
-    Map<int, pw.TableColumnWidth>? widths,
-    Set<int> numeric = const {},
+  /// [batchId]: the open batch on screen. [collectorUserId]: the signed-in
+  /// employee; 537 already scopes an employee's overview to their own rows,
+  /// and their submissions are narrowed once more by `collectorUserId`.
+  static DailyStatement of(
+    CollectionsOverviewDto data, {
+    required String? batchId,
+    required DateTime now,
+    String? collectorUserId,
+    String? employeeName,
   }) {
-    if (rows.isEmpty) {
-      return pw.Text(
-        CollectionsPdfText.none,
-        style: const pw.TextStyle(color: muted),
-      );
-    }
-    pw.Widget cell(String text, {bool header = false, int col = 0}) =>
-        pw.Padding(
-          padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 3.5),
-          child: pdfBidiText(
-            text,
-            // Fill the cell so the runs start at its right (start) edge.
-            fill: true,
-            style: header
-                ? pw.TextStyle(font: fonts.medium, fontSize: 9, color: ink)
-                : null,
-          ),
-        );
-    // pw.Table always lays columns out left to right, so the first (start)
-    // column is placed last to read right to left.
-    final n = headers.length;
-    List<T> rtl<T>(List<T> cells) => cells.reversed.toList();
-    return pw.Table(
-      border: const pw.TableBorder(
-        horizontalInside: pw.BorderSide(color: line, width: .6),
-        top: pw.BorderSide(color: line, width: .6),
-        bottom: pw.BorderSide(color: line, width: .6),
-      ),
-      columnWidths: widths == null
-          ? null
-          : {for (final e in widths.entries) n - 1 - e.key: e.value},
-      children: [
-        pw.TableRow(
-          decoration: const pw.BoxDecoration(color: head),
-          repeat: true,
-          children: rtl([
-            for (var i = 0; i < n; i++) cell(headers[i], header: true, col: i),
-          ]),
-        ),
-        for (final row in rows)
-          pw.TableRow(
-            children: rtl([
-              for (var i = 0; i < row.length; i++) cell(row[i], col: i),
-            ]),
-          ),
+    bool inBatch(String? id) => batchId != null && id == batchId;
+    final batch = data.openBatches.where((b) => b.id == batchId).firstOrNull;
+    return DailyStatement(
+      businessDate: batch?.businessDate ?? _date(now),
+      employeeName: employeeName,
+      rows: [
+        for (final s in data.submissions)
+          if (inBatch(s.batchId) &&
+              s.status == 'approved' &&
+              (collectorUserId == null ||
+                  s.collectorUserId == null ||
+                  s.collectorUserId == collectorUserId))
+            DailyStatementRow(s.customerName ?? '—', s.amountUnits?.asInt ?? 0),
+        for (final r in data.unlinkedReceipts)
+          if (inBatch(r.batchId) && r.status == 'approved')
+            DailyStatementRow(r.customerName, r.amountUnits?.asInt ?? 0),
       ],
     );
   }
+}
 
-  String submissionState(CollectionSubmissionDto s) {
-    if (s.status == 'pending') return CollectionsText.awaitingApproval;
-    if (s.status == 'rejected') return CollectionsPdfText.rejected;
-    if (s.awaitingCash) {
-      return admin
-          ? CollectionsText.awaitingCash
-          : CollectionsText.waitingCashFromAdmin;
-    }
-    if (s.cashReceivedAt != null) return CollectionsText.cashReceived;
-    return CollectionsPdfText.approved;
-  }
+/// A4 in PDF points, and how many device pixels each point is drawn with.
+const _pageW = 595.0, _pageH = 842.0, _scale = 2.5;
+const _margin = 40.0, _rowH = 30.0;
+const _font = 'IBMPlexSansArabic';
+const _ink = Color(0xFF17221F);
+const _muted = Color(0xFF5B6177);
+const _line = Color(0xFFC9CED8);
+const _head = Color(0xFFEEF0FA);
 
-  String cardState(CollectionAssignmentDto a) => switch (a.latestStatus) {
-    'pending' => CollectionsText.awaitingApproval,
-    'approved' => CollectionsPdfText.approved,
-    'rejected' => CollectionsPdfText.rejected,
-    _ => CollectionsPdfText.noReceipt,
-  };
-
-  String unlinkedState(UnlinkedReceiptDto r) => switch (r.status) {
-    'pending' =>
-      admin ? CollectionsText.unlinked : CollectionsText.myUnlinkedPending,
-    'approved' => CollectionsText.unlinkedApproved,
-    _ => CollectionsText.rejectedByAdmin,
-  };
-
-  String unlinkedCash(UnlinkedReceiptDto r) {
-    if (r.status != 'approved') return '—';
-    if (r.cashReceivedAt != null) return CollectionsText.cashReceived;
-    return admin
-        ? CollectionsText.awaitingCash
-        : CollectionsText.waitingCashFromAdmin;
-  }
-
-  String day(DateTime? t) => t == null ? '—' : _date(t.toLocal());
-
-  final batch = data.openBatches.isEmpty ? null : data.openBatches.first;
-
-  final receiptRows = <List<String>>[];
-  for (final a in data.assignments) {
-    var partial = 0;
-    for (final s in collectionCardHistory(data, a.id)) {
-      receiptRows.add([
-        a.customerName,
-        if (admin) a.assigneeName ?? '—',
-        s.mode == 'full'
-            ? CollectionsText.fullReceipt
-            : CollectionsText.partialReceiptN(++partial),
-        lyd(s.amountUnits),
-        submissionState(s),
-        day(s.createdAt),
-      ]);
-    }
-  }
-
+/// Draws the statement with Flutter's own text engine (full Arabic shaping,
+/// as on screen) and places each page in the PDF as one image, the way the
+/// website does with html2canvas + jsPDF.
+Future<Uint8List> buildCollectionsPdf({
+  required DailyStatement statement,
+  required MoneyFormatter money,
+}) async {
+  final pages = await renderDailyStatementPages(statement, money: money);
   final doc = pw.Document(
     title: CollectionsPdfText.title,
     author: 'VIB',
     creator: 'VIB mobile',
   );
-  doc.addPage(
-    pw.MultiPage(
-      theme: theme,
-      textDirection: pw.TextDirection.rtl,
-      pageFormat: PdfPageFormat.a4.copyWith(
-        marginLeft: 32,
-        marginRight: 32,
-        marginTop: 30,
-        marginBottom: 30,
+  for (final png in pages) {
+    final image = pw.MemoryImage(png);
+    doc.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: pw.EdgeInsets.zero,
+        build: (_) => pw.Image(image, fit: pw.BoxFit.fill),
       ),
-      header: (context) => context.pageNumber == 1
-          ? pw.SizedBox()
-          : pw.Container(
-              padding: const pw.EdgeInsets.only(bottom: 6),
-              child: pdfBidiText(
-                '${CollectionsPdfText.title} — ${_stamp(exportedAt)}',
-                style: const pw.TextStyle(fontSize: 8, color: muted),
-              ),
-            ),
-      footer: (context) => pw.Container(
-        padding: const pw.EdgeInsets.only(top: 6),
-        decoration: const pw.BoxDecoration(
-          border: pw.Border(top: pw.BorderSide(color: line, width: .6)),
-        ),
-        child: pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text(
-              CollectionsPdfText.footer,
-              style: const pw.TextStyle(fontSize: 7.5, color: muted),
-            ),
-            pdfBidiText(
-              CollectionsPdfText.page(context.pageNumber, context.pagesCount),
-              style: const pw.TextStyle(fontSize: 7.5, color: muted),
-            ),
-          ],
-        ),
-      ),
-      build: (context) => [
-        pw.Container(
-          width: double.infinity,
-          padding: const pw.EdgeInsets.all(12),
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: line, width: .8),
-            borderRadius: pw.BorderRadius.circular(6),
-          ),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(
-                CollectionsPdfText.title,
-                style: pw.TextStyle(font: fonts.bold, fontSize: 17),
-              ),
-              pw.SizedBox(height: 2),
-              pw.Text(
-                admin
-                    ? CollectionsPdfText.adminScope
-                    : CollectionsPdfText.employeeScope(userName),
-                style: pw.TextStyle(font: fonts.medium, fontSize: 10.5),
-              ),
-              pw.SizedBox(height: 6),
-              pw.Row(
-                children: [
-                  for (final part in [
-                    '${CollectionsPdfText.exportedAt}: ${_stamp(exportedAt)}',
-                    '${CollectionsPdfText.source}: $environmentLabel',
-                    if (batch != null)
-                      '${CollectionsPdfText.batch}: ${CollectionsText.batchLabel(batch.businessDate, batch.batchNumber)}',
-                  ])
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.only(left: 12),
-                      child: pdfBidiText(
-                        part,
-                        style: const pw.TextStyle(fontSize: 9, color: muted),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        heading(CollectionsPdfText.totals),
-        table(
-          [CollectionsPdfText.item, CollectionsPdfText.value],
-          [
-            [CollectionsText.totalApproved, lyd(data.collectedUnits)],
-            [CollectionsText.assigned, count(data.assignedCount)],
-            [CollectionsText.executed, count(data.executedCount)],
-            [CollectionsText.pending, count(data.pendingCount)],
-            [CollectionsText.unlinked, count(data.unlinkedPendingCount)],
-            [CollectionsText.cashOutstanding, lyd(data.cashOutstandingUnits)],
-          ],
-          widths: const {0: pw.FlexColumnWidth(3), 1: pw.FlexColumnWidth(2)},
-          numeric: const {1},
-        ),
-        if (admin) ...[
-          heading(CollectionsText.employeeTotals),
-          table(
-            [
-              CollectionsPdfText.employee,
-              CollectionsPdfText.approvedCount,
-              CollectionsPdfText.pendingCount,
-              CollectionsPdfText.collected,
-            ],
-            [
-              for (final e in data.employeeTotals)
-                [
-                  e.employeeName,
-                  count(e.approvedCount),
-                  count(e.pendingCount),
-                  lyd(e.collectedUnits),
-                ],
-            ],
-            widths: const {
-              0: pw.FlexColumnWidth(3),
-              1: pw.FlexColumnWidth(1),
-              2: pw.FlexColumnWidth(1),
-              3: pw.FlexColumnWidth(2),
-            },
-            numeric: const {1, 2, 3},
-          ),
-          if (data.outstandingCash.isNotEmpty) ...[
-            heading(CollectionsPdfText.outstanding),
-            table(
-              [
-                CollectionsPdfText.customer,
-                CollectionsPdfText.collector,
-                CollectionsPdfText.amount,
-              ],
-              [
-                for (final o in data.outstandingCash)
-                  [o.customerName, o.collectorName ?? '—', lyd(o.amountUnits)],
-              ],
-              numeric: const {2},
-            ),
-          ],
-        ],
-        heading(admin ? CollectionsPdfText.cards : CollectionsPdfText.myCards),
-        table(
-          [
-            CollectionsPdfText.customer,
-            if (admin) CollectionsPdfText.employee,
-            CollectionsPdfText.balance,
-            CollectionsPdfText.lastState,
-            CollectionsPdfText.receiptsCount,
-          ],
-          [
-            for (final a in data.assignments)
-              [
-                a.customerName,
-                if (admin) a.assigneeName ?? '—',
-                lyd(a.balanceUnits),
-                cardState(a),
-                '${collectionCardHistory(data, a.id).length}',
-              ],
-          ],
-          numeric: admin ? const {2, 4} : const {1, 3},
-        ),
-        heading(CollectionsPdfText.receipts),
-        table(
-          [
-            CollectionsPdfText.customer,
-            if (admin) CollectionsPdfText.employee,
-            CollectionsPdfText.kind,
-            CollectionsPdfText.amount,
-            CollectionsPdfText.state,
-            CollectionsPdfText.date,
-          ],
-          receiptRows,
-          numeric: admin ? const {3, 5} : const {2, 4},
-        ),
-        heading(
-          admin ? CollectionsPdfText.unlinked : CollectionsPdfText.myUnlinked,
-        ),
-        table(
-          [
-            CollectionsPdfText.name,
-            if (admin) CollectionsPdfText.collector,
-            CollectionsPdfText.amount,
-            CollectionsPdfText.state,
-            CollectionsPdfText.cash,
-            CollectionsPdfText.date,
-          ],
-          [
-            for (final r in data.unlinkedReceipts)
-              [
-                r.customerName,
-                if (admin) r.collectorName ?? '—',
-                lyd(r.amountUnits),
-                unlinkedState(r),
-                unlinkedCash(r),
-                day(r.submittedAt),
-              ],
-          ],
-          numeric: admin ? const {2, 5} : const {1, 4},
-        ),
-      ],
-    ),
-  );
+    );
+  }
   return doc.save();
+}
+
+/// The pages as PNG bytes (also used for the preview in the deliverables).
+Future<List<Uint8List>> renderDailyStatementPages(
+  DailyStatement statement, {
+  required MoneyFormatter money,
+}) async {
+  // Rows that fit under the header on page one, and on later pages.
+  const firstTop = 150.0, laterTop = _margin + _rowH;
+  const bottom = _pageH - _margin - 2 * _rowH - 20;
+  final firstCap = ((bottom - firstTop) / _rowH).floor();
+  final laterCap = ((bottom - laterTop) / _rowH).floor();
+  final chunks = <List<DailyStatementRow>>[];
+  final rows = statement.rows;
+  var i = 0;
+  do {
+    final cap = chunks.isEmpty ? firstCap : laterCap;
+    chunks.add(rows.sublist(i, math.min(rows.length, i + cap)));
+    i += cap;
+  } while (i < rows.length);
+
+  final out = <Uint8List>[];
+  for (var p = 0; p < chunks.length; p++) {
+    out.add(
+      await _renderPage(
+        statement,
+        chunks[p],
+        page: p,
+        pages: chunks.length,
+        money: money,
+      ),
+    );
+  }
+  return out;
+}
+
+Future<Uint8List> _renderPage(
+  DailyStatement s,
+  List<DailyStatementRow> rows, {
+  required int page,
+  required int pages,
+  required MoneyFormatter money,
+}) async {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder)..scale(_scale);
+  canvas.drawRect(
+    const Rect.fromLTWH(0, 0, _pageW, _pageH),
+    Paint()..color = const Color(0xFFFFFFFF),
+  );
+
+  const right = _pageW - _margin, width = _pageW - 2 * _margin;
+  // The value column on the left, the name column on the right.
+  const valueW = 170.0, split = _margin + valueW;
+
+  void text(
+    String value, {
+    required double top,
+    required double start,
+    required double end,
+    double size = 12,
+    FontWeight weight = FontWeight.w400,
+    Color color = _ink,
+    TextAlign align = TextAlign.right,
+    double height = _rowH,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: value,
+        style: TextStyle(
+          fontFamily: _font,
+          fontSize: size,
+          fontWeight: weight,
+          color: color,
+          height: 1.3,
+        ),
+      ),
+      textDirection: TextDirection.rtl,
+      textAlign: align,
+      maxLines: 1,
+      ellipsis: '…',
+    )..layout(minWidth: end - start, maxWidth: end - start);
+    painter.paint(canvas, Offset(start, top + (height - painter.height) / 2));
+    painter.dispose();
+  }
+
+  final linePaint = Paint()
+    ..color = _line
+    ..strokeWidth = .8;
+
+  void tableRow(
+    double top,
+    String name,
+    String value, {
+    bool header = false,
+    bool total = false,
+  }) {
+    if (header || total) {
+      canvas.drawRect(
+        Rect.fromLTWH(_margin, top, width, _rowH),
+        Paint()..color = _head,
+      );
+    }
+    canvas.drawRect(
+      Rect.fromLTWH(_margin, top, width, _rowH),
+      Paint()
+        ..color = _line
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .8,
+    );
+    canvas.drawLine(Offset(split, top), Offset(split, top + _rowH), linePaint);
+    final weight = header || total ? FontWeight.w700 : FontWeight.w400;
+    text(name, top: top, start: split + 10, end: right - 10, weight: weight);
+    text(value, top: top, start: _margin + 10, end: split - 10, weight: weight);
+  }
+
+  var y = _margin;
+  if (page == 0) {
+    text(
+      CollectionsPdfText.title,
+      top: y,
+      start: _margin,
+      end: right,
+      size: 20,
+      weight: FontWeight.w700,
+      height: 34,
+    );
+    y += 38;
+    text(
+      CollectionsPdfText.workDay(s.businessDate),
+      top: y,
+      start: _margin,
+      end: right,
+      color: _muted,
+      height: 20,
+    );
+    y += 22;
+    if (s.employeeName != null) {
+      text(
+        CollectionsPdfText.employee(s.employeeName!),
+        top: y,
+        start: _margin,
+        end: right,
+        color: _muted,
+        height: 20,
+      );
+    }
+    y = 150 - _rowH;
+  }
+  tableRow(
+    y,
+    CollectionsPdfText.name,
+    CollectionsPdfText.received,
+    header: true,
+  );
+  y += _rowH;
+  if (s.rows.isEmpty) {
+    text(
+      CollectionsPdfText.none,
+      top: y,
+      start: _margin + 10,
+      end: right - 10,
+      color: _muted,
+    );
+    y += _rowH;
+  }
+  for (final r in rows) {
+    tableRow(y, r.name, money.format(r.units, Currency.lyd));
+    y += _rowH;
+  }
+  if (page == pages - 1) {
+    tableRow(
+      y + 6,
+      CollectionsPdfText.total,
+      money.format(s.totalUnits, Currency.lyd),
+      total: true,
+    );
+  }
+  if (pages > 1) {
+    text(
+      CollectionsPdfText.page(page + 1, pages),
+      top: _pageH - _margin,
+      start: _margin,
+      end: right,
+      size: 9,
+      color: _muted,
+      align: TextAlign.center,
+      height: 14,
+    );
+  }
+
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(
+    (_pageW * _scale).round(),
+    (_pageH * _scale).round(),
+  );
+  picture.dispose();
+  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  return bytes!.buffer.asUint8List();
 }

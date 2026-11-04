@@ -7,7 +7,6 @@ import 'package:share_plus/share_plus.dart';
 import '../../api/api_providers.dart';
 import '../../state/session_providers.dart';
 import '../../ui/strings.dart';
-import '../../ui/widgets/environment_badge.dart';
 import 'collections_pdf.dart';
 
 /// Hands a finished PDF to the system share sheet (save to files, send…).
@@ -38,16 +37,9 @@ final collectionsExportClockProvider = Provider<DateTime Function()>(
   (ref) => DateTime.now,
 );
 
-/// The server the data came from, as the environment badge names it.
-final collectionsExportSourceProvider = Provider<String>((ref) {
-  if (ref.watch(apiLayerProvider).useFakeApi) return AppStrings.envFake;
-  final env = kBuildEnvironment;
-  final label = env.label ?? env.host;
-  return env.host.isEmpty || label == env.host ? label : '$label (${env.host})';
-});
-
-/// «تصدير PDF» on the collections screen. Builds the report on the device
-/// from the overview already on screen; it sends no request.
+/// «كشف PDF» on the collections screen: the daily statement (name and
+/// received value) of the batch on screen, built on the device from the
+/// overview already loaded; it sends no request. Disabled with no batch.
 class CollectionsExportButton extends ConsumerStatefulWidget {
   const CollectionsExportButton({
     required this.data,
@@ -92,13 +84,13 @@ class _CollectionsExportButtonState
     if (!widget.icon) {
       return OutlinedButton(
         key: CollectionsExportButton.buttonKey,
-        onPressed: _busy ? null : _export,
+        onPressed: _busy || widget.batchId == null ? null : _export,
         child: _busy ? spinner : text,
       );
     }
     return OutlinedButton.icon(
       key: CollectionsExportButton.buttonKey,
-      onPressed: _busy ? null : _export,
+      onPressed: _busy || widget.batchId == null ? null : _export,
       icon: _busy
           ? spinner
           : const Icon(Icons.picture_as_pdf_outlined, size: 18),
@@ -111,18 +103,18 @@ class _CollectionsExportButtonState
     setState(() => _busy = true);
     try {
       final session = ref.read(sessionStateProvider);
-      final name = session is SessionAuthenticated
-          ? session.profile.displayName
-          : '';
+      final profile = session is SessionAuthenticated ? session.profile : null;
       final at = ref.read(collectionsExportClockProvider)();
+      final statement = DailyStatement.of(
+        widget.data,
+        batchId: widget.batchId,
+        now: at,
+        collectorUserId: widget.admin ? null : profile?.id,
+        employeeName: widget.admin ? null : profile?.displayName,
+      );
       final bytes = await buildCollectionsPdf(
-        data: widget.data,
-        admin: widget.admin,
-        userName: name,
-        environmentLabel: ref.read(collectionsExportSourceProvider),
-        exportedAt: at,
+        statement: statement,
         money: ref.read(apiLayerProvider).money,
-        fonts: await CollectionsPdfFonts.load(),
       );
       await ref.read(collectionsPdfSharerProvider)(
         bytes,
