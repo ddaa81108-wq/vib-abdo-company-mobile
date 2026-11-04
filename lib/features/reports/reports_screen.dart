@@ -13,6 +13,7 @@ import '../../ui/widgets/common.dart';
 import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/export_pdf_button.dart';
 import '../../ui/widgets/labeled_money.dart';
+import 'report_blocks.dart';
 
 class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
@@ -75,12 +76,46 @@ class ReportsScreen extends ConsumerWidget {
               final showChange = data.rows.any(
                 (row) => row.netChangeUnits != null,
               );
-              final current = data.rows.first;
+              final current = data.current ?? data.rows.first;
+              const gap = SizedBox(height: AppSpacing.md);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _CurrentDay(row: current, money: money),
-                  const SizedBox(height: AppSpacing.md),
+                  // Arranged like the website (Ali, 2026-11-04).
+                  ReportHero(row: current, money: money),
+                  gap,
+                  ReportBalances(row: current, money: money),
+                  gap,
+                  ReportSources(row: current, money: money),
+                  gap,
+                  ReportToday(row: current, money: money),
+                  gap,
+                  ReportFollowUp(row: current, money: money),
+                  gap,
+                  ReportFiveAm(
+                    rows: data.rows,
+                    money: money,
+                    onOpen: (row) => showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      showDragHandle: true,
+                      builder: (context) => SingleChildScrollView(
+                        key: const Key('report-day-sheet'),
+                        padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+                        child: _ReportCard(
+                          row: row,
+                          money: money,
+                          showChange: showChange,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  const Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: PillTitle(AppStrings.dailyHistory),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
                   if (phone)
                     _ReportCards(
                       rows: data.rows,
@@ -109,85 +144,6 @@ class ReportsScreen extends ConsumerWidget {
             },
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CurrentDay extends StatelessWidget {
-  const _CurrentDay({required this.row, required this.money});
-
-  final DailyReportRowDto row;
-  final MoneyFormatter money;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-    return Card(
-      key: const Key('report-current'),
-      color: scheme.primaryContainer,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.xl),
-        side: BorderSide(color: sectionGold(context), width: 1.5),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              AppStrings.currentDay,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: scheme.onPrimaryContainer,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            SizedBox(
-              width: double.infinity,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: AlignmentDirectional.centerStart,
-                child: LtrText(
-                  row.date ?? AppStrings.dash,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: scheme.onPrimaryContainer,
-                  ),
-                ),
-              ),
-            ),
-            if (row.note != null && row.note!.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                row.note!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
-              ),
-            ],
-            const SizedBox(height: AppSpacing.sm),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: ReportStatusChip(status: row.status),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              AppStrings.net,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onPrimaryContainer,
-              ),
-            ),
-            SizedBox(
-              width: double.infinity,
-              child: ScaledMoney(
-                money.formatOrDash(row.netUnits, Currency.lyd),
-                style: context.textExtras.amountLarge.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

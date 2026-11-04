@@ -154,6 +154,7 @@ abstract final class AppStrings {
   static const cashIn = 'دخول';
   static const cashOut = 'خروج';
   static const cashMovements = 'سجل الفلوس النشطة';
+  static const dailyHistory = 'السجل اليومي للتقارير';
   static const formulaCaption = 'ديون لنا + النشط + المصري − ديون علينا';
   static const pinnedColumn = 'التاريخ';
   static const changePassword = 'تغيير كلمة المرور';
