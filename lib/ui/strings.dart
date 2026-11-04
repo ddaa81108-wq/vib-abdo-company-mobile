@@ -48,9 +48,15 @@ abstract final class AppStrings {
   static const emptyPayroll = 'لا توجد بيانات مرتبات';
   static const emptyReports = 'لا توجد بيانات';
   static const emptyPurchases = 'لا توجد أيام مسجّلة في هذا الدفتر';
-  static const online = 'متصل • جميع التغييرات محفوظة';
+  static const online = 'متصل • محفوظ';
   static const offline = 'غير متصل — تُعرض آخر بيانات محمّلة للقراءة';
   static const more = 'المزيد';
+
+  /// Bottom bar only (Ali, 2026-11-01). Everywhere else, and the bottom bar
+  /// semantics label, use the full [sectionLabel].
+  static const bottomTabCustomers = 'د العملاء';
+  static const bottomTabCompanies = 'د الشركات';
+  static const bottomTabCollections = 'الاستلامات';
   static const menu = 'القائمة';
   static const searchHint = 'بحث موحد في كل الحسابات…';
   static const search = 'بحث';
@@ -73,6 +79,17 @@ abstract final class AppStrings {
   static const loadMore = 'تحميل المزيد';
   static const netDebt = 'صافي إجمالي الديون';
   static const totalDebt = 'إجمالي الديون';
+  static const customersTotalDebt = 'إجمالي ديون العملاء';
+
+  /// Website company summary labels (DebtAccountsView, debt-total-card and
+  /// active-cards-card).
+  static const companiesActiveCards = 'عدد الكروت النشطة';
+  static const activeCardsCount = 'البطاقات النشطة';
+  static const activeShort = 'النشطة';
+  static const depositSectionNet = 'صافي إجمالي القسم';
+  static const rateRowLabel = 'سعر التحويل 1 د.ل =';
+  static const customerDebtWord = 'دين';
+  static const customerCreditWord = 'أمانة';
   static const lastActivity = 'آخر حركة';
   static const withEmployee = 'لدى';
   static const systemCard = 'نظامي';
@@ -136,7 +153,8 @@ abstract final class AppStrings {
   static const correctionClosed = 'التصحيح مغلق';
   static const cashIn = 'دخول';
   static const cashOut = 'خروج';
-  static const cashMovements = 'حركات النقد';
+  static const cashMovements = 'سجل الفلوس النشطة';
+  static const dailyHistory = 'السجل اليومي للتقارير';
   static const formulaCaption = 'ديون لنا + النشط + المصري − ديون علينا';
   static const pinnedColumn = 'التاريخ';
   static const changePassword = 'تغيير كلمة المرور';
@@ -156,12 +174,56 @@ abstract final class AppStrings {
   static const vodafoneOurs = 'باقي فودافون لصالحنا';
   static const vodafoneOwed = 'استهلاك فودافون علينا';
   static const balanceAfter = 'الرصيد بعد الحركة';
-  static const fullPayment = 'سداد كلي';
-  static const partialPayment = 'سداد جزئي';
-  static const debtMovement = 'دين';
-  static const paymentMovement = 'سداد';
-  static const depositIn = 'دخول';
-  static const depositOut = 'خروج';
+
+  // Ledger table columns, the website's labels (Ali, 2026-11-03).
+  static const ledgerColSeq = 'التسلسل';
+  static const cashColMove = 'الحركة';
+  static const cashColWhen = 'التاريخ';
+  static const ledgerColBy = 'بواسطة';
+  static const ledgerNewRow = 'جديد';
+  static const ledgerClose = 'إغلاق';
+  static const ledgerEditCard = 'تعديل البيانات';
+  static const ledgerColWhen = 'اليوم والتاريخ والوقت';
+  static const ledgerColType = 'نوع الحركة';
+  static const ledgerColNote = 'البيان';
+  static const ledgerColValue = 'القيمة';
+  static const ledgerColOperation = 'العملية';
+  static const ledgerColRate = 'السعر';
+  static const ledgerColDebt = 'دين مضاف';
+  static const ledgerColPaid = 'مدفوع';
+  static const ledgerColBalance = 'الرصيد';
+  static const ledgerColEdit = 'تعديل';
+  static const ledgerColCancel = 'إلغاء';
+  static const ledgerTotal = 'إجمالي الدين الحالي';
+  static const ledgerDepositTotal = 'إجمالي الأمانة';
+  static const ledgerAddMovement = 'إضافة حركة';
+  static const ledgerSwipeMore = '← اسحب للمزيد';
+  static const ledgerZeroWord = 'صفر';
+  static const ledgerCloseEdit = 'إغلاق التعديل';
+  static const ledgerLoadingOlder = 'جارٍ تحميل الحركات الأقدم…';
+  static const ledgerJumpTop = 'إلى أول حركة';
+  static const ledgerJumpBottom = 'إلى آخر حركة';
+  static const fullPaymentHint = 'دفع كلي: الخادم يسدّد الرصيد الحالي كله.';
+  static const weekdays = [
+    'الاثنين',
+    'الثلاثاء',
+    'الأربعاء',
+    'الخميس',
+    'الجمعة',
+    'السبت',
+    'الأحد',
+  ];
+  // Movement types use the website's words (Ali, 2026-11-03). Labels only;
+  // the values sent stay debt / payment + partial / full.
+  static const fullPayment = 'دفع كلي';
+  static const partialPayment = 'دفع جزئي';
+  static const debtMovement = 'ديون';
+  static const paymentMovement = 'دفع جزئي';
+
+  /// A payment line whose server paymentMode is missing.
+  static const paymentUnknownMode = 'دفع';
+  static const depositIn = 'إيداع أمانة';
+  static const depositOut = 'سحب أمانة';
   static const egpIn = 'إيداع مصري';
   static const egpOut = 'سحب مصري';
   static const direct = 'مباشر';
@@ -246,6 +308,7 @@ abstract final class AppStrings {
   static const critical = 'مراجعة فورية';
   static const missingRate = 'سعر التحويل مفقود';
   static const trustCustomer = 'أمانة للعميل';
+  static const companyTrust = 'أمانة للشركة';
   static const debtOnCustomer = 'دين على العميل';
   static const forOrg = 'لصالح المنظومة — دين على العميل';
   static const debtOnOrg = 'دين علينا للعميل';
@@ -258,6 +321,7 @@ abstract final class AppStrings {
   static const reasons = 'الأسباب';
   static const netChange = 'الفرق عن اليوم السابق';
   static const ourDebts = 'ديون لنا';
+  static const activeCashNote = 'يتغير بالدخول والخروج فقط';
   static const activeFunds = 'الأموال النشطة';
   static const egyptian = 'المصري';
   static const egyptianLyd = 'المصري بالليبي';
@@ -330,6 +394,14 @@ abstract final class AppStrings {
   static const chooseKind = 'اختر نوع العملية';
   static const assignee = 'الموظف';
   static const chooseAssignee = 'اختر الموظف.';
+  static const chooseAssignCards = 'اختر كارتًا واحدًا على الأقل من القائمة.';
+  static const assignHint =
+      'تظهر علامة الاختيار على الكروت ذات الدين غير الموجهة لموظف فقط.';
+  static String assignSelected(int n) => 'المحدد: $n كارت';
+  static String assignDone(int n, String name) => name.isEmpty
+      ? 'تم توجيه $n كارت إلى الموظف.'
+      : 'تم توجيه $n كارت إلى $name.';
+  static const assignCancel = 'إلغاء التوجيه';
   static const enterReference = 'أدخل المرجع.';
   static const edit = 'تعديل';
   static const editCard = 'تعديل الكارت';

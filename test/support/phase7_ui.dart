@@ -187,6 +187,9 @@ Color? _paintOf(Element element) {
     return _decorationColor(widget.decoration);
   }
   if (widget is ColoredBox && widget.color.a >= 0.9) return widget.color;
+  if (widget is Badge && widget.backgroundColor != null) {
+    return widget.backgroundColor;
+  }
   if (widget is Material && widget.type != MaterialType.transparency) {
     final color = widget.color ?? Theme.of(element).colorScheme.surface;
     if (color.a >= 0.9) return color;

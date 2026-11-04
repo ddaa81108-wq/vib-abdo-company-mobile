@@ -11,6 +11,7 @@ import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/ui/presentation.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
+import 'package:vib_abdo_company_mobile/ui/theme.dart';
 
 import 'support/pump_app.dart';
 
@@ -70,10 +71,12 @@ void main() {
     final loaded = await tester.runAsync(() async {
       final customers = await layer.accounts.list(AccountSection.customers);
       final companies = await layer.accounts.list(AccountSection.companies);
+      final libyan = await layer.accounts.list(AccountSection.libyanDeposits);
       final home = await layer.home.fetch();
       return (
         customer: customers.page.items.firstWhere((card) => card.id == 'c_55'),
         company: companies.page.items.firstWhere((card) => card.id == 'c_55'),
+        libyan: libyan.page.items.firstWhere((card) => card.id == 'c_55'),
         ticker: home.oldDebts!.firstWhere(
           (debt) =>
               debt.id == 'c_55' &&
@@ -92,7 +95,8 @@ void main() {
 
     await go(tester, '/customers');
     expectRtl(tester);
-    _expectSingleAge(tester, customerCard, AccountSection.customers);
+    // Customer cards show only name, value and assignee (Ali, 2026-11-02).
+    expect(find.byKey(Key('account-age-${customerCard.id}')), findsNothing);
     expect(
       tester.widget<Text>(find.byKey(const Key('ticker-age-c_55'))).data,
       singleAgeText(
@@ -102,8 +106,24 @@ void main() {
       ),
     );
 
+    // Company cards use the customer card words too (Ali, 2026-11-03):
+    // دين, no age line.
     await go(tester, '/companies');
-    _expectSingleAge(tester, companyCard, AccountSection.companies);
+    expect(find.byKey(Key('account-age-${companyCard.id}')), findsNothing);
+    expect(
+      tester
+          .widget<Text>(find.byKey(Key('account-kind-${companyCard.id}')))
+          .data,
+      AppStrings.customerDebtWord,
+    );
+    // Deposit cards show the status word, never the day count (Ali,
+    // 2026-11-04).
+    await go(tester, '/libyan-deposits');
+    final depositAge = tester
+        .widget<Text>(find.byKey(Key('account-age-${loaded.libyan.id}')))
+        .data!;
+    expect(depositAge.startsWith(AppStrings.sinceDays), isFalse);
+    expect(find.textContaining(AppStrings.sinceDays), findsNothing);
   });
 
   testWidgets('amounts sit on the RTL start edge in light and dark', (
@@ -120,11 +140,12 @@ void main() {
       final theme = Theme.of(tester.element(find.byType(HomeShell)));
       expect(theme.brightness, dark ? Brightness.dark : Brightness.light);
       _expectAmountOnStart(tester, '320 د.ل');
-      final gradient = _cardGradient(tester);
-      expect(
-        gradient.colors.first,
-        dark ? const Color(0xFF78551E) : const Color(0xFFFF9A00),
-      );
+      // Customer and company cards use the debt/credit/zero gloss (Ali,
+      // 2026-11-02 / 2026-11-03): c_55 is a debt, so glossy red in both.
+      final look = tester.element(find.byType(HomeShell)).look;
+      expect(_cardGradient(tester).colors.first, look.glossDebt.top);
+      await go(tester, '/companies');
+      expect(_cardGradient(tester).colors.first, look.glossDebt.top);
     }
   });
 
@@ -145,7 +166,8 @@ void main() {
       path: '/customers',
       add: true,
       assign: true,
-      pin: true,
+      // Customers cards no longer show pin (Ali, 2026-11-02).
+      pin: false,
       // #25 shows this only for a 0 balance with a pending review. The
       // fixed fixture's 0-balance card has no pending review, so it stays hidden.
       zero: false,
@@ -157,7 +179,8 @@ void main() {
       path: '/companies',
       add: true,
       assign: true,
-      pin: true,
+      // Companies use the customers' card design (Ali, 2026-11-03).
+      pin: false,
       zero: false,
       rate: false,
     );
@@ -232,7 +255,7 @@ void main() {
     final link = ToggleConnectivity(true);
     await pumpFakeApp(tester, size: const Size(800, 2200), connectivity: link);
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers');
+    await go(tester, '/libyan-deposits');
     link.setOnline(false);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
@@ -285,8 +308,10 @@ void main() {
             find.byKey(const Key('account-card-c_55')),
             list,
           );
-          await _reveal(tester, find.byKey(const Key('pin-c_55')), list);
-          if (path == '/customers') {
+          if (path != '/customers' && path != '/companies') {
+            await _reveal(tester, find.byKey(const Key('pin-c_55')), list);
+          }
+          if (path == '/customers' || path == '/companies') {
             await _reveal(tester, find.byKey(const Key('assign-mode')), list);
           }
           if (path == '/egyptian-deposits') {
@@ -325,6 +350,9 @@ void main() {
     await settle(tester);
 
     await _reveal(tester, find.byKey(const Key('assign-mode')), customers);
+    // Bring it clear of the floating bottom bar before tapping.
+    await tester.ensureVisible(find.byKey(const Key('assign-mode')));
+    await settle(tester);
     await tester.tap(find.byKey(const Key('assign-mode')));
     await settle(tester);
     expect(find.byKey(const Key('assignee-field')), findsOneWidget);
@@ -368,39 +396,6 @@ void main() {
   });
 }
 
-void _expectSingleAge(
-  WidgetTester tester,
-  AccountCardDto card,
-  AccountSection section,
-) {
-  final shown = singleAgeText(
-    serverLabel: card.ageStatusLabel,
-    ageStatus: card.ageStatus,
-    section: section,
-    debtAgeDays: card.debtAgeDays,
-  );
-  final finder = find.byKey(Key('account-card-${card.id}'));
-  final age = tester.widget<Text>(find.byKey(Key('account-age-${card.id}')));
-  expect(age.data, shown);
-  expect(shown, card.ageStatusLabel);
-  expect(
-    find.descendant(
-      of: finder,
-      matching: find.byKey(Key('account-age-${card.id}')),
-    ),
-    findsOneWidget,
-  );
-  expect(
-    find.descendant(of: finder, matching: find.text(shown!)),
-    findsOneWidget,
-  );
-  final days = card.debtAgeDays;
-  if (days == null) return;
-  final count = ageCountPhrase(days);
-  if (count == shown) return;
-  expect(find.descendant(of: finder, matching: find.text(count)), findsNothing);
-}
-
 void _expectAmountOnStart(WidgetTester tester, String amount) {
   final card = tester.getRect(find.byKey(const Key('account-card-c_55')));
   final box = tester.getRect(
@@ -409,7 +404,8 @@ void _expectAmountOnStart(WidgetTester tester, String amount) {
       matching: find.text(amount),
     ),
   );
-  expect(card.right - box.right, lessThan(box.left - card.left));
+  // A full-width amount (the test font is wide) counts as start-aligned.
+  expect(card.right - box.right, lessThanOrEqualTo(box.left - card.left));
 }
 
 LinearGradient _cardGradient(WidgetTester tester) {
@@ -510,9 +506,22 @@ Future<void> _reveal(WidgetTester tester, Finder target, Finder list) async {
 }
 
 Future<void> _loadScreenshotFonts() async {
-  await _loadFont('assets/fonts/Cairo-Variable.ttf', 'Cairo');
-  await _loadFont('assets/fonts/JetBrainsMono-Bold.ttf', 'JetBrainsMono');
-  await _loadFont('assets/fonts/JetBrainsMono-ExtraBold.ttf', 'JetBrainsMono');
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Regular.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Medium.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-SemiBold.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Bold.ttf',
+    'IBMPlexSansArabic',
+  );
   final icons = _materialIconsFile();
   if (icons != null) {
     await ui.loadFontFromList(

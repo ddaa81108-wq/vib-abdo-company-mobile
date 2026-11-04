@@ -130,9 +130,11 @@ void main() {
         tester,
         () => layer.collections.overview(),
       );
+      // 537f073 sends no day total; the screen shows the server's
+      // collectedUnits and cashOutstandingUnits.
+      expect(collections.dayTotalUnits, isNull);
       for (final units in [
         collections.collectedUnits,
-        collections.dayTotalUnits,
         collections.cashOutstandingUnits,
       ]) {
         expect(
@@ -143,7 +145,7 @@ void main() {
           findsWidgets,
         );
       }
-      expect(_fmt(money, collections.dayTotalUnits, Currency.lyd), '100 د.ل');
+      expect(_fmt(money, collections.collectedUnits, Currency.lyd), '250 د.ل');
       expect(
         _fmt(money, collections.cashOutstandingUnits, Currency.lyd),
         '250 د.ل',
@@ -161,6 +163,10 @@ void main() {
     await go(tester, '/customers/c_55');
 
     await tester.ensureVisible(find.byKey(const Key('add-payment')));
+
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(const Key('add-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('add-payment')));
     await settle(tester);
     await tester.enterText(
@@ -170,6 +176,10 @@ void main() {
       ),
       '100',
     );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('save-movement')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('save-movement')));
     await settle(tester);
 
@@ -188,7 +198,22 @@ void main() {
       findsOneWidget,
     );
 
+    // The add row: choose دفع كلي, then its save button.
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('composer-full')));
+    await tester.pump();
+    await tester.pump();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('full-payment')));
     await settle(tester);
     final afterFull = await _flushed(

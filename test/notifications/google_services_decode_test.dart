@@ -32,9 +32,7 @@ void main() {
       'client': [
         {
           'client_info': {
-            'android_client_info': {
-              'package_name': 'com.vip2100.vib',
-            },
+            'android_client_info': {'package_name': 'com.vip2100.vib'},
           },
           'api_key': [
             {'current_key': marker},

@@ -36,7 +36,7 @@ void main() {
     expect(find.byKey(const Key('signup-link')), findsOneWidget);
   });
 
-  testWidgets('home keeps shortcuts when the summary request fails', (
+  testWidgets('home keeps its tiles when the summary request fails', (
     tester,
   ) async {
     await pumpFakeApp(
@@ -49,9 +49,8 @@ void main() {
     );
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
 
-    expect(find.text(AppStrings.homeError), findsOneWidget);
-    expect(find.byKey(HomeDashboard.retryKey), findsOneWidget);
-    expect(find.text(AppStrings.retry), findsOneWidget);
+    // Home no longer reads the summary, so its failure shows nothing.
+    expect(find.text(AppStrings.homeError), findsNothing);
     expect(
       find.byKey(HomeShell.sectionKey(SectionKey.collections)),
       findsOneWidget,
@@ -71,13 +70,26 @@ void main() {
       final bar = tester.widget<PhoneBottomNav>(find.byType(PhoneBottomNav));
       expect(bar.tabs, hasLength(5));
       expect(find.text(AppStrings.more), findsOneWidget);
-      expect(find.text(AppStrings.settings), findsNothing);
+      // Not a tab: settings is a home tile and a drawer row.
+      expect(
+        find.descendant(
+          of: find.byType(PhoneBottomNav),
+          matching: find.text(AppStrings.settings),
+        ),
+        findsNothing,
+      );
 
       await tester.tap(find.byKey(HomeShell.menuKey));
       await settle(tester);
       final drawer = tester.getRect(find.byType(Drawer));
       expect(drawer.right, moreOrLessEquals(360, epsilon: 1));
-      expect(find.text(AppStrings.settings), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(Drawer),
+          matching: find.text(AppStrings.settings),
+        ),
+        findsOneWidget,
+      );
     },
   );
 

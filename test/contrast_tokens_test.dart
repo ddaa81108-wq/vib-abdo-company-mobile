@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/ui/bars_style.dart';
+import 'package:flutter_api_layer/api_layer.dart' show SectionKey;
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
@@ -146,12 +148,11 @@ void main() {
       _expectTextContrast(mark, scaffold);
       _expectTextContrast(word, scaffold);
       if (dark) {
-        expect(base, const Color(0xFFEAB600));
-        expect(scaffold, const Color(0xFF0D1522));
+        expect(base, AppSidebarPalette.glassNavy.base);
+        expect(scaffold, const Color(0xFF0B1020));
       } else {
-        expect(base, const Color(0xFF7C6100));
-        expect(scaffold, const Color(0xFFE5EDF6));
-        _expectSameHue(base, AppSidebarPalette.gold.base);
+        expect(base, AppSidebarPalette.fintechLight.base);
+        expect(scaffold, const Color(0xFFF5F7FB));
       }
     }
   });
@@ -213,23 +214,22 @@ void main() {
     'DEF-026 light onSurfaceVariant meets AA on the four measured surfaces',
     (tester) async {
       const previous = Color(0xFF6D7C77);
-      const ink = Color(0xFF5F6E69);
+      const ink = Color(0xFF5B6B80);
       const surfaces = <Color>[
-        Color(0xFFE5EDF6),
+        Color(0xFFF5F7FB),
         Color(0xFFFFFFFF),
-        Color(0xFFEDF9F4),
-        Color(0xFFE6F2ED),
+        Color(0xFFE8F5EC),
+        Color(0xFFE8EFFE),
       ];
       final light = buildAppTheme();
       final dark = buildAppTheme(Brightness.dark);
 
       expect(light.colorScheme.onSurfaceVariant, ink);
-      expect(dark.colorScheme.onSurfaceVariant, const Color(0xFFACBBCE));
-      expect(light.colorScheme.outline, const Color(0xFFD5DEE9));
-      expect(light.colorScheme.outlineVariant, const Color(0xFFE8EDF3));
+      expect(dark.colorScheme.onSurfaceVariant, const Color(0xFF94A3B8));
+      expect(light.colorScheme.outline, const Color(0xFFE4E8F1));
+      expect(light.colorScheme.outlineVariant, const Color(0xFFEEF1F6));
       expect(light.colorScheme.outline, isNot(previous));
       expect(light.colorScheme.outline, isNot(ink));
-      _expectSameHue(ink, previous);
       for (final surface in surfaces) {
         _expectContrast(ink, surface, 4.5);
       }
@@ -240,8 +240,8 @@ void main() {
       expect(note.style?.color, theme.colorScheme.onSurfaceVariant);
       expect(note.style?.fontSize, 11);
       expect(_isLargeText(note.style!), isFalse);
-      _expectTextContrast(note, const Color(0xFFE5EDF6));
-      expect(theme.scaffoldBackgroundColor, const Color(0xFFE5EDF6));
+      _expectTextContrast(note, const Color(0xFFF5F7FB));
+      expect(theme.scaffoldBackgroundColor, const Color(0xFFF5F7FB));
     },
   );
 }
@@ -258,19 +258,22 @@ void _expectRole(
   final onSurface = theme.colorScheme.onSurface;
   final background = onSidebar
       ? theme.extension<AppColors>()!.sidebarBg
-      : theme.scaffoldBackgroundColor;
+      // Phone: the role sits in the status strip at the top.
+      : stripLook(
+          tester.element(find.byKey(HomeShell.roleKey)),
+          online: true,
+        ).background;
 
-  expect(shine, const Color(0xFFFFFDE0));
+  expect(shine, dark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B));
   expect(role.style?.fontSize, 13);
   if (onSidebar) {
     expect(role.style?.color, shine);
     expect(role.style?.color, isNot(onSurface));
     expect(
       background,
-      dark ? const Color(0xFF101B2A) : const Color(0xFF102A26),
+      dark ? const Color(0xFF0B1020) : const Color(0xFFF5F7FB),
     );
   } else {
-    expect(role.style?.color, onSurface);
     expect(role.style?.color, isNot(shine));
   }
   _expectTextContrast(role, background);
@@ -287,12 +290,12 @@ void _expectDrawerWord(WidgetTester tester, {required bool dark}) {
   final palette = theme.extension<AppSidebarPalette>()!;
   expect(word.style?.color, palette.bright);
   expect(word.style?.color, isNot(palette.base));
-  expect(word.style?.color, const Color(0xFFFFDB35));
-  expect(word.style?.fontSize, 20);
-  _expectTextContrast(
-    word,
-    dark ? const Color(0xFF101B2A) : const Color(0xFF102A26),
+  expect(
+    word.style?.color,
+    dark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
   );
+  expect(word.style?.fontSize, 20);
+  _expectTextContrast(word, theme.extension<AppColors>()!.sidebarBg);
 }
 
 void _expectTokenPairs(ThemeData theme) {
@@ -318,25 +321,23 @@ void _expectTokenPairs(ThemeData theme) {
   _expectContrast(sidebar.shine, colors.sidebarBg, 4.5);
 
   if (dark) {
-    expect(scheme.primary, const Color(0xFF36B496));
-    expect(scheme.tertiary, scheme.primary);
+    expect(scheme.primary, const Color(0xFF60A5FA));
     expect(scheme.surfaceTint, scheme.primary);
-    expect(scheme.onPrimary, const Color(0xFF041510));
-    expect(scheme.surface, const Color(0xFF172333));
-    expect(status.dayTones[2], const Color(0xFF1A2C24));
+    expect(scheme.onPrimary, const Color(0xFF0B1020));
+    expect(scheme.surface, const Color(0xFF131A2C));
+    expect(status.dayTones[2], const Color(0xFF13261E));
     expect(status.cashPositiveText, const Color(0xFF0CB677));
-    expect(sidebar.base, const Color(0xFFEAB600));
-    _expectSameHue(scheme.primary, const Color(0xFF247763));
+    expect(sidebar.base, const Color(0xFF60A5FA));
     _expectSameHue(status.cashPositiveText, status.cashPositive);
-    _expectContrast(scheme.primary, const Color(0xFF172333), 4.5);
-    _expectContrast(scheme.primary, const Color(0xFF1A2C24), 4.5);
-    _expectContrast(status.cashPositiveText, const Color(0xFF172333), 4.5);
+    _expectContrast(scheme.primary, const Color(0xFF131A2C), 4.5);
+    _expectContrast(scheme.primary, const Color(0xFF13261E), 4.5);
+    _expectContrast(status.cashPositiveText, const Color(0xFF131A2C), 4.5);
   } else {
-    expect(scheme.primary, const Color(0xFF175F50));
-    expect(scheme.inversePrimary, const Color(0xFF247763));
+    expect(scheme.primary, const Color(0xFF2563EB));
+    expect(scheme.inversePrimary, const Color(0xFF93C5FD));
     expect(status.cashPositiveText, const Color(0xFF087A50));
-    expect(sidebar.base, const Color(0xFF7C6100));
-    expect(theme.scaffoldBackgroundColor, const Color(0xFFE5EDF6));
+    expect(sidebar.base, const Color(0xFF2563EB));
+    expect(theme.scaffoldBackgroundColor, const Color(0xFFF5F7FB));
     _expectContrast(sidebar.base, theme.scaffoldBackgroundColor, 4.5);
     _expectContrast(scheme.primary, white, 4.5);
   }
@@ -350,16 +351,27 @@ Future<void> _expectRenderedInk(
   final theme = Theme.of(tester.element(find.byKey(HomeShell.shellKey)));
   final scheme = theme.colorScheme;
   final status = theme.extension<AppStatusColors>()!;
-  final action = find.byKey(const Key('show-all-customers'));
-  expect(action, findsOneWidget);
-  final foreground = _buttonForeground(tester, action);
-  expect(foreground, scheme.primary);
-  _expectContrast(foreground, theme.scaffoldBackgroundColor, 4.5);
-  if (dark) {
-    expect(foreground, const Color(0xFF36B496));
-  } else {
-    expect(foreground, const Color(0xFF175F50));
+  // Home icon grid: ink label and tinted icon on the tile card.
+  final tileLabel = tester.widget<Text>(
+    find.byKey(const Key('home-tile-label-customers')),
+  );
+  final tileIcon = tester.widget<Icon>(
+    find.descendant(
+      of: find.byKey(HomeShell.sectionKey(SectionKey.customers)),
+      matching: find.byType(Icon),
+    ),
+  );
+  final look = theme.extension<AppLook>()!;
+  // Customers tile: glossy blue; check both ends of its gradient.
+  for (final tileColor in [look.glossBlue.top, look.glossBlue.bottom]) {
+    _expectContrast(tileLabel.style!.color!, tileColor, 4.5);
+    _expectContrast(tileIcon.color!, tileColor, 3);
   }
+  // «عرض الكل» left home; the primary ink is still checked on /purchases.
+  expect(
+    scheme.primary,
+    dark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB),
+  );
 
   await _go(tester, '/treasury');
   final card = tester.widget<Card>(find.byKey(const Key('active-cash-card')));

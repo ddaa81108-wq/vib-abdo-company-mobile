@@ -50,7 +50,9 @@ void main() {
       expect(_text('عميل سليم'), findsWidgets);
       expect(_text('320 د.ل'), findsWidgets);
       expect(_text('0 د.ل'), findsWidgets);
-      expect(_text('10,635 د.ل'), findsWidgets);
+      // Customers summary shows only server netBalance now (Ali, 2026-11-02),
+      // so the invalid net replaces the figure instead of totalDebt.
+      expect(_text('10,635 د.ل'), findsNothing);
       expect(_text(MoneyValue.invalidLabel), findsWidgets);
       expect(_icon(), findsWidgets);
       expect(_text('10 د.ل'), findsNothing);
@@ -158,8 +160,12 @@ void main() {
           findsOneWidget,
         );
         expect(_text('اسم سري'), findsWidgets);
-        expect(_text('سداد جزئي'), findsWidgets);
-        expect(_text('320 د.ل'), findsWidgets);
+        expect(_text('دفع جزئي'), findsWidgets);
+        // The row amount still shows. الرصيد is computed like the website
+        // and hidden because the stored card balance is not usable
+        // (Ali, 2026-11-03).
+        expect(_text('180 د.ل'), findsWidgets);
+        expect(find.byKey(const Key('ledger-balance-tx_2')), findsNothing);
         expect(_text('10 د.ل'), findsNothing);
         expect(_text('1,500 د.ل'), findsNothing);
         expect(
@@ -167,15 +173,38 @@ void main() {
           findsNothing,
         );
 
+        // The add row: choose دفع كلي, then its save button.
+        await tester.ensureVisible(find.byKey(const Key('composer-full')));
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.ensureVisible(find.byKey(const Key('composer-full')));
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.tap(find.byKey(const Key('composer-full')));
+        await tester.pump();
+        await tester.pump();
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pump();
         await tester.ensureVisible(find.byKey(const Key('full-payment')));
+        await tester.pump(const Duration(milliseconds: 400));
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pump();
+        await tester.ensureVisible(find.byKey(const Key('full-payment')));
+        await tester.pump(const Duration(milliseconds: 400));
         await tester.tap(find.byKey(const Key('full-payment')));
         await settle(tester);
         expect(fake.mutationRequestIds, isEmpty);
         expect(_errorTexts(tester), contains(MoneyValue.invalidLabel));
 
+        await tester.ensureVisible(find.byKey(const Key('add-payment')));
+
+        await tester.pump(const Duration(milliseconds: 400));
+
         await tester.tap(find.byKey(const Key('add-payment')));
         await settle(tester);
         await enterAmount(tester, '10');
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pump();
+        await tester.ensureVisible(find.byKey(const Key('save-movement')));
+        await tester.pump(const Duration(milliseconds: 400));
         await tester.tap(find.byKey(const Key('save-movement')));
         await settle(tester);
 

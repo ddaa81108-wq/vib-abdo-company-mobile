@@ -19,9 +19,13 @@ void main() {
     await pumpFakeApp(tester, size: const Size(800, 2400));
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
     await go(tester, '/collections');
+    // The employee's standalone receipts are on «تحصيلاتي».
+    await tester.tap(find.byKey(const Key('collections-tab-receipts')));
+    await settle(tester);
 
     expect(find.text('اسم غير مربوط تجريبي'), findsOneWidget);
-    expect(find.text('استلام مرفوض تجريبي'), findsOneWidget);
+    // 537f073 does not list a rejected standalone receipt.
+    expect(find.text('استلام مرفوض تجريبي'), findsNothing);
     expect(find.byKey(const Key('unlinked-reject-ur_1')), findsNothing);
     expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
     expect(find.byKey(const Key('unlinked-approve-ur_1')), findsNothing);
@@ -150,11 +154,9 @@ void main() {
     final overview = await tester.runAsync(
       () => layer.client.get('/api/collections'),
     );
+    // 537f073 leaves a rejected standalone receipt out of the list.
     final receipts = (overview!.data as Map)['unlinkedReceipts'] as List;
-    final row = receipts.cast<Map>().firstWhere((item) => item['id'] == 'ur_2');
-    expect(row['status'], 'rejected');
-    expect(row['cashStatus'], 'pending');
-    expect(row.containsKey('version'), isFalse);
+    expect(receipts.cast<Map>().any((item) => item['id'] == 'ur_2'), isFalse);
     expect(find.byKey(const Key('unlinked-cash-ur_2')), findsNothing);
   });
 
@@ -182,7 +184,8 @@ void main() {
         findsWidgets,
       );
       expect(fake.collectionOverviewReads, greaterThan(readsBefore));
-      expect(find.text('اسم غير مربوط تجريبي'), findsOneWidget);
+      // Rejected elsewhere: 537f073 no longer lists it after the refetch.
+      expect(find.text('اسم غير مربوط تجريبي'), findsNothing);
       expect(find.byKey(const Key('unlinked-reject-ur_1')), findsNothing);
       expect(body, {'decision': 'reject'});
     },
@@ -255,10 +258,12 @@ Future<void> reveal(WidgetTester tester, Key key) async {
   await tester.scrollUntilVisible(
     find.byKey(key),
     400,
-    scrollable: find.descendant(
-      of: find.byKey(CollectionsScreen.screenKey),
-      matching: find.byType(Scrollable),
-    ),
+    scrollable: find
+        .descendant(
+          of: find.byKey(CollectionsScreen.screenKey),
+          matching: find.byType(Scrollable),
+        )
+        .first,
   );
   await tester.pump();
 }

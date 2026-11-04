@@ -23,12 +23,21 @@ class TransactionCorrectionLauncher extends ConsumerWidget {
     required this.section,
     required this.accountId,
     required this.entry,
+    this.onOpen,
+    this.compact = false,
     super.key,
   });
+
+  /// A pencil in the ledger table's تعديل column.
+  final bool compact;
 
   final AccountSection section;
   final String accountId;
   final LedgerEntryDto entry;
+
+  /// When set, the button opens the same form inline in the ledger row
+  /// instead of a sheet. Same request, endpoint, and confirmation.
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -56,13 +65,25 @@ class TransactionCorrectionLauncher extends ConsumerWidget {
     if (!visible) return const SizedBox.shrink();
 
     final online = ref.watch(onlineProvider);
+    if (compact) {
+      return Tooltip(
+        message: AppStrings.correctTransaction,
+        child: TextButton(
+          key: Key('correct-${entry.id}'),
+          onPressed: online
+              ? (onOpen ?? () => _open(context, ref, accountId))
+              : null,
+          child: const Icon(Icons.edit_outlined, size: 18),
+        ),
+      );
+    }
     return GatedButton(
       buttonKey: Key('correct-${entry.id}'),
       allowed: true,
       online: online,
       filled: false,
       label: AppStrings.correctTransaction,
-      onPressed: () => _open(context, ref, accountId),
+      onPressed: onOpen ?? () => _open(context, ref, accountId),
     );
   }
 
@@ -95,12 +116,17 @@ class TransactionCorrectionForm extends ConsumerStatefulWidget {
     required this.section,
     required this.accountId,
     required this.entry,
+    this.onDone,
     super.key,
   });
 
   final AccountSection section;
   final String accountId;
   final LedgerEntryDto entry;
+
+  /// Inline use: called with true after a saved correction, instead of
+  /// popping the sheet. The caller refreshes the same providers.
+  final ValueChanged<bool>? onDone;
 
   @override
   ConsumerState<TransactionCorrectionForm> createState() =>
@@ -251,11 +277,11 @@ class _TransactionCorrectionFormState
               ),
               DropdownMenuItem(
                 value: CalculationMode.divide,
-                child: Text(AppStrings.divide),
+                child: CalculationMark(CalculationMode.divide),
               ),
               DropdownMenuItem(
                 value: CalculationMode.multiply,
-                child: Text(AppStrings.multiply),
+                child: CalculationMark(CalculationMode.multiply),
               ),
             ],
             onChanged: (value) =>
@@ -360,6 +386,11 @@ class _TransactionCorrectionFormState
       // The confirm dialog is the top route while this callback runs. Popping
       // here would dismiss that dialog and leave the form open. Close the form
       // on the next frame, after GuardedMutation has popped the dialog.
+      final onDone = widget.onDone;
+      if (onDone != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => onDone(true));
+        return null;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (navigator.mounted && route != null && route.isCurrent) {
           navigator.pop(true);

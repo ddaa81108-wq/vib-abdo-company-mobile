@@ -3,18 +3,15 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../api/api_providers.dart';
 import '../../models/home_summary.dart';
 import '../../state/notification_providers.dart';
 import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
-import '../../ui/presentation.dart';
 import '../../ui/section_labels.dart';
 import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
-import '../../ui/widgets/soft_tile.dart';
 import 'home_shell.dart';
 
 /// Readable debt sections in first-seen order. Each one gets its own control.
@@ -43,456 +40,274 @@ int homeCardColumns(double width, double textScale) {
   return AppBreakpoints.cardColumns(width);
 }
 
+/// Columns for the home icon grid. Two on a phone (as in Ali's reference),
+/// more on wider screens, one at a large text scale so labels never clip.
+int homeTileColumns(double width, double textScale) {
+  if (textScale >= 1.3) return 1;
+  if (width <= AppBreakpoints.phone) return 2;
+  if (width <= AppBreakpoints.tablet) return 3;
+  return 4;
+}
+
+/// Filled icon for a home tile. Presentation only; the drawer keeps
+/// [sectionIcon].
+IconData homeTileIcon(SectionKey section) => switch (section) {
+  SectionKey.customers => Icons.person,
+  SectionKey.collections => Icons.payments,
+  SectionKey.companies => Icons.apartment,
+  SectionKey.libyanDeposits => Icons.account_balance_wallet,
+  SectionKey.egyptianDeposits => Icons.currency_exchange,
+  SectionKey.masraweya => Icons.menu_book,
+  SectionKey.purchases => Icons.shopping_bag,
+  SectionKey.treasury => Icons.account_balance,
+  SectionKey.reports => Icons.insights,
+};
+
+/// Glossy tile finish per section, as in concepts 1 and 3: blue, violet,
+/// green. Presentation only.
+Gloss homeTileGloss(SectionKey? section, AppLook look) => switch (section) {
+  SectionKey.customers ||
+  SectionKey.libyanDeposits ||
+  SectionKey.treasury => look.glossBlue,
+  SectionKey.companies ||
+  SectionKey.purchases ||
+  SectionKey.egyptianDeposits => look.glossViolet,
+  SectionKey.collections ||
+  SectionKey.masraweya ||
+  SectionKey.reports => look.glossGreen,
+  null => look.glossGrey,
+};
+
+/// Home: the icon grid only (Ali, 2026-11-01). One tile per visible section,
+/// name only, then «الإعدادات» for whoever can open settings.
+///
+/// The section list, its order, and its visibility come from [HomeSummary]
+/// (the permission service), unchanged. Each tile opens the same route as
+/// before. The settings tile uses [showsSettingsEntry], the rule the side
+/// navigation and «المزيد» already use.
 class HomeDashboard extends ConsumerWidget {
   const HomeDashboard({super.key});
 
   static const screenKey = Key('home-dashboard');
   static const retryKey = Key('home-retry');
+  static const settingsTileKey = Key('home-tile-settings');
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(homeSummaryProvider);
-    final dashboard = ref.watch(homeDashboardProvider);
-    final fromFallback = ref.watch(homeLoadMetaProvider).fromFallback;
-    final online = ref.watch(onlineProvider);
     final permissions = permissionsOf(ref);
-    final money = ref.watch(apiLayerProvider).money;
-    final theme = Theme.of(context);
     final width = MediaQuery.sizeOf(context).width;
     final textScale = MediaQuery.textScalerOf(context).scale(1);
 
     if (summary == null) {
       return const Center(child: Text(AppStrings.loading));
     }
+    final tiles = <Widget>[
+      for (final section in summary.sections)
+        HomeTile(
+          tileKey: HomeShell.sectionKey(section),
+          labelKey: Key('home-tile-label-${section.key}'),
+          icon: homeTileIcon(section),
+          gloss: homeTileGloss(section, context.look),
+          label: sectionLabel(section),
+          path: sectionPath(section),
+        ),
+      if (showsSettingsEntry(permissions))
+        HomeTile(
+          tileKey: settingsTileKey,
+          labelKey: const Key('home-tile-label-settings'),
+          icon: Icons.settings,
+          gloss: homeTileGloss(null, context.look),
+          label: AppStrings.settings,
+          path: '/settings',
+        ),
+    ];
 
-    return RefreshIndicator(
+    final pad = pagePadding(width);
+    final columns = homeTileColumns(width - pad.horizontal, textScale);
+    final scroll = RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(homeDashboardProvider);
         ref.invalidate(unreadCountProvider);
         ref.invalidate(unreadNotificationsCountProvider);
-        await ref.read(homeDashboardProvider.future);
       },
-      child: ListView(
+      child: CustomScrollView(
         key: screenKey,
-        padding: pagePadding(width),
-        children: [
-          KeptData<HomeDto?>(
-            value: dashboard,
-            resetKey: 'home',
-            retryKey: retryKey,
-            onRetry: online
-                ? () => ref.invalidate(homeDashboardProvider)
-                : null,
-            messageOf: (_) => AppStrings.homeError,
-            loading: const SkeletonBox(
-              key: HomeShell.homeLoadingKey,
-              height: 88,
-            ),
-            builder: (home) {
-              if (home == null) return const SizedBox.shrink();
-              final cards = _visibleCards(home, permissions);
-              final debts = _visibleDebts(home, permissions);
-              final showAllSections = homeShowAllSections([
-                for (final debt in debts) debt.section,
-              ], permissions);
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (fromFallback)
-                    Card(
-                      key: const Key('home-fallback-banner'),
-                      color: theme.colorScheme.secondaryContainer,
-                      child: Padding(
-                        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-                        child: Text(
-                          AppStrings.homeFallbackNote,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSecondaryContainer,
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (home.businessDate != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      home.businessDate!,
-                      key: const Key('home-business-date'),
-                    ),
-                  ],
-                  if (home.generatedAt != null) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      '${AppStrings.updatedAt} ${formatIsoDate(home.generatedAt)}',
-                    ),
-                  ],
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    AppStrings.homeCardsTitle,
-                    style: theme.textTheme.titleMedium,
+        slivers: [
+          SliverPadding(
+            padding: pad,
+            sliver: SliverMainAxisGroup(
+              slivers: [
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppSpacing.sm),
+                ),
+                if (summary.sections.isEmpty)
+                  const SliverToBoxAdapter(
+                    child: EmptyPane(message: AppStrings.noSections),
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  if (cards.isEmpty)
-                    const EmptyPane(message: AppStrings.noSummaries)
-                  else
-                    LayoutBuilder(
-                      builder: (context, constraints) => _SummaryGrid(
-                        cards: cards,
-                        money: money,
-                        width: constraints.maxWidth,
-                        columns: homeCardColumns(width, textScale),
-                      ),
-                    ),
-                  if (home.oldDebts != null &&
-                      (showAllSections.isNotEmpty ||
-                          permissions.canRead(SectionKey.customers) ||
-                          permissions.canRead(SectionKey.companies))) ...[
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      AppStrings.oldDebtsTitle,
-                      style: theme.textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    if (debts.isEmpty)
-                      const EmptyPane(message: AppStrings.emptyTicker)
-                    else
-                      for (final section in showAllSections) ...[
-                        Text(
-                          sectionLabel(sectionKeyFor(section)!),
-                          style: theme.textTheme.labelLarge,
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        for (final debt in debts)
-                          if (debt.section == section)
-                            _DebtRow(debt: debt, money: money),
-                        Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: TextButton(
-                            key: Key('show-all-$section'),
-                            onPressed: () {
-                              final path = homeShowAllPath(
-                                section,
-                                permissions,
-                              );
-                              if (path != null) context.go(path);
-                            },
-                            child: const Text(AppStrings.showAll),
+                // Option 4 (Ali, 2026-11-01): the rows share the free height.
+                // Large text (one column) keeps natural tile heights and
+                // scrolls, so a capped tile never clips its label.
+                if (tiles.isNotEmpty && columns > 1)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    // No LayoutBuilder here: SliverFillRemaining measures
+                    // intrinsics.
+                    child: HomeFillGrid(tiles: tiles, columns: columns),
+                  ),
+                if (tiles.isNotEmpty && columns == 1)
+                  SliverToBoxAdapter(
+                    child: Column(
+                      key: const Key('home-tile-grid'),
+                      children: [
+                        for (final tile in tiles)
+                          Padding(
+                            padding: const EdgeInsetsDirectional.only(
+                              bottom: AppSpacing.md,
+                            ),
+                            child: tile,
                           ),
-                        ),
                       ],
-                  ],
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          if (summary.actions.isNotEmpty) ...[
-            Text(AppStrings.actionsTitle, style: theme.textTheme.titleMedium),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.md,
-              runSpacing: AppSpacing.sm,
-              children: [
-                for (final action in summary.actions)
-                  TextButton(
-                    key: HomeShell.actionKey(action),
-                    onPressed: online
-                        ? () => context.go(actionPath(action))
-                        : null,
-                    child: Text(actionLabel(action)),
+                    ),
                   ),
               ],
             ),
-            const SizedBox(height: AppSpacing.xl),
-          ],
-          Text(AppStrings.sectionsTitle, style: theme.textTheme.titleMedium),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            AppStrings.sectionsHint,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          if (summary.sections.isEmpty)
-            const EmptyPane(message: AppStrings.noSections)
-          else
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final columns = homeCardColumns(
-                  constraints.maxWidth,
-                  textScale,
-                );
-                final tileWidth =
-                    ((constraints.maxWidth - AppSpacing.md * (columns - 1)) /
-                            columns)
-                        .clamp(96.0, constraints.maxWidth);
-                return Wrap(
-                  spacing: AppSpacing.md,
-                  runSpacing: AppSpacing.md,
-                  children: [
-                    for (final section in summary.sections)
-                      SizedBox(
-                        width: tileWidth,
-                        child: _sectionTile(
-                          context,
-                          section,
-                          summary,
-                          online,
-                          dashboard.asData?.value,
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
         ],
       ),
     );
+    return scroll;
   }
+}
 
-  List<HomeSummaryDto> _visibleCards(
-    HomeDto home,
-    PermissionService permissions,
-  ) {
-    return [
-      for (final card in home.summaries)
-        if (sectionIsReadable(card.section, permissions)) card,
-    ];
-  }
+/// Section tile: a glossy card in its section colour (vivid in dark, soft
+/// in light) with a sheen, bright border and glow; the icon sits in a
+/// translucent square.
+class HomeTile extends StatelessWidget {
+  const HomeTile({
+    required this.tileKey,
+    required this.labelKey,
+    required this.icon,
+    required this.gloss,
+    required this.label,
+    required this.path,
+    super.key,
+  });
 
-  List<OldDebtDto> _visibleDebts(HomeDto home, PermissionService permissions) {
-    return [
-      for (final debt in home.oldDebts ?? const <OldDebtDto>[])
-        if (sectionIsReadable(debt.section, permissions)) debt,
-    ];
-  }
+  final Key tileKey;
+  final Key labelKey;
+  final IconData icon;
+  final Gloss gloss;
+  final String label;
+  final String path;
 
-  Widget _sectionTile(
-    BuildContext context,
-    SectionKey section,
-    HomeSummary summary,
-    bool online,
-    HomeDto? home,
-  ) {
-    final writable = summary.writableSections.contains(section);
-    final count = home?.counters[section.key];
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          InkWell(
-            key: HomeShell.sectionKey(section),
-            onTap: () => context.go(sectionPath(section)),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(sectionIcon(section)),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final radius = BorderRadius.circular(AppRadii.xxl);
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          boxShadow: gloss.glowShadow,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: radius,
+          clipBehavior: Clip.antiAlias,
+          child: Ink(
+            decoration: gloss.decoration(radius),
+            child: InkWell(
+              key: tileKey,
+              onTap: () => context.go(path),
+              child: GlossSheen(
+                gloss: gloss,
+                radius: radius,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 112),
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.lg,
+                    ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(sectionLabel(section)),
-                        if (count != null)
-                          Text(
-                            '${AppStrings.serverCount} $count',
-                            key: Key('section-counter-${section.key}'),
-                            style: theme.textTheme.bodySmall,
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: look.glass
+                                ? Colors.white.withValues(alpha: 0.16)
+                                : gloss.amount.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(AppRadii.xl),
                           ),
+                          child: Icon(icon, size: 30, color: gloss.amount),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          label,
+                          key: labelKey,
+                          textAlign: TextAlign.center,
+                          softWrap: true,
+                          style: cairo(16, 700, color: gloss.ink),
+                        ),
                       ],
                     ),
                   ),
-                  forwardChevron(context),
-                ],
+                ),
               ),
             ),
           ),
-          if (writable)
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: TextButton(
-                key: HomeShell.writeKey(section),
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(48, 48),
-                  tapTargetSize: MaterialTapTargetSize.padded,
-                ),
-                onPressed: online
-                    ? () => context.go(sectionPath(section))
-                    : null,
-                child: Text(_writeLabel(section)),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }
-
-  String _writeLabel(SectionKey section) => switch (section) {
-    SectionKey.customers => AppStrings.addCustomer,
-    SectionKey.companies => AppStrings.addCompany,
-    SectionKey.libyanDeposits ||
-    SectionKey.egyptianDeposits => AppStrings.addDeposit,
-    SectionKey.collections => AppStrings.submitReceipt,
-    SectionKey.purchases => AppStrings.add,
-    SectionKey.treasury => AppStrings.cashIn,
-    SectionKey.masraweya => AppStrings.save,
-    SectionKey.reports => AppStrings.refresh,
-  };
 }
 
-class _SummaryGrid extends StatelessWidget {
-  const _SummaryGrid({
-    required this.cards,
-    required this.money,
-    required this.width,
-    required this.columns,
-  });
+/// Rows share the free height evenly; each tile keeps its own
+/// minimum (so small screens scroll) and is capped at 190.
+class HomeFillGrid extends StatelessWidget {
+  const HomeFillGrid({required this.tiles, required this.columns, super.key});
 
-  final List<HomeSummaryDto> cards;
-  final MoneyFormatter money;
-  final double width;
+  final List<Widget> tiles;
   final int columns;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.md,
-      runSpacing: AppSpacing.md,
-      children: [
-        for (final card in cards)
-          SizedBox(
-            width: ((width - AppSpacing.md * (columns - 1)) / columns).clamp(
-              96,
-              width,
-            ),
-            child: _SummaryCard(card: card, money: money),
-          ),
-      ],
-    );
-  }
-}
-
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.card, required this.money});
-
-  final HomeSummaryDto card;
-  final MoneyFormatter money;
-
-  @override
-  Widget build(BuildContext context) {
-    final tone = toneColor(context.statusColors, card.tone);
-    final units = card.valueUnits;
-    final value = units != null && units.isInvalid
-        ? MoneyValue.invalidLabel
-        : card.currency != null
-        ? money.formatOrDash(units, card.currency!)
-        : (units == null || !units.isValid
-              ? AppStrings.dash
-              : money.formatNumber(units.units!));
-    final status = reportStatusLabel(card.status);
-    final theme = Theme.of(context);
-    return Card(
-      key: HomeShell.summaryKey(card.key),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(card.title, style: theme.textTheme.titleSmall),
-            const SizedBox(height: AppSpacing.sm),
-            MoneyText(
-              value,
-              style: context.textExtras.amountLarge.copyWith(color: tone),
-            ),
-            if (status != null) ...[
-              const SizedBox(height: AppSpacing.sm),
-              ReportStatusChip(status: card.status),
-            ],
-            if (card.note != null) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Text(card.note!, style: theme.textTheme.bodySmall),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DebtRow extends StatelessWidget {
-  const _DebtRow({required this.debt, required this.money});
-
-  final OldDebtDto debt;
-  final MoneyFormatter money;
-
-  @override
-  Widget build(BuildContext context) {
-    final visual = ageVisual(
-      colors: context.statusColors,
-      ageStatus: debt.ageStatus,
-      section: null,
-      serverLabel: debt.ageStatusLabel,
-    );
-    final colors = context.statusColors;
-    final amount = debt.currency == null
-        ? AppStrings.dash
-        : money.formatOrDash(debt.balanceUnits, debt.currency!);
-    final width = MediaQuery.sizeOf(context).width;
-    final theme = Theme.of(context);
-    final flat = useFlatAgeCard(width, theme.brightness);
-    final colored = visual.colored;
-    final serverLabel = debt.ageStatusLabel?.trim();
-    final age = (serverLabel != null && serverLabel.isNotEmpty)
-        ? debt.ageStatusLabel
-        : (debt.debtAgeDays != null ? sinceDays(debt.debtAgeDays) : null);
-    final fg = colored ? colors.onStatus : theme.colorScheme.onSurface;
-    final accent = colored
-        ? (visual.accent ?? colors.onStatus)
-        : theme.colorScheme.onSurfaceVariant;
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-      child: Material(
-        key: Key('old-debt-${debt.id}'),
-        color: colored
-            ? (flat ? visual.flat : colors.neutralCard)
-            : theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        clipBehavior: Clip.antiAlias,
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: colored && !flat ? visual.gradient : null,
-            color: colored && flat ? visual.flat : null,
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(
-              color: colored
-                  ? colors.onStatus.withValues(alpha: 0.2)
-                  : theme.colorScheme.outline,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final rows = <Widget>[];
+    for (var i = 0; i < tiles.length; i += columns) {
+      if (rows.isNotEmpty) rows.add(const SizedBox(height: AppSpacing.md));
+      rows.add(
+        Flexible(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 190),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(debt.name, style: cairo(16, 800, color: fg)),
-                MoneyText(
-                  amount,
-                  style: context.textExtras.amountLarge.copyWith(color: fg),
-                ),
-                if (age != null)
-                  Text(
-                    age,
-                    key: Key('old-debt-age-${debt.id}'),
-                    style: cairo(11, 500, color: accent),
+                for (var c = 0; c < columns; c++) ...[
+                  if (c > 0) const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: i + c < tiles.length
+                        ? tiles[i + c]
+                        : const SizedBox.shrink(),
                   ),
+                ],
               ],
             ),
           ),
         ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
+      child: Column(
+        key: const Key('home-tile-grid'),
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: rows,
       ),
     );
   }

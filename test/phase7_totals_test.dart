@@ -104,15 +104,24 @@ void main() {
     );
   });
 
-  testWidgets('P7-06 the zero card shows the server age label', (tester) async {
+  testWidgets('P7-06 a zero company card shows 0 like a customer card', (
+    tester,
+  ) async {
     await pumpFakeApp(tester, size: const Size(800, 2200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers');
-
-    expect(find.text('منذ 0 أيام'), findsWidgets);
+    // Company cards use the customer card words (Ali, 2026-11-03): no age
+    // line and no word on a zero card, just the server 0.
+    await go(tester, '/companies');
+    expect(find.text('منذ 0 أيام'), findsNothing);
     expect(find.text(AppStrings.zeroAccount), findsNothing);
-    expect(find.text('0 د.ل'), findsWidgets);
-  }, tags: ['pending-decision']);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('account-card-c_co_04')),
+        matching: find.text('0 د.ل'),
+      ),
+      findsOneWidget,
+    );
+  });
 
   testWidgets(
     'payroll remaining on the collections screen matches the server',
@@ -120,6 +129,10 @@ void main() {
       await pumpFakeApp(tester, size: const Size(800, 2600));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/collections');
+      // Payroll opens from «المرتبات» in the collections bar.
+      await tester.ensureVisible(find.byKey(const Key('collections-payroll')));
+      await tester.tap(find.byKey(const Key('collections-payroll')));
+      await settle(tester);
 
       await tester.ensureVisible(find.byKey(const Key('payroll-u_12')));
       expect(_inside(const Key('payroll-u_12'), '1,250 د.ل'), findsOneWidget);
@@ -135,26 +148,31 @@ void main() {
       await pumpFakeApp(tester, size: const Size(800, 2200));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/customers/c_55');
+      // The add row: choose دفع كلي, then its save button.
+      await tester.ensureVisible(find.byKey(const Key('composer-full')));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.ensureVisible(find.byKey(const Key('composer-full')));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.byKey(const Key('composer-full')));
+      await tester.pump();
+      await tester.pump();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
       await tester.ensureVisible(find.byKey(const Key('full-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+      await tester.ensureVisible(find.byKey(const Key('full-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('full-payment')));
       await settle(tester);
 
+      // Home no longer shows the debt row (icon grid only). The customers
+      // list shows the stored balance instead.
       await go(tester, '/');
-      expect(find.byKey(const Key('old-debt-c_55')), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('old-debt-c_55')),
-          matching: find.textContaining('0 د.ل'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('old-debt-c_55')),
-          matching: find.textContaining('320 د.ل'),
-        ),
-        findsNothing,
-      );
+      expect(find.byKey(const Key('old-debt-c_55')), findsNothing);
+      await go(tester, '/customers');
+      expect(find.textContaining('320 د.ل'), findsNothing);
     },
   );
 }

@@ -11,13 +11,16 @@ import '../../notifications/unread_badge.dart';
 import '../../state/notification_providers.dart';
 import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
+import '../../ui/bars_style.dart';
 import '../../ui/section_labels.dart';
 import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/environment_badge.dart';
 import '../../ui/widgets/logout_confirm.dart';
 import '../../ui/widgets/soft_tile.dart';
+import 'home_drawer.dart';
 
 class NavItem {
   const NavItem({
@@ -25,10 +28,14 @@ class NavItem {
     required this.label,
     required this.icon,
     required this.path,
+    this.shortLabel,
   });
 
   final String id;
   final String label;
+
+  /// Bottom bar text when it differs from [label]. Semantics keep [label].
+  final String? shortLabel;
   final IconData icon;
   final String path;
 }
@@ -63,6 +70,26 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Back on a section reached from home (or a ledger opened by a link)
+    // goes home instead of closing the app. Home itself keeps the system
+    // behaviour. Ali, 2026-11-03.
+    final atHome = widget.location == '/';
+    return PopScope(
+      canPop: atHome,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || !mounted) return;
+        final router = GoRouter.of(context);
+        if (router.canPop()) {
+          router.pop();
+        } else {
+          router.go('/');
+        }
+      },
+      child: _shell(context),
+    );
+  }
+
+  Widget _shell(BuildContext context) {
     final summary = ref.watch(homeSummaryProvider);
     final unread = ref.watch(unreadNotificationsCountProvider);
     final online = ref.watch(onlineProvider);
@@ -83,23 +110,23 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final items = _items(summary, permissions);
     final selected = _selectedIndex(items, widget.location);
     final showIdentityHere = phone;
-    final sidebar = context.sidebarPalette;
-    final colors = context.appColors;
 
     return Scaffold(
       key: HomeShell.shellKey,
       drawer: phone
           ? Drawer(
-              child: _NavList(
+              child: StyledDrawer(
                 items: items,
                 selected: selected,
                 summary: summary,
-                showIdentity: false,
                 dark: dark,
                 onSelect: (item) {
                   Navigator.of(context).pop();
                   context.go(item.path);
                 },
+                onToggleTheme: () =>
+                    ref.read(themeModeProvider.notifier).toggle(),
+                onLogout: () => requestLogout(context, ref),
               ),
             )
           : null,
@@ -154,7 +181,16 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ),
       body: Column(
         children: [
-          ConnectionBanner(online: online),
+          ConnectionBanner(
+            online: online,
+            // Phone: role at the top right and the Tripoli day and date in
+            // the middle, on every screen (in place of the old identity
+            // block). Wider layouts keep the identity in the side list.
+            role: showIdentityHere ? roleLabel(summary.role) : null,
+            roleKey: HomeShell.roleKey,
+            showDate: showIdentityHere,
+            topInset: showIdentityHere ? _badgeClearance(context) : 0,
+          ),
           Expanded(
             child: Row(
               children: [
@@ -190,12 +226,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                     ),
                   ),
                 Expanded(
-                  child: Column(
-                    children: [
-                      if (showIdentityHere) _PhoneIdentity(summary: summary),
-                      Expanded(child: widget.child),
-                    ],
-                  ),
+                  child: Column(children: [Expanded(child: widget.child)]),
                 ),
               ],
             ),
@@ -206,10 +237,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ? _BottomBar(
               items: items,
               location: widget.location,
-              indicator: sidebar.glowSoft,
-              selectedColor: sidebar.bright,
-              idleColor: colors.sidebarMuted,
-              background: colors.sidebarBg,
+              indicator: context.look.barIndicator,
+              selectedColor: context.look.barSelected,
+              idleColor: context.look.barIdle,
+              background: context.look.bar,
             )
           : null,
     );
@@ -230,8 +261,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           icon: sectionIcon(section),
           path: sectionPath(section),
         ),
-      if (permissions.canViewFinancialLedger ||
-          permissions.canDo(ManagementAction.settingsManage))
+      if (showsSettingsEntry(permissions))
         const NavItem(
           id: 'settings',
           label: AppStrings.settings,
@@ -278,6 +308,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   }
 }
 
+/// How far the environment pill reaches below the app bar, plus 2px, so
+/// the strip's middle text starts under it. Zero when no pill is drawn
+/// (production).
+double _badgeClearance(BuildContext context) {
+  if (kBuildEnvironment.label == null) return 0;
+  final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3);
+  final reach =
+      EnvironmentBadgeOverlay.height * scale - EnvironmentBadgeOverlay.lift;
+  return math.max(0, reach - AppSpacing.sm + 2);
+}
+
 bool _matches(String path, String location) {
   if (path == '/') return location == '/';
   return location == path || location.startsWith('$path/');
@@ -316,26 +357,6 @@ class IdentityBlock extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Keeps the signed-in name readable without pushing the page off screen
-/// when the text scale is large.
-class _PhoneIdentity extends StatelessWidget {
-  const _PhoneIdentity({required this.summary});
-
-  final HomeSummary summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final scale = MediaQuery.textScalerOf(context).scale(1);
-    final block = IdentityBlock(summary: summary);
-    if (scale <= 1.15) return block;
-    final cap = (88 * scale).clamp(88.0, 160.0);
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: cap),
-      child: SingleChildScrollView(child: block),
     );
   }
 }
@@ -513,6 +534,9 @@ class _NavList extends ConsumerWidget {
 
 /// Phone destinations in one row of equal slots. Labels wrap to two lines.
 /// [tabs] always ends with the "more" item.
+/// Largest text scale for bottom bar labels.
+const kTabLabelMaxScale = 1.3;
+
 class PhoneBottomNav extends StatelessWidget {
   const PhoneBottomNav({
     required this.tabs,
@@ -538,31 +562,47 @@ class PhoneBottomNav extends StatelessWidget {
     final safeIndex = tabs.isEmpty
         ? 0
         : selectedIndex.clamp(0, tabs.length - 1);
+    // Floating rounded bar over the page background.
+    final row = Padding(
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: AppSpacing.xs,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < tabs.length; i++)
+            Expanded(
+              child: _PhoneTab(
+                key: Key('bottom-tab-${tabs[i].id}'),
+                item: tabs[i],
+                selected: i == safeIndex,
+                indicator: indicator,
+                selectedColor: selectedColor,
+                idleColor: idleColor,
+                onTap: () => onSelected(i),
+              ),
+            ),
+        ],
+      ),
+    );
     return Material(
-      color: background,
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsetsDirectional.symmetric(
-            horizontal: AppSpacing.xs,
-            vertical: AppSpacing.xs,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var i = 0; i < tabs.length; i++)
-                Expanded(
-                  child: _PhoneTab(
-                    key: Key('bottom-tab-${tabs[i].id}'),
-                    item: tabs[i],
-                    selected: i == safeIndex,
-                    indicator: indicator,
-                    selectedColor: selectedColor,
-                    idleColor: idleColor,
-                    onTap: () => onSelected(i),
-                  ),
-                ),
-            ],
+          padding: BarLook.margin,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BarLook.radius,
+              border: Border.all(color: context.look.cardBorder),
+              boxShadow: BarLook.shadow,
+            ),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.symmetric(vertical: 4),
+              child: row,
+            ),
           ),
         ),
       ),
@@ -591,19 +631,17 @@ class _PhoneTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = selected ? selectedColor : idleColor;
-    final style =
-        Theme.of(context).navigationBarTheme.labelTextStyle?.resolve({}) ??
-        cairo(11, 700, color: color);
+    final radius = BorderRadius.circular(18);
     return Semantics(
       button: true,
       selected: selected,
       label: item.label,
       child: Material(
         color: selected ? indicator : Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
+        borderRadius: radius,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadii.lg),
+          borderRadius: radius,
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 48),
             child: Padding(
@@ -616,12 +654,25 @@ class _PhoneTab extends StatelessWidget {
                 children: [
                   Icon(item.icon, color: color, size: 22),
                   const SizedBox(height: AppSpacing.xxs),
-                  Text(
-                    item.label,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: style.copyWith(color: color),
+                  // The full name stays the semantics label above.
+                  // One line, like platform tab bars: text scaling is capped
+                  // at 1.3x and a long name shrinks to fit the tab.
+                  ExcludeSemantics(
+                    child: MediaQuery.withClampedTextScaling(
+                      maxScaleFactor: kTabLabelMaxScale,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          item.shortLabel ?? item.label,
+                          key: Key('bottom-tab-label-${item.id}'),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.visible,
+                          style: cairo(11, selected ? 800 : 600, color: color),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -656,7 +707,16 @@ class _BottomBar extends StatelessWidget {
       (item) =>
           item.id != 'home' && item.id != 'settings' && item.id != 'account',
     );
-    final head = sections.take(3).toList();
+    final head = [
+      for (final item in sections.take(3))
+        NavItem(
+          id: item.id,
+          label: item.label,
+          icon: item.icon,
+          path: item.path,
+          shortLabel: sectionBottomTabLabel(item.id),
+        ),
+    ];
     final rest = sections.skip(3).toList();
     final tail = items
         .where((item) => item.id == 'settings' || item.id == 'account')

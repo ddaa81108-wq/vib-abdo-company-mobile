@@ -182,6 +182,57 @@ void main() {
     expect(amount(tester, 'masraweya-remaining'), '8,950 ج.م');
   });
 
+  testWidgets('+ إضافة صف adds an empty row saved via the same entries list '
+      '(Ali, 2026-11-04)', (tester) async {
+    final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
+    final fake = layer.client as FakeApiClient;
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/masraweya');
+
+    await tester.tap(find.byKey(const Key('masraweya-add-row')));
+    await settle(tester);
+    expect(find.byKey(const Key('masraweya-form')), findsOneWidget);
+    expect(
+      find.byKey(const Key('masraweya-entry-value-field-1')),
+      findsOneWidget,
+    );
+
+    // Empty row blocks the save.
+    await tester.ensureVisible(find.byKey(const Key('save-masraweya')));
+    await tester.tap(find.byKey(const Key('save-masraweya')));
+    await tester.pump();
+    expect(fake.mutationRequestIds, isEmpty);
+
+    await enterField(tester, const Key('masraweya-entry-value-field-1'), '500');
+    await enterField(
+      tester,
+      const Key('masraweya-entry-commission-field-1'),
+      '10',
+    );
+    await tester.ensureVisible(find.byKey(const Key('save-masraweya')));
+    await tester.tap(find.byKey(const Key('save-masraweya')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byKey(const Key('confirm-mutation')));
+    await finishSend(tester);
+
+    expect(fake.mutationPaths.single, '/api/masraweya/day');
+    final body = jsonDecode(fake.mutationBodies.single) as Map<String, dynamic>;
+    final entries = body['entries'] as List;
+    expect(entries, hasLength(2));
+    expect(entries[1], {'valueUnits': 500, 'commissionUnits': 10});
+    expect(body.containsKey('workTotalUnits'), isFalse);
+    expect(body.containsKey('remainingUnits'), isFalse);
+
+    layer.permissions.applyFromServer(
+      const ['masraweya.read'],
+      role: 'employee',
+      sectionAccess: const {'masraweya': 'read'},
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('masraweya-add-row')), findsNothing);
+  });
+
   testWidgets(
     'a failed retry keeps the request id until the inputs or version change',
     (tester) async {

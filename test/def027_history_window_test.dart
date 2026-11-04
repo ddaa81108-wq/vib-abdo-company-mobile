@@ -17,57 +17,28 @@ void main() {
     HistoryWindow.trimEnabled = HistoryWindow.trimEnabledFromEnvironment;
   });
 
-  testWidgets('DEF-027 ledger keeps the newest rows and reloads the oldest', (
+  // The ledger is no longer windowed: it loads every page so row 1 is the
+  // first movement (Ali, 2026-11-03). Accounts and notifications keep the
+  // DEF-027 window below.
+  testWidgets('DEF-027 the ledger keeps every page and refresh starts over', (
     tester,
   ) async {
     HistoryWindow.trimEnabled = true;
     await _openLarge(tester);
     _go(tester, '/customers/${FakeLargeCatalog.longLedgerAccountId}');
-    await _until(tester, const Key('load-older'));
-
-    await _press(tester, const Key('load-older'), times: 3);
+    await _untilLedgerComplete(tester);
+    final all = _ledgerIds();
+    expect(all, hasLength(FakeLargeCatalog.ledgerLineCount));
+    expect(all.toSet(), hasLength(FakeLargeCatalog.ledgerLineCount));
     expect(
-      find.byKey(Key('ledger-retained-${HistoryWindow.retainLimit}')),
-      findsOneWidget,
+      _indexes(all),
+      containsAll([0, FakeLargeCatalog.ledgerLineCount - 1]),
     );
-    final trimmed = _ledgerIds();
-    _expectNewestPrefix(trimmed, length: 120, dropped: 120);
-    expect(find.byKey(const Key('ledger-sequence-ltx_00000')), findsOneWidget);
-
-    await _press(tester, const Key('load-older'));
-    final reloaded = _ledgerIds();
-    _expectNewestPrefix(reloaded, length: 160, dropped: 160);
-    expect(_indexes(reloaded), contains(120));
-    expect(find.byKey(const Key('ledger-sequence-ltx_00000')), findsOneWidget);
+    expect(find.byKey(const Key('load-older')), findsNothing);
 
     await _refresh(tester, const Key('ledger-refresh'));
-    await _until(tester, const Key('ledger-retained-0'));
-    expect(find.byKey(const Key('load-older')), findsOneWidget);
-    final reset = _ledgerIds();
-    _expectNewestPrefix(reset, length: FakeLargeCatalog.pageSize, dropped: 40);
-    expect(find.byKey(const Key('ledger-sequence-ltx_00000')), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('DEF-027 scrolling the ledger reaches the dropped older rows', (
-    tester,
-  ) async {
-    HistoryWindow.trimEnabled = true;
-    await _openLarge(tester);
-    _go(tester, '/customers/${FakeLargeCatalog.longLedgerAccountId}');
-    await _until(tester, const Key('load-older'));
-    await _press(tester, const Key('load-older'), times: 3);
-    expect(
-      find.byKey(Key('ledger-retained-${HistoryWindow.retainLimit}')),
-      findsOneWidget,
-    );
-
-    await _scrollToEnd(tester, const Key('ledger-older-list'));
-    final reached = _ledgerIds();
-    expect(_indexes(reached), contains(0));
-    expect(_indexes(reached), contains(120));
-    _expectNoGaps(reached);
-    expect(find.byKey(const Key('ledger-sequence-ltx_00000')), findsOneWidget);
+    await _untilLedgerComplete(tester);
+    expect(_ledgerIds(), hasLength(FakeLargeCatalog.ledgerLineCount));
     expect(tester.takeException(), isNull);
   });
 
@@ -199,29 +170,6 @@ Future<void> _refresh(WidgetTester tester, Key key) async {
   await tester.pump(const Duration(milliseconds: 50));
 }
 
-Future<void> _scrollToEnd(WidgetTester tester, Key listKey) async {
-  final list = find.byKey(listKey);
-  expect(list, findsOneWidget);
-  final gesture = await tester.startGesture(tester.getCenter(list));
-  for (var step = 0; step < 30; step++) {
-    await gesture.moveBy(const Offset(0, -700));
-    await tester.pump(const Duration(milliseconds: 16));
-    final position = tester
-        .state<ScrollableState>(
-          find.descendant(of: list, matching: find.byType(Scrollable)),
-        )
-        .position;
-    if (position.maxScrollExtent > 0 &&
-        position.pixels >= position.maxScrollExtent - 24) {
-      break;
-    }
-  }
-  await gesture.up();
-  for (var i = 0; i < 8; i++) {
-    await tester.pump(const Duration(milliseconds: 20));
-  }
-}
-
 List<String> _ledgerIds() {
   return [...HistoryWindowTrace.ledgerPage, ...HistoryWindowTrace.ledgerExtra];
 }
@@ -232,15 +180,6 @@ Set<int> _indexes(Iterable<String> ids) {
     expect(match, isNotNull, reason: id);
     return int.parse(match!.group(1)!);
   }).toSet();
-}
-
-void _expectNoGaps(Iterable<String> ids) {
-  final indexes = _indexes(ids);
-  expect(indexes, isNotEmpty);
-  final max = indexes.reduce((a, b) => a > b ? a : b);
-  for (var i = 0; i <= max; i++) {
-    expect(indexes, contains(i), reason: 'gap at $i');
-  }
 }
 
 void _expectNewestPrefix(
@@ -255,4 +194,18 @@ void _expectNewestPrefix(
   for (var i = 0; i < length; i++) {
     expect(indexes, contains(i), reason: 'gap at $i');
   }
+}
+
+Future<void> _untilLedgerComplete(WidgetTester tester) async {
+  final loading = find.byKey(const Key('ledger-loading-older'));
+  for (var i = 0; i < 400; i++) {
+    await tester.pump(const Duration(milliseconds: 20));
+    if (HistoryWindowTrace.ledgerExtra.length ==
+            (FakeLargeCatalog.ledgerPageCount - 1) *
+                FakeLargeCatalog.pageSize &&
+        loading.evaluate().isEmpty) {
+      return;
+    }
+  }
+  fail('the ledger did not finish loading its older pages');
 }

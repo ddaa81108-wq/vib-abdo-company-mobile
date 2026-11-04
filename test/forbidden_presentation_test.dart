@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/error_handling/app_failure.dart';
 import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart';
@@ -42,7 +43,10 @@ void main() {
 
     await go(tester, '/collections');
     expect(find.text(AppStrings.employeeTotals), findsNothing);
-    expect(find.byKey(const Key('collections-metrics')), findsNothing);
+    // 537f073 website: the employee sees the same metrics, scoped by the
+    // server to their own rows. Other employees' totals never show.
+    expect(find.byKey(const Key('collections-metrics')), findsOneWidget);
+    expect(find.byKey(const Key('employee-totals')), findsNothing);
     expect(find.text(AppStrings.approve), findsNothing);
     expect(find.text(AppStrings.reject), findsNothing);
     expect(find.byKey(const Key('approve-sb_1')), findsNothing);
@@ -62,14 +66,11 @@ void main() {
   ) async {
     await pumpFakeApp(tester, size: const Size(800, 1600));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    expect(
-      find.byKey(HomeShell.actionKey(ManagementAction.collectionsDecide)),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(HomeShell.actionKey(ManagementAction.settingsManage)),
-      findsOneWidget,
-    );
+    // Home is the icon grid only; the admin gets the settings tile and keeps
+    // both management permissions.
+    expect(find.byKey(HomeDashboard.settingsTileKey), findsOneWidget);
+    expect(homeActions(tester), contains(ManagementAction.collectionsDecide));
+    expect(homeActions(tester), contains(ManagementAction.settingsManage));
 
     await go(tester, '/collections');
     expect(find.byKey(const Key('collections-metrics')), findsOneWidget);
@@ -214,9 +215,14 @@ Future<void> go(WidgetTester tester, String path) async {
 }
 
 Future<void> loadScreenshotFonts() async {
-  final cairo = File('assets/fonts/Cairo-Variable.ttf');
-  if (cairo.existsSync()) {
-    await ui.loadFontFromList(await cairo.readAsBytes(), fontFamily: 'Cairo');
+  for (final weight in const ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+    final file = File('assets/fonts/IBMPlexSansArabic-$weight.ttf');
+    if (file.existsSync()) {
+      await ui.loadFontFromList(
+        await file.readAsBytes(),
+        fontFamily: 'IBMPlexSansArabic',
+      );
+    }
   }
   final icons = File(Platform.resolvedExecutable).parent.parent.parent;
   final material = File(

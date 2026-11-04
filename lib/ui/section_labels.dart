@@ -16,6 +16,21 @@ String sectionLabel(SectionKey section) => switch (section) {
   SectionKey.reports => 'التقارير الذكية',
 };
 
+/// Short text for the phone bottom bar only. Null means the full
+/// [sectionLabel]. Screen readers still get the full name.
+String? sectionBottomTabLabel(String sectionKey) {
+  if (sectionKey == SectionKey.customers.key) {
+    return AppStrings.bottomTabCustomers;
+  }
+  if (sectionKey == SectionKey.collections.key) {
+    return AppStrings.bottomTabCollections;
+  }
+  if (sectionKey == SectionKey.companies.key) {
+    return AppStrings.bottomTabCompanies;
+  }
+  return null;
+}
+
 IconData sectionIcon(SectionKey section) => switch (section) {
   SectionKey.customers => Icons.person_outline,
   SectionKey.collections => Icons.payments_outlined,
@@ -76,6 +91,12 @@ String actionLabel(ManagementAction action) => switch (action) {
   ManagementAction.accountRequestsDecide => 'طلبات الحسابات',
   ManagementAction.settingsManage => 'الإعدادات',
 };
+
+/// Whether the «الإعدادات» entry is shown (navigation, «المزيد», home tile).
+/// Same rule as the `/settings` gate in `auth_gate.dart`.
+bool showsSettingsEntry(PermissionService permissions) =>
+    permissions.canViewFinancialLedger ||
+    permissions.canDo(ManagementAction.settingsManage);
 
 String actionPath(ManagementAction action) => switch (action) {
   ManagementAction.collectionsAssign => sectionPath(SectionKey.customers),

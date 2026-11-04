@@ -72,7 +72,10 @@ void main() {
       permissionRedirect('/settings/employees', permissions),
       forbiddenLocation,
     );
-    expect(permissionRedirect('/settings/audit', permissions), forbiddenLocation);
+    expect(
+      permissionRedirect('/settings/audit', permissions),
+      forbiddenLocation,
+    );
     expect(
       permissionRedirect('/settings/operations', permissions),
       forbiddenLocation,

@@ -29,18 +29,21 @@ void main() {
     await pumpFakeApp(tester, size: const Size(800, 2400));
     await visitMainScreens(tester, (path) {
       expectRtl(tester);
-      if (path == '/') _expectLatinDates(tester);
+      if (path == '/') _expectNoArabicDigits(tester);
       if (path == '/notifications') _expectNoticeDirection(tester);
-      if (path == '/customers/c_55') _expectBackArrow(tester);
+      // The ledger closes with a round × at the end of its name bar.
+      if (path == '/customers/c_55') {
+        expect(find.byKey(const Key('ledger-close')), findsOneWidget);
+      }
       if (path == '/signup-info') _expectBackArrow(tester);
       if (path == '/account') _expectLogoutMirrored(tester);
     });
   });
 }
 
-void _expectLatinDates(WidgetTester tester) {
-  expect(find.text('2026-10-19'), findsWidgets);
-  expect(find.textContaining('آخر تحديث 2026-10-19'), findsOneWidget);
+/// Home is the icon grid only (no business date), so only the digit rule is
+/// checked there.
+void _expectNoArabicDigits(WidgetTester tester) {
   final arabicDigits = RegExp('[٠-٩]');
   final painted = tester
       .widgetList<Text>(find.byType(Text))
