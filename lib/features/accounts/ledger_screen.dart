@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -108,18 +109,22 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     _syncingColumns = false;
   }
 
-  /// The table opens at its start (التسلسل, then the date in RTL), even
-  /// after focusing القيمة scrolled it sideways.
-  void _toTableStart([int frames = 12]) {
+  /// Ali, 2026-11-04 (option 1): on a narrow phone the table opens scrolled
+  /// sideways just far enough that القيمة of the new row is fully on screen
+  /// (focused, ✓ pinned beside it). Columns keep their order; التسلسل and the
+  /// date may start off screen. Wide screens stay at the start.
+  void _toValueField([int frames = 12]) {
     if (!mounted) return;
     for (final c in [_columnsScroll, _headerScroll]) {
-      if (c.hasClients && c.offset != c.position.minScrollExtent) {
-        c.jumpTo(c.position.minScrollExtent);
-      }
+      if (!c.hasClients) continue;
+      final position = c.position;
+      final target = _LedgerColumns.valueOffset(position.viewportDimension)
+          .clamp(position.minScrollExtent, position.maxScrollExtent);
+      if ((c.offset - target).abs() > 0.5) c.jumpTo(target);
     }
     if (frames > 0) {
       WidgetsBinding.instance
-        ..addPostFrameCallback((_) => _toTableStart(frames - 1))
+        ..addPostFrameCallback((_) => _toValueField(frames - 1))
         ..scheduleFrame();
     }
   }
@@ -569,7 +574,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   /// First open: the newest rows and the entry buttons are on screen.
   void _jumpToEntry() {
     if (!mounted) return;
-    _toTableStart();
+    _toValueField();
     if (_innerRows.hasClients) {
       _innerRows.jumpTo(_innerRows.position.maxScrollExtent);
     }
@@ -984,36 +989,55 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
           // report an intrinsic height.
           child: SizedBox(
             height: MediaQuery.textScalerOf(context).scale(_composerHeight),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Stack(
               children: [
-                _Cell(_LedgerColumns.seq, saveCell),
-                _Cell(_LedgerColumns.when, date),
-                _Cell(_LedgerColumns.by, dash),
-                _Cell(
-                  _LedgerColumns.type,
-                  widget.typeCell == null
-                      ? dash
-                      : FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: widget.typeCell,
-                        ),
+                Positioned.fill(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const _Cell(_LedgerColumns.seq, SizedBox.shrink()),
+                      _Cell(_LedgerColumns.when, date),
+                      _Cell(_LedgerColumns.by, dash),
+                      _Cell(
+                        _LedgerColumns.type,
+                        widget.typeCell == null
+                            ? dash
+                            : FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: widget.typeCell,
+                              ),
+                      ),
+                      _Cell(_LedgerColumns.note, note),
+                      _Cell(_LedgerColumns.value, full ? dash : amount),
+                      _Cell(
+                        _LedgerColumns.operation,
+                        FittedBox(fit: BoxFit.scaleDown, child: modes),
+                      ),
+                      _Cell(_LedgerColumns.rate, rate),
+                      // No preview on the phone: figures come from the server.
+                      _Cell(_LedgerColumns.debt, dash),
+                      _Cell(_LedgerColumns.paid, dash),
+                      if (columns.showBalance)
+                        _Cell(_LedgerColumns.balance, dash),
+                      _Cell(
+                        _LedgerColumns.edit + _LedgerColumns.cancel,
+                        dash,
+                        divider: false,
+                      ),
+                    ],
+                  ),
                 ),
-                _Cell(_LedgerColumns.note, note),
-                _Cell(_LedgerColumns.value, full ? dash : amount),
-                _Cell(
-                  _LedgerColumns.operation,
-                  FittedBox(fit: BoxFit.scaleDown, child: modes),
-                ),
-                _Cell(_LedgerColumns.rate, rate),
-                // No preview on the phone: figures come from the server.
-                _Cell(_LedgerColumns.debt, dash),
-                _Cell(_LedgerColumns.paid, dash),
-                if (columns.showBalance) _Cell(_LedgerColumns.balance, dash),
-                _Cell(
-                  _LedgerColumns.edit + _LedgerColumns.cancel,
-                  dash,
-                  divider: false,
+                // ✓ pinned at the visible RTL start edge of the row, so it
+                // stays next to القيمة when the table opens scrolled.
+                PositionedDirectional(
+                  start: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: _LedgerColumns.seq,
+                  child: _PinnedToStart(
+                    key: const Key('composer-save-pin'),
+                    child: saveCell,
+                  ),
                 ),
               ],
             ),
@@ -1618,8 +1642,8 @@ class _LedgerColumns {
   static const seq = 56.0;
   static const when = 112.0;
   static const by = 76.0;
-  static const type = 164.0;
-  static const note = 108.0;
+  static const type = 150.0;
+  static const note = 100.0;
   static const value = 84.0;
   static const operation = 128.0;
   static const rate = 76.0;
@@ -1628,6 +1652,18 @@ class _LedgerColumns {
   static const balance = 92.0;
   static const edit = 52.0;
   static const cancel = 52.0;
+
+  /// Where القيمة ends, from the RTL start of the row.
+  static const valueEnd = seq + when + by + type + note + value;
+
+  /// The pinned ✓ may slide over التاريخ and بواسطة only.
+  static const pinLimit = when + by;
+
+  /// Sideways offset that shows القيمة whole (0 when it already fits).
+  static double valueOffset(double viewport) {
+    final needed = valueEnd + 8 - viewport;
+    return needed > 0 ? needed : 0;
+  }
 
   bool get _deposits =>
       section == AccountSection.libyanDeposits ||
@@ -1880,6 +1916,43 @@ Color _gridLine(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
     ? const Color(0xFF2E3A57)
     : const Color(0xFFD3DCE8);
+
+/// Keeps its child at the visible start edge of the sideways table scroll.
+class _PinnedToStart extends StatelessWidget {
+  const _PinnedToStart({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scrollable = Scrollable.maybeOf(context, axis: Axis.horizontal);
+    if (scrollable == null) return child;
+    final position = scrollable.position;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    return AnimatedBuilder(
+      animation: position,
+      child: child,
+      builder: (context, child) {
+        // Follows the start edge only up to the opening offset, and never
+        // past the بواسطة column: it never covers the type chips or a field.
+        // (On a 320dp phone that leaves ✓ one short swipe away.)
+        final pixels = position.hasPixels && position.hasContentDimensions
+            ? (position.pixels - position.minScrollExtent).clamp(
+                0.0,
+                math.min<double>(
+                  _LedgerColumns.valueOffset(position.viewportDimension),
+                  _LedgerColumns.pinLimit,
+                ),
+              )
+            : 0.0;
+        return Transform.translate(
+          offset: Offset(rtl ? -pixels : pixels, 0),
+          child: child,
+        );
+      },
+    );
+  }
+}
 
 class _Cell extends StatelessWidget {
   const _Cell(this.width, this.child, {this.alignment, this.divider = true});
@@ -2307,7 +2380,14 @@ class _InlineComposer extends StatefulWidget {
 }
 
 class _InlineComposerState extends State<_InlineComposer> {
-  var _type = 'debt';
+  /// The type chip selected on open and after each save (Ali, 2026-11-04):
+  /// ديون for customers and companies, إيداع مصري ('debt') for Egyptian
+  /// deposits, سحب أمانة ('payment') for Libyan deposits. UI default only;
+  /// each type's request is unchanged.
+  String get _defaultType =>
+      widget.section == AccountSection.libyanDeposits ? 'payment' : 'debt';
+
+  late var _type = _defaultType;
 
   /// A new round after each accepted movement: fresh fields, new request id.
   var _round = 0;
@@ -2387,10 +2467,10 @@ class _InlineComposerState extends State<_InlineComposer> {
       typeCell: chips,
       onFull: widget.onFull,
       onSaved: (posted) {
-        // A fresh row, back on ديون (Ali, 2026-11-03).
+        // A fresh row, back on the section's default type.
         setState(() {
           _round++;
-          _type = 'debt';
+          _type = _defaultType;
         });
         widget.onPosted(posted);
       },

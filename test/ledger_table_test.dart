@@ -19,6 +19,8 @@ import 'support/pump_app.dart';
 /// one continuous record, the total card pinned, the screen opens at the
 /// entry buttons, and a correction opens in its own row.
 void main() {
+  _defaultTypeAndOpeningView();
+
   testWidgets('columns carry the website labels', (tester) async {
     await pumpFakeApp(tester, size: const Size(430, 932));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
@@ -559,4 +561,78 @@ void main() {
       },
     );
   }
+}
+
+// Ali, 2026-11-04: per-section default type and the opening sideways view.
+void _defaultTypeAndOpeningView() {
+  for (final (route, type, label) in const [
+    ('/customers/c_55', 'debt', AppStrings.debtMovement),
+    ('/companies/c_co_02', 'debt', AppStrings.debtMovement),
+    ('/egyptian-deposits/c_eg_08', 'debt', AppStrings.egpIn),
+    ('/libyan-deposits/c_55', 'payment', AppStrings.depositOut),
+  ]) {
+    testWidgets('$route opens on «$label», القيمة focused and on screen, '
+        '✓ reachable beside it', (tester) async {
+      await pumpFakeApp(tester, size: const Size(430, 932));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, route);
+      await settle(tester);
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      expect(find.byKey(ValueKey('movement-$type-0')), findsOneWidget);
+      final screen = tester.getRect(find.byType(Scaffold).first);
+      final amount = find.byKey(const Key('movement-amount'));
+      final amountRect = tester.getRect(amount);
+      expect(amountRect.left, greaterThanOrEqualTo(screen.left));
+      expect(amountRect.right, lessThanOrEqualTo(screen.right));
+      final field = find.descendant(
+        of: amount,
+        matching: find.byType(EditableText),
+      );
+      expect(tester.widget<EditableText>(field).focusNode.hasFocus, isTrue);
+      final saveRect = tester.getRect(find.byKey(const Key('save-movement')));
+      expect(saveRect.left, greaterThanOrEqualTo(screen.left));
+      expect(saveRect.right, lessThanOrEqualTo(screen.right));
+      // ✓ is not under the القيمة field.
+      expect(saveRect.overlaps(amountRect), isFalse);
+      // Column order is kept: التسلسل's column sits at the RTL start (right
+      // of القيمة), only scrolled sideways.
+      final rows = tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byKey(const Key('ledger-columns-scroll')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(rows.position.pixels, greaterThan(0));
+      // The type chip can still be changed.
+      final other = type == 'debt' ? 'add-payment' : 'add-debt';
+      await tester.tap(find.byKey(Key(other)));
+      await tester.pump();
+      expect(
+        find.byKey(
+          ValueKey('movement-${type == 'debt' ? 'payment' : 'debt'}-0'),
+        ),
+        findsOneWidget,
+      );
+    });
+  }
+
+  testWidgets('a wide screen keeps the table at its start', (tester) async {
+    await pumpFakeApp(tester, size: const Size(1400, 1000));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    await settle(tester);
+    final rows = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byKey(const Key('ledger-columns-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(rows.position.pixels, 0);
+  });
 }
