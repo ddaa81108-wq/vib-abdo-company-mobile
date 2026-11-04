@@ -282,7 +282,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
           // Top: the owner's name in a pill, then small round buttons
           // (jump, تعديل البيانات, ×). Nothing else above the table.
           final bar = Padding(
-            padding: padding.copyWith(top: AppSpacing.xs, bottom: 0),
+            padding: padding.copyWith(top: 0, bottom: 0),
             child: Row(
               children: [
                 Expanded(
@@ -685,8 +685,8 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   }
 }
 
-/// The add row's height at text scale 1: three stacked type buttons.
-const _composerHeight = 124.0;
+/// The add row's height at text scale 1: one row like the posted rows.
+const _composerHeight = 60.0;
 
 class _MovementForm extends ConsumerStatefulWidget {
   const _MovementForm({
@@ -890,10 +890,9 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
         prefix: const Icon(Icons.calendar_today_outlined, size: 14),
       ),
     );
-    final modes = Wrap(
-      spacing: 4,
-      runSpacing: 4,
-      alignment: WrapAlignment.center,
+    final modes = Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      spacing: 3,
       children: [
         for (final mode in const [
           CalculationMode.direct,
@@ -919,6 +918,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
             inputs: 'full:${watchedCard.asData?.value.version}',
             expectedVersion: watchedCard.asData?.value.version,
             label: AppStrings.save,
+            glyph: Icons.check_rounded,
             onSubmit: widget.onFull!,
           )
         : GuardedMutation(
@@ -928,6 +928,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
                 '${widget.type}|$_mode|${_amount.text}|${_factor.text}|${_date.text}|${_note.text}',
             expectedVersion: watchedCard.asData?.value.version,
             label: AppStrings.save,
+            glyph: Icons.check_rounded,
             onVersionConflict: () {
               ref.invalidate(ledgerProvider((widget.section, widget.id)));
               ref.invalidate(accountCardProvider((widget.section, widget.id)));
@@ -936,6 +937,36 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
             },
             onSubmit: _submit,
           );
+    // ✓ in the first (rightmost) cell: on screen at the RTL start, no
+    // swipe. An error line may spill under the row.
+    final saveCell = OverflowBox(
+      maxWidth: 240,
+      maxHeight: double.infinity,
+      alignment: AlignmentDirectional.topStart,
+      child: Padding(
+        padding: const EdgeInsetsDirectional.only(start: 8, top: 10),
+        child: SectionTheme(
+          child: Builder(
+            builder: (context) {
+              final theme = Theme.of(context);
+              return Theme(
+                data: theme.copyWith(
+                  filledButtonTheme: FilledButtonThemeData(
+                    style: theme.filledButtonTheme.style?.copyWith(
+                      minimumSize: const WidgetStatePropertyAll(Size(40, 40)),
+                      fixedSize: const WidgetStatePropertyAll(Size(40, 40)),
+                      padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+                      shape: const WidgetStatePropertyAll(CircleBorder()),
+                    ),
+                  ),
+                ),
+                child: save,
+              );
+            },
+          ),
+        ),
+      ),
+    );
     final viewport = _InlineViewport.of(context);
     return Column(
       key: const Key('movement-inline'),
@@ -956,16 +987,24 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _Cell(
-                  _LedgerColumns.seq,
-                  Icon(Icons.add_rounded, size: 18, color: look.accent),
-                ),
+                _Cell(_LedgerColumns.seq, saveCell),
                 _Cell(_LedgerColumns.when, date),
                 _Cell(_LedgerColumns.by, dash),
-                _Cell(_LedgerColumns.type, widget.typeCell ?? dash),
+                _Cell(
+                  _LedgerColumns.type,
+                  widget.typeCell == null
+                      ? dash
+                      : FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: widget.typeCell,
+                        ),
+                ),
                 _Cell(_LedgerColumns.note, note),
                 _Cell(_LedgerColumns.value, full ? dash : amount),
-                _Cell(_LedgerColumns.operation, modes),
+                _Cell(
+                  _LedgerColumns.operation,
+                  FittedBox(fit: BoxFit.scaleDown, child: modes),
+                ),
                 _Cell(_LedgerColumns.rate, rate),
                 // No preview on the phone: figures come from the server.
                 _Cell(_LedgerColumns.debt, dash),
@@ -973,25 +1012,11 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
                 if (columns.showBalance) _Cell(_LedgerColumns.balance, dash),
                 _Cell(
                   _LedgerColumns.edit + _LedgerColumns.cancel,
-                  Icon(Icons.south_rounded, size: 18, color: look.muted),
+                  dash,
                   divider: false,
                 ),
               ],
             ),
-          ),
-        ),
-        // Save stays in view under the entry row while the table scrolls
-        // sideways: no swipe needed on the phone.
-        _PinnedToViewport(
-          width: viewport,
-          child: Container(
-            color: look.accent.withValues(alpha: 0.10),
-            padding: const EdgeInsetsDirectional.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: AppSpacing.xs,
-            ),
-            alignment: AlignmentDirectional.centerEnd,
-            child: SectionTheme(child: save),
           ),
         ),
         if (full || watchedCard.hasError)
@@ -1261,29 +1286,29 @@ class _Header extends StatelessWidget {
             vertical: AppSpacing.xs,
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Wrap(
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.xxs,
+                alignment: WrapAlignment.center,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   if (showTitle)
                     Text(title, style: cairo(16, 800, color: foreground)),
-                  if (visual.label != null)
-                    Text(visual.label!, style: cairo(12, 700, color: accent)),
                 ],
               ),
-              Text(value.name, style: cairo(18, 800, color: foreground)),
-              if (value.phone != null)
-                LtrText(value.phone!, style: cairo(12, 500, color: accent)),
-              if (kindWord != null)
-                Text(
-                  AppStrings.ledgerTotal,
-                  style: cairo(12, 600, color: accent),
-                ),
+              Text(
+                section == AccountSection.libyanDeposits ||
+                        section == AccountSection.egyptianDeposits
+                    ? AppStrings.ledgerDepositTotal
+                    : AppStrings.ledgerTotal,
+                key: const Key('ledger-total-heading'),
+                style: cairo(12, 600, color: accent),
+              ),
               Wrap(
                 spacing: AppSpacing.sm,
+                alignment: WrapAlignment.center,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   MoneyText(
@@ -1408,11 +1433,6 @@ class _TotalCard extends StatelessWidget {
         ? money.format(-units, card.currency)
         : money.formatOrDash(shown, card.currency);
     final radius = BorderRadius.circular(AppRadii.card);
-    final subtitle = [
-      card.name,
-      if (card.phone != null && card.phone!.isNotEmpty) card.phone!,
-    ].join(' • ');
-    final age = card.ageStatusLabel;
     return Material(
       key: const Key('ledger-header'),
       type: MaterialType.transparency,
@@ -1426,23 +1446,26 @@ class _TotalCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsetsDirectional.symmetric(
               horizontal: AppSpacing.lg,
-              vertical: AppSpacing.md,
+              vertical: AppSpacing.sm,
             ),
-            child: Row(
+            // Only the total, centred: heading, figure and word. The name
+            // and phone are already above the ledger (Ali, 2026-11-04).
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        heading,
-                        key: const Key('ledger-total-heading'),
-                        style: cairo(12, 700, color: gloss.ink),
-                      ),
-                      FittedBox(
+                Text(
+                  heading,
+                  key: const Key('ledger-total-heading'),
+                  textAlign: TextAlign.center,
+                  style: cairo(12, 700, color: gloss.ink),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: FittedBox(
                         fit: BoxFit.scaleDown,
-                        alignment: AlignmentDirectional.centerStart,
                         child: MoneyText(
                           text,
                           key: const Key('ledger-header-balance'),
@@ -1451,70 +1474,49 @@ class _TotalCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Text(
-                        subtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: cairo(
-                          12,
-                          600,
-                          color: gloss.ink.withValues(alpha: 0.85),
-                        ),
-                      ),
-                      if (age != null && age.isNotEmpty)
-                        Text(
-                          age,
-                          style: cairo(
-                            11.5,
-                            600,
-                            color: gloss.ink.withValues(alpha: 0.8),
+                    ),
+                    if (word != null) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      DecoratedBox(
+                        key: const Key('ledger-header-kind'),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(999),
+                          color: gloss.ink.withValues(alpha: 0.12),
+                          border: Border.all(
+                            color: gloss.ink.withValues(alpha: 0.4),
                           ),
                         ),
-                      if (reloadError != null)
-                        Semantics(
-                          container: true,
-                          excludeSemantics: true,
-                          label: AppStrings.ledgerReloadFailed,
+                        child: Padding(
+                          padding: const EdgeInsetsDirectional.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.xxs,
+                          ),
                           child: Text(
-                            AppStrings.ledgerReloadFailed,
-                            key: const Key('ledger-reload-failed'),
-                            style: cairo(12, 600, color: gloss.ink),
+                            word,
+                            style: cairo(13, 800, color: gloss.amount),
                           ),
                         ),
-                      if (card.systemManaged)
-                        Text(
-                          AppStrings.systemCard,
-                          key: ValueKey(
-                            'system-${card.systemLinkKey ?? 'managed'}',
-                          ),
-                          style: cairo(12, 700, color: gloss.ink),
-                        ),
+                      ),
                     ],
-                  ),
+                  ],
                 ),
-                if (word != null) ...[
-                  const SizedBox(width: AppSpacing.sm),
-                  DecoratedBox(
-                    key: const Key('ledger-header-kind'),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      color: gloss.ink.withValues(alpha: 0.12),
-                      border: Border.all(
-                        color: gloss.ink.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsetsDirectional.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.xs,
-                      ),
-                      child: Text(
-                        word,
-                        style: cairo(13, 800, color: gloss.amount),
-                      ),
+                if (reloadError != null)
+                  Semantics(
+                    container: true,
+                    excludeSemantics: true,
+                    label: AppStrings.ledgerReloadFailed,
+                    child: Text(
+                      AppStrings.ledgerReloadFailed,
+                      key: const Key('ledger-reload-failed'),
+                      style: cairo(12, 600, color: gloss.ink),
                     ),
                   ),
-                ],
+                if (card.systemManaged)
+                  Text(
+                    AppStrings.systemCard,
+                    key: ValueKey('system-${card.systemLinkKey ?? 'managed'}'),
+                    style: cairo(12, 700, color: gloss.ink),
+                  ),
               ],
             ),
           ),
@@ -1615,9 +1617,9 @@ class _LedgerColumns {
 
   static const seq = 56.0;
   static const when = 112.0;
-  static const by = 96.0;
-  static const type = 100.0;
-  static const note = 124.0;
+  static const by = 76.0;
+  static const type = 164.0;
+  static const note = 108.0;
   static const value = 84.0;
   static const operation = 128.0;
   static const rate = 76.0;
@@ -1858,38 +1860,6 @@ class _JumpButtons extends StatelessWidget {
 }
 
 /// Gives rows the visible width so an inline form fits the screen.
-/// Keeps [child] at the visible start of a sideways-scrolling table.
-class _PinnedToViewport extends StatelessWidget {
-  const _PinnedToViewport({required this.width, required this.child});
-
-  final double? width;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final scrollable = Scrollable.maybeOf(context, axis: Axis.horizontal);
-    final body = Align(
-      alignment: AlignmentDirectional.centerStart,
-      child: SizedBox(width: width, child: child),
-    );
-    if (scrollable == null) return body;
-    final position = scrollable.position;
-    final rtl = Directionality.of(context) == TextDirection.rtl;
-    return AnimatedBuilder(
-      animation: position,
-      builder: (context, child) {
-        final o = position.hasPixels ? position.pixels : 0.0;
-        return Transform.translate(
-          offset: Offset(rtl ? -o : o, 0),
-          transformHitTests: true,
-          child: child,
-        );
-      },
-      child: body,
-    );
-  }
-}
-
 class _InlineViewport extends InheritedWidget {
   const _InlineViewport({required this.width, required super.child});
 
@@ -2376,9 +2346,8 @@ class _InlineComposerState extends State<_InlineComposer> {
 
     // The section's own type buttons, stacked in the نوع الحركة cell.
     final chips = widget.cardReady
-        ? Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+        ? Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               chip(
                 const Key('add-debt'),
@@ -2388,7 +2357,7 @@ class _InlineComposerState extends State<_InlineComposer> {
                 'debt',
                 _deposits ? _ChipKind.partial : _ChipKind.debt,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(width: 3),
               chip(
                 const Key('add-payment'),
                 _deposits
@@ -2398,7 +2367,7 @@ class _InlineComposerState extends State<_InlineComposer> {
                 _deposits ? _ChipKind.debt : _ChipKind.partial,
               ),
               if (!_deposits) ...[
-                const SizedBox(height: 4),
+                const SizedBox(width: 3),
                 chip(
                   const Key('composer-full'),
                   AppStrings.fullPayment,
@@ -2610,20 +2579,11 @@ class _OwnerPill extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsetsDirectional.symmetric(
             horizontal: AppSpacing.md,
-            vertical: AppSpacing.xs,
+            vertical: AppSpacing.xxs,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Flexible(
-                child: Text(
-                  section,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: cairo(11, 700, color: look.muted),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
               Flexible(
                 child: Text(
                   name,

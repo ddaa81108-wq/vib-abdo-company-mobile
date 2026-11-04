@@ -59,7 +59,8 @@ void main() {
     await go(tester, '/libyan-deposits/c_55');
 
     _expectHeaderGradient(tester, AppStatusColors.light.warningDebt);
-    expect(find.text('منذ 4 أيام'), findsWidgets);
+    // The total card shows only the total (Ali, 2026-11-04): no age line.
+    expect(find.text('منذ 4 أيام'), findsNothing);
 
     await _toggleDark(tester);
     _expectHeaderGradient(tester, AppStatusColors.dark.warningDebt);
@@ -146,7 +147,9 @@ void main() {
           );
           await _scrollToTop(tester, const Key('screen-ledger-customers'));
           expectRtl(tester);
-          expect(find.text(AppStrings.customerLedger), findsOneWidget);
+          // Only the owner's name sits above the ledger (Ali, 2026-11-04).
+          expect(find.byKey(const Key('ledger-owner-pill')), findsOneWidget);
+          expect(find.text(AppStrings.customerLedger), findsNothing);
           expect(find.text('posted'), findsNothing);
           await _expectFits(
             tester,
@@ -237,7 +240,9 @@ void main() {
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/libyan-deposits/c_55');
-    expect(find.text(AppStrings.libyanLedger), findsOneWidget);
+    // Only the owner's name sits above the ledger (Ali, 2026-11-04).
+    expect(find.byKey(const Key('ledger-owner-pill')), findsOneWidget);
+    expect(find.text(AppStrings.libyanLedger), findsNothing);
     // م counts the drawn rows 1..n once every page is in (Ali,
     // 2026-11-03); a row without a server sequence still gets its place.
     await tester.pump(const Duration(milliseconds: 50));
@@ -326,7 +331,9 @@ void main() {
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/egyptian-deposits/c_55');
-    expect(find.text(AppStrings.egyptianLedger), findsOneWidget);
+    // Only the owner's name sits above the ledger (Ali, 2026-11-04).
+    expect(find.byKey(const Key('ledger-owner-pill')), findsOneWidget);
+    expect(find.text(AppStrings.egyptianLedger), findsNothing);
     expect(find.text(AppStrings.systemCard), findsOneWidget);
     _expectWritesHidden(tester);
   });

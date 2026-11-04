@@ -189,6 +189,7 @@ abstract final class AppStrings {
   static const ledgerColEdit = 'تعديل';
   static const ledgerColCancel = 'إلغاء';
   static const ledgerTotal = 'إجمالي الدين الحالي';
+  static const ledgerDepositTotal = 'إجمالي الأمانة';
   static const ledgerAddMovement = 'إضافة حركة';
   static const ledgerSwipeMore = '← اسحب للمزيد';
   static const ledgerZeroWord = 'صفر';

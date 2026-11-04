@@ -74,7 +74,8 @@ void main() {
       expect(find.byKey(const Key('add-debt')), findsOneWidget);
       expect(find.byKey(const Key('composer-full')), findsOneWidget);
       expect(find.text('مرّ عليه 3 أيام'), findsNothing);
-      expect(find.text('منذ 4 أيام'), findsWidgets);
+      // The ledger total card shows only the total (Ali, 2026-11-04).
+      expect(find.text('منذ 4 أيام'), findsNothing);
     },
   );
 }

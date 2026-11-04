@@ -327,7 +327,12 @@ class GatedButton extends StatelessWidget {
     this.online = true,
     this.destructive = false,
     this.filled = true,
+    this.glyph,
   });
+
+  /// Shown instead of the label text (the label stays as the tooltip and
+  /// screen-reader name): actions as symbols (Ali, 2026-11-04).
+  final IconData? glyph;
 
   final bool allowed;
   final String label;
@@ -347,6 +352,11 @@ class GatedButton extends StatelessWidget {
             width: 18,
             height: 18,
             child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : glyph != null
+        ? Tooltip(
+            message: label,
+            child: Icon(glyph, semanticLabel: label),
           )
         : Text(label);
     if (!filled) {
