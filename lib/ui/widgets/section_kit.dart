@@ -192,20 +192,15 @@ class SectionCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (title != null || trailing != null) ...[
-                Row(
+                // Wraps under large text instead of overflowing.
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
                   children: [
-                    Expanded(
-                      child: Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: title == null
-                            ? const SizedBox.shrink()
-                            : PillTitle(title!),
-                      ),
-                    ),
-                    if (trailing != null) ...[
-                      const SizedBox(width: AppSpacing.sm),
-                      trailing!,
-                    ],
+                    if (title != null) PillTitle(title!),
+                    ?trailing,
                   ],
                 ),
                 if (note != null)
@@ -289,7 +284,7 @@ class FigureRow extends StatelessWidget {
             Flexible(
               child: boxed
                   ? Container(
-                      constraints: const BoxConstraints(minWidth: 110),
+                      constraints: const BoxConstraints(minWidth: 64),
                       padding: const EdgeInsetsDirectional.symmetric(
                         horizontal: AppSpacing.md,
                         vertical: AppSpacing.xs,

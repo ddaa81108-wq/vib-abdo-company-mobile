@@ -150,9 +150,14 @@ class _DayView extends StatelessWidget {
                       color: look.muted,
                     ),
                     const SizedBox(width: AppSpacing.sm),
-                    LtrText(
-                      data.businessDate,
-                      style: cairo(15, 800, color: look.ink),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: LtrText(
+                          data.businessDate,
+                          style: cairo(15, 800, color: look.ink),
+                        ),
+                      ),
                     ),
                   ],
                 ),
