@@ -14,6 +14,7 @@ import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/labeled_money.dart';
 import '../../ui/widgets/mutation_form.dart';
+import '../../ui/widgets/section_kit.dart';
 
 class TreasuryScreen extends ConsumerWidget {
   const TreasuryScreen({super.key});
@@ -31,61 +32,68 @@ class TreasuryScreen extends ConsumerWidget {
     final canWrite = permissions.canWrite(SectionKey.treasury);
     final width = MediaQuery.sizeOf(context).width;
 
-    return ListView(
-      key: screenKey,
-      padding: pagePadding(width),
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Expanded(child: ScreenTitle(AppStrings.treasury)),
-            IconButton(
-              key: const Key('treasury-refresh'),
-              tooltip: AppStrings.refresh,
-              onPressed: () {
-                ref.invalidate(treasuryProvider);
-                ref.invalidate(cashLedgerProvider);
-              },
-              icon: const Icon(Icons.refresh),
+    return SectionTheme(
+      child: ListView(
+        key: screenKey,
+        padding: pagePadding(width),
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Expanded(child: SectionHeading(AppStrings.treasury)),
+              IconButton(
+                key: const Key('treasury-refresh'),
+                tooltip: AppStrings.refresh,
+                onPressed: () {
+                  ref.invalidate(treasuryProvider);
+                  ref.invalidate(cashLedgerProvider);
+                },
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
+          ),
+          if (canWrite) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _WriteActions(
+              online: online,
+              onEntry: (direction) => _entry(context, ref, direction),
             ),
           ],
-        ),
-        if (canWrite) ...[
+          const SizedBox(height: AppSpacing.md),
+          KeptData<TreasurySummaryDto>(
+            value: summary,
+            resetKey: 'treasury',
+            onRetry: () => ref.invalidate(treasuryProvider),
+            messageOf: (error) =>
+                failureText(ref.read(errorHandlerProvider).toFailure(error)),
+            failureOf: (error) =>
+                ref.read(errorHandlerProvider).toFailure(error),
+            loading: const SkeletonBox(
+              key: Key('treasury-loading'),
+              height: 180,
+            ),
+            builder: (data) => _Cards(data: data, money: money),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          const Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: PillTitle(AppStrings.cashMovements),
+          ),
           const SizedBox(height: AppSpacing.sm),
-          _WriteActions(
-            online: online,
-            onEntry: (direction) => _entry(context, ref, direction),
+          KeptData<Paged<CashEntryDto>>(
+            value: ledger,
+            resetKey: 'cash',
+            onRetry: () => ref.invalidate(cashLedgerProvider),
+            messageOf: (error) =>
+                failureText(ref.read(errorHandlerProvider).toFailure(error)),
+            failureOf: (error) =>
+                ref.read(errorHandlerProvider).toFailure(error),
+            loading: const SkeletonBox(height: 80),
+            builder: (page) =>
+                _Movements(page: page, money: money, online: online),
           ),
         ],
-        const SizedBox(height: AppSpacing.md),
-        KeptData<TreasurySummaryDto>(
-          value: summary,
-          resetKey: 'treasury',
-          onRetry: () => ref.invalidate(treasuryProvider),
-          messageOf: (error) =>
-              failureText(ref.read(errorHandlerProvider).toFailure(error)),
-          failureOf: (error) => ref.read(errorHandlerProvider).toFailure(error),
-          loading: const SkeletonBox(key: Key('treasury-loading'), height: 180),
-          builder: (data) => _Cards(data: data, money: money),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          AppStrings.cashMovements,
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        KeptData<Paged<CashEntryDto>>(
-          value: ledger,
-          resetKey: 'cash',
-          onRetry: () => ref.invalidate(cashLedgerProvider),
-          messageOf: (error) =>
-              failureText(ref.read(errorHandlerProvider).toFailure(error)),
-          failureOf: (error) => ref.read(errorHandlerProvider).toFailure(error),
-          loading: const SkeletonBox(height: 80),
-          builder: (page) =>
-              _Movements(page: page, money: money, online: online),
-        ),
-      ],
+      ),
     );
   }
 
@@ -254,7 +262,6 @@ class _Cards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.statusColors;
-    final scheme = Theme.of(context).colorScheme;
     final cashColor = switch (data.activeCashTone) {
       SummaryTone.positive => colors.cashPositive,
       SummaryTone.negative => colors.cashNegative,
@@ -266,8 +273,12 @@ class _Cards extends StatelessWidget {
       money.formatOrDash(data.netUnits, Currency.lyd),
       AppStrings.formulaCaption,
       emphasize: true,
-      background: scheme.primaryContainer,
-      foreground: scheme.onPrimaryContainer,
+      background: Color.alphaBlend(
+        sectionGold(context).withValues(alpha: 0.12),
+        context.look.card,
+      ),
+      foreground: context.look.ink,
+      edge: sectionGold(context),
     );
     final rest = [
       _tile(
@@ -275,12 +286,14 @@ class _Cards extends StatelessWidget {
         AppStrings.receivables,
         money.formatOrDash(data.receivablesUnits, Currency.lyd),
         AppStrings.ourDebts,
+        edge: colors.creditText,
       ),
       _tile(
         context,
         AppStrings.liabilities,
         money.formatOrDash(data.liabilitiesUnits, Currency.lyd),
         AppStrings.owedDebts,
+        edge: colors.debtText,
       ),
       _tile(
         context,
@@ -329,7 +342,9 @@ class _Cards extends StatelessWidget {
     bool emphasize = false,
     Color? background,
     Color? foreground,
+    Color? edge,
   }) {
+    final look = context.look;
     final theme = Theme.of(context);
     final titleStyle =
         (emphasize ? theme.textTheme.titleSmall : theme.textTheme.labelLarge)
@@ -340,6 +355,13 @@ class _Cards extends StatelessWidget {
           ? const Key('active-cash-card')
           : null,
       color: background,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        side: BorderSide(
+          color: edge ?? look.cardBorder,
+          width: edge == null ? 1 : 1.5,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
         child: Column(
@@ -393,14 +415,19 @@ class _Egyptian extends StatelessWidget {
     // The original EGP amount is the server field, with or without a rate.
     final source = money.formatOrDash(data.egyptianSourceUnits, Currency.egp);
     return Card(
+      color: context.look.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        side: BorderSide(color: context.look.cardBorder),
+      ),
       child: Padding(
         padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              AppStrings.egyptianTransfers,
-              style: Theme.of(context).textTheme.labelLarge,
+            const Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: PillTitle(AppStrings.egyptianTransfers),
             ),
             const SizedBox(height: AppSpacing.sm),
             LabeledMoney(label: AppStrings.egyptianSource, value: source),
@@ -623,6 +650,11 @@ class _CashRow extends StatelessWidget {
     return Card(
       key: Key('cash-entry-${entry.id}'),
       margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
+      color: context.look.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        side: BorderSide(color: color.withValues(alpha: 0.55), width: 1.2),
+      ),
       child: Padding(
         padding: const EdgeInsetsDirectional.all(AppSpacing.md),
         child: Column(
