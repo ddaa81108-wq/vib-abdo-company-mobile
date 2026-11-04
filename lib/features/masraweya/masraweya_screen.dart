@@ -33,7 +33,6 @@ class MasraweyaScreen extends ConsumerWidget {
         key: screenKey,
         padding: pagePadding(MediaQuery.sizeOf(context).width),
         children: [
-          const SectionHeading('صفحة المصراوية'),
           day.when(
             loading: () => const SkeletonBox(height: 120),
             error: (error, _) => presentFailure(
@@ -71,6 +70,10 @@ abstract final class _MText {
   static const commission = 'العمولة';
   static const noRows = 'لا توجد صفوف لهذا اليوم.';
   static const status = 'حالة اليوم';
+  static const page = 'صفحة المصراوية';
+  static const currentDayChip = 'يوم العمل الحالي';
+  static const workDate = 'تاريخ العمل';
+  static const result = 'الناتج';
 }
 
 class _DayView extends StatelessWidget {
@@ -94,9 +97,69 @@ class _DayView extends StatelessWidget {
         Theme.of(context).extension<AppColors>()?.success ??
         context.statusColors.creditText;
     final adjustment = data.historicalAdjustmentUnits;
+    final look = context.look;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // صفحة المصراوية: the server's business day (the app reads only the
+        // current day; no date picker in the API layer).
+        SectionCard(
+          title: _MText.page,
+          trailing: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              color: sectionGold(context).withValues(alpha: 0.16),
+              border: Border.all(
+                color: sectionGold(context).withValues(alpha: 0.5),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.xxs,
+              ),
+              child: Text(
+                _MText.currentDayChip,
+                style: cairo(11.5, 800, color: look.ink),
+              ),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(_MText.workDate, style: cairo(13, 700, color: look.ink)),
+              const SizedBox(height: AppSpacing.xs),
+              Container(
+                key: const Key('masraweya-date'),
+                padding: const EdgeInsetsDirectional.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: look.card,
+                  borderRadius: BorderRadius.circular(AppRadii.lg),
+                  border: Border.all(
+                    color: sectionGold(context).withValues(alpha: 0.6),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      size: 18,
+                      color: look.muted,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    LtrText(
+                      data.businessDate,
+                      style: cairo(15, 800, color: look.ink),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
         SectionCard(
           title: _MText.summary,
           note: _MText.summaryNote,
@@ -106,6 +169,7 @@ class _DayView extends StatelessWidget {
                   allowed: true,
                   online: online,
                   label: AppStrings.save,
+                  glyph: Icons.edit_outlined,
                   onPressed: () =>
                       showAppForm<void>(context, _MasraweyaForm(day: data)),
                 )
@@ -118,12 +182,14 @@ class _DayView extends StatelessWidget {
                 key: const Key('masraweya-previous'),
                 label: AppStrings.previousValue,
                 value: _egp(data.previousValueUnits),
+                boxed: true,
               ),
               FigureRow(
                 key: const Key('masraweya-purchases'),
                 label: _MText.purchasesToday,
                 hint: _MText.purchasesHint,
                 value: _egp(data.purchasesUnits),
+                boxed: true,
               ),
               FigureRow(
                 key: const Key('masraweya-work-total'),
@@ -161,8 +227,15 @@ class _DayView extends StatelessWidget {
           title: _MText.work,
           note: _MText.workNote,
           child: GridTable(
-            headers: const [_MText.seq, _MText.value, _MText.commission],
-            flex: const [2, 4, 4],
+            // الناتج: no per-row result from the server, so a dash (no
+            // device arithmetic).
+            headers: const [
+              _MText.seq,
+              _MText.value,
+              _MText.commission,
+              _MText.result,
+            ],
+            flex: const [2, 4, 4, 3],
             empty: _MText.noRows,
             rows: [
               for (var i = 0; i < data.entries.length; i++)
@@ -179,10 +252,12 @@ class _DayView extends StatelessWidget {
                       _egp(data.entries[i].commissionUnits),
                     ),
                   ),
+                  gridText(context, AppStrings.dash),
                 ],
             ],
             footer: [
               gridText(context, _MText.workToday, bold: true),
+              const SizedBox.shrink(),
               const SizedBox.shrink(),
               gridMoney(context, _egp(data.workTotalUnits), bold: true),
             ],

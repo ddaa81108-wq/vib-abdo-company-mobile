@@ -116,6 +116,15 @@ class SectionTheme extends StatelessWidget {
   }
 }
 
+/// The statement header strip: glossy black with light text (Ali's device
+/// shots), in both themes.
+const sectionStripGradient = LinearGradient(
+  begin: Alignment.topCenter,
+  end: Alignment.bottomCenter,
+  colors: [Color(0xFF2A2F3A), Color(0xFF0B0B0F)],
+);
+const sectionStripInk = Color(0xFFF5F5F4);
+
 /// A title in a gold-bordered pill, like the app's section headers.
 class PillTitle extends StatelessWidget {
   const PillTitle(this.text, {super.key});
@@ -129,15 +138,24 @@ class PillTitle extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        color: Color.alphaBlend(gold.withValues(alpha: 0.10), look.card),
-        border: Border.all(color: gold, width: 1.5),
+        gradient: sectionStripGradient,
+        border: Border.all(color: gold.withValues(alpha: 0.8), width: 1.2),
+        boxShadow: look.glass
+            ? null
+            : const [
+                BoxShadow(
+                  color: Color(0x330B0B0F),
+                  blurRadius: 6,
+                  offset: Offset(0, 2),
+                ),
+              ],
       ),
       child: Padding(
         padding: const EdgeInsetsDirectional.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.xs,
         ),
-        child: Text(text, style: cairo(14, 800, color: look.ink)),
+        child: Text(text, style: cairo(15, 800, color: sectionStripInk)),
       ),
     );
   }
@@ -219,6 +237,7 @@ class FigureRow extends StatelessWidget {
     this.highlight,
     this.last = false,
     this.money = true,
+    this.boxed = false,
     super.key,
   });
 
@@ -228,6 +247,9 @@ class FigureRow extends StatelessWidget {
   final Color? highlight;
   final bool last;
   final bool money;
+
+  /// The value sits in a field-like box (display only).
+  final bool boxed;
 
   @override
   Widget build(BuildContext context) {
@@ -265,13 +287,35 @@ class FigureRow extends StatelessWidget {
             ),
             const SizedBox(width: AppSpacing.sm),
             Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: AlignmentDirectional.centerEnd,
-                child: money
-                    ? MoneyText(value, style: figure)
-                    : Text(value, style: figure),
-              ),
+              child: boxed
+                  ? Container(
+                      constraints: const BoxConstraints(minWidth: 110),
+                      padding: const EdgeInsetsDirectional.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.xs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: look.card,
+                        borderRadius: BorderRadius.circular(AppRadii.lg),
+                        border: Border.all(
+                          color: sectionGold(context).withValues(alpha: 0.6),
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: money
+                            ? MoneyText(value, style: figure)
+                            : Text(value, style: figure),
+                      ),
+                    )
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: money
+                          ? MoneyText(value, style: figure)
+                          : Text(value, style: figure),
+                    ),
             ),
           ],
         ),
@@ -291,12 +335,11 @@ class FigureBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final look = context.look;
     final radius = BorderRadius.circular(AppRadii.card);
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
-        border: Border.all(color: look.cardBorder),
+        border: Border.all(color: sectionGold(context).withValues(alpha: 0.6)),
       ),
       child: ClipRRect(
         borderRadius: radius,
@@ -305,7 +348,7 @@ class FigureBox extends StatelessWidget {
           children: [
             if (title != null)
               Container(
-                color: look.strip,
+                decoration: const BoxDecoration(gradient: sectionStripGradient),
                 padding: const EdgeInsetsDirectional.symmetric(
                   horizontal: AppSpacing.md,
                   vertical: AppSpacing.sm,
@@ -315,13 +358,13 @@ class FigureBox extends StatelessWidget {
                     Expanded(
                       child: Text(
                         title!,
-                        style: cairo(13, 800, color: look.ink),
+                        style: cairo(13, 800, color: sectionStripInk),
                       ),
                     ),
                     if (trailing != null)
                       LtrText(
                         trailing!,
-                        style: cairo(12.5, 800, color: look.muted),
+                        style: cairo(12.5, 800, color: sectionStripInk),
                       ),
                   ],
                 ),
@@ -454,6 +497,7 @@ class GridTable extends StatelessWidget {
         DecoratedBox(
           decoration: BoxDecoration(
             color: color,
+            gradient: head ? sectionStripGradient : null,
             border: Border(bottom: line),
           ),
           child: IntrinsicHeight(
@@ -489,18 +533,14 @@ class GridTable extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            row(
-              [
-                for (final h in headers)
-                  Text(
-                    h,
-                    textAlign: TextAlign.center,
-                    style: cairo(11.5, 800, color: look.muted),
-                  ),
-              ],
-              color: look.strip,
-              head: true,
-            ),
+            row([
+              for (final h in headers)
+                Text(
+                  h,
+                  textAlign: TextAlign.center,
+                  style: cairo(11.5, 800, color: sectionStripInk),
+                ),
+            ], head: true),
             if (rows.isEmpty && empty != null)
               Padding(
                 padding: const EdgeInsetsDirectional.all(AppSpacing.md),
