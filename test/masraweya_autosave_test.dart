@@ -81,34 +81,40 @@ void main() {
     expect(autosave.sentRequestIds[0], isNot(autosave.sentRequestIds[1]));
   });
 
-  test('an error keeps the request id and a conflict does not auto-send', () async {
-    final autosave = MasraweyaAutosave(
-      send: (request, meta) async {
-        throw const ConflictException(
-          code: 'VERSION_CONFLICT',
-          message: 'conflict',
-        );
-      },
-    );
-    autosave.bindLoaded(day(2), draft());
-    autosave.noteLeave(draft(previous: 1), leftRowIndex: 0, online: true);
-    await autosave.pump();
-    expect(autosave.phase, MasraweyaSavePhase.conflict);
-    expect(autosave.blocksNavigation, isTrue);
-    final sent = autosave.sentRequestIds.length;
+  test(
+    'an error keeps the request id and a conflict does not auto-send',
+    () async {
+      final autosave = MasraweyaAutosave(
+        send: (request, meta) async {
+          throw const ConflictException(
+            code: 'VERSION_CONFLICT',
+            message: 'conflict',
+          );
+        },
+      );
+      autosave.bindLoaded(day(2), draft());
+      autosave.noteLeave(draft(previous: 1), leftRowIndex: 0, online: true);
+      await autosave.pump();
+      expect(autosave.phase, MasraweyaSavePhase.conflict);
+      expect(autosave.blocksNavigation, isTrue);
+      final sent = autosave.sentRequestIds.length;
 
-    autosave.noteLeave(draft(previous: 8), leftRowIndex: 0, online: true);
-    await autosave.pump();
-    await autosave.retry();
-    expect(autosave.sentRequestIds, hasLength(sent));
+      autosave.noteLeave(draft(previous: 8), leftRowIndex: 0, online: true);
+      await autosave.pump();
+      await autosave.retry();
+      expect(autosave.sentRequestIds, hasLength(sent));
 
-    autosave.adoptFreshVersion(3);
-    autosave.noteLeave(draft(previous: 8), leftRowIndex: 0, online: true);
-    // The sender still conflicts; the point is a new id and the new version.
-    await autosave.pump();
-    expect(autosave.sentVersions.last, 3);
-    expect(autosave.sentRequestIds.last, isNot(autosave.sentRequestIds.first));
-  });
+      autosave.adoptFreshVersion(3);
+      autosave.noteLeave(draft(previous: 8), leftRowIndex: 0, online: true);
+      // The sender still conflicts; the point is a new id and the new version.
+      await autosave.pump();
+      expect(autosave.sentVersions.last, 3);
+      expect(
+        autosave.sentRequestIds.last,
+        isNot(autosave.sentRequestIds.first),
+      );
+    },
+  );
 
   test('a failed send reuses the request id until the draft changes', () async {
     var fail = true;
@@ -138,9 +144,7 @@ void main() {
   });
 
   test('a partial row and an offline leave do not send', () async {
-    final autosave = MasraweyaAutosave(
-      send: (request, meta) async => day(3),
-    );
+    final autosave = MasraweyaAutosave(send: (request, meta) async => day(3));
     final initial = draft();
     autosave.bindLoaded(day(2), initial);
     final partial = MasraweyaDraft(
@@ -167,20 +171,43 @@ void main() {
     expect(autosave.issue, MasraweyaDraftIssue.offline);
   });
 
-  test('shiftIsoDate is a calendar step and editability is the server flag', () {
-    expect(shiftIsoDate('2026-10-01', -1), '2026-09-30');
-    expect(shiftIsoDate('2026-10-19', -8), '2026-10-11');
-    expect(
-      masraweyaFieldsEditable(canWrite: true, serverEditable: false),
-      isFalse,
-    );
-    expect(
-      masraweyaFieldsEditable(canWrite: true, serverEditable: null),
-      isTrue,
-    );
-    expect(
-      masraweyaFieldsEditable(canWrite: false, serverEditable: true),
-      isFalse,
-    );
+  test('row display total is an integer sum and stays off the save body', () {
+    expect(masraweyaRowDisplayUnits('3000', '50'), 3050);
+    expect(masraweyaRowDisplayUnits('0', '0'), 0);
+    expect(masraweyaRowDisplayUnits('1,000', '250'), 1250);
+    expect(masraweyaRowDisplayUnits('9007199254740993', '1'), 9007199254740994);
+    expect(masraweyaRowDisplayUnits('', '5'), isNull);
+    expect(masraweyaRowDisplayUnits('5', ''), isNull);
+    expect(masraweyaRowDisplayUnits('12.5', '1'), isNull);
+    expect(masraweyaRowDisplayUnits('-3', '5'), isNull);
+    expect(masraweyaRowDisplayUnits('abc', '1'), isNull);
+
+    final plan = MasraweyaSavePlan.of(draft(rows: const [(3000, 50), (10, 0)]));
+    expect(plan.canSend, isTrue);
+    final body = plan.request!.toJson();
+    expect(body.containsKey('workTotalUnits'), isFalse);
+    expect(body.containsKey('remainingUnits'), isFalse);
+    final entries = body['entries'] as List;
+    expect(entries[1].containsKey('totalUnits'), isFalse);
   });
+
+  test(
+    'shiftIsoDate is a calendar step and editability is the server flag',
+    () {
+      expect(shiftIsoDate('2026-10-01', -1), '2026-09-30');
+      expect(shiftIsoDate('2026-10-19', -8), '2026-10-11');
+      expect(
+        masraweyaFieldsEditable(canWrite: true, serverEditable: false),
+        isFalse,
+      );
+      expect(
+        masraweyaFieldsEditable(canWrite: true, serverEditable: null),
+        isTrue,
+      );
+      expect(
+        masraweyaFieldsEditable(canWrite: false, serverEditable: true),
+        isFalse,
+      );
+    },
+  );
 }

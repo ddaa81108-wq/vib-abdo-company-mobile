@@ -14,51 +14,57 @@ import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  test('saveMasraweyaDay stores the day and the provider reads it back', () async {
-    final layer = ApiLayer.create(
-      config: const ApiConfig(
-        baseUrl: 'https://fake.invalid',
-        useFakeApi: true,
-      ),
-      fakeLatency: Duration.zero,
-    );
-    addTearDown(layer.dispose);
-    await layer.session.login(username: 'admin.demo', password: 'x');
-    final container = ProviderContainer(
-      overrides: [apiLayerProvider.overrideWithValue(layer)],
-    );
-    addTearDown(container.dispose);
+  test(
+    'saveMasraweyaDay stores the day and the provider reads it back',
+    () async {
+      final layer = ApiLayer.create(
+        config: const ApiConfig(
+          baseUrl: 'https://fake.invalid',
+          useFakeApi: true,
+        ),
+        fakeLatency: Duration.zero,
+      );
+      addTearDown(layer.dispose);
+      await layer.session.login(username: 'admin.demo', password: 'x');
+      final container = ProviderContainer(
+        overrides: [apiLayerProvider.overrideWithValue(layer)],
+      );
+      addTearDown(container.dispose);
 
-    final before = await container.read(masraweyaProvider.future);
-    expect(before.previousValueUnits?.units, 10000);
-    expect(before.version, 2);
-    expect(before.editable, isTrue);
-    expect(before.today, '2026-10-19');
+      final before = await container.read(masraweyaProvider.future);
+      expect(before.previousValueUnits?.units, 10000);
+      expect(before.version, 2);
+      expect(before.editable, isTrue);
+      expect(before.today, '2026-10-19');
 
-    final saved = await container
-        .read(masraweyaActionsProvider)
-        .saveDay(
-          SaveMasraweyaDayRequest(
-            businessDate: before.businessDate,
-            previousValueUnits: 1,
-            purchasesUnits: before.purchasesUnits?.asInt,
-            entries: before.entries,
-          ),
-          MutationMeta(expectedVersion: before.version, requestId: 'provider-1'),
-        );
-    expect(saved.previousValueUnits?.units, 1);
-    expect(saved.version, 3);
-    expect(saved.purchasesUnits, before.purchasesUnits);
-    expect(saved.workTotalUnits, before.workTotalUnits);
-    expect(saved.remainingUnits, before.remainingUnits);
+      final saved = await container
+          .read(masraweyaActionsProvider)
+          .saveDay(
+            SaveMasraweyaDayRequest(
+              businessDate: before.businessDate,
+              previousValueUnits: 1,
+              purchasesUnits: before.purchasesUnits?.asInt,
+              entries: before.entries,
+            ),
+            MutationMeta(
+              expectedVersion: before.version,
+              requestId: 'provider-1',
+            ),
+          );
+      expect(saved.previousValueUnits?.units, 1);
+      expect(saved.version, 3);
+      expect(saved.purchasesUnits, before.purchasesUnits);
+      expect(saved.workTotalUnits, before.workTotalUnits);
+      expect(saved.remainingUnits, before.remainingUnits);
 
-    container.invalidate(masraweyaProvider);
-    final after = await container.read(masraweyaProvider.future);
-    expect(after.previousValueUnits?.units, 1);
-    expect(after.version, 3);
-    expect(after.workTotalUnits, before.workTotalUnits);
-    expect(after.remainingUnits, before.remainingUnits);
-  });
+      container.invalidate(masraweyaProvider);
+      final after = await container.read(masraweyaProvider.future);
+      expect(after.previousValueUnits?.units, 1);
+      expect(after.version, 3);
+      expect(after.workTotalUnits, before.workTotalUnits);
+      expect(after.remainingUnits, before.remainingUnits);
+    },
+  );
 
   testWidgets('fields follow masraweya write, not a manual save button', (
     tester,
@@ -112,59 +118,63 @@ void main() {
     expect(find.byKey(MasraweyaScreen.screenKey), findsNothing);
   });
 
-  testWidgets('leaving a complete row autosaves raw inputs and keeps server totals', (
-    tester,
-  ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(440, 1200));
-    final fake = layer.client as FakeApiClient;
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/masraweya');
+  testWidgets(
+    'leaving a complete row autosaves raw inputs and keeps server totals',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(440, 1200));
+      final fake = layer.client as FakeApiClient;
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/masraweya');
 
-    expect(fieldDigits(tester, 'masraweya-previous-field'), '10000');
-    expect(fieldDigits(tester, 'masraweya-purchases-field'), '2000');
-    expect(amount(tester, 'masraweya-work-total'), '3,050 ج.م');
-    expect(amount(tester, 'masraweya-remaining'), '8,950 ج.م');
+      expect(fieldDigits(tester, 'masraweya-previous-field'), '10000');
+      expect(fieldDigits(tester, 'masraweya-purchases-field'), '2000');
+      expect(amount(tester, 'masraweya-work-total'), '3,050 ج.م');
+      expect(amount(tester, 'masraweya-remaining'), '8,950 ج.م');
 
-    await enterField(tester, const Key('masraweya-previous-field'), '');
-    await leaveFocus(tester);
-    expect(fake.mutationRequestIds, isEmpty);
-    expect(find.text('القيمة السابقة عدد صحيح.'), findsOneWidget);
+      await enterField(tester, const Key('masraweya-previous-field'), '');
+      await leaveFocus(tester);
+      expect(fake.mutationRequestIds, isEmpty);
+      expect(find.text('القيمة السابقة عدد صحيح.'), findsOneWidget);
 
-    await enterField(tester, const Key('masraweya-previous-field'), '1');
-    await enterField(tester, const Key('masraweya-purchases-field'), '9');
-    await enterField(
-      tester,
-      const Key('masraweya-entry-commission-field-0'),
-      '60',
-    );
-    await leaveFocus(tester);
+      await enterField(tester, const Key('masraweya-previous-field'), '1');
+      await enterField(tester, const Key('masraweya-purchases-field'), '9');
+      await enterField(
+        tester,
+        const Key('masraweya-entry-commission-field-0'),
+        '60',
+      );
+      await leaveFocus(tester);
 
-    expect(fake.mutationPaths, isNotEmpty);
-    expect(fake.mutationPaths.every((path) => path == '/api/masraweya/day'), isTrue);
-    final last = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
-    expect(last['expectedVersion'], isA<int>());
-    expect(last['businessDate'], '2026-10-19');
-    expect(last['previousValueUnits'], 1);
-    expect(last['purchasesUnits'], 9);
-    expect(last.containsKey('workTotalUnits'), isFalse);
-    expect(last.containsKey('remainingUnits'), isFalse);
-    final entries = last['entries'] as List;
-    expect(entries.single['valueUnits'], 3000);
-    expect(entries.single['commissionUnits'], 60);
-    expect(fieldDigits(tester, 'masraweya-previous-field'), '1');
-    expect(amount(tester, 'masraweya-work-total'), '3,050 ج.م');
-    expect(amount(tester, 'masraweya-remaining'), '8,950 ج.م');
-    expect(find.text('تم الحفظ'), findsOneWidget);
+      expect(fake.mutationPaths, isNotEmpty);
+      expect(
+        fake.mutationPaths.every((path) => path == '/api/masraweya/day'),
+        isTrue,
+      );
+      final last = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
+      expect(last['expectedVersion'], isA<int>());
+      expect(last['businessDate'], '2026-10-19');
+      expect(last['previousValueUnits'], 1);
+      expect(last['purchasesUnits'], 9);
+      expect(last.containsKey('workTotalUnits'), isFalse);
+      expect(last.containsKey('remainingUnits'), isFalse);
+      final entries = last['entries'] as List;
+      expect(entries.single['valueUnits'], 3000);
+      expect(entries.single['commissionUnits'], 60);
+      expect(fieldDigits(tester, 'masraweya-previous-field'), '1');
+      expect(amount(tester, 'masraweya-work-total'), '3,050 ج.م');
+      expect(amount(tester, 'masraweya-remaining'), '8,950 ج.م');
+      expect(find.text('تم الحفظ'), findsOneWidget);
 
-    final versions = [
-      for (final raw in fake.mutationBodies)
-        (jsonDecode(raw) as Map<String, dynamic>)['expectedVersion'] as int,
-    ];
-    expect(versions.first, 2);
-    for (var i = 1; i < versions.length; i++) {
-      expect(versions[i], versions[i - 1] + 1);
-    }
-  });
+      final versions = [
+        for (final raw in fake.mutationBodies)
+          (jsonDecode(raw) as Map<String, dynamic>)['expectedVersion'] as int,
+      ];
+      expect(versions.first, 2);
+      for (var i = 1; i < versions.length; i++) {
+        expect(versions[i], versions[i - 1] + 1);
+      }
+    },
+  );
 
   testWidgets('an empty new row is omitted and a partial row does not save', (
     tester,
@@ -176,14 +186,20 @@ void main() {
 
     await tester.tap(find.byKey(const Key('masraweya-add-row')));
     await settle(tester);
-    expect(find.byKey(const Key('masraweya-entry-value-field-1')), findsOneWidget);
+    expect(
+      find.byKey(const Key('masraweya-entry-value-field-1')),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('masraweya-work-table')), findsOneWidget);
     expect(fake.mutationRequestIds, isEmpty);
 
     await enterField(tester, const Key('masraweya-entry-value-field-1'), '500');
     await leaveFocus(tester);
     expect(fake.mutationRequestIds, isEmpty);
-    expect(find.text('أكمل القيمة والعمولة في الصف قبل الحفظ.'), findsOneWidget);
+    expect(
+      find.text('أكمل القيمة والعمولة في الصف قبل الحفظ.'),
+      findsOneWidget,
+    );
 
     await enterField(
       tester,
@@ -198,26 +214,27 @@ void main() {
     expect(body.containsKey('workTotalUnits'), isFalse);
   });
 
-  testWidgets('a failed autosave keeps the request id until the draft changes', (
-    tester,
-  ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(440, 1200));
-    final fake = layer.client as FakeApiClient;
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/masraweya');
-    await enterField(tester, const Key('masraweya-previous-field'), '1');
-    fake.failMutationsRemaining = 1;
-    await leaveFocus(tester);
+  testWidgets(
+    'a failed autosave keeps the request id until the draft changes',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(440, 1200));
+      final fake = layer.client as FakeApiClient;
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/masraweya');
+      await enterField(tester, const Key('masraweya-previous-field'), '1');
+      fake.failMutationsRemaining = 1;
+      await leaveFocus(tester);
 
-    expect(find.text('تعذر تنفيذ الطلب.'), findsWidgets);
-    final first = fake.mutationRequestIds.single;
-    expect(fieldDigits(tester, 'masraweya-previous-field'), '1');
+      expect(find.text('تعذر تنفيذ الطلب.'), findsWidgets);
+      final first = fake.mutationRequestIds.single;
+      expect(fieldDigits(tester, 'masraweya-previous-field'), '1');
 
-    await tester.tap(find.byKey(const Key('masraweya-retry-save')));
-    await finishSend(tester);
-    expect(fake.mutationRequestIds, [first, first]);
-    expect(fieldDigits(tester, 'masraweya-previous-field'), '1');
-  });
+      await tester.tap(find.byKey(const Key('masraweya-retry-save')));
+      await finishSend(tester);
+      expect(fake.mutationRequestIds, [first, first]);
+      expect(fieldDigits(tester, 'masraweya-previous-field'), '1');
+    },
+  );
 
   testWidgets('a version conflict keeps the draft and does not send again', (
     tester,
@@ -271,39 +288,150 @@ void main() {
     expect(retry['previousValueUnits'], 1);
   });
 
-  testWidgets('older than the server window is read-only and does not propagate', (
+  testWidgets('a row total updates while typing and the server summary stays', (
     tester,
   ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(440, 956));
+    final layer = await pumpFakeApp(tester, size: const Size(440, 1200));
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/masraweya');
-    expect(find.text('يوم العمل الحالي'), findsOneWidget);
-    expect(dateText(tester), '2026-10-19');
 
-    await tester.tap(find.byKey(const Key('masraweya-date-prev')));
+    expect(rowAmount(tester, 0), '3,050 ج.م');
+    expect(amount(tester, 'masraweya-work-total'), '3,050 ج.م');
+    expect(amount(tester, 'masraweya-remaining'), '8,950 ج.م');
+
+    await tester.ensureVisible(find.byKey(const Key('masraweya-add-row')));
+    await tester.tap(find.byKey(const Key('masraweya-add-row')));
     await settle(tester);
-    expect(dateText(tester), '2026-10-18');
-    expect(find.byKey(const Key('masraweya-previous-field')), findsNothing);
-    expect(find.byKey(const Key('masraweya-purchases-field')), findsOneWidget);
-    expect(find.text('يوم العمل الحالي'), findsNothing);
+    expect(rowAmount(tester, 1), '—');
 
-    for (var i = 0; i < 7; i++) {
-      await tester.tap(find.byKey(const Key('masraweya-date-prev')));
-      await settle(tester);
-    }
-    expect(dateText(tester), '2026-10-11');
-    expect(find.byKey(const Key('masraweya-readonly')), findsOneWidget);
-    expect(find.byKey(const Key('masraweya-purchases-field')), findsNothing);
-    expect(find.byKey(const Key('masraweya-add-row')), findsNothing);
+    await enterField(tester, const Key('masraweya-entry-value-field-1'), '10');
+    expect(rowAmount(tester, 1), '—');
     expect(fake.mutationRequestIds, isEmpty);
 
-    await tester.tap(find.byKey(const Key('masraweya-date-today')));
-    await settle(tester);
-    expect(dateText(tester), '2026-10-19');
-    expect(fieldDigits(tester, 'masraweya-previous-field'), '10000');
+    await enterField(
+      tester,
+      const Key('masraweya-entry-commission-field-1'),
+      '0',
+    );
+    expect(rowAmount(tester, 1), '10 ج.م');
     expect(amount(tester, 'masraweya-work-total'), '3,050 ج.م');
+
+    await enterField(
+      tester,
+      const Key('masraweya-entry-commission-field-1'),
+      '5',
+    );
+    expect(rowAmount(tester, 1), '15 ج.م');
+
+    await enterField(tester, const Key('masraweya-entry-value-field-1'), '0');
+    await enterField(
+      tester,
+      const Key('masraweya-entry-commission-field-1'),
+      '0',
+    );
+    expect(rowAmount(tester, 1), '0 ج.م');
+
+    await enterField(
+      tester,
+      const Key('masraweya-entry-value-field-1'),
+      '1,000',
+    );
+    await enterField(
+      tester,
+      const Key('masraweya-entry-commission-field-1'),
+      '250',
+    );
+    expect(rowAmount(tester, 1), '1,250 ج.م');
+
+    await enterField(
+      tester,
+      const Key('masraweya-entry-value-field-1'),
+      '9007199254740993',
+    );
+    await enterField(
+      tester,
+      const Key('masraweya-entry-commission-field-1'),
+      '1',
+    );
+    expect(rowAmount(tester, 1), '9,007,199,254,740,994 ج.م');
+
+    await enterField(
+      tester,
+      const Key('masraweya-entry-value-field-1'),
+      '12.5',
+    );
+    expect(rowAmount(tester, 1), '—');
+    await enterField(tester, const Key('masraweya-entry-value-field-1'), '-3');
+    expect(rowAmount(tester, 1), '—');
+    await enterField(
+      tester,
+      const Key('masraweya-entry-commission-field-1'),
+      '',
+    );
+    expect(rowAmount(tester, 1), '—');
+
+    expect(amount(tester, 'masraweya-work-total'), '3,050 ج.م');
+    expect(amount(tester, 'masraweya-remaining'), '8,950 ج.م');
+    for (final raw in fake.mutationBodies) {
+      final body = jsonDecode(raw) as Map<String, dynamic>;
+      expect(body.containsKey('workTotalUnits'), isFalse);
+      expect(body.containsKey('remainingUnits'), isFalse);
+      for (final entry in body['entries'] as List) {
+        expect((entry as Map).containsKey('totalUnits'), isFalse);
+      }
+    }
   });
+
+  testWidgets(
+    'older than the server window is read-only and does not propagate',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(440, 956));
+      final fake = layer.client as FakeApiClient;
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/masraweya');
+      expect(find.text('يوم العمل الحالي'), findsOneWidget);
+      expect(dateText(tester), '2026-10-19');
+
+      await tester.tap(find.byKey(const Key('masraweya-date-prev')));
+      await settle(tester);
+      expect(dateText(tester), '2026-10-18');
+      expect(find.byKey(const Key('masraweya-previous-field')), findsNothing);
+      expect(
+        find.byKey(const Key('masraweya-purchases-field')),
+        findsOneWidget,
+      );
+      expect(find.text('يوم العمل الحالي'), findsNothing);
+
+      for (var i = 0; i < 7; i++) {
+        await tester.tap(find.byKey(const Key('masraweya-date-prev')));
+        await settle(tester);
+      }
+      expect(dateText(tester), '2026-10-11');
+      expect(find.byKey(const Key('masraweya-readonly')), findsOneWidget);
+      expect(find.byKey(const Key('masraweya-purchases-field')), findsNothing);
+      expect(find.byKey(const Key('masraweya-add-row')), findsNothing);
+      expect(fake.mutationRequestIds, isEmpty);
+
+      await tester.tap(find.byKey(const Key('masraweya-date-today')));
+      await settle(tester);
+      expect(dateText(tester), '2026-10-19');
+      expect(fieldDigits(tester, 'masraweya-previous-field'), '10000');
+      expect(amount(tester, 'masraweya-work-total'), '3,050 ج.م');
+    },
+  );
+}
+
+String rowAmount(WidgetTester tester, int index) {
+  final text = tester.widget<Text>(
+    find
+        .descendant(
+          of: find.byKey(Key('masraweya-entry-total-$index')),
+          matching: find.byType(Text),
+        )
+        .last,
+  );
+  return text.data!;
 }
 
 String amount(WidgetTester tester, String key) {

@@ -46,7 +46,9 @@ void main() {
     tester.view.resetViewInsets();
     await tester.pump();
 
-    final before = tester.getSize(find.byKey(const Key('masraweya-work-table')));
+    final before = tester.getSize(
+      find.byKey(const Key('masraweya-work-table')),
+    );
     for (var i = 0; i < 3; i++) {
       final add = find.byKey(const Key('masraweya-add-row'));
       await tester.ensureVisible(add);
@@ -78,6 +80,58 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('masraweya-work-table')));
     await tester.pump();
     await saveShot(tester, 'masraweya-gold-dark-added-rows');
+    expect(tester.takeException(), isNull);
+  }, tags: const ['screenshots']);
+
+  testWidgets('row totals on a large phone, fake data', (tester) async {
+    const viewport = Size(440, 956);
+    await pumpFakeApp(tester, size: viewport);
+    await tester.runAsync(loadScreenshotFonts);
+    await tester.pump();
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await _go(tester, '/masraweya');
+
+    Future<void> add() async {
+      final button = find.byKey(const Key('masraweya-add-row'));
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await _settle(tester);
+    }
+
+    Future<void> type(String key, String value) async {
+      final field = find.descendant(
+        of: find.byKey(Key(key)),
+        matching: find.byType(EditableText),
+      );
+      await tester.ensureVisible(field);
+      await tester.tap(field);
+      await tester.enterText(field, value);
+      await tester.pump();
+    }
+
+    await add();
+    await add();
+    await type('masraweya-entry-value-field-1', '1000');
+    await type('masraweya-entry-commission-field-1', '25');
+    await type('masraweya-entry-value-field-2', '0');
+    await type('masraweya-entry-commission-field-2', '0');
+    await add();
+    await type('masraweya-entry-value-field-3', '400');
+    expect(find.text('1,025 ج.م'), findsOneWidget);
+    expect(find.text('0 ج.م'), findsWidgets);
+    expect(find.text('3,050 ج.م'), findsWidgets);
+    await tester.ensureVisible(find.byKey(const Key('masraweya-work-table')));
+    await tester.pump();
+    await saveShot(tester, 'masraweya-row-totals-light');
+
+    final focus = find.byKey(const Key('masraweya-entry-value-field-1'));
+    await tester.ensureVisible(focus);
+    await tester.tap(focus);
+    await tester.pump();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 340);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle(const Duration(milliseconds: 50));
+    await saveShot(tester, 'masraweya-row-totals-focused');
     expect(tester.takeException(), isNull);
   }, tags: const ['screenshots']);
 }

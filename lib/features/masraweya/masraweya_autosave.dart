@@ -23,17 +23,13 @@ class MasraweyaRowDraft {
   final String valueText;
   final String commissionText;
 
-  bool get isEmpty =>
-      valueText.trim().isEmpty && commissionText.trim().isEmpty;
+  bool get isEmpty => valueText.trim().isEmpty && commissionText.trim().isEmpty;
 
   /// PUT items require both integers and `minimum: 0`.
   bool get isComplete {
     final value = parseUnits(valueText);
     final commission = parseUnits(commissionText);
-    return value != null &&
-        value >= 0 &&
-        commission != null &&
-        commission >= 0;
+    return value != null && value >= 0 && commission != null && commission >= 0;
   }
 
   bool get isPartial => !isEmpty && !isComplete;
@@ -128,6 +124,20 @@ class MasraweyaSavePlan {
       fingerprint: masraweyaDraftFingerprint(request),
     );
   }
+}
+
+/// Display-only row total Ali confirmed: القيمة + العمولة.
+///
+/// Integer units from [parseUnits]. Empty, partial, negative, or invalid
+/// text is null so the cell stays a dash. The sum is not sent and is not
+/// `workTotalUnits` or `remainingUnits`.
+int? masraweyaRowDisplayUnits(String valueText, String commissionText) {
+  final value = parseUnits(valueText);
+  final commission = parseUnits(commissionText);
+  if (value == null || value < 0 || commission == null || commission < 0) {
+    return null;
+  }
+  return value + commission;
 }
 
 /// Stable identity of a PUT body. Does not include `requestId` or totals.

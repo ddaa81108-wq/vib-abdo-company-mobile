@@ -99,7 +99,7 @@ abstract final class _MText {
   static const fromServer = 'من رد الخادم';
   static const remaining = 'الرصيد المتبقي';
   static const work = 'شغل اليوم';
-  static const rowTotalGap = 'لا يرسل الخادم إجماليًا لكل صف.';
+  static const rowFormula = 'إجمالي الصف = القيمة + العمولة';
   static const seq = 'ت';
   static const value = 'القيمة';
   static const commission = 'العمولة';
@@ -247,9 +247,11 @@ class _DayViewState extends ConsumerState<_DayView> {
       _purchases = TextEditingController(text: _digits(day.purchasesUnits));
       _rows = [
         for (final entry in day.entries)
-          _EntryFields(
-            value: entry.valueUnits,
-            commission: entry.commissionUnits,
+          _listenedRow(
+            _EntryFields(
+              value: entry.valueUnits,
+              commission: entry.commissionUnits,
+            ),
           ),
       ];
       _foci.addAll([
@@ -377,10 +379,21 @@ class _DayViewState extends ConsumerState<_DayView> {
     });
   }
 
+  void _onRowText() {
+    if (_binding || !mounted) return;
+    setState(() {});
+  }
+
+  _EntryFields _listenedRow(_EntryFields row) {
+    row.value.addListener(_onRowText);
+    row.commission.addListener(_onRowText);
+    return row;
+  }
+
   void _addRow() {
     if (!_canEdit) return;
     setState(() {
-      final row = _EntryFields();
+      final row = _listenedRow(_EntryFields());
       final value = FocusNode()..addListener(_scheduleLeaveCheck);
       final commission = FocusNode()..addListener(_scheduleLeaveCheck);
       _rows = [..._rows, row];
@@ -942,7 +955,7 @@ class _DayViewState extends ConsumerState<_DayView> {
                   _blackPill(_MText.work),
                   const SizedBox(height: 4),
                   Text(
-                    _MText.rowTotalGap,
+                    _MText.rowFormula,
                     style: cairo(11.5, 500, color: look.muted),
                   ),
                 ],
@@ -1007,7 +1020,7 @@ class _DayViewState extends ConsumerState<_DayView> {
                     ),
                   KeyedSubtree(
                     key: Key('masraweya-entry-total-$i'),
-                    child: _moneyCell(context, AppStrings.dash),
+                    child: _moneyCell(context, _rowTotalLabel(i, editing)),
                   ),
                 ],
             ],
@@ -1015,6 +1028,23 @@ class _DayViewState extends ConsumerState<_DayView> {
         ],
       ),
     );
+  }
+
+  /// Screen sum of the two cells. Null stays a dash. Server summary is untouched.
+  String _rowTotalLabel(int index, bool editing) {
+    final int? units;
+    if (editing) {
+      final row = _rows[index];
+      units = masraweyaRowDisplayUnits(row.value.text, row.commission.text);
+    } else {
+      final entry = _shown.entries[index];
+      units = masraweyaRowDisplayUnits(
+        _digits(entry.valueUnits),
+        _digits(entry.commissionUnits),
+      );
+    }
+    if (units == null) return AppStrings.dash;
+    return money.format(units, Currency.egp);
   }
 
   String _sequenceLabel(MasraweyaDayDto day, int index, bool editing) {

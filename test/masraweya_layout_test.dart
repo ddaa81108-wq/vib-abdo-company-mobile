@@ -46,15 +46,19 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const Key('masraweya-entry-total-0')),
-          matching: find.text('—'),
+          matching: find.text('3,050 ج.م'),
         ),
         findsOneWidget,
       );
+      expect(find.text('إجمالي الصف = القيمة + العمولة'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       await tapAddRow(tester);
       await tapAddRow(tester);
-      expect(find.byKey(const Key('masraweya-entry-value-field-2')), findsOneWidget);
+      expect(
+        find.byKey(const Key('masraweya-entry-value-field-2')),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     });
   }
@@ -65,10 +69,15 @@ void main() {
     await pumpFakeApp(tester, size: const Size(440, 1200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/masraweya');
-    final before = tester.getRect(find.byKey(const Key('masraweya-work-table')));
+    final before = tester.getRect(
+      find.byKey(const Key('masraweya-work-table')),
+    );
     await tester.tap(find.byKey(const Key('masraweya-add-row')));
     await settle(tester);
-    expect(find.byKey(const Key('masraweya-entry-value-field-1')), findsOneWidget);
+    expect(
+      find.byKey(const Key('masraweya-entry-value-field-1')),
+      findsOneWidget,
+    );
     expect(find.byType(Dialog), findsNothing);
     final after = tester.getRect(find.byKey(const Key('masraweya-work-table')));
     expect(after.height, greaterThan(before.height));
@@ -99,7 +108,9 @@ void main() {
     expect(find.byKey(const Key('masraweya-work-table')), findsOneWidget);
   });
 
-  testWidgets('keyboard inset keeps the focused field on screen', (tester) async {
+  testWidgets('keyboard inset keeps the focused field on screen', (
+    tester,
+  ) async {
     await pumpFakeApp(tester, size: const Size(440, 956));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/masraweya');
@@ -182,10 +193,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(shared, Uint8List.fromList(const [7, 7, 7]));
-    expect(
-      tester.renderObject(capture).runtimeType,
-      isNot(RenderView),
-    );
+    expect(tester.renderObject(capture).runtimeType, isNot(RenderView));
   });
 }
 
