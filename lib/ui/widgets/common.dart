@@ -806,6 +806,10 @@ class UnitsField extends StatelessWidget {
     this.showHint = true,
     this.autofocus = false,
     this.focusNode,
+    this.textInputAction,
+    this.onEditingComplete,
+    this.onSubmitted,
+    this.scrollPadding = const EdgeInsets.all(20),
   });
 
   /// The ledger's add row opens with the cursor here (Ali, 2026-11-03).
@@ -821,6 +825,13 @@ class UnitsField extends StatelessWidget {
   /// Overrides the theme density. Null keeps the theme value.
   final bool? dense;
 
+  final TextInputAction? textInputAction;
+  final VoidCallback? onEditingComplete;
+  final ValueChanged<String>? onSubmitted;
+
+  /// Zero keeps the page from jumping when the keyboard opens (المصراوية).
+  final EdgeInsets scrollPadding;
+
   @override
   Widget build(BuildContext context) {
     return TextField(
@@ -830,6 +841,10 @@ class UnitsField extends StatelessWidget {
       keyboardType: TextInputType.number,
       textDirection: TextDirection.ltr,
       textAlign: TextAlign.start,
+      textInputAction: textInputAction,
+      onEditingComplete: onEditingComplete,
+      onSubmitted: onSubmitted,
+      scrollPadding: scrollPadding,
       decoration: InputDecoration(
         labelText: label,
         helperText: showHint ? AppStrings.unitsHint : null,

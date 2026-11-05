@@ -75,13 +75,15 @@ void main() {
     await go(tester, '/masraweya');
 
     expect(find.byKey(MasraweyaScreen.screenKey), findsOneWidget);
+    // Inline editor (Ali, 2026-11-05): fields and save are on the page.
     expect(find.byKey(const Key('edit-masraweya')), findsOneWidget);
-    expect(find.byKey(const Key('save-masraweya')), findsNothing);
-
-    await tester.tap(find.byKey(const Key('edit-masraweya')));
-    await settle(tester);
-    expect(find.byKey(const Key('masraweya-form')), findsOneWidget);
     expect(find.byKey(const Key('save-masraweya')), findsOneWidget);
+    expect(find.byKey(const Key('masraweya-form')), findsOneWidget);
+    expect(find.byKey(const Key('masraweya-previous-field')), findsOneWidget);
+    expect(
+      find.byKey(const Key('masraweya-entry-value-field-0')),
+      findsOneWidget,
+    );
 
     layer.permissions.applyFromServer(
       const ['masraweya.read'],
@@ -131,12 +133,11 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/masraweya');
 
-    expect(amount(tester, 'masraweya-previous'), '10,000 ج.م');
-    expect(amount(tester, 'masraweya-purchases'), '2,000 ج.م');
+    expect(fieldDigits(tester, 'masraweya-previous-field'), '10000');
+    expect(fieldDigits(tester, 'masraweya-purchases-field'), '2000');
     expect(amount(tester, 'masraweya-work-total'), '3,050 ج.م');
     expect(amount(tester, 'masraweya-remaining'), '8,950 ج.م');
 
-    await openForm(tester);
     await enterField(tester, const Key('masraweya-previous-field'), '');
     await tester.ensureVisible(find.byKey(const Key('save-masraweya')));
     await tester.tap(find.byKey(const Key('save-masraweya')));
@@ -174,10 +175,10 @@ void main() {
     expect(entries.single['valueUnits'], 3000);
     expect(entries.single['commissionUnits'], 60);
     expect(fake.mutationPaths.single, '/api/masraweya/day');
-    expect(find.byKey(const Key('masraweya-form')), findsNothing);
-    expect(amount(tester, 'masraweya-previous'), '1 ج.م');
-    expect(amount(tester, 'masraweya-purchases'), '9 ج.م');
-    expect(amount(tester, 'masraweya-entry-commission-0'), '60 ج.م');
+    expect(find.byKey(const Key('masraweya-form')), findsOneWidget);
+    expect(fieldDigits(tester, 'masraweya-previous-field'), '1');
+    expect(fieldDigits(tester, 'masraweya-purchases-field'), '9');
+    expect(fieldDigits(tester, 'masraweya-entry-commission-field-0'), '60');
     expect(amount(tester, 'masraweya-work-total'), '3,050 ج.م');
     expect(amount(tester, 'masraweya-remaining'), '8,950 ج.م');
   });
@@ -196,6 +197,8 @@ void main() {
       find.byKey(const Key('masraweya-entry-value-field-1')),
       findsOneWidget,
     );
+    // Still the same table — no separate sheet.
+    expect(find.byKey(const Key('masraweya-work-table')), findsOneWidget);
 
     // Empty row blocks the save.
     await tester.ensureVisible(find.byKey(const Key('save-masraweya')));
@@ -289,20 +292,21 @@ void main() {
           MutationMeta(expectedVersion: 2, requestId: 'other-writer'),
         ),
       );
-      expect(amount(tester, 'masraweya-previous'), '10,000 ج.م');
+      expect(fieldDigits(tester, 'masraweya-previous-field'), '10000');
 
       await enterField(tester, const Key('masraweya-previous-field'), '1');
       await confirmSave(tester);
       await finishSend(tester);
 
       expect(find.text(AppStrings.versionConflict), findsWidgets);
-      expect(amount(tester, 'masraweya-previous'), '7 ج.م');
+      // Inline editor keeps the typed value; only the expectedVersion refreshes.
+      expect(fieldDigits(tester, 'masraweya-previous-field'), '1');
       expect(find.byKey(const Key('masraweya-form')), findsOneWidget);
 
       await confirmSave(tester);
       await finishSend(tester);
 
-      expect(amount(tester, 'masraweya-previous'), '1 ج.م');
+      expect(fieldDigits(tester, 'masraweya-previous-field'), '1');
       expect(amount(tester, 'masraweya-remaining'), '8,950 ج.م');
       expect(fake.mutationRequestIds, hasLength(3));
       expect(fake.mutationRequestIds[1], isNot(fake.mutationRequestIds[2]));
@@ -322,8 +326,16 @@ String amount(WidgetTester tester, String key) {
 }
 
 Future<void> openForm(WidgetTester tester) async {
-  await tester.tap(find.byKey(const Key('edit-masraweya')));
+  // Inline editor: fields are already on the page.
   await settle(tester);
+}
+
+String fieldDigits(WidgetTester tester, String key) {
+  final field = find.descendant(
+    of: find.byKey(Key(key)),
+    matching: find.byType(EditableText),
+  );
+  return tester.widget<EditableText>(field).controller.text;
 }
 
 Future<void> enterField(WidgetTester tester, Key key, String value) async {
