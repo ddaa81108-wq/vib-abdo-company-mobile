@@ -41,6 +41,7 @@ void invalidateUserScope(WidgetRef ref) {
   ref.invalidate(unreadCountProvider);
   ref.invalidate(unreadNotificationsCountProvider);
   ref.invalidate(foregroundNotificationsProvider);
+  ref.invalidate(masraweyaDateProvider);
   ref.invalidate(masraweyaProvider);
 }
 

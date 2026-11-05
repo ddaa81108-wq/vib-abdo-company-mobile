@@ -135,6 +135,89 @@ void main() {
     },
   );
 
+  test('GET date is the documented query and edits do not propagate', () async {
+    final api = await login('admin.demo');
+    final today = await api.masraweya.getDay();
+    expect(today.businessDate, '2026-10-19');
+    expect(today.today, '2026-10-19');
+    expect(today.earliestEditableDate, '2026-10-12');
+    expect(today.editable, isTrue);
+    expect(today.openingEditable, isTrue);
+    expect(today.workTotalUnits?.units, 3050);
+    expect(today.remainingUnits?.units, 8950);
+
+    final inside = await api.masraweya.getDay(date: '2026-10-18');
+    expect(inside.businessDate, '2026-10-18');
+    expect(inside.editable, isTrue);
+    expect(inside.openingEditable, isFalse);
+    expect(inside.workTotalUnits?.units, 0);
+    expect(inside.remainingUnits?.units, 0);
+
+    final outside = await api.masraweya.getDay(date: '2026-10-11');
+    expect(outside.editable, isFalse);
+    await expectLater(
+      api.masraweya.saveDay(
+        const SaveMasraweyaDayRequest(
+          businessDate: '2026-10-11',
+          purchasesUnits: 1,
+        ),
+        MutationMeta(expectedVersion: 0, requestId: 'locked-day'),
+      ),
+      throwsA(isA<ForbiddenException>()),
+    );
+
+    final saved = await api.masraweya.saveDay(
+      const SaveMasraweyaDayRequest(
+        businessDate: '2026-10-18',
+        previousValueUnits: 4,
+        purchasesUnits: 5,
+      ),
+      MutationMeta(expectedVersion: 0, requestId: 'historical'),
+    );
+    expect(saved.purchasesUnits?.units, 5);
+    expect(saved.workTotalUnits?.units, 0);
+    expect(saved.remainingUnits?.units, 0);
+    expect(saved.version, 1);
+
+    final current = await api.masraweya.getDay();
+    expect(current.previousValueUnits?.units, 10000);
+    expect(current.purchasesUnits?.units, 2000);
+    expect(current.workTotalUnits?.units, 3050);
+    expect(current.remainingUnits?.units, 8950);
+    expect(current.version, 2);
+  });
+
+  test('finalUnits fills remaining and entries have no row total on the wire', () {
+    final parsed = MasraweyaDayDto.fromData({
+      'businessDate': '2026-10-22',
+      'today': '2026-10-22',
+      'earliestEditableDate': '2026-10-15',
+      'editable': true,
+      'openingEditable': false,
+      'workTotalUnits': 105,
+      'finalUnits': 895,
+      'entries': [
+        {
+          'id': 'row-1',
+          'sequence': 4,
+          'valueUnits': 100,
+          'commissionUnits': 5,
+          'totalUnits': 999,
+        },
+      ],
+    });
+    expect(parsed.remainingUnits?.units, 895);
+    expect(parsed.workTotalUnits?.units, 105);
+    expect(parsed.editable, isTrue);
+    expect(parsed.openingEditable, isFalse);
+    final entry = parsed.entries.single;
+    expect(entry.id, 'row-1');
+    expect(entry.sequence, 4);
+    expect(entry.valueUnits?.units, 100);
+    expect(entry.commissionUnits?.units, 5);
+    expect(entry.toJson().keys, ['valueUnits', 'commissionUnits']);
+  });
+
   test('DEF-013 a profile without masraweya write gets 403', () async {
     final api = await login('employee.demo');
     expect(api.permissions.canWrite(SectionKey.masraweya), isFalse);

@@ -1,136 +1,208 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/masraweya/masraweya_screen.dart';
+import 'package:vib_abdo_company_mobile/features/masraweya/masraweya_share.dart';
 
 import 'support/pump_app.dart';
 
-// Ali, 2026-11-05: المصراوية inline table, fixed page, row navigation.
 void main() {
   for (final (size, scale, label) in const [
-    (Size(430, 2200), 1.0, 'phone'),
-    (Size(1280, 1600), 1.0, 'tablet'),
-    (Size(430, 2600), 1.6, 'phone-large-text'),
+    (Size(440, 956), 1.0, 'large-phone'),
+    (Size(440, 956), 1.3, 'large-phone-text'),
+    (Size(1280, 900), 1.0, 'tablet'),
   ]) {
-    testWidgets('masraweya layout $label x$scale no overflow', (tester) async {
-      tester.platformDispatcher.textScaleFactorTestValue = scale;
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      await pumpFakeApp(tester, size: size);
+    testWidgets('masraweya $label has no overflow', (tester) async {
+      await pumpFakeApp(tester, size: size, textScale: scale);
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/masraweya');
       expect(find.byKey(MasraweyaScreen.screenKey), findsOneWidget);
       expect(find.byKey(const Key('masraweya-page')), findsOneWidget);
       expect(find.byKey(const Key('masraweya-summary')), findsOneWidget);
       expect(find.byKey(const Key('masraweya-work')), findsOneWidget);
-      // Image-3 order on phone: page → ملخص → شغل.
       if (size.width < 900) {
-        double top(String k) => tester.getTopLeft(find.byKey(Key(k))).dy;
+        double top(String key) => tester.getTopLeft(find.byKey(Key(key))).dy;
         expect(top('masraweya-page'), lessThan(top('masraweya-summary')));
         expect(top('masraweya-summary'), lessThan(top('masraweya-work')));
       }
-      expect(find.byKey(const Key('masraweya-work-table')), findsOneWidget);
-      expect(find.text('التسلسل'), findsOneWidget);
-      expect(find.text('القيمة'), findsWidgets);
-      expect(find.text('العمولة'), findsWidgets);
-      expect(find.text('الناتج'), findsOneWidget);
+      expect(find.text('ت'), findsWidgets);
+      expect(find.text('الإجمالي'), findsWidgets);
+      expect(find.text('التسلسل'), findsNothing);
+      expect(find.text('الناتج'), findsNothing);
       expect(find.text('ملخص اليوم'), findsOneWidget);
       expect(find.text('شغل اليوم'), findsOneWidget);
-      expect(find.byKey(const Key('masraweya-foot')), findsOneWidget);
-      // الناتج stays a dash (no device formula).
+      expect(find.text('مشتريات اليوم'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byKey(const Key('masraweya-work-table')),
+          matching: find.text('مشتريات اليوم'),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('masraweya-entry-total-0')),
           matching: find.text('—'),
         ),
-        findsWidgets,
+        findsOneWidget,
       );
+      expect(tester.takeException(), isNull);
+
+      await tapAddRow(tester);
+      await tapAddRow(tester);
+      expect(find.byKey(const Key('masraweya-entry-value-field-2')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
 
-  testWidgets('+ صف grows the same table downward', (tester) async {
-    await pumpFakeApp(tester, size: const Size(430, 2200));
+  testWidgets('add row grows the same table and focus moves across it', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(440, 1200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/masraweya');
-    expect(
-      find.byKey(const Key('masraweya-entry-value-field-0')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('masraweya-entry-value-field-1')),
-      findsNothing,
-    );
-    final before = tester.getRect(
-      find.byKey(const Key('masraweya-work-table')),
-    );
+    final before = tester.getRect(find.byKey(const Key('masraweya-work-table')));
     await tester.tap(find.byKey(const Key('masraweya-add-row')));
     await settle(tester);
-    expect(
-      find.byKey(const Key('masraweya-entry-value-field-1')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('masraweya-work-table')), findsOneWidget);
+    expect(find.byKey(const Key('masraweya-entry-value-field-1')), findsOneWidget);
+    expect(find.byType(Dialog), findsNothing);
     final after = tester.getRect(find.byKey(const Key('masraweya-work-table')));
-    expect(after.top, before.top);
     expect(after.height, greaterThan(before.height));
-  });
 
-  testWidgets('typing in a row keeps the table position', (tester) async {
-    await pumpFakeApp(tester, size: const Size(430, 2200));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/masraweya');
-    final table = find.byKey(const Key('masraweya-work-table'));
-    final before = tester.getRect(table);
-    final field = find.byKey(const Key('masraweya-entry-value-field-0'));
-    await tester.tap(field);
-    await tester.pump();
-    // Simulate the on-screen keyboard without moving the page (viewInsets
-    // are zeroed on this screen).
-    tester.view.viewInsets = FakeViewPadding(bottom: 300);
-    addTearDown(() => tester.view.resetViewInsets());
-    await tester.enterText(field, '3200');
-    await tester.pump();
-    expect(tester.getRect(table), before);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('focus moves value → commission → next row', (tester) async {
-    await pumpFakeApp(tester, size: const Size(430, 2200));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/masraweya');
-    await tester.tap(find.byKey(const Key('masraweya-add-row')));
-    await settle(tester);
     FocusNode nodeOf(Key key) {
-      final editable = tester.widget<EditableText>(
-        find.descendant(
-          of: find.byKey(key),
-          matching: find.byType(EditableText),
-        ),
-      );
-      return editable.focusNode;
+      return tester
+          .widget<EditableText>(
+            find.descendant(
+              of: find.byKey(key),
+              matching: find.byType(EditableText),
+            ),
+          )
+          .focusNode;
     }
 
-    final v0 = const Key('masraweya-entry-value-field-0');
-    final c0 = const Key('masraweya-entry-commission-field-0');
-    final v1 = const Key('masraweya-entry-value-field-1');
-    await tester.tap(find.byKey(v0));
+    final value = const Key('masraweya-entry-value-field-0');
+    final commission = const Key('masraweya-entry-commission-field-0');
+    final nextValue = const Key('masraweya-entry-value-field-1');
+    await tester.tap(find.byKey(value));
     await tester.pump();
-    expect(nodeOf(v0).hasFocus, isTrue);
-    nodeOf(c0).requestFocus();
+    expect(nodeOf(value).hasFocus, isTrue);
+    nodeOf(commission).requestFocus();
     await tester.pump();
-    expect(nodeOf(c0).hasFocus, isTrue);
-    nodeOf(v1).requestFocus();
+    expect(nodeOf(commission).hasFocus, isTrue);
+    nodeOf(nextValue).requestFocus();
     await tester.pump();
-    expect(nodeOf(v1).hasFocus, isTrue);
+    expect(nodeOf(nextValue).hasFocus, isTrue);
+    expect(find.byKey(const Key('masraweya-work-table')), findsOneWidget);
   });
 
-  testWidgets('masraweya stays clear on phone', (tester) async {
-    await pumpFakeApp(tester, size: const Size(430, 2400));
+  testWidgets('keyboard inset keeps the focused field on screen', (tester) async {
+    await pumpFakeApp(tester, size: const Size(440, 956));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/masraweya');
+    final field = find.byKey(const Key('masraweya-entry-commission-field-0'));
+    await tester.ensureVisible(field);
+    await tester.tap(field);
+    await tester.pump();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 340);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle(const Duration(milliseconds: 50));
+    final rect = tester.getRect(field);
+    const keyboardTop = 956 - 340;
+    expect(rect.bottom, lessThanOrEqualTo(keyboardTop + 1));
+    expect(rect.top, greaterThanOrEqualTo(0));
+    expect(find.byKey(const Key('masraweya-work-table')), findsOneWidget);
+    expect(find.byType(Dialog), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('summary capture excludes the work table and the share control', (
+    tester,
+  ) async {
+    Uint8List? shared;
+    await pumpFakeApp(
+      tester,
+      size: const Size(440, 956),
+      overrides: [
+        masraweyaBoundaryCaptureProvider.overrideWithValue(
+          (boundary) async => Uint8List.fromList(const [7, 7, 7]),
+        ),
+        masraweyaSummarySharerProvider.overrideWith(
+          (ref) => (png, name) async {
+            shared = png;
+            expect(name, 'masraweya-summary.png');
+          },
+        ),
+      ],
+    );
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/masraweya');
+
+    final capture = find.byKey(const Key('masraweya-summary-capture'));
+    expect(capture, findsOneWidget);
+    expect(
+      find.descendant(of: capture, matching: find.text('مشتريات اليوم')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: capture, matching: find.text('إجمالي شغل اليوم')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: capture, matching: find.text('القيمة السابقة')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: capture, matching: find.text('الرصيد المتبقي')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: capture,
+        matching: find.byKey(const Key('masraweya-work-table')),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: capture,
+        matching: find.byKey(const Key('masraweya-share-summary')),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: capture, matching: find.text('شغل اليوم')),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const Key('masraweya-share-summary')));
+    await tester.pump();
+    await tester.pump();
+    expect(shared, Uint8List.fromList(const [7, 7, 7]));
+    expect(
+      tester.renderObject(capture).runtimeType,
+      isNot(RenderView),
+    );
+  });
+}
+
+Future<void> tapAddRow(WidgetTester tester) async {
+  final add = find.byKey(const Key('masraweya-add-row'));
+  final list = find.byKey(MasraweyaScreen.screenKey);
+  await tester.ensureVisible(add);
+  await tester.pump();
+  final view = tester.view.physicalSize.height / tester.view.devicePixelRatio;
+  for (var i = 0; i < 5; i++) {
+    final rect = tester.getRect(add);
+    if (rect.center.dy < view - 96 && rect.center.dy > 72) break;
+    await tester.drag(list, Offset(0, rect.center.dy > view - 96 ? -180 : 180));
+    await tester.pump();
+  }
+  await tester.tap(add);
+  await settle(tester);
 }
 
 Future<void> go(WidgetTester tester, String path) async {
