@@ -38,27 +38,47 @@ class MasraweyaScreen extends ConsumerWidget {
     final money = ref.watch(apiLayerProvider).money;
     final canWrite = permissions.canWrite(SectionKey.masraweya);
     final online = ref.watch(onlineProvider);
-    return SectionTheme(
-      child: ListView(
-        key: screenKey,
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
-        padding: pagePadding(MediaQuery.sizeOf(context).width),
-        children: [
-          day.when(
-            skipLoadingOnReload: true,
-            loading: () => const SkeletonBox(height: 120),
-            error: (error, _) => presentFailure(
-              ref.read(errorHandlerProvider).toFailure(error),
-              onRetry: () => ref.invalidate(masraweyaProvider),
-            ),
-            data: (data) => _DayView(
-              data: data,
-              money: money,
-              canWrite: canWrite,
-              online: online,
-            ),
+    final frame = _frameGold(context);
+    final theme = Theme.of(context);
+    final radius = BorderRadius.circular(AppRadii.md);
+    final goldSide = BorderSide(color: frame, width: 1.4);
+    final goldBox = OutlineInputBorder(
+      borderRadius: radius,
+      borderSide: goldSide,
+    );
+    return Theme(
+      data: theme.copyWith(
+        inputDecorationTheme: theme.inputDecorationTheme.copyWith(
+          border: goldBox,
+          enabledBorder: goldBox,
+          focusedBorder: OutlineInputBorder(
+            borderRadius: radius,
+            borderSide: BorderSide(color: frame, width: 2),
           ),
-        ],
+        ),
+      ),
+      child: SectionTheme(
+        child: ListView(
+          key: screenKey,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+          padding: pagePadding(MediaQuery.sizeOf(context).width),
+          children: [
+            day.when(
+              skipLoadingOnReload: true,
+              loading: () => const SkeletonBox(height: 120),
+              error: (error, _) => presentFailure(
+                ref.read(errorHandlerProvider).toFailure(error),
+                onRetry: () => ref.invalidate(masraweyaProvider),
+              ),
+              data: (data) => _DayView(
+                data: data,
+                money: money,
+                canWrite: canWrite,
+                online: online,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -106,6 +126,10 @@ abstract final class _MText {
 }
 
 const _goldFill = sectionButtonGold;
+
+/// Light-mode [sectionGold] is orange. Frames and fields use the button gold.
+Color _frameGold(BuildContext context) =>
+    context.look.glass ? sectionGold(context) : sectionButtonGold;
 const _goldGradient = LinearGradient(
   begin: Alignment.topCenter,
   end: Alignment.bottomCenter,
@@ -216,7 +240,9 @@ class _DayViewState extends ConsumerState<_DayView> {
     if (editing) {
       final editPrevious = day.openingEditable != false;
       if (editPrevious) {
-        _previous = TextEditingController(text: _digits(day.previousValueUnits));
+        _previous = TextEditingController(
+          text: _digits(day.previousValueUnits),
+        );
       }
       _purchases = TextEditingController(text: _digits(day.purchasesUnits));
       _rows = [
@@ -227,7 +253,8 @@ class _DayViewState extends ConsumerState<_DayView> {
           ),
       ];
       _foci.addAll([
-        for (var i = 0; i < _rows.length * 2; i++) FocusNode()..addListener(_scheduleLeaveCheck),
+        for (var i = 0; i < _rows.length * 2; i++)
+          FocusNode()..addListener(_scheduleLeaveCheck),
       ]);
     }
     _boundDate = day.businessDate;
@@ -300,7 +327,8 @@ class _DayViewState extends ConsumerState<_DayView> {
     final previous = _previousFocus.hasFocus;
     final purchases = _purchasesFocus.hasFocus;
     final leftRow = _seenRow != null && _seenRow != row ? _seenRow : null;
-    final summaryLeave = (_seenPrevious && !previous) || (_seenPurchases && !purchases);
+    final summaryLeave =
+        (_seenPrevious && !previous) || (_seenPurchases && !purchases);
     _seenRow = row;
     _seenPrevious = previous;
     _seenPurchases = purchases;
@@ -422,9 +450,8 @@ class _DayViewState extends ConsumerState<_DayView> {
     if (next == null) return;
     if (delta > 0 && today != null && next.compareTo(today) > 0) return;
     setState(() => _navNote = null);
-    ref.read(masraweyaDateProvider.notifier).state = today != null && next == today
-        ? null
-        : next;
+    ref.read(masraweyaDateProvider.notifier).state =
+        today != null && next == today ? null : next;
   }
 
   Future<void> _goToday() async {
@@ -497,15 +524,15 @@ class _DayViewState extends ConsumerState<_DayView> {
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(_MText.shareFailed)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text(_MText.shareFailed)));
     }
   }
 
   String? get _statusText {
     if (_autosave.phase == MasraweyaSavePhase.saving) return _MText.saving;
-    if (_autosave.announceSaved && _autosave.phase == MasraweyaSavePhase.saved) {
+    if (_autosave.announceSaved &&
+        _autosave.phase == MasraweyaSavePhase.saved) {
       return _MText.saved;
     }
     if (_autosave.phase == MasraweyaSavePhase.conflict) return _MText.conflict;
@@ -569,7 +596,8 @@ class _DayViewState extends ConsumerState<_DayView> {
     final look = context.look;
     final day = _shown;
     final earliest = day.earliestEditableDate;
-    final window = day.editable != null && earliest != null && earliest.isNotEmpty
+    final window =
+        day.editable != null && earliest != null && earliest.isNotEmpty
         ? '${_MText.serverWindow}: $earliest'
         : null;
     return _goldCard(
@@ -611,7 +639,7 @@ class _DayViewState extends ConsumerState<_DayView> {
                   decoration: BoxDecoration(
                     color: look.card,
                     borderRadius: BorderRadius.circular(AppRadii.lg),
-                    border: Border.all(color: look.cardBorder),
+                    border: Border.all(color: _frameGold(context), width: 1.4),
                   ),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
@@ -727,7 +755,7 @@ class _DayViewState extends ConsumerState<_DayView> {
                   key: const Key('masraweya-share-summary'),
                   tooltip: _MText.share,
                   onPressed: _share,
-                  icon: Icon(Icons.ios_share, color: sectionGold(context)),
+                  icon: Icon(Icons.ios_share, color: _frameGold(context)),
                 ),
               ],
             ),
@@ -776,7 +804,7 @@ class _DayViewState extends ConsumerState<_DayView> {
                     hint: _MText.fromServer,
                     value: _egp(day.workTotalUnits),
                     boxed: false,
-                    background: sectionGold(context).withValues(alpha: 0.16),
+                    background: _frameGold(context).withValues(alpha: 0.16),
                   ),
                   Offstage(
                     child: _summaryPlainRow(
@@ -810,7 +838,10 @@ class _DayViewState extends ConsumerState<_DayView> {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: AlignmentDirectional.centerStart,
-              child: Text(_MText.box, style: cairo(14, 800, color: Colors.white)),
+              child: Text(
+                _MText.box,
+                style: cairo(14, 800, color: Colors.white),
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -834,7 +865,8 @@ class _DayViewState extends ConsumerState<_DayView> {
         remaining != null && remaining.isValid && (remaining.units ?? 0) < 0;
     final color = negative
         ? colors.cashNegative
-        : (Theme.of(context).extension<AppColors>()?.success ?? colors.creditText);
+        : (Theme.of(context).extension<AppColors>()?.success ??
+              colors.creditText);
     final mint = negative
         ? colors.cashNegative.withValues(alpha: 0.10)
         : const Color(0xFFDCF5E7);
@@ -951,7 +983,10 @@ class _DayViewState extends ConsumerState<_DayView> {
                   else
                     KeyedSubtree(
                       key: Key('masraweya-entry-$i'),
-                      child: _moneyCell(context, _egp(day.entries[i].valueUnits)),
+                      child: _moneyCell(
+                        context,
+                        _egp(day.entries[i].valueUnits),
+                      ),
                     ),
                   if (editing)
                     KeyedSubtree(
@@ -987,7 +1022,9 @@ class _DayViewState extends ConsumerState<_DayView> {
       final sequence = day.entries[index].sequence;
       if (sequence != null) return '$sequence';
     }
-    if (editing && index < data.entries.length && data.entries[index].sequence != null) {
+    if (editing &&
+        index < data.entries.length &&
+        data.entries[index].sequence != null) {
       return '${data.entries[index].sequence}';
     }
     return '${index + 1}';
@@ -995,7 +1032,7 @@ class _DayViewState extends ConsumerState<_DayView> {
 
   Widget _goldCard({required Widget child, Key? key, EdgeInsetsGeometry? pad}) {
     final look = context.look;
-    final gold = sectionGold(context);
+    final gold = _frameGold(context);
     return Padding(
       key: key,
       padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
@@ -1019,7 +1056,7 @@ class _DayViewState extends ConsumerState<_DayView> {
       decoration: BoxDecoration(
         color: const Color(0xFF0B0B0F),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: sectionGold(context).withValues(alpha: 0.7)),
+        border: Border.all(color: _frameGold(context).withValues(alpha: 0.7)),
       ),
       child: Padding(
         padding: const EdgeInsetsDirectional.symmetric(
@@ -1039,10 +1076,10 @@ class _DayViewState extends ConsumerState<_DayView> {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: look.glass
-            ? sectionGold(context).withValues(alpha: 0.18)
+            ? _frameGold(context).withValues(alpha: 0.18)
             : const Color(0xFFFFF3C4),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: sectionGold(context).withValues(alpha: 0.55)),
+        border: Border.all(color: _frameGold(context).withValues(alpha: 0.55)),
       ),
       child: Padding(
         padding: const EdgeInsetsDirectional.symmetric(
@@ -1106,7 +1143,7 @@ class _DayViewState extends ConsumerState<_DayView> {
     required FocusNode focusNode,
   }) {
     final look = context.look;
-    final gold = sectionGold(context);
+    final gold = _frameGold(context);
     final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
     return Container(
       key: key,
@@ -1168,7 +1205,7 @@ class _DayViewState extends ConsumerState<_DayView> {
     Color? background,
   }) {
     final look = context.look;
-    final gold = sectionGold(context);
+    final gold = _frameGold(context);
     final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
     return Container(
       key: key,
@@ -1259,7 +1296,7 @@ class _DayViewState extends ConsumerState<_DayView> {
       decoration: BoxDecoration(
         color: look.card,
         borderRadius: BorderRadius.circular(AppRadii.md),
-        border: Border.all(color: look.cardBorder),
+        border: Border.all(color: _frameGold(context), width: 1.4),
       ),
       padding: const EdgeInsetsDirectional.symmetric(horizontal: 2),
       child: UnitsField(
@@ -1298,7 +1335,7 @@ class _WorkTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final look = context.look;
-    final gold = sectionGold(context);
+    final gold = _frameGold(context);
     final line = BorderSide(color: gold.withValues(alpha: 0.55));
     Widget cell(int i, Widget child) => Expanded(
       flex: _flex[i],

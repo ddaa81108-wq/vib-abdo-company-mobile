@@ -22,18 +22,18 @@ void main() {
     await tester.pump();
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await _go(tester, '/masraweya');
-    await saveShot(tester, 'masraweya-light-top');
+    await saveShot(tester, 'masraweya-gold-light-top');
     await tester.ensureVisible(find.byKey(const Key('masraweya-summary')));
     await tester.pump();
-    await saveShot(tester, 'masraweya-light-summary');
+    await saveShot(tester, 'masraweya-gold-light-summary');
     await saveBoundaryShot(
       tester,
       find.byKey(const Key('masraweya-summary-capture')),
-      'masraweya-summary-only-light',
+      'masraweya-gold-summary-only-light',
     );
     await tester.ensureVisible(find.byKey(const Key('masraweya-work')));
     await tester.pump();
-    await saveShot(tester, 'masraweya-light-work');
+    await saveShot(tester, 'masraweya-gold-light-work');
 
     final field = find.byKey(const Key('masraweya-entry-value-field-0'));
     await tester.ensureVisible(field);
@@ -42,7 +42,7 @@ void main() {
     tester.view.viewInsets = const FakeViewPadding(bottom: 340);
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpAndSettle(const Duration(milliseconds: 50));
-    await saveShot(tester, 'masraweya-light-keyboard');
+    await saveShot(tester, 'masraweya-gold-light-keyboard');
     tester.view.resetViewInsets();
     await tester.pump();
 
@@ -60,7 +60,7 @@ void main() {
     );
     await tester.ensureVisible(find.byKey(const Key('masraweya-work-table')));
     await tester.pump();
-    await saveShot(tester, 'masraweya-light-work-added-rows');
+    await saveShot(tester, 'masraweya-gold-light-added-rows');
 
     final container = ProviderScope.containerOf(
       tester.element(find.byType(HomeShell)),
@@ -69,15 +69,15 @@ void main() {
     await _settle(tester);
     await tester.ensureVisible(find.byKey(const Key('masraweya-summary')));
     await tester.pump();
-    await saveShot(tester, 'masraweya-dark-summary');
+    await saveShot(tester, 'masraweya-gold-dark-summary');
     await saveBoundaryShot(
       tester,
       find.byKey(const Key('masraweya-summary-capture')),
-      'masraweya-summary-only-dark',
+      'masraweya-gold-summary-only-dark',
     );
     await tester.ensureVisible(find.byKey(const Key('masraweya-work-table')));
     await tester.pump();
-    await saveShot(tester, 'masraweya-dark-work-added-rows');
+    await saveShot(tester, 'masraweya-gold-dark-added-rows');
     expect(tester.takeException(), isNull);
   }, tags: const ['screenshots']);
 }

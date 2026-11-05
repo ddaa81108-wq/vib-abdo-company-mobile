@@ -34,6 +34,8 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # Test double for SharePlus.custom. Same version share_plus 12.0.2 already pulls in.
+  share_plus_platform_interface: 6.1.0
   # Widget tests script the real Dio stack. The app does not call Dio itself.
   dio: ^5.4.0
   # Same package the Flutter SDK already resolves. Used by the profile

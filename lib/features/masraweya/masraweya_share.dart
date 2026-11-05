@@ -7,15 +7,24 @@ import 'package:share_plus/share_plus.dart';
 
 /// Shares the summary-card PNG only. Callers must pass bytes captured from
 /// the totals card, not the work table or the app shell.
-typedef MasraweyaSummarySharer =
-    Future<void> Function(Uint8List png, String fileName);
+typedef MasraweyaSummarySharer = Future<void> Function(
+  Uint8List png,
+  String fileName,
+);
 
-Future<void> shareMasraweyaSummary(Uint8List png, String fileName) {
-  return SharePlus.instance.share(
+/// Hands the summary PNG to the platform share sheet.
+///
+/// [sharePlus] exists so tests can pass [SharePlus.custom]. The default is
+/// the process share plugin. A unit test of this function does not open an
+/// Android share sheet.
+Future<void> shareMasraweyaSummary(
+  Uint8List png,
+  String fileName, {
+  SharePlus? sharePlus,
+}) {
+  return (sharePlus ?? SharePlus.instance).share(
     ShareParams(
-      files: [
-        XFile.fromData(png, name: fileName, mimeType: 'image/png'),
-      ],
+      files: [XFile.fromData(png, name: fileName, mimeType: 'image/png')],
       fileNameOverrides: [fileName],
     ),
   );
@@ -25,8 +34,9 @@ final masraweyaSummarySharerProvider = Provider<MasraweyaSummarySharer>(
   (ref) => shareMasraweyaSummary,
 );
 
-typedef MasraweyaBoundaryCapture =
-    Future<Uint8List> Function(RenderRepaintBoundary boundary);
+typedef MasraweyaBoundaryCapture = Future<Uint8List> Function(
+  RenderRepaintBoundary boundary,
+);
 
 /// Null uses [captureBoundaryPng]. Tests inject a capture so they do not
 /// depend on the raster thread.
