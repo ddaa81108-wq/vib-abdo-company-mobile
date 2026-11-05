@@ -117,12 +117,17 @@ void main() {
     await type('masraweya-entry-commission-field-2', '0');
     await add();
     await type('masraweya-entry-value-field-3', '400');
-    expect(find.text('1,025 ج.م'), findsOneWidget);
-    expect(find.text('0 ج.م'), findsWidgets);
-    expect(find.text('3,050 ج.م'), findsWidgets);
+    expect(find.text('1,025'), findsWidgets);
+    expect(find.text('ج.م'), findsWidgets);
+    expect(find.text('3,050'), findsWidgets);
     await tester.ensureVisible(find.byKey(const Key('masraweya-work-table')));
     await tester.pump();
-    await saveShot(tester, 'masraweya-row-totals-light');
+    await saveShot(tester, 'masraweya-egp-left-light');
+    await saveBoundaryShot(
+      tester,
+      find.byKey(const Key('masraweya-summary-capture')),
+      'masraweya-egp-left-summary',
+    );
 
     final focus = find.byKey(const Key('masraweya-entry-value-field-1'));
     await tester.ensureVisible(focus);
@@ -132,6 +137,21 @@ void main() {
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpAndSettle(const Duration(milliseconds: 50));
     await saveShot(tester, 'masraweya-row-totals-focused');
+    expect(tester.takeException(), isNull);
+  }, tags: const ['screenshots']);
+
+  testWidgets('treasury egyptian amount has ج.م on the left', (tester) async {
+    await pumpFakeApp(tester, size: const Size(440, 956));
+    await tester.runAsync(loadScreenshotFonts);
+    await tester.pump();
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await _go(tester, '/treasury');
+    await tester.ensureVisible(find.text('95,000'));
+    await tester.pump();
+    final symbol = tester.getRect(find.text('ج.م').first);
+    final number = tester.getRect(find.text('95,000').first);
+    expect(symbol.center.dx, lessThan(number.center.dx));
+    await saveShot(tester, 'treasury-egp-left-light');
     expect(tester.takeException(), isNull);
   }, tags: const ['screenshots']);
 }

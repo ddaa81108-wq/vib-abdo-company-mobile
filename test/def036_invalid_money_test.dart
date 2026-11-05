@@ -232,7 +232,8 @@ void main() {
       findsOneWidget,
     );
     expect(_text('51,000 د.ل'), findsWidgets);
-    expect(_text('95,000 ج.م'), findsWidgets);
+    expect(_text('95,000'), findsWidgets);
+    expect(_text('ج.م'), findsWidgets);
     expect(_text('10,000 د.ل'), findsWidgets);
     expect(_text(MoneyValue.invalidLabel), findsWidgets);
     expect(_icon(), findsWidgets);

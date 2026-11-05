@@ -46,7 +46,14 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const Key('masraweya-entry-total-0')),
-          matching: find.text('3,050 ج.م'),
+          matching: find.text('3,050'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('masraweya-entry-total-0')),
+          matching: find.text('ج.م'),
         ),
         findsOneWidget,
       );

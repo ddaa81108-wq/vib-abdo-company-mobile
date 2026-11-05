@@ -297,6 +297,19 @@ void main() {
     await go(tester, '/masraweya');
 
     expect(rowAmount(tester, 0), '3,050 ج.م');
+    final rowSymbol = tester.getRect(
+      find.descendant(
+        of: find.byKey(const Key('masraweya-entry-total-0')),
+        matching: find.text('ج.م'),
+      ),
+    );
+    final rowDigits = tester.getRect(
+      find.descendant(
+        of: find.byKey(const Key('masraweya-entry-total-0')),
+        matching: find.text('3,050'),
+      ),
+    );
+    expect(rowSymbol.center.dx, lessThan(rowDigits.center.dx));
     expect(amount(tester, 'masraweya-work-total'), '3,050 ج.م');
     expect(amount(tester, 'masraweya-remaining'), '8,950 ج.م');
 
@@ -423,22 +436,27 @@ void main() {
 }
 
 String rowAmount(WidgetTester tester, int index) {
-  final text = tester.widget<Text>(
-    find
-        .descendant(
-          of: find.byKey(Key('masraweya-entry-total-$index')),
-          matching: find.byType(Text),
-        )
-        .last,
-  );
-  return text.data!;
+  return _shownMoney(tester, find.byKey(Key('masraweya-entry-total-$index')));
 }
 
 String amount(WidgetTester tester, String key) {
-  final text = tester.widget<Text>(
-    find.descendant(of: find.byKey(Key(key)), matching: find.byType(Text)).last,
-  );
-  return text.data!;
+  return _shownMoney(tester, find.byKey(Key(key)));
+}
+
+/// Reads a formatted amount. EGP is two texts, symbol then digits.
+String _shownMoney(WidgetTester tester, Finder scope) {
+  final texts = tester
+      .widgetList<Text>(find.descendant(of: scope, matching: find.byType(Text)))
+      .map((text) => text.data)
+      .whereType<String>()
+      .toList();
+  if (texts.contains('ج.م')) {
+    final number = texts.lastWhere(
+      (text) => RegExp(r'^-?[\d,]+(?:\.\d+)?$').hasMatch(text),
+    );
+    return '$number ج.م';
+  }
+  return texts.last;
 }
 
 String dateText(WidgetTester tester) {

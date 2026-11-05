@@ -103,15 +103,26 @@ void main() {
         final sourceText = _amountText(
           tester,
           AppStrings.egyptianSource,
-          source,
+          '95,000',
         );
         final convertedText = _amountText(
           tester,
           AppStrings.converted,
           converted,
         );
-        expect(sourceText.data, source);
-        expect(sourceText.data, '95,000 ج.م');
+        expect(sourceText.data, '95,000');
+        expect(
+          tester
+              .getRect(
+                find.descendant(
+                  of: find.byKey(const Key('egp-source')),
+                  matching: find.text('ج.م'),
+                ),
+              )
+              .center
+              .dx,
+          lessThan(tester.getRect(find.byWidget(sourceText)).center.dx),
+        );
         expect(convertedText.data, converted);
         expect(convertedText.data, '11,111 د.ل');
         expect(
@@ -166,9 +177,20 @@ Future<void> _runMissingRate(
     expect(source, '95,000 ج.م');
     expect(converted, '10,000 د.ل');
 
-    final sourceText = _amountText(tester, AppStrings.egyptianSource, source);
-    expect(sourceText.data, source);
-    expect(sourceText.data, '95,000 ج.م');
+    final sourceText = _amountText(tester, AppStrings.egyptianSource, '95,000');
+    expect(sourceText.data, '95,000');
+    expect(
+      tester
+          .getRect(
+            find.descendant(
+              of: find.byKey(const Key('egp-source')),
+              matching: find.text('ج.م'),
+            ),
+          )
+          .center
+          .dx,
+      lessThan(tester.getRect(find.byWidget(sourceText)).center.dx),
+    );
     expect(
       _labeled(TreasuryScreen.screenKey, AppStrings.rate, AppStrings.dash),
       findsOneWidget,
@@ -185,7 +207,7 @@ Future<void> _runMissingRate(
     );
     expect(_insideCard(card, '0'), findsNothing);
     expect(_insideCard(card, '0 د.ل'), findsNothing);
-    expect(_insideCard(card, '0 ج.م'), findsNothing);
+    expect(_insideCard(card, '0'), findsNothing);
     expect(_insideCard(card, '10,000'), findsNothing);
     expect(
       find.descendant(of: card, matching: find.textContaining('د.ل')),

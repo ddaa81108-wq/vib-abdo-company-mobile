@@ -73,20 +73,49 @@ class MoneyText extends StatelessWidget {
         ),
       );
     }
+    final resolved = (style ?? extras.amount).copyWith(
+      fontFamily: kAppFont,
+      // One face for digits and the currency letters; digits are equal width.
+    );
+    final egp = _egpNumber(text);
+    if (egp != null) {
+      // Physical left, even when the page is RTL. Two paragraphs so the
+      // Arabic symbol cannot swap places with the digits.
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        textDirection: TextDirection.ltr,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            Currency.egp.symbol,
+            textDirection: TextDirection.rtl,
+            style: resolved,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            egp,
+            textDirection: TextDirection.ltr,
+            textAlign: align,
+            style: resolved,
+          ),
+        ],
+      );
+    }
     return Directionality(
       textDirection: TextDirection.ltr,
-      child: Text(
-        text,
-        textAlign: align,
-        softWrap: true,
-        style: (style ?? extras.amount).copyWith(
-          fontFamily: kAppFont,
-          // One face for digits and the currency letters (د.ل); its digits
-          // are already equal width.
-        ),
-      ),
+      child: Text(text, textAlign: align, softWrap: true, style: resolved),
     );
   }
+}
+
+/// The digit run of a formatted EGP amount (`1,250 ج.م`). Null for other text.
+String? _egpNumber(String text) {
+  const symbol = 'ج.م';
+  const gap = ' $symbol';
+  if (!text.endsWith(gap)) return null;
+  final number = text.substring(0, text.length - gap.length);
+  if (number.isEmpty || number.contains(' ')) return null;
+  return number;
 }
 
 class LtrText extends StatelessWidget {
