@@ -69,6 +69,7 @@ class GuardedMutation extends ConsumerStatefulWidget {
     this.leading,
     this.tooltip,
     this.onVersionConflict,
+    this.reportErrorInline = true,
   });
 
   /// Fields that define this attempt. A change starts a new request id.
@@ -106,6 +107,11 @@ class GuardedMutation extends ConsumerStatefulWidget {
   /// Refetch the record this write was based on. Used for VERSION_CONFLICT and
   /// for a collection status conflict.
   final VoidCallback? onVersionConflict;
+
+  /// When false, a rejected send still returns its message to the caller and
+  /// keeps the request id, but the message is not painted under the button.
+  /// Tight cards use this so a long server line cannot overflow them.
+  final bool reportErrorInline;
 
   @override
   ConsumerState<GuardedMutation> createState() => _GuardedMutationState();
@@ -161,7 +167,8 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         button,
-        if (_error != null) Text(_error!, key: const Key('mutation-error')),
+        if (widget.reportErrorInline && _error != null)
+          Text(_error!, key: const Key('mutation-error')),
       ],
     );
   }
