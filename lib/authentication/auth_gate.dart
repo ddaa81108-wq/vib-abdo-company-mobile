@@ -35,13 +35,21 @@ String? authRedirect(
       if (atSplash || atLogin || location == '/change-password') return '/';
       return permissions == null
           ? null
-          : permissionRedirect(location, permissions);
+          : permissionRedirect(
+              location,
+              permissions,
+              primaryOwner: profile.isOwner,
+            );
   }
 }
 
 /// [forbiddenLocation] when [location] is a section or admin path the user
 /// cannot read. Null to stay. [forbiddenLocation] itself is never redirected.
-String? permissionRedirect(String location, PermissionService permissions) {
+String? permissionRedirect(
+  String location,
+  PermissionService permissions, {
+  bool primaryOwner = false,
+}) {
   final path = location.split('?').first;
   if (path == '/' ||
       path == forbiddenLocation ||
@@ -53,6 +61,10 @@ String? permissionRedirect(String location, PermissionService permissions) {
   }
   if (path == '/settings' || path.startsWith('/settings/')) {
     final manage = permissions.canDo(ManagementAction.settingsManage);
+    if (path == '/settings/users/new') {
+      if (!primaryOwner || !manage) return forbiddenLocation;
+      return null;
+    }
     if (path != '/settings') return manage ? null : forbiddenLocation;
     if (permissions.canViewFinancialLedger || manage) return null;
     return forbiddenLocation;

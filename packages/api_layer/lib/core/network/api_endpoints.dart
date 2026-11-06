@@ -104,6 +104,7 @@ class ApiEndpoints {
   static const employees = '/api/employees';
   static const admins = '/api/admins';
   static const audit = '/api/audit';
+  static const auditLog = '/api/audit-log';
   static const operations = '/api/operations';
 
   // Realtime & notifications
