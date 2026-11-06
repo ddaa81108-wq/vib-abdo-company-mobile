@@ -3,10 +3,11 @@ package com.vip2100.vib
 /**
  * Release capture state. Debug builds stay open.
  *
- * An allow is not permanent. It stays open only until [DEFAULT_HOLD_MS]
- * after the last allow that reached this object. The app refreshes that
- * hold while the verified session remains. Logout sends an immediate
- * secure update; if that update never arrives, the hold still locks.
+ * Logout and a failed session lock immediately when the call arrives,
+ * when the activity pauses, or when a newer secure intent is applied.
+ * [DEFAULT_HOLD_MS] is only the last resort: both the channel message and
+ * the intent file failed. It is not a logout delay, and a same-generation
+ * refresh must not be described as instant protection.
  */
 internal class CaptureLock(
     private val debuggable: Boolean,
@@ -18,12 +19,36 @@ internal class CaptureLock(
     var secure: Boolean = !debuggable
         private set
 
+    /** Set after the first channel call in this process. */
+    var channelAccepted: Boolean = false
+        private set
+
+    private var hostPaused = false
     private var holdToken = 0L
 
     fun resetForNewEngine() {
         generations.reset()
+        channelAccepted = false
+        hostPaused = false
         disarm()
         secure = !debuggable
+    }
+
+    fun markChannelAccepted() {
+        channelAccepted = true
+    }
+
+    /** Recents and background. Does not open the window again. */
+    fun onHostPause() {
+        if (debuggable) return
+        hostPaused = true
+        disarm()
+        secure = true
+    }
+
+    /** Stay secure until a later verified allow. */
+    fun onHostResume() {
+        hostPaused = false
     }
 
     /**
@@ -42,6 +67,7 @@ internal class CaptureLock(
             secure = true
             return true
         }
+        if (hostPaused) return false
         secure = false
         arm()
         return true

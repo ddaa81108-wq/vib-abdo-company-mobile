@@ -152,6 +152,18 @@ android {
         }
     }
 
+    // Flutter adds the profile type later and copies debug, which is
+    // debuggable. The capture harness needs profile Dart (fake API allowed)
+    // and a non-debuggable window so FLAG_SECURE follows the release rule.
+    // Release builds do not set CAPTURE_HARNESS, so this does not run for them.
+    if (System.getenv("CAPTURE_HARNESS") == "true") {
+        buildTypes.configureEach {
+            if (name == "profile") {
+                isDebuggable = false
+            }
+        }
+    }
+
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }

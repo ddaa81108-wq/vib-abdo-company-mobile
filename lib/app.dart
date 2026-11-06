@@ -8,6 +8,7 @@ import 'features/notifications/notification_permission_registration.dart';
 import 'features/splash/splash_screen.dart';
 import 'notifications/notification_transport_host.dart';
 import 'notifications/realtime_lifecycle.dart';
+import 'security/capture_resume.dart';
 import 'state/router_provider.dart';
 import 'state/session_providers.dart';
 import 'state/theme_controller.dart';
@@ -89,11 +90,13 @@ class CompanyApp extends ConsumerWidget {
 }
 
 Widget _services(Widget? page) {
-  return NotificationPermissionRegistration(
+  return CaptureResume(
+    child: NotificationPermissionRegistration(
     child: NotificationTransportHost(
       child: ForegroundNotificationBanner(
         child: RealtimeLifecycle(child: page ?? const SizedBox.shrink()),
       ),
+    ),
     ),
   );
 }

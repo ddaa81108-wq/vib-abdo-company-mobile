@@ -1,5 +1,6 @@
 import 'package:flutter_api_layer/api_layer.dart';
 
+import '../security/capture_harness.dart';
 import '../ui/strings.dart';
 
 /// Signed-in users who open a section or admin path they cannot read land here.
@@ -7,8 +8,8 @@ const forbiddenLocation = '/forbidden';
 
 /// Where the router should send the user for the current server session.
 ///
-/// Returns null to stay on [location]. [SessionOtpRequired] is treated as
-/// signed out: the current server does not issue that state.
+/// Returns null to stay on [location]. [SessionOtpRequired] stays on the
+/// code screen and does not open the signed-in shell.
 ///
 /// When [permissions] is set, a signed-in user who opens a section they cannot
 /// read is sent to [forbiddenLocation]. Search, notifications, the account
@@ -19,6 +20,7 @@ String? authRedirect(
   String location, {
   PermissionService? permissions,
 }) {
+  if (kCaptureHarness && location == captureHarnessPath) return null;
   final atSplash = location == '/splash';
   final atLogin = location == '/login';
   switch (session) {

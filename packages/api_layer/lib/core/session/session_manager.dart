@@ -325,13 +325,16 @@ class SessionManager {
     await _applyCapture(epoch);
   }
 
+  /// Sends the current session to the window again after the activity resumes.
+  Future<void> reapplyCapture() => _applyCapture(_transitionEpoch);
+
   Future<void> _secureNow(int generation) async {
     final gate = _captureGate;
     if (gate == null) return;
     try {
       await gate.secure(generation: generation);
     } catch (_) {
-      // A release hold still locks if this update never reaches the window.
+      // The intent file and the activity pause still lock. The hold is last.
     }
   }
 

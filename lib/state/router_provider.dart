@@ -29,6 +29,7 @@ import '../features/settings/login_accounts_screen.dart';
 import '../features/settings/security_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/splash/splash_screen.dart';
+import '../security/capture_harness.dart';
 import '../features/treasury/treasury_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -38,7 +39,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final refresh = _RouterRefresh(session.listenable, permissions);
   ref.onDispose(refresh.dispose);
   final router = GoRouter(
-    initialLocation: '/splash',
+    initialLocation: kCaptureHarness ? captureHarnessPath : '/splash',
     refreshListenable: refresh,
     redirect: (context, state) =>
         authRedirect(session.state, state.uri.path, permissions: permissions),
@@ -49,6 +50,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/mfa', builder: (context, state) => const MfaScreen()),
+      if (kCaptureHarness)
+        GoRoute(
+          path: captureHarnessPath,
+          builder: (context, state) => const CaptureHarnessScreen(),
+        ),
       GoRoute(
         path: '/signup-info',
         builder: (context, state) => const SignupInfoScreen(),

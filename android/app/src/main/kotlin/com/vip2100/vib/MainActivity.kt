@@ -8,8 +8,10 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
+import android.os.FileObserver
 import android.os.Handler
 import android.os.Looper
+import java.io.File
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.android.FlutterActivity
@@ -20,6 +22,7 @@ class MainActivity : FlutterActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var holdCallback: Runnable? = null
     private var windowAlive = true
+    private var intentObserver: FileObserver? = null
     private val captureLock = CaptureLock(
         debuggable = BuildConfig.DEBUG,
         scheduleHold = { token, delayMs ->
@@ -37,13 +40,52 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         secureWindowAtStart()
+        watchCaptureIntent()
         ensureCollectionsChannel()
+    }
+
+    override fun onPause() {
+        captureLock.onHostPause()
+        publishCapture()
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        captureLock.onHostResume()
+        publishCapture()
     }
 
     override fun onDestroy() {
         windowAlive = false
+        intentObserver?.stopWatching()
+        intentObserver = null
         captureLock.disarm()
         super.onDestroy()
+    }
+
+    /** Release listens for a secure intent even if the channel call is lost. */
+    private fun watchCaptureIntent() {
+        if (BuildConfig.DEBUG) return
+        val dir = filesDir
+        val file = File(dir, CaptureIntents.FILE_NAME)
+        if (!file.exists()) file.writeText("")
+        val mask = FileObserver.CLOSE_WRITE or FileObserver.MODIFY
+        intentObserver = object : FileObserver(dir, mask) {
+            override fun onEvent(event: Int, path: String?) {
+                if (path != CaptureIntents.FILE_NAME) return
+                mainHandler.post { applyCaptureIntent() }
+            }
+        }.also { it.startWatching() }
+    }
+
+    private fun applyCaptureIntent() {
+        if (!windowAlive || BuildConfig.DEBUG) return
+        val text = File(filesDir, CaptureIntents.FILE_NAME).readText()
+        val intent = CaptureIntents.parse(text) ?: return
+        if (!CaptureIntents.shouldApply(captureLock.channelAccepted, intent)) return
+        if (!captureLock.apply(intent.role, intent.generation)) return
+        publishCapture()
     }
 
     /** Release starts secure. Debug starts capturable. A new engine resets the generation. */
@@ -83,6 +125,7 @@ class MainActivity : FlutterActivity() {
         secureWindowAtStart()
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/screen_security")
             .setMethodCallHandler { call, result ->
+                captureLock.markChannelAccepted()
                 val handled = CaptureMessages.handle(
                     call.method,
                     call.arguments,
