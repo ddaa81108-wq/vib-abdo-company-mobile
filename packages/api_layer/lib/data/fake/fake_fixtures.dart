@@ -4,6 +4,9 @@
 class FakeFixtures {
   FakeFixtures._();
 
+  /// Fake-only MFA code. Not a production secret and not written into errors.
+  static const mfaFixtureCode = '000000';
+
   /// Ordinary collections employee. Own-data routes key off this id.
   static const demoEmployeeId = 'u_12';
 
@@ -69,6 +72,29 @@ class FakeFixtures {
   /// - `mustchange…`      -> that employee with `mustChangePassword: true`.
   /// - anything else      -> observed collector (collections codes, no sectionAccess).
   static Map<String, dynamic> meFor(String username) {
+    if (username.startsWith('mfa.mustchange')) {
+      return _me(
+        id: 'u_31',
+        username: 'mfa.mustchange@example.invalid',
+        name: 'مدير تحقق تجريبي',
+        role: 'admin',
+        permissions: const [],
+        sectionAccess: null,
+        isOwner: true,
+        mustChangePassword: true,
+      );
+    }
+    if (username.startsWith('mfa.')) {
+      return _me(
+        id: 'u_32',
+        username: 'mfa.admin@example.invalid',
+        name: 'مدير تحقق تجريبي',
+        role: 'admin',
+        permissions: const [],
+        sectionAccess: null,
+        isOwner: true,
+      );
+    }
     if (username.startsWith('created.admin')) {
       // A full admin the primary manager created. Role admin with empty
       // lists is full access. isOwner stays false.

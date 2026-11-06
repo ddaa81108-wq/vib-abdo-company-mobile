@@ -25,14 +25,20 @@ String? authRedirect(
     case SessionUnknown():
       return atSplash ? null : '/splash';
     case SessionUnauthenticated():
-    case SessionOtpRequired():
       if (atLogin || location == '/signup-info') return null;
       return '/login';
+    case SessionOtpRequired():
+      return location == '/mfa' ? null : '/mfa';
     case SessionAuthenticated(:final profile):
       if (profile.mustChangePassword) {
         return location == '/change-password' ? null : '/change-password';
       }
-      if (atSplash || atLogin || location == '/change-password') return '/';
+      if (atSplash ||
+          atLogin ||
+          location == '/mfa' ||
+          location == '/change-password') {
+        return '/';
+      }
       return permissions == null
           ? null
           : permissionRedirect(

@@ -26,16 +26,21 @@ void main() {
     );
     expect(
       authRedirect(
-        const SessionOtpRequired(LoginChallenge(loginTicket: 'ticket')),
-        '/home',
+        const SessionOtpRequired(LoginChallenge()),
+        '/settings',
       ),
-      '/login',
+      '/mfa',
+    );
+    expect(
+      authRedirect(const SessionOtpRequired(LoginChallenge()), '/mfa'),
+      isNull,
     );
   });
 
   test('authenticated session leaves login and splash', () {
     const session = SessionAuthenticated(profile);
     expect(authRedirect(session, '/login'), '/');
+    expect(authRedirect(session, '/mfa'), '/');
     expect(authRedirect(session, '/splash'), '/');
     expect(authRedirect(session, '/'), isNull);
     expect(authRedirect(session, '/account/password'), isNull);

@@ -14,6 +14,7 @@ import '../features/home/home_dashboard.dart';
 import '../features/home/home_shell.dart';
 import '../features/login/change_password_screen.dart';
 import '../features/login/login_screen.dart';
+import '../features/login/mfa_screen.dart';
 import '../features/login/signup_info_screen.dart';
 import '../features/masraweya/masraweya_screen.dart';
 import '../features/notifications/notifications_screen.dart';
@@ -47,6 +48,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(path: '/mfa', builder: (context, state) => const MfaScreen()),
       GoRoute(
         path: '/signup-info',
         builder: (context, state) => const SignupInfoScreen(),

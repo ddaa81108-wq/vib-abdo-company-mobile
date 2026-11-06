@@ -244,7 +244,16 @@ class FakeApiClient implements ApiClient {
 
   /// Server-side cookie sessions. The id is the `abdo_session` cookie value.
   final Map<String, _FakeSession> _sessions = {};
+  final Map<String, _MfaChallenge> _mfaChallenges = {};
   int _sessionSeq = 0;
+
+  /// Marks every pending MFA challenge expired. Tests only.
+  void expireMfaChallenges() {
+    final past = DateTime.now().toUtc().subtract(const Duration(seconds: 1));
+    for (final challenge in _mfaChallenges.values) {
+      challenge.expiresAt = past;
+    }
+  }
   int _csrfSeq = 0;
   String? _jarId;
   String? _latestSessionId;
@@ -978,6 +987,18 @@ class FakeApiClient implements ApiClient {
           authenticated: false,
         );
       }
+      final username = '${b['username']}';
+      if (username.startsWith('mfa.')) {
+        final id = 'mfa-${++_sessionSeq}';
+        _mfaChallenges[id] = _MfaChallenge(
+          username,
+          DateTime.now().toUtc().add(const Duration(minutes: 5)),
+        );
+        setCookie?.add(
+          '${ApiConfig.mfaCookieName}=$id; Path=/api/auth; HttpOnly; Secure; SameSite=Lax; Max-Age=300',
+        );
+        _fail(401, 'MFA_REQUIRED', 'أدخل رمز التحقق', authenticated: false);
+      }
       final previous = _jarId;
       if (previous != null) {
         _sessions.remove(previous);
@@ -992,6 +1013,9 @@ class FakeApiClient implements ApiClient {
         '${ApiConfig.sessionCookieName}=$id; Path=/; HttpOnly; Secure; SameSite=Strict',
       );
       return _ok({..._me, 'csrfToken': csrfToken});
+    }
+    if (method == 'POST' && path == ApiEndpoints.mfaVerify) {
+      return _verifyMfa(options, b, setCookie);
     }
     if (path == '/api/auth/csrf') {
       return _rotateCsrf(options);
@@ -1111,6 +1135,66 @@ class FakeApiClient implements ApiClient {
       _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تسجيل الجهاز.');
     }
     return _ok(const <String, Object?>{});
+  }
+
+  ApiResponse _verifyMfa(
+    ApiRequestOptions options,
+    Map b,
+    List<String>? setCookie,
+  ) {
+    final id = _namedCookie(options, ApiConfig.mfaCookieName);
+    final challenge = id == null ? null : _mfaChallenges[id];
+    if (challenge == null ||
+        !DateTime.now().toUtc().isBefore(challenge.expiresAt)) {
+      if (id != null) _mfaChallenges.remove(id);
+      setCookie?.add('${ApiConfig.mfaCookieName}=; Path=/api/auth; Max-Age=0');
+      _fail(401, 'MFA_INVALID', 'انتهت صلاحية التحقق', authenticated: false);
+    }
+    final code = b['code'];
+    if (code is! String || code != FakeFixtures.mfaFixtureCode) {
+      challenge.failures += 1;
+      if (challenge.failures >= 8) {
+        _fail(
+          429,
+          'LOGIN_RATE_LIMITED',
+          'محاولات كثيرة. أعد المحاولة لاحقًا.',
+          authenticated: false,
+        );
+      }
+      _fail(401, 'MFA_INVALID', 'رمز التحقق غير صحيح', authenticated: false);
+    }
+    _mfaChallenges.remove(id);
+    setCookie?.add('${ApiConfig.mfaCookieName}=; Path=/api/auth; Max-Age=0');
+    final previous = _jarId;
+    if (previous != null) _sessions.remove(previous);
+    _activate(FakeFixtures.meFor(challenge.username));
+    final sessionId = 'fake-session-${++_sessionSeq}';
+    final csrfToken = _allocateCsrf();
+    _sessions[sessionId] =
+        _FakeSession(id: sessionId, me: _me, csrfToken: csrfToken);
+    _latestSessionId = sessionId;
+    _jarId = sessionId;
+    setCookie?.add(
+      '${ApiConfig.sessionCookieName}=$sessionId; Path=/; HttpOnly; Secure; SameSite=Strict',
+    );
+    return _ok({..._me, 'csrfToken': csrfToken});
+  }
+
+  String? _namedCookie(ApiRequestOptions options, String name) {
+    final raw = _hasHeader(options, 'cookie')
+        ? _header(options, 'cookie')
+        : null;
+    if (raw == null) return null;
+    for (final part in raw.split(';')) {
+      final piece = part.trim();
+      final eq = piece.indexOf('=');
+      if (eq <= 0) continue;
+      if (piece.substring(0, eq).trim().toLowerCase() == name) {
+        final value = piece.substring(eq + 1).trim();
+        return value.isEmpty ? null : value;
+      }
+    }
+    return null;
   }
 
   /// Cookie session check. A missing, revoked, or expired cookie is 401
@@ -2962,6 +3046,14 @@ class FakeApiClient implements ApiClient {
     if (name == null) _fail(404, 'NOT_FOUND', _notFound);
     return {'id': id, 'displayName': name};
   }
+}
+
+class _MfaChallenge {
+  _MfaChallenge(this.username, this.expiresAt);
+
+  final String username;
+  DateTime expiresAt;
+  int failures = 0;
 }
 
 /// One in-memory cookie session. Lifetime is not counted down locally.

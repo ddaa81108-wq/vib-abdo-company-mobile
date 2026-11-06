@@ -8,6 +8,9 @@ abstract interface class AuthRepository {
   Future<LoginResult> login(
       {required String username, required String password});
 
+  /// POST /api/auth/mfa/verify {code}. Public. Uses the challenge cookie.
+  Future<LoginResult> verifyMfa({required String code});
+
   /// POST /api/auth/logout (requires cookie + X-CSRF-Token).
   Future<void> logout();
 
@@ -26,6 +29,16 @@ class RemoteAuthRepository implements AuthRepository {
       {required String username, required String password}) async {
     final res = await _api.post(ApiEndpoints.login,
         body: {'username': username, 'password': password}, options: _public);
+    return LoginResult.fromData(res.data);
+  }
+
+  @override
+  Future<LoginResult> verifyMfa({required String code}) async {
+    final res = await _api.post(
+      ApiEndpoints.mfaVerify,
+      body: {'code': code},
+      options: _public,
+    );
     return LoginResult.fromData(res.data);
   }
 

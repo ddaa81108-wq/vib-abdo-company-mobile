@@ -55,6 +55,9 @@ class ApiConfig {
   /// name and does not look up an older name.
   static const sessionCookieName = 'abdo_session';
 
+  /// Short-lived challenge cookie. It is not a session.
+  static const mfaCookieName = 'abdo_mfa';
+
   const ApiConfig({
     required this.baseUrl,
     this.connectTimeout = const Duration(seconds: 15),
