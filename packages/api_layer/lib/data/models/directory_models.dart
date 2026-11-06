@@ -162,15 +162,21 @@ class AuditPage {
   factory AuditPage.fromData(Object? data) {
     final json = asJson(data);
     final raw = json['items'];
-    final cursor = json['nextBefore'];
     return AuditPage(
       items: [
         for (final item in raw is List ? raw : const [])
           if (item is Map) AuditEvent.fromJson(asJson(item)),
       ],
-      nextBefore: cursor is String && cursor.isNotEmpty ? cursor : null,
+      nextBefore: auditCursor(json['nextBefore']),
     );
   }
+}
+
+/// `before` is an integer cursor. Anything else is not a page token.
+String? auditCursor(Object? value) {
+  if (value is int) return '$value';
+  if (value is String && RegExp(r'^\d+$').hasMatch(value)) return value;
+  return null;
 }
 
 class ServerHealth {

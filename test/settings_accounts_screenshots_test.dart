@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vib_abdo_company_mobile/features/login/mfa_screen.dart';
 import 'package:vib_abdo_company_mobile/features/settings/financial_ledger_screen.dart';
 import 'package:vib_abdo_company_mobile/features/settings/settings_screen.dart';
 
@@ -43,6 +44,26 @@ void main() {
           findsOneWidget,
         );
         await saveShot(tester, 'development-$theme-440');
+      }
+    },
+    tags: ['screenshots'],
+  );
+
+  testWidgets(
+    'mfa challenge and security notes at 440x956',
+    (tester) async {
+      await pumpFakeApp(tester, size: const Size(440, 956));
+      await tester.runAsync(loadScreenshotFonts);
+      await signIn(tester, username: 'mfa.admin', password: 'demo-only');
+      for (final dark in [false, true]) {
+        final theme = dark ? 'dark' : 'light';
+        expect(find.byKey(MfaScreen.screenKey), findsOneWidget);
+        expect(find.byKey(MfaScreen.codeKey), findsOneWidget);
+        if (dark) {
+          await tester.tap(find.byKey(const Key('mfa-theme')));
+          await tester.pumpAndSettle();
+        }
+        await saveShot(tester, 'mfa-challenge-$theme-440');
       }
     },
     tags: ['screenshots'],

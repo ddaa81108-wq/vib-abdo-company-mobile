@@ -371,6 +371,10 @@ void main() {
     await go(tester, '/settings/audit');
     expect(find.byKey(const Key('screen-settings-audit')), findsOneWidget);
     expect(find.byKey(const Key('security-current-session')), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('collection.unlinked.submit'),
+      200,
+    );
     expect(find.text('collection.unlinked.submit'), findsOneWidget);
 
     await go(tester, '/settings/operations');

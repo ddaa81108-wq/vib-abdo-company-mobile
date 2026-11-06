@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
-import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../state/session_providers.dart';
 import '../../ui/strings.dart';
@@ -12,11 +11,6 @@ import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/section_kit.dart';
-
-final auditLogProvider = FutureProvider<AuditPage>((ref) async {
-  watchSignedIn(ref);
-  return ref.read(apiLayerProvider).directory.auditLog();
-});
 
 class SecurityScreen extends ConsumerWidget {
   const SecurityScreen({super.key});
@@ -30,7 +24,6 @@ class SecurityScreen extends ConsumerWidget {
     }
     final session = ref.watch(sessionStateProvider);
     final profile = session is SessionAuthenticated ? session.profile : null;
-    final audit = ref.watch(auditLogProvider);
     return SectionTheme(
       child: ListView(
         key: screenKey,
@@ -64,57 +57,120 @@ class SecurityScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'التحقق بخطوتين يقرره الخادم عند الدخول. لا يوجد مفتاح في التطبيق لتفعيله أو لإيقافه. إذا طلب الخادم الرمز، الإكمال يكون عبر خدمته وليس من هذه الشاشة.',
+            'إذا طلب الخادم رمزًا عند الدخول، التطبيق يرسل النص كما هو إلى POST /api/auth/mfa/verify. لا مفتاح هنا للتفعيل أو الإيقاف أو الاسترجاع، ولا تُفتح الجلسة قبل نجاح الرمز.',
             key: Key('security-mfa-note'),
+          ),
+          const Text(
+            'هذا مسار العقد المكتوب. فحص القراءة على staging في 2026-10-23 لم يطلب MFA للحسابات الثلاثة، لذلك هذه الشاشة لا تثبت حسابًا حيًا يستخدم الرمز.',
+            key: Key('security-mfa-evidence'),
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'لقطات الشاشة في الإصدار تُفتح فقط لدور الإدارة أو الموظف بعد التحقق من الجلسة، وتُقفل لغير ذلك. لا يفصل النظام اللقطة عن التسجيل. لا يوجد هنا تجاوز لذلك.',
+            'لقطات الشاشة في الإصدار تُفتح فقط لدور الإدارة أو الموظف بعد التحقق من الجلسة، وتُقفل لغير ذلك. لا يفصل النظام اللقطة عن التسجيل. إذا ضاع طلب القفل بعد السماح، يعود القفل بعد مهلة قصيرة وليس فورًا. لا يوجد هنا تجاوز.',
             key: Key('security-capture-note'),
           ),
           const SizedBox(height: AppSpacing.md),
           Text('سجل الخادم', style: cairo(16, 800)),
           const Text(
-            'العمليات التي أعادها الخادم. صف الدخول أو الجلسة يظهر فقط إذا كان اسم العملية نفسه كذلك.',
+            'لا مسار جلسات. الصفحة التالية تُطلب فقط بمعامل before عندما يعيد الخادم nextBefore. لا مرشح لنوع العملية. فحص staging للقراءة لم يستدع GET /api/audit-log. العينة المنشورة عمليات تحصيل لا دخول. الصفوف رد الخادم، وليست سجلاً محليًا.',
             key: Key('security-audit-scope'),
           ),
-          audit.when(
-            loading: () => const SkeletonBox(height: 72),
-            error: (error, _) => presentFailure(
-              ref.read(errorHandlerProvider).toFailure(error),
-              onRetry: () => ref.invalidate(auditLogProvider),
-              retryKey: const Key('audit-retry'),
-            ),
-            data: (page) {
-              final sessionRows = page.items
-                  .where((item) => item.isSessionAction)
-                  .length;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    sessionRows == 0
-                        ? 'لا عملية دخول أو جلسة في هذه الصفحة.'
-                        : 'عمليات دخول أو جلسة في الصفحة: $sessionRows',
-                    key: const Key('security-session-count'),
-                  ),
-                  if (page.items.isEmpty)
-                    const EmptyPane(message: AppStrings.auditEmpty)
-                  else
-                    for (final item in page.items)
-                      ListTile(
-                        key: Key('audit-event-${item.id}'),
-                        title: Text(item.action),
-                        subtitle: Text(
-                          '${item.actorName ?? item.actorUsername ?? '—'} · ${item.createdAt ?? '—'}',
-                        ),
-                      ),
-                ],
-              );
-            },
-          ),
+          const _ServerAuditLog(),
         ],
       ),
+    );
+  }
+}
+
+class _ServerAuditLog extends ConsumerStatefulWidget {
+  const _ServerAuditLog();
+
+  @override
+  ConsumerState<_ServerAuditLog> createState() => _ServerAuditLogState();
+}
+
+class _ServerAuditLogState extends ConsumerState<_ServerAuditLog> {
+  final _items = <AuditEvent>[];
+  String? _before;
+  Object? _error;
+  var _loading = true;
+  var _more = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(_load);
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() {
+      if (_items.isEmpty) {
+        _loading = true;
+      } else {
+        _more = true;
+      }
+      _error = null;
+    });
+    try {
+      final page = await ref.read(apiLayerProvider).directory.auditLog(
+            before: _before,
+          );
+      if (!mounted) return;
+      setState(() {
+        _items.addAll(page.items);
+        _before = page.nextBefore;
+        _loading = false;
+        _more = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error;
+        _loading = false;
+        _more = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const SkeletonBox(height: 72);
+    if (_error != null && _items.isEmpty) {
+      return presentFailure(
+        ref.read(errorHandlerProvider).toFailure(_error!),
+        onRetry: _load,
+        retryKey: const Key('audit-retry'),
+      );
+    }
+    final sessionRows = _items.where((item) => item.isSessionAction).length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          sessionRows == 0
+              ? 'لا عملية دخول أو جلسة في الصفوف المحمّلة.'
+              : 'عمليات دخول أو جلسة في الصفوف المحمّلة: $sessionRows',
+          key: const Key('security-session-count'),
+        ),
+        if (_items.isEmpty)
+          const EmptyPane(message: AppStrings.auditEmpty)
+        else
+          for (final item in _items)
+            ListTile(
+              key: Key('audit-event-${item.id}'),
+              title: Text(item.action),
+              subtitle: Text(
+                '${item.actorName ?? item.actorUsername ?? '—'} · ${item.outcome ?? '—'} · ${item.createdAt ?? '—'}',
+              ),
+            ),
+        if (_before != null)
+          TextButton(
+            key: const Key('audit-older'),
+            onPressed: _more ? null : _load,
+            child: Text(_more ? '...' : 'أقدم'),
+          ),
+      ],
     );
   }
 }
