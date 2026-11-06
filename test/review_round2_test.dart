@@ -327,9 +327,14 @@ Future<void> fillLabeled(
   String label,
   String value,
 ) async {
-  final field = find.byWidgetPredicate(
-    (widget) => widget is TextField && widget.decoration?.labelText == label,
-  );
+  final field = switch (label) {
+    AppStrings.egpValue => find.byKey(const Key('purchase-field-value')),
+    AppStrings.exchangeRate => find.byKey(const Key('purchase-field-rate')),
+    AppStrings.paid => find.byKey(const Key('purchase-field-paid')),
+    _ => find.byWidgetPredicate(
+      (widget) => widget is TextField && widget.decoration?.labelText == label,
+    ),
+  };
   await tester.ensureVisible(field);
   await tester.pump();
   await tester.enterText(field, value);

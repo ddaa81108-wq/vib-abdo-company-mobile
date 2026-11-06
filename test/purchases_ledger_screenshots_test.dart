@@ -22,13 +22,16 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await _go(tester, '/purchases');
 
+    await _scrollPageHome(tester);
     await saveShot(tester, 'purchases-grid-light-top');
     await _showLedger(tester);
     await _scrollLedgerHome(tester);
+    _expectHeaderInView(tester, 'ت');
     await saveShot(tester, 'purchases-grid-light-ledger');
-    await _scrollLedger(tester, 400);
-    await saveShot(tester, 'purchases-grid-light-ledger-mid');
-    await _scrollLedger(tester, 280);
+    await _scrollLedgerEnd(tester);
+    for (final header in const ['الناتج', 'المسدد', 'الباقي', 'مستهلك فودافون', '✓']) {
+      _expectHeaderInView(tester, header);
+    }
     await saveShot(tester, 'purchases-grid-light-ledger-end');
 
     final container = ProviderScope.containerOf(
@@ -36,19 +39,17 @@ void main() {
     );
     container.read(themeModeProvider.notifier).toggle();
     await _settle(tester);
+    await _scrollPageHome(tester);
     await _scrollLedgerHome(tester);
-    await tester.drag(
-      find.byKey(const Key('screen-purchases')),
-      const Offset(0, 800),
-    );
-    await tester.pump();
     await saveShot(tester, 'purchases-grid-dark-top');
     await _showLedger(tester);
     await _scrollLedgerHome(tester);
+    _expectHeaderInView(tester, 'ت');
     await saveShot(tester, 'purchases-grid-dark-ledger');
-    await _scrollLedger(tester, 400);
-    await saveShot(tester, 'purchases-grid-dark-ledger-mid');
-    await _scrollLedger(tester, 280);
+    await _scrollLedgerEnd(tester);
+    for (final header in const ['الناتج', 'المسدد', 'الباقي', 'مستهلك فودافون', '✓']) {
+      _expectHeaderInView(tester, header);
+    }
     await saveShot(tester, 'purchases-grid-dark-ledger-end');
     expect(find.text(AppStrings.alBayan), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -87,23 +88,52 @@ Future<void> _showLedger(WidgetTester tester) async {
   }
 }
 
-Future<void> _scrollLedger(WidgetTester tester, double dx) async {
-  await tester.drag(
-    find.byKey(const Key('purchase-ledger-scroll')),
-    Offset(dx, 0),
-  );
-  await tester.pump();
-}
-
-Future<void> _scrollLedgerHome(WidgetTester tester) async {
-  final scrollable = tester.state<ScrollableState>(
+ScrollableState _ledgerScroll(WidgetTester tester) {
+  return tester.state<ScrollableState>(
     find.descendant(
       of: find.byKey(const Key('purchase-ledger-scroll')),
       matching: find.byType(Scrollable),
     ),
   );
+}
+
+Future<void> _scrollLedgerHome(WidgetTester tester) async {
+  _ledgerScroll(tester).position.jumpTo(0);
+  await tester.pump();
+}
+
+Future<void> _scrollLedgerEnd(WidgetTester tester) async {
+  final position = _ledgerScroll(tester).position;
+  position.jumpTo(position.maxScrollExtent);
+  await tester.pump();
+}
+
+Future<void> _scrollPageHome(WidgetTester tester) async {
+  final scrollable = tester.state<ScrollableState>(
+    find.descendant(
+      of: find.byKey(const Key('screen-purchases')),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Scrollable && widget.axis == Axis.vertical,
+      ),
+    ),
+  );
   scrollable.position.jumpTo(0);
   await tester.pump();
+}
+
+void _expectHeaderInView(WidgetTester tester, String header) {
+  final port = tester.getRect(find.byKey(const Key('purchase-ledger-scroll')));
+  final text = find.text(header);
+  expect(text, findsWidgets);
+  Rect? visible;
+  for (var i = 0; i < text.evaluate().length; i++) {
+    final rect = tester.getRect(text.at(i));
+    final overlaps = rect.right > port.left + 2 && rect.left < port.right - 2;
+    if (overlaps && rect.width > 8) visible = rect;
+  }
+  expect(visible, isNotNull, reason: '$header is outside the ledger viewport');
+  expect(visible!.left, greaterThanOrEqualTo(port.left - 2), reason: header);
+  expect(visible.right, lessThanOrEqualTo(port.right + 2), reason: header);
 }
 
 Future<void> _go(WidgetTester tester, String path) async {

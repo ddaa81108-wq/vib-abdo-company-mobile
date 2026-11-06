@@ -227,7 +227,8 @@ void main() {
     expect(find.text(AppStrings.kindBanks), findsOneWidget);
     expect(find.text(AppStrings.otherKind), findsOneWidget);
     expect(find.text('فورى'), findsNothing);
-    expect(find.text(AppStrings.divide), findsOneWidget);
+    expect(find.text('\u00F7'), findsWidgets);
+    expect(find.bySemanticsLabel(AppStrings.divide), findsWidgets);
     expect(find.byType(Dialog), findsNothing);
     expect(find.byType(BottomSheet), findsNothing);
     final menu = find.byType(DropdownButton<CalculationMode>);
@@ -235,7 +236,8 @@ void main() {
     await tester.pump();
     await tester.tap(menu);
     await tester.pumpAndSettle();
-    expect(find.text(AppStrings.multiply), findsWidgets);
+    expect(find.text('\u00D7'), findsWidgets);
+    expect(find.bySemanticsLabel(AppStrings.multiply), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 

@@ -696,7 +696,18 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
     }
 
     final fieldPad = const EdgeInsets.fromLTRB(72, 96, 72, 180);
-    return Row(
+    final quietFields = Theme.of(context).copyWith(
+      inputDecorationTheme: const InputDecorationTheme(
+        isDense: true,
+        floatingLabelBehavior: FloatingLabelBehavior.never,
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+      ),
+    );
+    return Theme(
+      data: quietFields,
+      child: Row(
       key: const Key('purchase-inline-row'),
       textDirection: TextDirection.rtl,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -755,7 +766,7 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
             key: const Key('purchase-field-value'),
             controller: _egp,
             focusNode: _valueFocus,
-            label: AppStrings.egpValue,
+            label: '',
             showHint: false,
             dense: true,
             scrollPadding: fieldPad,
@@ -774,11 +785,11 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
             items: const [
               DropdownMenuItem(
                 value: CalculationMode.divide,
-                child: Text(AppStrings.divide),
+                child: CalculationMark(CalculationMode.divide),
               ),
               DropdownMenuItem(
                 value: CalculationMode.multiply,
-                child: Text(AppStrings.multiply),
+                child: CalculationMark(CalculationMode.multiply),
               ),
             ],
             onChanged: (value) {
@@ -798,8 +809,8 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
             textInputAction: TextInputAction.next,
             scrollPadding: fieldPad,
             decoration: const InputDecoration(
-              labelText: AppStrings.exchangeRate,
               isDense: true,
+              border: InputBorder.none,
             ),
             onEditingComplete: () => _next(_paidFocus),
             onSubmitted: (_) => _next(_paidFocus),
@@ -822,7 +833,7 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
             key: const Key('purchase-field-paid'),
             controller: _paid,
             focusNode: _paidFocus,
-            label: AppStrings.paid,
+            label: '',
             showHint: false,
             dense: true,
             scrollPadding: fieldPad,
@@ -848,7 +859,7 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
             key: const Key('purchase-field-vodafone'),
             controller: _vodafone,
             focusNode: _vodafoneFocus,
-            label: AppStrings.vodafoneConsumed,
+            label: '',
             showHint: false,
             dense: true,
             scrollPadding: fieldPad,
@@ -878,6 +889,7 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
           ),
         ),
       ],
+    ),
     );
   }
 
@@ -1222,19 +1234,19 @@ Widget _totalPair(BuildContext context, Widget right, Widget left) {
 }
 
 const _ledgerCols = <(String, double)>[
-  (_PText.colSeq, 56),
-  (_PText.colKind, 136),
-  (_PText.colValue, 136),
-  (_PText.operation, 76),
+  (_PText.colSeq, 48),
+  (_PText.colKind, 188),
+  (_PText.colValue, 132),
+  (_PText.operation, 56),
   (_PText.rate, 88),
-  (_PText.result, 124),
-  (AppStrings.paid, 120),
-  (_PText.remaining, 120),
-  (AppStrings.vodafoneConsumed, 156),
+  (_PText.result, 72),
+  (AppStrings.paid, 72),
+  (_PText.remaining, 72),
+  (AppStrings.vodafoneConsumed, 108),
 ];
 
-const _ledgerActionWidth = 128.0;
-const _ledgerHeaderH = 48.0;
+const _ledgerActionWidth = 96.0;
+const _ledgerHeaderH = 56.0;
 const _ledgerRowH = 64.0;
 const _ledgerBreakH = 48.0;
 
@@ -1398,11 +1410,8 @@ class _PurchaseGrid extends ConsumerWidget {
                   width: _ledgerCols[i].$2 * scale,
                   height: height,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: cells[i],
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: FittedBox(fit: BoxFit.scaleDown, child: cells[i]),
                   ),
                 ),
               ),
@@ -1517,7 +1526,18 @@ class _PurchaseGrid extends ConsumerWidget {
                 cellKey: Key('purchase-grid-cell-${entry.id}'),
                 cells: dataCells(line, look.ink),
                 tail: _writable(entry)
-                    ? Row(
+                    ? Theme(
+                        data: Theme.of(context).copyWith(
+                          textButtonTheme: TextButtonThemeData(
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(44, 44),
+                              padding: EdgeInsets.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           GatedButton(
                             buttonKey: Key('edit-${entry.id}'),
@@ -1546,6 +1566,7 @@ class _PurchaseGrid extends ConsumerWidget {
                             ),
                           ),
                         ],
+                        ),
                       )
                     : null,
               ),
