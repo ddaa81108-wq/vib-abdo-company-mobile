@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
@@ -14,6 +15,18 @@ import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/mutation_form.dart';
+
+/// Which ledger row is being written. A null [entryId] is a new row.
+class _LedgerDraft {
+  const _LedgerDraft({this.entryId});
+
+  final String? entryId;
+}
+
+final _ledgerDraftProvider = StateProvider.autoDispose<_LedgerDraft?>((ref) {
+  ref.watch(purchaseBookProvider);
+  return null;
+});
 
 class PurchasesScreen extends ConsumerWidget {
   const PurchasesScreen({super.key});
@@ -123,7 +136,9 @@ class PurchasesScreen extends ConsumerWidget {
                     ),
                     builder: (data) {
                       final day = data.day;
-                      final empty = day == null && data.entries.isEmpty;
+                      final draft = ref.watch(_ledgerDraftProvider);
+                      final empty =
+                          day == null && data.entries.isEmpty && draft == null;
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -141,7 +156,7 @@ class PurchasesScreen extends ConsumerWidget {
                               key: Key('purchases-empty'),
                               message: AppStrings.emptyPurchases,
                             ),
-                          if (data.entries.isNotEmpty)
+                          if (data.entries.isNotEmpty || draft != null)
                             _PurchaseGrid(
                               entries: data.entries,
                               money: money,
@@ -208,6 +223,11 @@ Color _amber(BuildContext c) => Theme.of(c).brightness == Brightness.dark
 /// Light-mode [sectionGold] is orange. The statement frame uses button gold.
 Color _frameGold(BuildContext context) =>
     context.look.glass ? sectionGold(context) : sectionButtonGold;
+
+Color _gridLine(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+    ? const Color(0xFFD6D3D1)
+    : const Color(0xFF292524);
 
 Widget _goldAdd(BuildContext context, Widget child) {
   return Theme(
@@ -359,13 +379,9 @@ class _DayCard extends ConsumerWidget {
                         online: online,
                         leading: Icons.add,
                         label: _PText.addDeal,
-                        onPressed: () => showAppForm<void>(
-                          context,
-                          // expectedDayVersion is the open day's version. A new
-                          // row has no version yet; edit and delete send the
-                          // entry's own version as expectedVersion.
-                          _PurchaseForm(book: book, version: day.version),
-                        ),
+                        onPressed: () =>
+                            ref.read(_ledgerDraftProvider.notifier).state =
+                                const _LedgerDraft(),
                       ),
                     ),
                   ),
@@ -522,23 +538,41 @@ class _DayCard extends ConsumerWidget {
   }
 }
 
-class _PurchaseForm extends ConsumerStatefulWidget {
-  const _PurchaseForm({required this.book, required this.version, this.entry});
+class _InlineLedgerRow extends ConsumerStatefulWidget {
+  const _InlineLedgerRow({
+    required this.book,
+    required this.version,
+    required this.money,
+    required this.scale,
+    required this.actionWidth,
+    this.entry,
+    super.key,
+  });
 
   final PurchaseBook book;
+
+  /// Open day version sent as `expectedDayVersion`.
   final int? version;
+  final MoneyFormatter money;
+  final double scale;
+  final double actionWidth;
   final PurchaseEntryDto? entry;
 
   @override
-  ConsumerState<_PurchaseForm> createState() => _PurchaseFormState();
+  ConsumerState<_InlineLedgerRow> createState() => _InlineLedgerRowState();
 }
 
-class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
+class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
   final _egp = TextEditingController();
   final _rate = TextEditingController();
   final _paid = TextEditingController();
   final _vodafone = TextEditingController();
   final _customLabel = TextEditingController();
+  final _valueFocus = FocusNode();
+  final _opFocus = FocusNode();
+  final _rateFocus = FocusNode();
+  final _paidFocus = FocusNode();
+  final _vodafoneFocus = FocusNode();
   var _mode = CalculationMode.divide;
   String? _itemCode;
 
@@ -555,6 +589,15 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
   @override
   void initState() {
     super.initState();
+    for (final node in [
+      _valueFocus,
+      _opFocus,
+      _rateFocus,
+      _paidFocus,
+      _vodafoneFocus,
+    ]) {
+      node.addListener(() => _onFocus(node));
+    }
     final entry = widget.entry;
     if (entry != null) {
       _itemCode = entry.itemCode;
@@ -571,9 +614,23 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
     for (final controller in [_egp, _rate, _paid, _vodafone, _customLabel]) {
       controller.addListener(_changed);
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _valueFocus.requestFocus();
+    });
   }
 
   void _changed() => setState(() {});
+
+  void _onFocus(FocusNode node) {
+    if (!mounted) return;
+    setState(() {});
+    if (!node.hasFocus) return;
+    final target = node.context;
+    if (target == null) return;
+    Scrollable.ensureVisible(target, alignment: 0.5, duration: Duration.zero);
+  }
+
+  void _next(FocusNode node) => node.requestFocus();
 
   void _prefill(TextEditingController controller, MoneyValue? value) {
     if (value != null && value.isValid && value.units != null) {
@@ -587,68 +644,238 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
       controller.removeListener(_changed);
       controller.dispose();
     }
+    for (final node in [
+      _valueFocus,
+      _opFocus,
+      _rateFocus,
+      _paidFocus,
+      _vodafoneFocus,
+    ]) {
+      node.dispose();
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final custom = _itemCode == PurchaseItemCodes.custom;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(AppStrings.noPreview),
-        Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          children: [
-            for (final kind in _kinds)
-              ChoiceChip(
-                key: Key('purchase-kind-${kind.$1}'),
-                label: Text(kind.$2),
-                selected: _itemCode == kind.$1,
-                onSelected: (_) => setState(() => _itemCode = kind.$1),
-              ),
-          ],
+    final line = _gridLine(context);
+    final width = _ledgerCols.map((col) => col.$2 * widget.scale).toList();
+    final existing = widget.entry;
+    final result = existing == null
+        ? AppStrings.dash
+        : widget.money.formatOrDash(existing.resultUnits, Currency.lyd);
+    final remaining = existing == null
+        ? AppStrings.dash
+        : widget.money.formatOrDash(existing.remainingUnits, Currency.lyd);
+    Widget cell({
+      required int index,
+      required Widget child,
+      bool focused = false,
+    }) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: sectionButtonGold.withValues(alpha: 0.14),
+          border: Border.all(
+            color: focused ? sectionButtonGold : line,
+            width: focused ? 2 : 1,
+          ),
         ),
-        if (custom)
-          TextField(
-            key: const Key('purchase-custom-label'),
-            controller: _customLabel,
-            decoration: const InputDecoration(
-              labelText: AppStrings.customItemName,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: width[index],
+            maxWidth: width[index],
+            minHeight: 72,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: child,
+          ),
+        ),
+      );
+    }
+
+    final fieldPad = const EdgeInsets.fromLTRB(72, 96, 72, 180);
+    return Row(
+      key: const Key('purchase-inline-row'),
+      textDirection: TextDirection.rtl,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        cell(
+          index: 0,
+          child: Center(
+            child: Text(
+              existing?.sequence?.toString() ?? '—',
+              style: cairo(14, 800, color: context.look.ink),
             ),
           ),
-        UnitsField(controller: _egp, label: AppStrings.egpValue),
-        DropdownButton<CalculationMode>(
-          value: _mode,
-          isExpanded: true,
-          items: const [
-            DropdownMenuItem(
-              value: CalculationMode.divide,
-              child: Text(AppStrings.divide),
-            ),
-            DropdownMenuItem(
-              value: CalculationMode.multiply,
-              child: Text(AppStrings.multiply),
-            ),
-          ],
-          onChanged: (value) =>
-              setState(() => _mode = value ?? CalculationMode.divide),
         ),
-        TextField(
-          controller: _rate,
-          textDirection: TextDirection.ltr,
-          decoration: const InputDecoration(labelText: AppStrings.exchangeRate),
+        cell(
+          index: 1,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 48,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final kind in _kinds)
+                        Padding(
+                          padding: const EdgeInsetsDirectional.only(end: 4),
+                          child: ChoiceChip(
+                            key: Key('purchase-kind-${kind.$1}'),
+                            label: Text(kind.$2),
+                            selected: _itemCode == kind.$1,
+                            onSelected: (_) =>
+                                setState(() => _itemCode = kind.$1),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              if (custom)
+                TextField(
+                  key: const Key('purchase-custom-label'),
+                  controller: _customLabel,
+                  decoration: const InputDecoration(
+                    labelText: AppStrings.customItemName,
+                    isDense: true,
+                  ),
+                ),
+            ],
+          ),
         ),
-        UnitsField(controller: _paid, label: AppStrings.paid),
-        UnitsField(controller: _vodafone, label: AppStrings.vodafoneConsumed),
-        GuardedMutation(
-          buttonKey: const Key('save-purchase'),
-          inputs:
-              '$_itemCode|${_customLabel.text}|$_mode|${_egp.text}|${_rate.text}|${_paid.text}|${_vodafone.text}',
-          expectedVersion: widget.version,
-          label: AppStrings.save,
-          onSubmit: _submit,
+        cell(
+          index: 2,
+          focused: _valueFocus.hasFocus,
+          child: UnitsField(
+            key: const Key('purchase-field-value'),
+            controller: _egp,
+            focusNode: _valueFocus,
+            label: AppStrings.egpValue,
+            showHint: false,
+            dense: true,
+            scrollPadding: fieldPad,
+            textInputAction: TextInputAction.next,
+            onEditingComplete: () => _next(_rateFocus),
+            onSubmitted: (_) => _next(_rateFocus),
+          ),
+        ),
+        cell(
+          index: 3,
+          focused: _opFocus.hasFocus,
+          child: DropdownButton<CalculationMode>(
+            focusNode: _opFocus,
+            value: _mode,
+            isExpanded: true,
+            items: const [
+              DropdownMenuItem(
+                value: CalculationMode.divide,
+                child: Text(AppStrings.divide),
+              ),
+              DropdownMenuItem(
+                value: CalculationMode.multiply,
+                child: Text(AppStrings.multiply),
+              ),
+            ],
+            onChanged: (value) {
+              setState(() => _mode = value ?? CalculationMode.divide);
+              _next(_rateFocus);
+            },
+          ),
+        ),
+        cell(
+          index: 4,
+          focused: _rateFocus.hasFocus,
+          child: TextField(
+            key: const Key('purchase-field-rate'),
+            controller: _rate,
+            focusNode: _rateFocus,
+            textDirection: TextDirection.ltr,
+            textInputAction: TextInputAction.next,
+            scrollPadding: fieldPad,
+            decoration: const InputDecoration(
+              labelText: AppStrings.exchangeRate,
+              isDense: true,
+            ),
+            onEditingComplete: () => _next(_paidFocus),
+            onSubmitted: (_) => _next(_paidFocus),
+          ),
+        ),
+        cell(
+          index: 5,
+          child: Center(
+            child: Text(
+              result,
+              textAlign: TextAlign.center,
+              style: cairo(12, 700, color: context.look.muted),
+            ),
+          ),
+        ),
+        cell(
+          index: 6,
+          focused: _paidFocus.hasFocus,
+          child: UnitsField(
+            key: const Key('purchase-field-paid'),
+            controller: _paid,
+            focusNode: _paidFocus,
+            label: AppStrings.paid,
+            showHint: false,
+            dense: true,
+            scrollPadding: fieldPad,
+            textInputAction: TextInputAction.next,
+            onEditingComplete: () => _next(_vodafoneFocus),
+            onSubmitted: (_) => _next(_vodafoneFocus),
+          ),
+        ),
+        cell(
+          index: 7,
+          child: Center(
+            child: Text(
+              remaining,
+              textAlign: TextAlign.center,
+              style: cairo(12, 700, color: context.look.muted),
+            ),
+          ),
+        ),
+        cell(
+          index: 8,
+          focused: _vodafoneFocus.hasFocus,
+          child: UnitsField(
+            key: const Key('purchase-field-vodafone'),
+            controller: _vodafone,
+            focusNode: _vodafoneFocus,
+            label: AppStrings.vodafoneConsumed,
+            showHint: false,
+            dense: true,
+            scrollPadding: fieldPad,
+            textInputAction: TextInputAction.done,
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: sectionButtonGold.withValues(alpha: 0.14),
+            border: Border.all(color: line),
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: widget.actionWidth,
+              maxWidth: widget.actionWidth,
+              minHeight: 72,
+            ),
+            child: GuardedMutation(
+              buttonKey: const Key('save-purchase'),
+              inputs:
+                  '$_itemCode|${_customLabel.text}|$_mode|${_egp.text}|${_rate.text}|${_paid.text}|${_vodafone.text}',
+              expectedVersion: widget.version,
+              glyph: Icons.check,
+              label: AppStrings.save,
+              onSubmit: _submit,
+            ),
+          ),
         ),
       ],
     );
@@ -702,8 +929,8 @@ class _PurchaseFormState extends ConsumerState<_PurchaseForm> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
       );
+      ref.read(_ledgerDraftProvider.notifier).state = null;
       ref.invalidate(purchasesProvider);
-      Navigator.of(context).pop();
       return null;
     } catch (error) {
       return failureText(ref.read(errorHandlerProvider).toFailure(error));
@@ -1089,6 +1316,7 @@ class _PurchaseGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final look = context.look;
+    final draft = ref.watch(_ledgerDraftProvider);
     final lines = _ledgerLines(entries);
     final gold = _frameGold(context);
     final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
@@ -1150,34 +1378,46 @@ class _PurchaseGrid extends ConsumerWidget {
       required double height,
       required Color color,
       required List<Widget> cells,
+      required Color lineColor,
       Widget? tail,
-      Border? border,
+      Key? cellKey,
     }) {
-      return DecoratedBox(
-        decoration: BoxDecoration(color: color, border: border),
+      return ColoredBox(
+        color: color,
         child: Row(
           textDirection: TextDirection.rtl,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             for (var i = 0; i < _ledgerCols.length; i++)
-              SizedBox(
-                width: _ledgerCols[i].$2 * scale,
-                height: height,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: cells[i],
+              DecoratedBox(
+                key: i == 0 && cellKey != null ? cellKey : null,
+                decoration: BoxDecoration(
+                  border: Border.all(color: lineColor, width: 1),
+                ),
+                child: SizedBox(
+                  width: _ledgerCols[i].$2 * scale,
+                  height: height,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: cells[i],
+                    ),
                   ),
                 ),
               ),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: actionW,
-                maxWidth: actionW,
-                minHeight: height,
+            DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(color: lineColor, width: 1),
               ),
-              child: tail ?? const SizedBox.shrink(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: actionW,
+                  maxWidth: actionW,
+                  minHeight: height,
+                ),
+                child: tail ?? const SizedBox.shrink(),
+              ),
             ),
           ],
         ),
@@ -1188,6 +1428,7 @@ class _PurchaseGrid extends ConsumerWidget {
       band(
         height: headerH,
         color: headerFill,
+        lineColor: sectionButtonGold,
         cells: [
           for (final col in _ledgerCols)
             Text(
@@ -1223,8 +1464,11 @@ class _PurchaseGrid extends ConsumerWidget {
                     (sum, col) => sum + col.$2 * scale,
                   ) +
                   actionW,
-              child: ColoredBox(
-                color: breakFill,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: breakFill,
+                  border: Border.all(color: _gridLine(context)),
+                ),
                 child: Row(
                   textDirection: TextDirection.rtl,
                   children: [
@@ -1256,12 +1500,21 @@ class _PurchaseGrid extends ConsumerWidget {
           scrollBands.add(
             KeyedSubtree(
               key: Key('purchase-entry-${entry.id}'),
-              child: band(
+              child: draft?.entryId == entry.id
+                  ? _InlineLedgerRow(
+                      key: ValueKey('edit-${entry.id}'),
+                      book: book,
+                      version: entry.dayVersion,
+                      money: money,
+                      scale: scale,
+                      actionWidth: actionW,
+                      entry: entry,
+                    )
+                  : band(
                 height: rowH,
                 color: fill,
-                border: Border(
-                  top: BorderSide(color: gold.withValues(alpha: 0.35)),
-                ),
+                lineColor: _gridLine(context),
+                cellKey: Key('purchase-grid-cell-${entry.id}'),
                 cells: dataCells(line, look.ink),
                 tail: _writable(entry)
                     ? Row(
@@ -1271,16 +1524,11 @@ class _PurchaseGrid extends ConsumerWidget {
                             allowed: true,
                             online: online,
                             filled: false,
-                            glyph: Icons.check,
+                            glyph: Icons.edit_outlined,
                             label: AppStrings.edit,
-                            onPressed: () => showAppForm<void>(
-                              context,
-                              _PurchaseForm(
-                                book: book,
-                                version: entry.dayVersion,
-                                entry: entry,
-                              ),
-                            ),
+                            onPressed: () =>
+                                ref.read(_ledgerDraftProvider.notifier).state =
+                                    _LedgerDraft(entryId: entry.id),
                           ),
                           Expanded(
                             child: GuardedMutation(
@@ -1304,6 +1552,19 @@ class _PurchaseGrid extends ConsumerWidget {
             ),
           );
       }
+    }
+
+    if (draft != null && draft.entryId == null && openDay != null) {
+      scrollBands.add(
+        _InlineLedgerRow(
+          key: const ValueKey('purchase-inline-new'),
+          book: book,
+          version: openDay!.version,
+          money: money,
+          scale: scale,
+          actionWidth: actionW,
+        ),
+      );
     }
 
     return Padding(

@@ -228,9 +228,81 @@ void main() {
     expect(find.text(AppStrings.otherKind), findsOneWidget);
     expect(find.text('فورى'), findsNothing);
     expect(find.text(AppStrings.divide), findsOneWidget);
-    await tester.tap(find.byType(DropdownButton<CalculationMode>));
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
+    final menu = find.byType(DropdownButton<CalculationMode>);
+    await tester.ensureVisible(menu);
+    await tester.pump();
+    await tester.tap(menu);
     await tester.pumpAndSettle();
     expect(find.text(AppStrings.multiply), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('writing stays in the ledger and the focused cell stays visible', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(440, 956));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+    await tester.tap(find.byKey(const Key('add-purchase-12')));
+    await settle(tester);
+
+    expect(find.byKey(const Key('purchase-inline-row')), findsOneWidget);
+    expect(find.byKey(const Key('purchase-ledger')), findsOneWidget);
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
+
+    final value = find.descendant(
+      of: find.byKey(const Key('purchase-field-value')),
+      matching: find.byType(EditableText),
+    );
+    expect(
+      tester.widget<EditableText>(value).focusNode.hasFocus,
+      isTrue,
+    );
+
+    final gridLine = tester
+        .widget<DecoratedBox>(
+          find.byKey(const Key('purchase-grid-cell-pe_old')),
+        )
+        .decoration as BoxDecoration;
+    final side = (gridLine.border! as Border).top;
+    expect(side.width, 1);
+    expect((gridLine.border! as Border).left.width, 1);
+    expect((gridLine.border! as Border).right.width, 1);
+    expect((gridLine.border! as Border).bottom.width, 1);
+
+    Future<void> next() async {
+      await tester.testTextInput.receiveAction(TextInputAction.next);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 220));
+    }
+
+    bool inside(Finder field) {
+      final item = tester.getRect(field);
+      final port = tester.getRect(
+        find.byKey(const Key('purchase-ledger-scroll')),
+      );
+      return item.left >= port.left - 8 && item.right <= port.right + 8;
+    }
+
+    expect(inside(find.byKey(const Key('purchase-field-value'))), isTrue);
+    await next();
+    final rate = find.descendant(
+      of: find.byKey(const Key('purchase-field-rate')),
+      matching: find.byType(EditableText),
+    );
+    expect(tester.widget<EditableText>(rate).focusNode.hasFocus, isTrue);
+    expect(inside(find.byKey(const Key('purchase-field-rate'))), isTrue);
+    await next();
+    await next();
+    final vodafone = find.descendant(
+      of: find.byKey(const Key('purchase-field-vodafone')),
+      matching: find.byType(EditableText),
+    );
+    expect(tester.widget<EditableText>(vodafone).focusNode.hasFocus, isTrue);
+    expect(inside(find.byKey(const Key('purchase-field-vodafone'))), isTrue);
     expect(tester.takeException(), isNull);
   });
 }

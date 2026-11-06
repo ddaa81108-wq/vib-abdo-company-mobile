@@ -53,6 +53,27 @@ void main() {
     expect(find.text(AppStrings.alBayan), findsOneWidget);
     expect(tester.takeException(), isNull);
   }, tags: const ['screenshots']);
+
+  testWidgets('inline ledger entry stays focused in the grid', (tester) async {
+    await pumpFakeApp(tester, size: const Size(440, 956));
+    await tester.runAsync(loadScreenshotFonts);
+    await tester.pump();
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await _go(tester, '/purchases');
+    await tester.tap(find.byKey(const Key('add-purchase-12')));
+    await _settle(tester);
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
+    final value = find.descendant(
+      of: find.byKey(const Key('purchase-field-value')),
+      matching: find.byType(EditableText),
+    );
+    await tester.enterText(value, '1500');
+    await tester.pump();
+    await _showLedger(tester);
+    await saveShot(tester, 'purchases-grid-inline-focus-light');
+    expect(tester.takeException(), isNull);
+  }, tags: const ['screenshots']);
 }
 
 Future<void> _showLedger(WidgetTester tester) async {

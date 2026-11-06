@@ -51,6 +51,8 @@ void main() {
         MutationMeta(expectedVersion: 3, requestId: 'finalize-before-save'),
       ),
     );
+    await tester.ensureVisible(find.byKey(const Key('save-purchase')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('save-purchase')));
     await settle(tester);
 
@@ -124,7 +126,9 @@ Future<void> fillLabeled(
   final field = find.byWidgetPredicate(
     (widget) => widget is TextField && widget.decoration?.labelText == label,
   );
-  await tester.enterText(field.hitTestable(), value);
+  await tester.ensureVisible(field);
+  await tester.pump();
+  await tester.enterText(field, value);
   await tester.pump();
 }
 
