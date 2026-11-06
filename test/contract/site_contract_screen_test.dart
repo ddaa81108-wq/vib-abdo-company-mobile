@@ -46,7 +46,8 @@ void main() {
     );
     await go(tester, '/treasury');
     expect(find.text('5,160 د.ل'), findsWidgets);
-    expect(find.text('14,900 ج.م'), findsWidgets);
+    expect(find.text('14,900'), findsWidgets);
+    expect(find.text('ج.م'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 

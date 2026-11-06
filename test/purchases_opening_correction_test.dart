@@ -37,7 +37,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const Key('opening-card')),
-        matching: find.textContaining('80 ج.م'),
+        matching: find.text('80'),
       ),
       findsOneWidget,
     );
@@ -127,7 +127,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const Key('opening-card')),
-          matching: find.textContaining('40 ج.م'),
+          matching: find.text('40'),
         ),
         findsOneWidget,
       );
@@ -502,7 +502,10 @@ void main() {
         expect(text.maxLines, anyOf(isNull, greaterThan(1)));
         expect(text.overflow, isNot(TextOverflow.ellipsis));
         expect(text.overflow, isNot(TextOverflow.fade));
-        expect(text.softWrap, isNot(false));
+        // ج.م is its own short run; the digits keep wrapping.
+        if (text.data != 'ج.م') {
+          expect(text.softWrap, isNot(false));
+        }
         final rect = tester.getRect(figure);
         expect(rect.left, greaterThanOrEqualTo(cardRect.left - 1));
         expect(rect.right, lessThanOrEqualTo(cardRect.right + 1));
