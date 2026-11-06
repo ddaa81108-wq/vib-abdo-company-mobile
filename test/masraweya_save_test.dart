@@ -11,6 +11,7 @@ import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/masraweya/masraweya_screen.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 
+import 'shell_screenshots_test.dart' show loadScreenshotFonts, saveShot;
 import 'support/pump_app.dart';
 
 void main() {
@@ -176,7 +177,7 @@ void main() {
     },
   );
 
-  testWidgets('an empty new row is omitted and a partial row does not save', (
+  testWidgets('an empty new row is omitted and a value alone saves', (
     tester,
   ) async {
     final layer = await pumpFakeApp(tester, size: const Size(440, 1400));
@@ -195,9 +196,12 @@ void main() {
 
     await enterField(tester, const Key('masraweya-entry-value-field-1'), '500');
     await leaveFocus(tester);
-    expect(fake.mutationRequestIds, isEmpty);
+    expect(fake.mutationRequestIds, isNotEmpty);
     expect(
-      find.text('أكمل القيمة والعمولة في الصف قبل الحفظ.'),
+      find.descendant(
+        of: find.byKey(const Key('masraweya-entry-total-1')),
+        matching: find.textContaining('500'),
+      ),
       findsOneWidget,
     );
 
@@ -207,7 +211,8 @@ void main() {
       '10',
     );
     await leaveFocus(tester);
-    final body = jsonDecode(fake.mutationBodies.single) as Map<String, dynamic>;
+    final body =
+        jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
     final entries = body['entries'] as List;
     expect(entries, hasLength(2));
     expect(entries[1], {'valueUnits': 500, 'commissionUnits': 10});
@@ -319,7 +324,7 @@ void main() {
     expect(rowAmount(tester, 1), '—');
 
     await enterField(tester, const Key('masraweya-entry-value-field-1'), '10');
-    expect(rowAmount(tester, 1), '—');
+    expect(rowAmount(tester, 1), '10 ج.م');
     expect(fake.mutationRequestIds, isEmpty);
 
     await enterField(
@@ -433,6 +438,20 @@ void main() {
       expect(amount(tester, 'masraweya-work-total'), '3,050 ج.م');
     },
   );
+
+  testWidgets('value-only row total preview', (tester) async {
+    await pumpFakeApp(tester, size: const Size(440, 956));
+    await tester.runAsync(loadScreenshotFonts);
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/masraweya');
+    await tester.tap(find.byKey(const Key('masraweya-add-row')));
+    await settle(tester);
+    await enterField(tester, const Key('masraweya-entry-value-field-1'), '500');
+    await tester.pump();
+    expect(rowAmount(tester, 1), '500 ج.م');
+    await saveShot(tester, 'masraweya-value-only-total');
+    expect(tester.takeException(), isNull);
+  }, tags: const ['screenshots']);
 }
 
 String rowAmount(WidgetTester tester, int index) {
