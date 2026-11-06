@@ -29,6 +29,12 @@ void main() {
         await go(tester, '/settings/users');
         expect(find.byKey(const Key('login-account-create')), findsOneWidget);
         await saveShot(tester, 'login-accounts-$theme-440');
+        await go(tester, '/settings/users/new');
+        expect(find.byKey(const Key('screen-login-account-create')), findsOneWidget);
+        await saveShot(tester, 'login-account-create-$theme-440');
+        await go(tester, '/settings/users/u_12');
+        expect(find.byKey(const Key('screen-login-account-edit')), findsOneWidget);
+        await saveShot(tester, 'login-account-edit-$theme-440');
         await go(tester, '/settings/ledger');
         expect(find.byKey(FinancialLedgerScreen.screenKey), findsOneWidget);
         await saveShot(tester, 'financial-ledger-$theme-440');

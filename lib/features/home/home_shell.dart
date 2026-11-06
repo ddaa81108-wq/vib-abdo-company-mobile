@@ -291,6 +291,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     if (location.startsWith('/settings/employee-totals')) {
       return AppStrings.employeeTotals;
     }
+    if (location.startsWith('/settings/users/new')) return 'إنشاء حساب';
+    if (RegExp(r'/settings/users/[^/]+$').hasMatch(location)) {
+      return 'الحساب';
+    }
     if (location.startsWith('/settings/employees') ||
         location.startsWith('/settings/users')) {
       return AppStrings.employeesTile;

@@ -107,16 +107,21 @@ class LoginAccountsScreen extends ConsumerWidget {
                 : Column(
                     children: [
                       for (final account in page.items)
-                        ListTile(
-                          key: Key('login-account-${account.id}'),
-                          title: Text(account.displayName ?? account.username),
-                          subtitle: Text(
-                            '${account.username} · ${account.role ?? '—'}'
-                            '${account.isOwner ? ' · المدير الأساسي' : ''}'
-                            '${account.isActive ? '' : ' · موقوف'}',
+                        Card(
+                          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          child: ListTile(
+                            key: Key('login-account-${account.id}'),
+                            minTileHeight: 64,
+                            title: Text(account.displayName ?? account.username),
+                            subtitle: Text(
+                              '${account.username} · ${_roleLabel(account.role)}'
+                              '${account.isOwner ? ' · المدير الأساسي' : ''}'
+                              '${account.isActive ? '' : ' · موقوف'}',
+                            ),
+                            trailing: const Icon(Icons.chevron_left),
+                            onTap: () =>
+                                context.go('/settings/users/${account.id}'),
                           ),
-                          onTap: () =>
-                              context.go('/settings/users/${account.id}'),
                         ),
                     ],
                   ),
@@ -134,38 +139,90 @@ class _RequestTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ListTile(
-      key: Key('account-request-${request.id}'),
-      title: Text(request.displayName ?? request.email ?? request.id),
-      subtitle: Text('${request.email ?? '—'} · ${request.status ?? '—'}'),
-      trailing: request.pending
-          ? Wrap(
-              spacing: 4,
-              children: [
-                TextButton(
-                  key: Key('account-request-approve-${request.id}'),
-                  onPressed: () => _decide(ref, 'approve'),
-                  child: const Text('موافقة'),
-                ),
-                TextButton(
-                  key: Key('account-request-reject-${request.id}'),
-                  onPressed: () => _decide(ref, 'reject'),
-                  child: const Text('رفض'),
-                ),
-              ],
-            )
-          : null,
+    return Card(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              request.displayName ?? request.email ?? request.id,
+              key: Key('account-request-${request.id}'),
+              style: cairo(14, 800),
+            ),
+            Text('${request.email ?? '—'} · ${request.status ?? '—'}'),
+            if (request.pending)
+              Wrap(
+                spacing: 8,
+                children: [
+                  TextButton(
+                    key: Key('account-request-approve-${request.id}'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(64, 48),
+                    ),
+                    onPressed: () => _decide(ref, 'approve'),
+                    child: const Text('موافقة'),
+                  ),
+                  TextButton(
+                    key: Key('account-request-reject-${request.id}'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(64, 48),
+                    ),
+                    onPressed: () => _decide(ref, 'reject'),
+                    child: const Text('رفض'),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 
   Future<void> _decide(WidgetRef ref, String decision) async {
-    await ref.read(apiLayerProvider).directory.decideAccountRequest(
-      request.id,
-      {'expectedVersion': request.version ?? 1, 'decision': decision},
-    );
-    ref.invalidate(accountRequestsProvider);
+    final messenger = ScaffoldMessenger.maybeOf(ref.context);
+    try {
+      await ref.read(apiLayerProvider).directory.decideAccountRequest(
+        request.id,
+        {'expectedVersion': request.version ?? 1, 'decision': decision},
+      );
+      ref.invalidate(accountRequestsProvider);
+    } catch (error) {
+      final message = ref.read(errorHandlerProvider).toFailure(error).message;
+      messenger?.showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 }
+
+String _roleLabel(String? role) => switch (role) {
+  'admin' => 'إدارة',
+  'employee' => 'موظف',
+  null || '' => '—',
+  _ => role,
+};
+
+String permissionLabel(String code) => switch (code) {
+  'debts.read' => 'قراءة ديون العملاء',
+  'debts.write' => 'تسجيل ديون العملاء',
+  'companies.read' => 'قراءة ديون الشركات',
+  'companies.write' => 'تسجيل ديون الشركات',
+  'libyan_deposits.read' => 'قراءة الأمانات الليبية',
+  'libyan_deposits.write' => 'تسجيل الأمانات الليبية',
+  'egyptian_deposits.read' => 'قراءة الأمانات المصرية',
+  'egyptian_deposits.write' => 'تسجيل الأمانات المصرية',
+  'collections.read' => 'قراءة الاستلامات',
+  'collections.write' => 'تسجيل الاستلامات',
+  'masraweya.read' => 'قراءة المصراوية',
+  'masraweya.write' => 'تسجيل المصراوية',
+  'purchases.read' => 'قراءة المشتريات',
+  'purchases.write' => 'تسجيل المشتريات',
+  'purchases.finalize' => 'إقفال يوم المشتريات',
+  'treasury.read' => 'قراءة الخزينة',
+  'treasury.write' => 'تسجيل الخزينة',
+  'reports.read' => 'قراءة التقارير',
+  _ => code,
+};
 
 bool _primaryOwner(WidgetRef ref) {
   final session = ref.watch(sessionStateProvider);
@@ -364,7 +421,7 @@ class _LoginAccountCreateScreenState
                     }
                   }),
                 ),
-                Expanded(child: Text(code)),
+                Expanded(child: Text(permissionLabel(code))),
               ],
             ),
             Text('أقسام', style: cairo(14, 800)),
@@ -395,6 +452,11 @@ class _LoginAccountCreateScreenState
   }
 
   Future<void> _submit() async {
+    final problem = _problem();
+    if (problem != null) {
+      setState(() => _error = problem);
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
@@ -419,6 +481,18 @@ class _LoginAccountCreateScreenState
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  String? _problem() {
+    if (_username.text.trim().isEmpty) return 'أدخل اسم الدخول';
+    if (_name.text.trim().isEmpty) return 'أدخل الاسم الظاهر';
+    if (_role == 'admin' && !_email.text.contains('@')) {
+      return 'البريد مطلوب لحساب الإدارة';
+    }
+    if (_password.text.length < 10) {
+      return 'كلمة المرور المؤقتة عشرة أحرف على الأقل';
+    }
+    return null;
   }
 }
 
@@ -467,7 +541,7 @@ class _PermissionEditorState extends State<_PermissionEditor> {
                   }
                 }),
               ),
-              Expanded(child: Text(code)),
+              Expanded(child: Text(permissionLabel(code))),
             ],
           ),
         if (widget.error != null) Text(widget.error!),

@@ -5,6 +5,7 @@ import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
+import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 
 /// Code entry after `MFA_REQUIRED`. The challenge is not a signed-in session.
@@ -37,12 +38,19 @@ class _MfaScreenState extends ConsumerState<MfaScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dark = ref.watch(themeModeProvider) == ThemeMode.dark;
+    final width = MediaQuery.sizeOf(context).width;
+    final pad = width <= 360 ? AppSpacing.lg : AppSpacing.xxl;
     return Scaffold(
       key: MfaScreen.screenKey,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsetsDirectional.all(AppSpacing.xxl),
+            padding: EdgeInsetsDirectional.fromSTEB(
+              pad,
+              AppSpacing.lg,
+              pad,
+              pad + MediaQuery.viewInsetsOf(context).bottom,
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
@@ -52,6 +60,7 @@ class _MfaScreenState extends ConsumerState<MfaScreen> {
                     alignment: AlignmentDirectional.centerEnd,
                     child: IconButton(
                       key: const Key('mfa-theme'),
+                      tooltip: dark ? AppStrings.themeLight : AppStrings.themeDark,
                       onPressed: () =>
                           ref.read(themeModeProvider.notifier).toggle(),
                       icon: Icon(
@@ -62,47 +71,68 @@ class _MfaScreenState extends ConsumerState<MfaScreen> {
                     ),
                   ),
                   Text(
-                    'رمز التحقق',
+                    AppStrings.brandMark,
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.titleLarge,
+                    style: cairo(32, 800, color: context.sidebarPalette.base),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  const Text(
-                    'الخادم طلب رمزًا لإكمال الدخول. لم تُفتح الجلسة بعد، ولا تُحمَّل الصلاحيات قبل نجاح الرمز.',
-                    key: Key('mfa-not-signed-in'),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  TextField(
-                    key: MfaScreen.codeKey,
-                    controller: _code,
-                    enabled: !_busy,
-                    obscureText: true,
-                    keyboardType: TextInputType.text,
-                    textDirection: TextDirection.ltr,
-                    decoration: const InputDecoration(labelText: 'الرمز'),
-                    onSubmitted: (_) => _submit(),
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      _error!,
-                      key: MfaScreen.errorKey,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.error,
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'رمز التحقق',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          const Text(
+                            'الخادم طلب رمزًا لإكمال الدخول. لم تُفتح الجلسة بعد، ولا تُحمَّل الصلاحيات قبل نجاح الرمز.',
+                            key: Key('mfa-not-signed-in'),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          TextField(
+                            key: MfaScreen.codeKey,
+                            controller: _code,
+                            enabled: !_busy,
+                            obscureText: true,
+                            keyboardType: TextInputType.text,
+                            textDirection: TextDirection.ltr,
+                            decoration: const InputDecoration(
+                              labelText: 'الرمز',
+                              isDense: false,
+                            ),
+                            onSubmitted: (_) => _submit(),
+                          ),
+                          if (_error != null) ...[
+                            const SizedBox(height: AppSpacing.md),
+                            Text(
+                              _error!,
+                              key: MfaScreen.errorKey,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.error,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: AppSpacing.lg),
+                          FilledButton(
+                            key: MfaScreen.submitKey,
+                            onPressed: _busy ? null : _submit,
+                            child: _busy
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('تأكيد'),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                  const SizedBox(height: AppSpacing.lg),
-                  FilledButton(
-                    key: MfaScreen.submitKey,
-                    onPressed: _busy ? null : _submit,
-                    child: _busy
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('تأكيد'),
                   ),
                   TextButton(
                     key: MfaScreen.cancelKey,

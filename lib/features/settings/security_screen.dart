@@ -61,7 +61,7 @@ class SecurityScreen extends ConsumerWidget {
             key: Key('security-mfa-note'),
           ),
           const Text(
-            'هذا مسار العقد المكتوب. فحص القراءة على staging في 2026-10-23 لم يطلب MFA للحسابات الثلاثة، لذلك هذه الشاشة لا تثبت حسابًا حيًا يستخدم الرمز.',
+            'هذا مسار العقد المكتوب. فحص القراءة على staging في 2026-10-23 لم يطلب MFA للحسابات الثلاثة، لذلك هذه الشاشة لا تثبت حسابًا حيًا يستخدم الرمز. التفعيل والإيقاف والاسترجاع ليست مسارات منشورة.',
             key: Key('security-mfa-evidence'),
           ),
           const SizedBox(height: AppSpacing.sm),

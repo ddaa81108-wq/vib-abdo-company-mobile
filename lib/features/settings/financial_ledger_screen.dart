@@ -7,7 +7,6 @@ import '../../error_handling/error_handler.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
-import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/section_kit.dart';
@@ -83,7 +82,6 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
         key: FinancialLedgerScreen.screenKey,
         padding: pagePadding(MediaQuery.sizeOf(context).width),
         children: [
-          Text(AppStrings.financialLedger, style: cairo(18, 800)),
           const Text(
             'قيود الصفحة كما أرسلها الخادم. إجمالي الصفحة ليس إجمالي المؤسسة.',
             key: Key('ledger-page-note'),
@@ -97,6 +95,7 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
           DropdownButtonFormField<String?>(
             key: const Key('ledger-currency'),
             initialValue: _currency,
+            isExpanded: true,
             decoration: const InputDecoration(labelText: 'العملة'),
             items: const [
               DropdownMenuItem(value: null, child: Text('الكل')),
@@ -108,6 +107,7 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
           DropdownButtonFormField<FinancialLedgerSectionKey?>(
             key: const Key('ledger-section'),
             initialValue: _section,
+            isExpanded: true,
             decoration: const InputDecoration(labelText: 'القسم'),
             items: [
               const DropdownMenuItem(value: null, child: Text('كل الأقسام')),
@@ -132,9 +132,12 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
               children: [
                 Text(AppStrings.pageTotals),
                 for (final entry in data.pageTotals.entries)
-                  MoneyText(
-                    _money(money, entry.key, entry.value),
-                    key: Key('ledger-screen-total-${entry.key}'),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: MoneyText(
+                      _money(money, entry.key, entry.value),
+                      key: Key('ledger-screen-total-${entry.key}'),
+                    ),
                   ),
                 if (data.page.items.isEmpty)
                   const EmptyPane(message: AppStrings.emptyLedger)
@@ -168,18 +171,23 @@ class _LedgerRow extends ConsumerWidget {
     final text = amount == null || amount.isInvalid || amount.units == null
         ? MoneyValue.invalidLabel
         : money.formatOrDash(amount, row.currency);
-    return ListTile(
+    final detail = [
+      if (row.sectionKeyRaw != null) row.sectionKeyRaw,
+      if (row.sourceStatusRaw != null) row.sourceStatusRaw,
+      if (row.referenceNo != null) row.referenceNo,
+      if (row.actorName != null) row.actorName,
+    ].join(' · ');
+    return Padding(
       key: Key('ledger-entry-${row.id}'),
-      title: Text(row.counterpartyName ?? row.description ?? row.id),
-      subtitle: Text(
-        [
-          if (row.sectionKeyRaw != null) row.sectionKeyRaw,
-          if (row.sourceStatusRaw != null) row.sourceStatusRaw,
-          if (row.referenceNo != null) row.referenceNo,
-          if (row.actorName != null) row.actorName,
-        ].join(' · '),
+      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(row.counterpartyName ?? row.description ?? row.id),
+          if (detail.isNotEmpty) Text(detail),
+          Align(alignment: Alignment.centerLeft, child: MoneyText(text)),
+        ],
       ),
-      trailing: MoneyText(text),
     );
   }
 }

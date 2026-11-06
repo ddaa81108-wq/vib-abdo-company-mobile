@@ -38,7 +38,10 @@ class DevelopmentScreen extends ConsumerWidget {
         key: screenKey,
         padding: pagePadding(MediaQuery.sizeOf(context).width),
         children: [
-          Text('تطوير التطبيق', style: cairo(18, 800)),
+          const Text(
+            'إصدار هذه النسخة وحالة الخادم. لا أسرار ولا محدّث عن بعد.',
+            style: TextStyle(height: 1.4),
+          ),
           const SizedBox(height: AppSpacing.sm),
           _row('إصدار التطبيق', appReleaseLabel, 'development-app-version'),
           _row(
