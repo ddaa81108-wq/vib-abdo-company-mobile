@@ -27,11 +27,12 @@ import 'unlinked_receipt_actions.dart';
 /// laid out after Ali's two pictures (2026-11-03), in the app's own dark and
 /// light theme.
 ///
-/// Admin (`collections.decide`): filter card (batch, employee, search),
-/// action bar (payroll, close, PDF), the batch close note, four summary
-/// cards, four tabs with counts and the chosen tab's list. Employee: action
-/// bar (standalone receipt, payroll, PDF), own counts, the cash to hand
-/// over, three tabs, search and the list. Payroll opens from the bar.
+/// Admin (`collections.decide`): batch and employee filters side by side,
+/// one row of payroll / close / statement, the batch close note, four
+/// summary cards, search beside the employee-totals menu, four existing
+/// status tabs, then the list. Employee (no `collections.decide`): the same
+/// density for their own actions, own counts, own tabs and own list. No
+/// batch filter, close, or staff totals. Payroll opens from the bar.
 /// Every figure is a server field or derived from the server's lists; see
 /// `collections_view_model.dart`.
 class CollectionsScreen extends ConsumerStatefulWidget {
@@ -66,15 +67,6 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
       key: CollectionsScreen.screenKey,
       padding: pagePadding(width).copyWith(bottom: AppSpacing.xxl),
       children: [
-        const ScreenTitle(CollectionsText.title),
-        Text(
-          manage
-              ? CollectionsText.adminDescription
-              : CollectionsText.employeeDescription,
-          style: Theme.of(context).textTheme.bodySmall
-              ?.copyWith(color: context.look.muted),
-        ),
-        const SizedBox(height: AppSpacing.md),
         if (_payroll && showPayroll) ...[
           Align(
             alignment: AlignmentDirectional.centerStart,
@@ -196,141 +188,121 @@ class _AdminViewState extends ConsumerState<_AdminView> {
       children: [
         CollectionsPanel(
           key: const Key('collections-filter-card'),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _FieldPair(
-                first: _LabeledField(
-                  label: CollectionsText.filterBatch,
-                  child: DropdownButtonFormField<String>(
-                    key: const Key('collections-filter-batch'),
-                    initialValue: batch?.id,
-                    isExpanded: true,
-                    hint: const Text(CollectionsText.noOpenBatches),
-                    items: [
-                      for (final b in batches)
-                        DropdownMenuItem(
-                          value: b.id,
-                          child: Text(
-                            CollectionsText.batchLabel(
-                              b.businessDate,
-                              b.batchNumber,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            style: cairo(13, 700, color: look.ink),
-                          ),
+          child: _PeerRow(
+            first: _LabeledField(
+              label: CollectionsText.filterBatch,
+              child: DropdownButtonFormField<String>(
+                key: const Key('collections-filter-batch'),
+                initialValue: batch?.id,
+                isExpanded: true,
+                hint: const Text(CollectionsText.noOpenBatches),
+                items: [
+                  for (final b in batches)
+                    DropdownMenuItem(
+                      value: b.id,
+                      child: Text(
+                        CollectionsText.batchLabel(
+                          b.businessDate,
+                          b.batchNumber,
                         ),
-                    ],
-                    onChanged: batches.isEmpty
-                        ? null
-                        : (id) => setState(() => _batchId = id),
-                  ),
-                ),
-                second: _LabeledField(
-                  label: CollectionsText.filterEmployee,
-                  child: DropdownButtonFormField<String?>(
-                    key: const Key('collections-filter-employee'),
-                    initialValue: employee,
-                    isExpanded: true,
-                    items: [
-                      DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text(
-                          CollectionsText.allEmployees,
-                          style: cairo(13, 700, color: look.ink),
-                        ),
-                      ),
-                      for (final name in employees)
-                        DropdownMenuItem<String?>(
-                          value: name,
-                          child: Text(
-                            name,
-                            overflow: TextOverflow.ellipsis,
-                            style: cairo(13, 700, color: look.ink),
-                          ),
-                        ),
-                    ],
-                    onChanged: (name) => setState(() => _employee = name),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _LabeledField(
-                label: CollectionsText.searchView,
-                child: TextField(
-                  key: const Key('collections-search'),
-                  controller: _search,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    hintText: CollectionsText.searchViewHint,
-                    prefixIcon: Icon(Icons.search),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _ActionBar(
-                key: const Key('collections-action-bar'),
-                children: [
-                  if (widget.onPayroll != null)
-                    _BarButton(
-                      buttonKey: const Key('collections-payroll'),
-                      label: CollectionsText.payrollButton,
-                      onPressed: widget.onPayroll,
-                    ),
-                  if (close) _CloseBatchButton(batch: batch),
-                  CollectionsExportButton(
-                    data: data,
-                    admin: true,
-                    batchId: batch?.id,
-                    label: CollectionsText.exportBatch,
-                    icon: false,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Divider(color: look.cardBorder, height: 1),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                CollectionsText.closeBatchTitle,
-                style: cairo(15, 800, color: look.ink),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                CollectionsText.closeScopeNote,
-                style: cairo(12, 500, color: look.muted),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Wrap(
-                key: const Key('close-batch-note'),
-                spacing: AppSpacing.lg,
-                runSpacing: AppSpacing.xxs,
-                children: [
-                  Text(
-                    CollectionsText.reviewCount(settlement.reviewCount),
-                    key: const Key('close-batch-review'),
-                    style: cairo(13, 600, color: look.ink),
-                  ),
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        '${CollectionsText.cashNotReceived} ',
-                        style: cairo(13, 600, color: look.ink),
-                      ),
-                      MoneyText(
-                        _money(money, settlement.cashUnits),
-                        key: const Key('close-batch-cash'),
+                        overflow: TextOverflow.ellipsis,
                         style: cairo(13, 700, color: look.ink),
                       ),
-                    ],
-                  ),
+                    ),
                 ],
+                onChanged: batches.isEmpty
+                    ? null
+                    : (id) => setState(() => _batchId = id),
               ),
-            ],
+            ),
+            second: _LabeledField(
+              label: CollectionsText.filterEmployee,
+              child: DropdownButtonFormField<String?>(
+                key: const Key('collections-filter-employee'),
+                initialValue: employee,
+                isExpanded: true,
+                items: [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text(
+                      CollectionsText.allEmployees,
+                      style: cairo(13, 700, color: look.ink),
+                    ),
+                  ),
+                  for (final name in employees)
+                    DropdownMenuItem<String?>(
+                      value: name,
+                      child: Text(
+                        name,
+                        overflow: TextOverflow.ellipsis,
+                        style: cairo(13, 700, color: look.ink),
+                      ),
+                    ),
+                ],
+                onChanged: (name) => setState(() => _employee = name),
+              ),
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        _Grid2(
+        _ActionBar(
+          key: const Key('collections-action-bar'),
+          oneRow: true,
+          children: [
+            if (widget.onPayroll != null)
+              _BarButton(
+                buttonKey: const Key('collections-payroll'),
+                label: CollectionsText.payrollButton,
+                onPressed: widget.onPayroll,
+              ),
+            if (close)
+              _CloseBatchButton(
+                batch: batch,
+                label: CollectionsText.closeShort,
+              ),
+            CollectionsExportButton(
+              data: data,
+              admin: true,
+              batchId: batch?.id,
+              label: CollectionsText.exportShort,
+              icon: false,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          CollectionsText.closeScopeNote,
+          style: cairo(12, 500, color: look.muted),
+        ),
+        const SizedBox(height: AppSpacing.xxs),
+        Wrap(
+          key: const Key('close-batch-note'),
+          spacing: AppSpacing.lg,
+          runSpacing: AppSpacing.xxs,
+          children: [
+            Text(
+              CollectionsText.reviewCount(settlement.reviewCount),
+              key: const Key('close-batch-review'),
+              style: cairo(13, 600, color: look.ink),
+            ),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  '${CollectionsText.cashNotReceived} ',
+                  style: cairo(13, 600, color: look.ink),
+                ),
+                MoneyText(
+                  _money(money, settlement.cashUnits),
+                  key: const Key('close-batch-cash'),
+                  style: cairo(13, 700, color: look.ink),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _NumberRow(
           key: const Key('collections-metrics'),
           children: [
             _SummaryCard(
@@ -358,23 +330,36 @@ class _AdminViewState extends ConsumerState<_AdminView> {
               key: const Key('metric-pending'),
               title: CollectionsText.sumPending,
               value: '${summary.pendingCount}',
-              unit: CollectionsText.operations,
-              note: CollectionsText.unlinkedWithin(
-                summary.unlinkedPendingCount,
-              ),
               edge: look.violet,
             ),
           ],
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          CollectionsText.summaryNote,
-          style: cairo(12, 500, color: look.muted),
+          CollectionsText.unlinkedWithin(summary.unlinkedPendingCount),
+          style: cairo(11, 500, color: look.muted),
         ),
-        const SizedBox(height: AppSpacing.md),
-        _Grid2(
+        Text(
+          CollectionsText.summaryNote,
+          style: cairo(11, 500, color: look.muted),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _PeerRow(
+          first: TextField(
+            key: const Key('collections-search'),
+            controller: _search,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              hintText: CollectionsText.searchViewHint,
+              prefixIcon: Icon(Icons.search),
+              isDense: true,
+            ),
+          ),
+          second: _EmployeeTotalsMenu(rows: data.employeeTotals, money: money),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _NumberRow(
           key: const Key('collections-tabs'),
-          tight: true,
           children: [
             for (final tab in AdminTab.values)
               _TabChip(
@@ -406,30 +391,47 @@ class _AdminViewState extends ConsumerState<_AdminView> {
                   },
           ),
         ),
-        if (data.employeeTotals.isNotEmpty)
-          _EmployeeTotalsSection(rows: data.employeeTotals, money: money),
       ],
     );
   }
 }
 
-/// 537 `employeeTotals` (admin only), kept under the list as before.
-class _EmployeeTotalsSection extends StatelessWidget {
-  const _EmployeeTotalsSection({required this.rows, required this.money});
+class _EmployeeTotalsMenu extends StatefulWidget {
+  const _EmployeeTotalsMenu({required this.rows, required this.money});
 
   final List<EmployeeTotalDto> rows;
   final MoneyFormatter money;
 
   @override
+  State<_EmployeeTotalsMenu> createState() => _EmployeeTotalsMenuState();
+}
+
+class _EmployeeTotalsMenuState extends State<_EmployeeTotalsMenu> {
+  var _open = false;
+
+  @override
   Widget build(BuildContext context) {
+    final look = context.look;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const CollectionsHeading(
-          CollectionsText.employeeTotals,
-          note: CollectionsText.employeeTotalsNote,
+        OutlinedButton(
+          key: const Key('employee-totals-toggle'),
+          onPressed: widget.rows.isEmpty
+              ? null
+              : () => setState(() => _open = !_open),
+          child: Text(
+            CollectionsText.employeeTotals,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: cairo(12, 800, color: look.ink),
+          ),
         ),
-        _EmployeeTotals(rows: rows, money: money),
+        if (_open && widget.rows.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.xs),
+          _EmployeeTotals(rows: widget.rows, money: widget.money),
+        ],
       ],
     );
   }
@@ -722,6 +724,7 @@ class _EmployeeViewState extends ConsumerState<_EmployeeView> {
       children: [
         _ActionBar(
           key: const Key('collections-action-bar'),
+          oneRow: true,
           children: [
             if (widget.write)
               _BarButton(
@@ -744,21 +747,20 @@ class _EmployeeViewState extends ConsumerState<_EmployeeView> {
               data: data,
               admin: false,
               batchId: data.openBatches.firstOrNull?.id,
-              label: CollectionsText.exportDay,
+              label: CollectionsText.exportShort,
               icon: false,
             ),
           ],
         ),
-        const SizedBox(height: AppSpacing.md),
-        _Grid2(
+        const SizedBox(height: AppSpacing.sm),
+        _NumberRow(
           key: const Key('collections-metrics'),
           children: [
             _SummaryCard(
               key: const Key('metric-assigned'),
-              title: CollectionsText.myCardsTitle,
+              title: CollectionsText.assigned,
               // 537 `assignedCount` (= the caller's active cards).
               value: '${data.assignedCount ?? data.assignments.length}',
-              unit: CollectionsText.cardsUnit,
               edge: _amber(context),
             ),
             _SummaryCard(
@@ -767,45 +769,45 @@ class _EmployeeViewState extends ConsumerState<_EmployeeView> {
               // 537 metrics.pendingCount + metrics.unlinkedPendingCount.
               value:
                   '${(data.pendingCount ?? 0) + (data.unlinkedPendingCount ?? 0)}',
-              unit: CollectionsText.operations,
               edge: look.violet,
+            ),
+            _SummaryCard(
+              key: const Key('metric-cash'),
+              title: CollectionsText.cashOutstanding,
+              // 537 metrics.cashOutstandingUnits: own approved, cash not
+              // received, earlier batches and cancelled cards included.
+              value: money.formatOrDash(
+                data.cashOutstandingUnits,
+                Currency.lyd,
+              ),
+              money: true,
+              edge: _amber(context),
             ),
           ],
         ),
-        const SizedBox(height: AppSpacing.sm),
-        _SummaryCard(
-          key: const Key('metric-cash'),
-          title: CollectionsText.cashToHand,
-          // 537 metrics.cashOutstandingUnits: own approved, cash not
-          // received, earlier batches and cancelled cards included.
-          value: money.formatOrDash(data.cashOutstandingUnits, Currency.lyd),
-          money: true,
-          note: CollectionsText.cashToHandNote,
-          edge: _amber(context),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          CollectionsText.cashToHandNote,
+          style: cairo(11, 500, color: look.muted),
         ),
-        const SizedBox(height: AppSpacing.md),
-        Row(
+        const SizedBox(height: AppSpacing.sm),
+        _NumberRow(
           key: const Key('collections-tabs'),
           children: [
-            for (final tab in EmployeeTab.values) ...[
-              if (tab != EmployeeTab.values.first)
-                const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _TabChip(
-                  key: Key('collections-tab-${tab.name}'),
-                  label: switch (tab) {
-                    EmployeeTab.cards => CollectionsText.tabMyCards,
-                    EmployeeTab.receipts => CollectionsText.tabMyReceipts,
-                    EmployeeTab.cash => CollectionsText.tabMyCash,
-                  },
-                  selected: _tab == tab,
-                  onTap: () => setState(() => _tab = tab),
-                ),
+            for (final tab in EmployeeTab.values)
+              _TabChip(
+                key: Key('collections-tab-${tab.name}'),
+                label: switch (tab) {
+                  EmployeeTab.cards => CollectionsText.tabMyCards,
+                  EmployeeTab.receipts => CollectionsText.tabMyReceipts,
+                  EmployeeTab.cash => CollectionsText.tabMyCash,
+                },
+                selected: _tab == tab,
+                onTap: () => setState(() => _tab = tab),
               ),
-            ],
           ],
         ),
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: AppSpacing.sm),
         _LabeledField(
           label: CollectionsText.searchNameOrPhone,
           child: TextField(
@@ -815,6 +817,7 @@ class _EmployeeViewState extends ConsumerState<_EmployeeView> {
             decoration: const InputDecoration(
               hintText: CollectionsText.searchNameOrPhoneHint,
               prefixIcon: Icon(Icons.search),
+              isDense: true,
             ),
           ),
         ),
@@ -904,36 +907,44 @@ class _ReceiptRow extends StatelessWidget {
 
 // --------------------------------------------------------------- layout
 
-/// Two fields side by side, or stacked when the line is tight.
-class _FieldPair extends StatelessWidget {
-  const _FieldPair({required this.first, required this.second});
+/// Two peers that stay side by side, including at text scale 1.3.
+class _PeerRow extends StatelessWidget {
+  const _PeerRow({required this.first, required this.second});
 
   final Widget first;
   final Widget second;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (_tight(context, constraints.maxWidth)) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              first,
-              const SizedBox(height: AppSpacing.sm),
-              second,
-            ],
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: first),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(child: second),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: first),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(child: second),
+      ],
+    );
+  }
+}
+
+/// Equal cells in one horizontal row. Content scales down instead of clipping.
+class _NumberRow extends StatelessWidget {
+  const _NumberRow({required this.children, super.key});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(child: children[i]),
           ],
-        );
-      },
+        ],
+      ),
     );
   }
 }
@@ -960,9 +971,10 @@ class _LabeledField extends StatelessWidget {
 /// The glossy bar of pill buttons (the website's green bar, in the app's
 /// hero gloss). Buttons inside take the bar's colours.
 class _ActionBar extends StatelessWidget {
-  const _ActionBar({required this.children, super.key});
+  const _ActionBar({required this.children, this.oneRow = false, super.key});
 
   final List<Widget> children;
+  final bool oneRow;
 
   @override
   Widget build(BuildContext context) {
@@ -1012,8 +1024,9 @@ class _ActionBar extends StatelessWidget {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final narrow =
-                        _tight(context, constraints.maxWidth) ||
-                        constraints.maxWidth / children.length < 104;
+                        !oneRow &&
+                        (_tight(context, constraints.maxWidth) ||
+                            constraints.maxWidth / children.length < 104);
                     if (narrow) {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1063,7 +1076,12 @@ class _BarButton extends StatelessWidget {
     return OutlinedButton(
       key: buttonKey,
       onPressed: onPressed,
-      child: Text(label, maxLines: 2, textAlign: TextAlign.center),
+      child: Text(
+        label,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+      ),
     );
   }
 }
@@ -1071,24 +1089,28 @@ class _BarButton extends StatelessWidget {
 /// «إغلاق ومسح الدفعة» for the chosen batch. 537 refuses an unsettled
 /// batch (COLLECTION_DAY_NOT_SETTLED); that message is shown, never hidden.
 class _CloseBatchButton extends ConsumerWidget {
-  const _CloseBatchButton({required this.batch});
+  const _CloseBatchButton({
+    required this.batch,
+    this.label = CollectionsText.closeBatch,
+  });
 
   final CollectionBatchDto? batch;
+  final String label;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final batch = this.batch;
     if (batch == null) {
-      return const OutlinedButton(
-        key: Key('close-batch'),
+      return OutlinedButton(
+        key: const Key('close-batch'),
         onPressed: null,
-        child: Text(CollectionsText.closeBatch, textAlign: TextAlign.center),
+        child: Text(label, textAlign: TextAlign.center),
       );
     }
     return GuardedMutation(
       buttonKey: const Key('close-batch'),
       inputs: 'close:${batch.id}',
-      label: CollectionsText.closeBatch,
+      label: label,
       confirmText: CollectionsText.closeConfirm,
       destructive: true,
       onVersionConflict: () => ref.invalidate(collectionsProvider),
@@ -1118,58 +1140,6 @@ class _CloseBatchButton extends ConsumerWidget {
   }
 }
 
-/// Two equal columns (one when tight); each row's cells share a height.
-class _Grid2 extends StatelessWidget {
-  const _Grid2({required this.children, this.tight = false, super.key});
-
-  final List<Widget> children;
-  final bool tight;
-
-  @override
-  Widget build(BuildContext context) {
-    final gap = tight ? AppSpacing.sm : AppSpacing.sm;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (_tight(context, constraints.maxWidth)) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final child in children) ...[
-                if (child != children.first) SizedBox(height: gap),
-                child,
-              ],
-            ],
-          );
-        }
-        final lines = <Widget>[];
-        for (var i = 0; i < children.length; i += 2) {
-          if (i > 0) lines.add(SizedBox(height: gap));
-          lines.add(
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: children[i]),
-                  SizedBox(width: gap),
-                  Expanded(
-                    child: i + 1 < children.length
-                        ? children[i + 1]
-                        : const SizedBox.shrink(),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: lines,
-        );
-      },
-    );
-  }
-}
-
 /// A summary card with a coloured start edge, as in the pictures.
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
@@ -1177,8 +1147,6 @@ class _SummaryCard extends StatelessWidget {
     required this.value,
     required this.edge,
     this.money = false,
-    this.unit,
-    this.note,
     super.key,
   });
 
@@ -1186,8 +1154,6 @@ class _SummaryCard extends StatelessWidget {
   final String value;
   final Color edge;
   final bool money;
-  final String? unit;
-  final String? note;
 
   @override
   Widget build(BuildContext context) {
@@ -1216,47 +1182,27 @@ class _SummaryCard extends StatelessWidget {
             border: BorderDirectional(start: BorderSide(color: edge, width: 5)),
           ),
           child: Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: cairo(14, 800, color: look.ink)),
-                const SizedBox(height: AppSpacing.sm),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: AlignmentDirectional.centerStart,
-                  child: money
-                      ? MoneyText(value, style: figure)
-                      : Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              value,
-                              textDirection: TextDirection.ltr,
-                              style: figure,
-                            ),
-                            if (unit != null) ...[
-                              const SizedBox(width: AppSpacing.xs),
-                              Text(
-                                unit!,
-                                style: cairo(13, 600, color: look.muted),
-                              ),
-                            ],
-                          ],
+            padding: const EdgeInsetsDirectional.all(AppSpacing.xs),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: cairo(11, 700, color: look.ink),
+                  ),
+                  const SizedBox(height: 2),
+                  money
+                      ? MoneyText(value, style: figure.copyWith(fontSize: 15))
+                      : Text(
+                          value,
+                          textDirection: TextDirection.ltr,
+                          style: figure.copyWith(fontSize: 15),
                         ),
-                ),
-                if (note != null) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(note!, style: cairo(11, 500, color: look.muted)),
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -1290,8 +1236,8 @@ class _TabChip extends StatelessWidget {
     final ink = selected ? look.onHero : look.ink;
     final body = Padding(
       padding: const EdgeInsetsDirectional.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.md,
+        horizontal: 4,
+        vertical: 8,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1299,8 +1245,10 @@ class _TabChip extends StatelessWidget {
           Flexible(
             child: Text(
               label,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: cairo(13, 800, color: ink),
+              style: cairo(11, 800, color: ink),
             ),
           ),
           if (count != null) ...[

@@ -38,14 +38,12 @@ void main() {
 
       final button = find.byKey(CollectionsExportButton.buttonKey);
       expect(button, findsOneWidget);
+      // The bar shows the short face. Admin still exports the open batch;
+      // the employee export stays scoped to that caller's own rows.
       expect(
         find.descendant(
           of: button,
-          matching: find.text(
-            role == 'admin'
-                ? CollectionsText.exportBatch
-                : CollectionsText.exportDay,
-          ),
+          matching: find.text(CollectionsText.exportShort),
         ),
         findsOneWidget,
       );
