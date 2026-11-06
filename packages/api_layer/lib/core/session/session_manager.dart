@@ -39,6 +39,20 @@ class SessionAuthenticated extends SessionState {
 /// Hook for clearing caches, local notifications, badge, downloaded files, push token, realtime.
 typedef SessionCleanup = Future<void> Function();
 
+/// Applies the window capture flag for a session generation.
+///
+/// [secure] runs before logout, expiry, and account switch so the previous
+/// account cannot be captured while its widgets are still up. [applySession]
+/// runs only after that generation is still the current one.
+abstract interface class SessionCaptureGate {
+  Future<void> secure({required int generation});
+
+  Future<void> applySession({
+    required int generation,
+    required SessionState state,
+  });
+}
+
 /// Cookie-session lifecycle for the real system:
 ///   login    POST /api/auth/login {username,password} -> {user, csrfToken}; then GET /api/me
 ///   restore  GET /api/me then GET /api/auth/csrf (same order as the web client's resume)
@@ -50,18 +64,26 @@ class SessionManager {
     required AuthRepository authRepository,
     required ProfileRepository profileRepository,
     required PermissionService permissionService,
+    SessionCaptureGate? captureGate,
     List<SessionCleanup> cleanups = const [],
   })  : _strategy = authStrategy,
         _auth = authRepository,
         _profile = profileRepository,
         _permissions = permissionService,
+        _captureGate = captureGate,
         _cleanups = cleanups;
 
   final AuthStrategy _strategy;
   final AuthRepository _auth;
   final ProfileRepository _profile;
   final PermissionService _permissions;
+  final SessionCaptureGate? _captureGate;
   final List<SessionCleanup> _cleanups;
+
+  /// Bumped before logout, expiry, and account switch. An in-flight profile
+  /// read keeps the generation it started with and cannot publish after it.
+  int _transitionEpoch = 0;
+  int _reloadSerial = 0;
 
   final _controller = StreamController<SessionState>.broadcast();
   final ValueNotifier<SessionState> _listenable =
@@ -86,11 +108,14 @@ class SessionManager {
 
   /// App start: resume a persisted cookie session if any.
   Future<void> restore() async {
+    await _secureNow(_transitionEpoch);
     if (!await _strategy.hasPersistedSession()) {
-      return _emit(const SessionUnauthenticated());
+      await _publish(const SessionUnauthenticated());
+      return;
     }
     try {
       await reloadProfileAndPermissions(); // AUTH_REQUIRED -> interceptor -> forceLogout
+      if (state is! SessionAuthenticated) return;
       await _strategy.onSessionResumed(); // GET /api/auth/csrf
     } catch (error, stack) {
       if (state is! SessionUnauthenticated) {
@@ -107,9 +132,28 @@ class SessionManager {
 
   Future<void> login(
       {required String username, required String password}) async {
-    final result = await _auth.login(username: username, password: password);
-    await _strategy.onLoginSucceeded(result.raw);
-    await reloadProfileAndPermissions();
+    final switching =
+        state is SessionAuthenticated || state is SessionOtpRequired;
+    if (switching) {
+      _transitionEpoch++;
+      await _secureNow(_transitionEpoch);
+    }
+    final epoch = _transitionEpoch;
+    try {
+      final result = await _auth.login(username: username, password: password);
+      // Logout or expiry won the race. Do not publish this login.
+      if (epoch != _transitionEpoch) return;
+      await _strategy.onLoginSucceeded(result.raw);
+      if (epoch != _transitionEpoch) return;
+      await reloadProfileAndPermissions();
+    } catch (_) {
+      if (switching &&
+          epoch == _transitionEpoch &&
+          state is SessionAuthenticated) {
+        await _applyCapture(epoch);
+      }
+      rethrow;
+    }
   }
 
   Future<void> changePassword(
@@ -120,14 +164,26 @@ class SessionManager {
   }
 
   Future<void> reloadProfileAndPermissions() async {
-    final me = await _profile.fetchMe();
-    _permissions.applyFromServer(
-      me.user.permissions,
-      role: me.user.role,
-      sectionAccess: me.user.sectionAccess,
-      fullAccess: me.user.fullAccess,
-    );
-    _emit(SessionAuthenticated(me.user));
+    final epoch = _transitionEpoch;
+    final serial = ++_reloadSerial;
+    // The next profile may be a different role. Secure until it is applied.
+    await _secureNow(epoch);
+    try {
+      final me = await _profile.fetchMe();
+      if (!_reloadCurrent(serial, epoch)) return;
+      _permissions.applyFromServer(
+        me.user.permissions,
+        role: me.user.role,
+        sectionAccess: me.user.sectionAccess,
+        fullAccess: me.user.fullAccess,
+      );
+      if (!_reloadCurrent(serial, epoch)) return;
+      _emit(SessionAuthenticated(me.user));
+      await _applyCapture(epoch);
+    } catch (_) {
+      if (_reloadCurrent(serial, epoch)) await _applyCapture(epoch);
+      rethrow;
+    }
   }
 
   /// Calls the REAL logout endpoint first (needs cookie + CSRF), then wipes locally
@@ -135,6 +191,8 @@ class SessionManager {
   /// so the login screen does not show the expiry notice.
   Future<void> logout() async {
     _logoutRequested = true;
+    _transitionEpoch++;
+    await _secureNow(_transitionEpoch);
     try {
       await _auth.logout();
     } catch (_) {
@@ -167,7 +225,10 @@ class SessionManager {
   Future<void> _performWipe() async {
     if (_loggingOut) return;
     _loggingOut = true;
+    _transitionEpoch++;
+    final epoch = _transitionEpoch;
     try {
+      await _secureNow(epoch);
       await _strategy.clear(); // cookies + CSRF (or tokens)
       _permissions.clear();
       for (final c in _cleanups) {
@@ -178,11 +239,45 @@ class SessionManager {
       // Read the reason after the awaits so a logout that started while this
       // wipe was already running can upgrade session_expired to logout.
       _emit(SessionUnauthenticated(reason: _wipeReason ?? 'session_expired'));
+      await _applyCapture(epoch);
     } finally {
       _loggingOut = false;
       _wipeInFlight = null;
       _wipeReason = null;
       _logoutRequested = false;
+    }
+  }
+
+  bool _reloadCurrent(int serial, int epoch) =>
+      serial == _reloadSerial &&
+      epoch == _transitionEpoch &&
+      !_loggingOut &&
+      _wipeInFlight == null;
+
+  Future<void> _publish(SessionState next) async {
+    final epoch = _transitionEpoch;
+    _emit(next);
+    await _applyCapture(epoch);
+  }
+
+  Future<void> _secureNow(int generation) async {
+    final gate = _captureGate;
+    if (gate == null) return;
+    try {
+      await gate.secure(generation: generation);
+    } catch (_) {
+      // The window stays at its last native state. Release starts secure.
+    }
+  }
+
+  Future<void> _applyCapture(int epoch) async {
+    final gate = _captureGate;
+    if (gate == null || epoch != _transitionEpoch) return;
+    try {
+      await gate.applySession(generation: epoch, state: state);
+    } catch (_) {
+      if (epoch != _transitionEpoch) return;
+      await _secureNow(epoch);
     }
   }
 

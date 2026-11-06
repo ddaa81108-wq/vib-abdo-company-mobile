@@ -16,11 +16,24 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private val captureGenerations = CaptureGeneration()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Debug: allow screenshots and recording. Release: FLAG_SECURE.
-        ScreenCapturePolicy.apply(window, BuildConfig.DEBUG)
+        secureWindowAtStart()
         ensureCollectionsChannel()
+    }
+
+    /** Release starts secure. Debug starts capturable. A new engine resets the generation. */
+    private fun secureWindowAtStart() {
+        captureGenerations.reset()
+        ScreenCapturePolicy.apply(
+            window,
+            BuildConfig.DEBUG,
+            null,
+            0L,
+            captureGenerations,
+        )
     }
 
     private fun ensureCollectionsChannel() {
@@ -39,22 +52,41 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        ScreenCapturePolicy.apply(window, BuildConfig.DEBUG)
+        secureWindowAtStart()
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/screen_security")
             .setMethodCallHandler { call, result ->
-                // "enable" can only reinforce release protection. It cannot
-                // clear FLAG_SECURE, and a debug build does not set it again.
-                if (call.method == "enable") {
-                    if (ScreenCapturePolicy.windowIsSecure(BuildConfig.DEBUG)) {
+                if (call.method != "applyVerifiedRole") {
+                    // An unknown call cannot clear the flag. Release fails closed.
+                    if (CaptureRules.windowIsSecure(BuildConfig.DEBUG, null)) {
                         window.setFlags(
                             WindowManager.LayoutParams.FLAG_SECURE,
                             WindowManager.LayoutParams.FLAG_SECURE,
                         )
                     }
-                    result.success(null)
-                } else {
                     result.notImplemented()
+                    return@setMethodCallHandler
                 }
+                val args = call.arguments as? Map<*, *>
+                val generation = (args?.get("generation") as? Number)?.toLong()
+                if (args == null || generation == null) {
+                    if (CaptureRules.windowIsSecure(BuildConfig.DEBUG, null)) {
+                        window.setFlags(
+                            WindowManager.LayoutParams.FLAG_SECURE,
+                            WindowManager.LayoutParams.FLAG_SECURE,
+                        )
+                    }
+                    result.error("invalid_capture_policy", "generation required", null)
+                    return@setMethodCallHandler
+                }
+                val role = args["role"] as? String
+                val applied = ScreenCapturePolicy.apply(
+                    window,
+                    BuildConfig.DEBUG,
+                    role,
+                    generation,
+                    captureGenerations,
+                )
+                result.success(applied)
             }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/android_notifications")
             .setMethodCallHandler { call, result ->

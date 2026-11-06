@@ -3,23 +3,20 @@ package com.vip2100.vib
 import android.view.Window
 import android.view.WindowManager
 
-/**
- * Capture follows the Android build type, not a dart-define.
- *
- * [windowIsSecure] is true for every release compile (`debuggable == false`),
- * including a release APK signed with the debug keystore. Debug compiles
- * (`debuggable == true`) are not secure: screenshots and screen recording
- * both work, and the recents thumbnail can show the window.
- *
- * Android [WindowManager.LayoutParams.FLAG_SECURE] does not split those.
- * Clearing it allows screenshots, recording, and the recents image together.
- * There is no window flag that allows a screenshot while blocking recording.
- */
 internal object ScreenCapturePolicy {
-    fun windowIsSecure(debuggable: Boolean): Boolean = !debuggable
-
-    fun apply(window: Window, debuggable: Boolean) {
-        if (windowIsSecure(debuggable)) {
+    /**
+     * Returns false when [generation] is older than one already applied.
+     * The flags are left untouched in that case.
+     */
+    fun apply(
+        window: Window,
+        debuggable: Boolean,
+        role: String?,
+        generation: Long,
+        generations: CaptureGeneration,
+    ): Boolean {
+        if (!generations.accept(generation)) return false
+        if (CaptureRules.windowIsSecure(debuggable, role)) {
             window.setFlags(
                 WindowManager.LayoutParams.FLAG_SECURE,
                 WindowManager.LayoutParams.FLAG_SECURE,
@@ -27,5 +24,6 @@ internal object ScreenCapturePolicy {
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
+        return true
     }
 }
