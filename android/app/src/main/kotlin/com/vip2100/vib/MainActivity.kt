@@ -18,10 +18,8 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE,
-        )
+        // Debug: allow screenshots and recording. Release: FLAG_SECURE.
+        ScreenCapturePolicy.apply(window, BuildConfig.DEBUG)
         ensureCollectionsChannel()
     }
 
@@ -41,17 +39,18 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE,
-        )
+        ScreenCapturePolicy.apply(window, BuildConfig.DEBUG)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/screen_security")
             .setMethodCallHandler { call, result ->
+                // "enable" can only reinforce release protection. It cannot
+                // clear FLAG_SECURE, and a debug build does not set it again.
                 if (call.method == "enable") {
-                    window.setFlags(
-                        WindowManager.LayoutParams.FLAG_SECURE,
-                        WindowManager.LayoutParams.FLAG_SECURE,
-                    )
+                    if (ScreenCapturePolicy.windowIsSecure(BuildConfig.DEBUG)) {
+                        window.setFlags(
+                            WindowManager.LayoutParams.FLAG_SECURE,
+                            WindowManager.LayoutParams.FLAG_SECURE,
+                        )
+                    }
                     result.success(null)
                 } else {
                     result.notImplemented()

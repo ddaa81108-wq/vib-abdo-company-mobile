@@ -98,6 +98,9 @@ val requireReleaseSigning =
 
 android {
     namespace = "com.vip2100.vib"
+    buildFeatures {
+        buildConfig = true
+    }
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -197,6 +200,7 @@ kotlin {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    testImplementation("junit:junit:4.13.2")
     // NotificationCompat.setPublicVersion. The local-notifications plugin
     // cannot set a lock-screen public version, so MainActivity posts it.
     implementation("androidx.core:core-ktx:1.15.0")
