@@ -4,19 +4,20 @@ import android.view.Window
 import android.view.WindowManager
 
 internal object ScreenCapturePolicy {
-    /**
-     * Returns false when [generation] is older than one already applied.
-     * The flags are left untouched in that case.
-     */
+    /** A stale generation does not reach [push], so the flag stays as it was. */
     fun apply(
         window: Window,
-        debuggable: Boolean,
+        lock: CaptureLock,
         role: String?,
         generation: Long,
-        generations: CaptureGeneration,
     ): Boolean {
-        if (!generations.accept(generation)) return false
-        if (CaptureRules.windowIsSecure(debuggable, role)) {
+        if (!lock.apply(role, generation)) return false
+        push(window, lock.secure)
+        return true
+    }
+
+    fun push(window: Window, secure: Boolean) {
+        if (secure) {
             window.setFlags(
                 WindowManager.LayoutParams.FLAG_SECURE,
                 WindowManager.LayoutParams.FLAG_SECURE,
@@ -24,6 +25,5 @@ internal object ScreenCapturePolicy {
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
-        return true
     }
 }

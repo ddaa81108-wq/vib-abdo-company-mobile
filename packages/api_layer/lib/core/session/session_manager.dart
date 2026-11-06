@@ -266,7 +266,7 @@ class SessionManager {
     try {
       await gate.secure(generation: generation);
     } catch (_) {
-      // The window stays at its last native state. Release starts secure.
+      // A release hold still locks if this update never reaches the window.
     }
   }
 

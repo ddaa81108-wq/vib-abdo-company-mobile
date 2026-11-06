@@ -13,6 +13,12 @@ void main() {
   final rules = File(
     'android/app/src/main/kotlin/com/vip2100/vib/CaptureRules.kt',
   ).readAsStringSync();
+  final lock = File(
+    'android/app/src/main/kotlin/com/vip2100/vib/CaptureLock.kt',
+  ).readAsStringSync();
+  final messages = File(
+    'android/app/src/main/kotlin/com/vip2100/vib/CaptureMessages.kt',
+  ).readAsStringSync();
   final gate = File('lib/security/android_capture_gate.dart')
       .readAsStringSync();
   final permissions = File(
@@ -32,32 +38,40 @@ void main() {
       rules.indexOf('if (debuggable) return false'),
       lessThan(rules.indexOf('verifiedRole(role) == null')),
     );
-    expect(rules, isNot(contains('disable')));
-    expect(policy, isNot(contains('disable')));
-    expect(activity, isNot(contains('disable')));
-    expect(gate, isNot(contains('disable')));
-    expect(gate, isNot(contains('kDebugMode')));
+    for (final source in [rules, policy, activity, gate, lock, messages]) {
+      expect(source, isNot(contains('disable')));
+    }
+    expect(activity, isNot(contains('Long.MAX_VALUE')));
   });
 
   test('a stale generation cannot clear the flag', () {
-    final accept = policy.indexOf('generations.accept(generation)');
-    final clear = policy.indexOf('window.clearFlags');
-    expect(accept, greaterThanOrEqualTo(0));
-    expect(clear, greaterThan(accept));
+    expect(lock, contains('if (!generations.accept(generation)) return false'));
+    expect(policy, contains('if (!lock.apply(role, generation)) return false'));
     expect(
-      policy,
-      contains('if (!generations.accept(generation)) return false'),
+      policy.indexOf('if (!lock.apply(role, generation)) return false'),
+      lessThan(policy.indexOf('window.clearFlags')),
     );
     expect(activity, isNot(contains('clearFlags')));
+  });
+
+  test('a missed secure update still locks when the hold elapses', () {
+    expect(lock, contains('const val DEFAULT_HOLD_MS = 2000L'));
+    expect(lock, contains('fun onHoldElapsed(token: Long)'));
+    expect(lock, contains('secure = false\n        arm()'));
+    expect(gate, contains('Duration(milliseconds: 500)'));
+    expect(gate.indexOf('Duration(milliseconds: 500)'), greaterThan(0));
+    expect(activity, contains('onCaptureHoldElapsed'));
+    expect(activity, contains('captureLock.disarm()'));
+    expect(activity, contains('captureLock.resetForNewEngine()'));
   });
 
   test(
     'the release window starts secure and only a verified role can update it',
     () {
-      expect(activity, contains('secureWindowAtStart()'));
-      expect(activity, contains('captureGenerations.reset()'));
-      expect(activity, contains('applyVerifiedRole'));
-      expect(gate, contains("'applyVerifiedRole'"));
+    expect(activity, contains('secureWindowAtStart()'));
+    expect(activity, contains('CaptureMessages.handle'));
+    expect(messages, contains('const val METHOD = "applyVerifiedRole"'));
+    expect(gate, contains("'applyVerifiedRole'"));
       expect(activity, contains('BuildConfig.DEBUG'));
       expect(activity, contains('null,'));
       expect(activity, contains('0L'));
@@ -69,10 +83,10 @@ void main() {
         activity.indexOf('secureWindowAtStart()', onCreate),
         lessThan(engine),
       );
-      expect(
-        activity.indexOf('secureWindowAtStart()', engine),
-        lessThan(activity.indexOf('applyVerifiedRole')),
-      );
+    expect(
+      activity.indexOf('secureWindowAtStart()', engine),
+      lessThan(activity.indexOf('CaptureMessages.handle')),
+    );
     },
   );
 }

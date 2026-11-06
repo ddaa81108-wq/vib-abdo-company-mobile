@@ -8,7 +8,8 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
-import android.view.WindowManager
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.android.FlutterActivity
@@ -16,7 +17,22 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val captureGenerations = CaptureGeneration()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var holdCallback: Runnable? = null
+    private var windowAlive = true
+    private val captureLock = CaptureLock(
+        debuggable = BuildConfig.DEBUG,
+        scheduleHold = { token, delayMs ->
+            holdCallback?.let(mainHandler::removeCallbacks)
+            val callback = Runnable { onCaptureHoldElapsed(token) }
+            holdCallback = callback
+            mainHandler.postDelayed(callback, delayMs)
+        },
+        cancelHold = {
+            holdCallback?.let(mainHandler::removeCallbacks)
+            holdCallback = null
+        },
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,16 +40,28 @@ class MainActivity : FlutterActivity() {
         ensureCollectionsChannel()
     }
 
+    override fun onDestroy() {
+        windowAlive = false
+        captureLock.disarm()
+        super.onDestroy()
+    }
+
     /** Release starts secure. Debug starts capturable. A new engine resets the generation. */
     private fun secureWindowAtStart() {
-        captureGenerations.reset()
-        ScreenCapturePolicy.apply(
-            window,
-            BuildConfig.DEBUG,
-            null,
-            0L,
-            captureGenerations,
-        )
+        captureLock.resetForNewEngine()
+        captureLock.apply(null, 0L)
+        publishCapture()
+    }
+
+    private fun onCaptureHoldElapsed(token: Long) {
+        if (!windowAlive) return
+        captureLock.onHoldElapsed(token)
+        publishCapture()
+    }
+
+    private fun publishCapture() {
+        if (!windowAlive) return
+        ScreenCapturePolicy.push(window, captureLock.secure)
     }
 
     private fun ensureCollectionsChannel() {
@@ -55,38 +83,18 @@ class MainActivity : FlutterActivity() {
         secureWindowAtStart()
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/screen_security")
             .setMethodCallHandler { call, result ->
-                if (call.method != "applyVerifiedRole") {
-                    // An unknown call cannot clear the flag. Release fails closed.
-                    if (CaptureRules.windowIsSecure(BuildConfig.DEBUG, null)) {
-                        window.setFlags(
-                            WindowManager.LayoutParams.FLAG_SECURE,
-                            WindowManager.LayoutParams.FLAG_SECURE,
-                        )
-                    }
-                    result.notImplemented()
-                    return@setMethodCallHandler
-                }
-                val args = call.arguments as? Map<*, *>
-                val generation = (args?.get("generation") as? Number)?.toLong()
-                if (args == null || generation == null) {
-                    if (CaptureRules.windowIsSecure(BuildConfig.DEBUG, null)) {
-                        window.setFlags(
-                            WindowManager.LayoutParams.FLAG_SECURE,
-                            WindowManager.LayoutParams.FLAG_SECURE,
-                        )
-                    }
-                    result.error("invalid_capture_policy", "generation required", null)
-                    return@setMethodCallHandler
-                }
-                val role = args["role"] as? String
-                val applied = ScreenCapturePolicy.apply(
-                    window,
-                    BuildConfig.DEBUG,
-                    role,
-                    generation,
-                    captureGenerations,
+                val handled = CaptureMessages.handle(
+                    call.method,
+                    call.arguments,
+                    captureLock,
                 )
-                result.success(applied)
+                publishCapture()
+                when (handled.status) {
+                    CaptureMessages.Status.APPLIED -> result.success(handled.applied)
+                    CaptureMessages.Status.NOT_IMPLEMENTED -> result.notImplemented()
+                    CaptureMessages.Status.INVALID ->
+                        result.error("invalid_capture_policy", "generation required", null)
+                }
             }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/android_notifications")
             .setMethodCallHandler { call, result ->

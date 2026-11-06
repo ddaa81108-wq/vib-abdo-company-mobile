@@ -11,6 +11,7 @@ void main() {
   final employee = PermissionService.employeeRoleValue;
 
   late List<MethodCall> calls;
+  final gates = <AndroidCaptureGate>[];
 
   setUp(() {
     calls = [];
@@ -22,11 +23,22 @@ void main() {
   });
 
   tearDown(() {
+    for (final gate in gates) {
+      gate.dispose();
+    }
+    gates.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
   });
 
-  AndroidCaptureGate gate() => AndroidCaptureGate(channel: channel);
+  AndroidCaptureGate gate() {
+    final created = AndroidCaptureGate(
+      channel: channel,
+      ticker: ManualTicker(),
+    );
+    gates.add(created);
+    return created;
+  }
 
   Map<Object?, Object?> argsOf(MethodCall call) =>
       call.arguments as Map<Object?, Object?>;
@@ -115,6 +127,20 @@ void main() {
     expect(argsOf(calls.last)['role'], isNull);
     expect(calls.every((call) => call.method == 'applyVerifiedRole'), isTrue);
   });
+}
+
+class ManualTicker implements CaptureTicker {
+  void Function()? onTick;
+
+  @override
+  void start(Duration interval, void Function() onTick) {
+    this.onTick = onTick;
+  }
+
+  @override
+  void stop() {
+    onTick = null;
+  }
 }
 
 UserProfile _person({

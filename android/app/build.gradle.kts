@@ -151,6 +151,10 @@ android {
             }
         }
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 gradle.taskGraph.whenReady(
@@ -198,9 +202,19 @@ kotlin {
     }
 }
 
+// Flutter's asset copy is an input of the host unit-test package, but the
+// Android Gradle plugin does not declare that edge. Without it, testDebugUnitTest
+// fails before Robolectric can read FLAG_SECURE.
+tasks.configureEach {
+    if (name == "packageDebugUnitTestForUnitTest") {
+        dependsOn("copyFlutterAssetsDebug")
+    }
+}
+
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
     // NotificationCompat.setPublicVersion. The local-notifications plugin
     // cannot set a lock-screen public version, so MainActivity posts it.
     implementation("androidx.core:core-ktx:1.15.0")
