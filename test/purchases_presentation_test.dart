@@ -14,6 +14,7 @@ import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'package:vib_abdo_company_mobile/ui/theme.dart';
+import 'package:vib_abdo_company_mobile/ui/widgets/section_kit.dart';
 
 import 'support/pump_app.dart';
 
@@ -34,13 +35,13 @@ void main() {
     expect(find.byKey(const Key('purchase-day-12')), findsOneWidget);
     expect(find.byKey(const Key('purchase-entry-pe_1')), findsOneWidget);
     expect(find.text('فودافون كاش'), findsOneWidget);
-    expect(cardColor(tester), AppStatusColors.light.dayTones[2]);
+    expect(frameBorder(tester).color, sectionButtonGold);
 
     await tester.tap(find.byTooltip(AppStrings.themeDark));
     await settle(tester);
     expect(themeOf(tester).brightness, Brightness.dark);
     expectRtl(tester);
-    expect(cardColor(tester), AppStatusColors.dark.dayTones[2]);
+    expect(frameBorder(tester).color, const Color(0xFFFBBF24));
     expect(
       themeOf(tester).scaffoldBackgroundColor,
       buildAppTheme(Brightness.dark).scaffoldBackgroundColor,
@@ -323,8 +324,14 @@ double textScaleOf(WidgetTester tester) {
   ).scale(1);
 }
 
-Color? cardColor(WidgetTester tester) {
-  return tester.widget<Card>(find.byKey(const Key('purchase-day-12'))).color;
+BorderSide frameBorder(WidgetTester tester) {
+  final frame = find.ancestor(
+    of: find.byKey(const Key('purchase-day-12')),
+    matching: find.byType(DecoratedBox),
+  );
+  final decoration =
+      tester.widget<DecoratedBox>(frame.first).decoration as BoxDecoration;
+  return (decoration.border! as Border).top;
 }
 
 VoidCallback? pressed(WidgetTester tester, Key key) {

@@ -166,4 +166,17 @@ Future<void> show(WidgetTester tester, Finder finder) async {
     ),
   );
   await tester.pump();
+  await _revealHorizontally(tester, finder);
+}
+
+Future<void> _revealHorizontally(WidgetTester tester, Finder finder) async {
+  final horizontal = find.byKey(const Key('purchase-ledger-scroll'));
+  if (horizontal.evaluate().isEmpty) return;
+  final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+  for (var i = 0; i < 5; i++) {
+    final rect = tester.getRect(finder);
+    if (rect.left >= 0 && rect.right <= width - 4) return;
+    await tester.drag(horizontal, const Offset(420, 0));
+    await tester.pump();
+  }
 }
