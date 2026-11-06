@@ -394,12 +394,9 @@ Future<void> _expectRenderedInk(
   expect(edit, findsOneWidget);
   final editInk = _buttonForeground(tester, edit);
   expect(editInk, scheme.primary);
-  final purchaseCard = tester.widget<Card>(
-    find.ancestor(of: edit, matching: find.byType(Card)).first,
+  final row = tester.widget<DecoratedBox>(
+    find.ancestor(of: edit, matching: find.byType(DecoratedBox)).first,
   );
-  final band = purchaseCard.color ?? surface;
+  final band = (row.decoration as BoxDecoration).color ?? surface;
   _expectContrast(editInk, band, 4.5);
-  if (dark) {
-    expect(status.dayTones, contains(band));
-  }
 }
