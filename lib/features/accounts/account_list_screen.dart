@@ -177,10 +177,8 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             padding: pagePadding(width),
             children: [
               // Customers and companies: no page title (Ali, 2026-11-02).
-              if (deposits) ...[
-                _DepositTitleBar(sectionLabel(section.sectionKey)),
-                const SizedBox(height: AppSpacing.md),
-              ] else if (!debtLook) ...[
+              // Deposits: the toolbar already names the section (Ali, t348).
+              if (!debtLook && !deposits) ...[
                 ScreenTitle(sectionLabel(section.sectionKey)),
                 const SizedBox(height: AppSpacing.md),
               ],
@@ -196,28 +194,14 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                       ? HistoryWindow.retainLimit
                       : null,
                 ),
-              // Deposits (Ali's device shots, 2026-11-04): one row with the
-              // section total, the active count and add; then the rate row.
+              // Deposits: الإجمالي, النشط, إضافة أمانة on one row, then a
+              // full-width search. The Egyptian rate stays under that search.
               if (deposits)
                 _DepositTopRow(
                   summary: data.summary,
                   currency: section.currency,
                   money: money,
                   add: addButton,
-                  assign: _canAssign(permissions)
-                      ? GatedButton(
-                          buttonKey: const Key('assign-mode'),
-                          allowed: true,
-                          online: online,
-                          filled: false,
-                          label: AppStrings.assign,
-                          glyph: Icons.assignment_ind_outlined,
-                          onPressed: () => setState(() {
-                            _assigning = !_assigning;
-                            _selected.clear();
-                          }),
-                        )
-                      : null,
                 )
               else
                 _SummaryStrip(
@@ -226,7 +210,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                   currency: section.currency,
                   money: money,
                 ),
-              if (section == AccountSection.egyptianDeposits) const _RateCard(),
               const SizedBox(height: AppSpacing.md),
               // Customers and companies: no filter chips (Ali, 2026-11-02).
               // Deposits: no filter chips (Ali, 2026-11-04).
@@ -245,7 +228,9 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                 )
               else ...[
                 searchField,
-                // Deposits: add and assign sit in the top row.
+                if (section == AccountSection.egyptianDeposits)
+                  const _RateCard(),
+                // Deposits: add sits in the top row.
                 if (!deposits) ...[
                   const SizedBox(height: AppSpacing.md),
                   Wrap(
@@ -858,60 +843,20 @@ class _SummaryStrip extends StatelessWidget {
   }
 }
 
-/// The deposits' title band: dark glass with the title in gold.
-class _DepositTitleBar extends StatelessWidget {
-  const _DepositTitleBar(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final look = context.look;
-    final gold = sectionGold(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadii.xl),
-        gradient: LinearGradient(
-          begin: AlignmentDirectional.centerStart,
-          end: AlignmentDirectional.centerEnd,
-          colors: [
-            look.card,
-            Color.alphaBlend(gold.withValues(alpha: 0.10), look.card),
-          ],
-        ),
-        border: Border.all(color: look.cardBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.md,
-        ),
-        child: Text(
-          title,
-          key: const Key('deposit-title'),
-          style: cairo(20, 800, color: gold),
-        ),
-      ),
-    );
-  }
-}
-
-/// One row: gold section total pill, النشطة N pill, then the actions.
-/// Server figures only (netBalance, activeCards).
+/// One row: الإجمالي (section net), النشط (active cards), إضافة أمانة.
+/// Server figures only. The three stay side by side, including at text 1.3.
 class _DepositTopRow extends StatelessWidget {
   const _DepositTopRow({
     required this.summary,
     required this.currency,
     required this.money,
     required this.add,
-    this.assign,
   });
 
   final AccountsSummaryDto summary;
   final Currency currency;
   final MoneyFormatter money;
   final Widget add;
-  final Widget? assign;
 
   @override
   Widget build(BuildContext context) {
@@ -919,6 +864,7 @@ class _DepositTopRow extends StatelessWidget {
     final gold = sectionGold(context);
     final on = onSectionGold(context);
     final count = summary.activeCards;
+    final scale = MediaQuery.textScalerOf(context).scale(1);
     final total = DecoratedBox(
       key: const Key('deposit-total-pill'),
       decoration: BoxDecoration(
@@ -929,24 +875,17 @@ class _DepositTopRow extends StatelessWidget {
           colors: [Color.lerp(gold, Colors.white, 0.25)!, gold],
         ),
         border: Border.all(color: Color.lerp(gold, Colors.white, 0.4)!),
-        boxShadow: [
-          BoxShadow(
-            color: gold.withValues(alpha: 0.35),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Padding(
         padding: const EdgeInsetsDirectional.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.xs,
+          horizontal: 8,
+          vertical: 4,
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              AppStrings.depositSectionNet,
+              AppStrings.depositTotalCompact,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: cairo(11, 700, color: on),
@@ -958,7 +897,7 @@ class _DepositTopRow extends StatelessWidget {
                 key: const Key('deposit-total'),
                 style: context.textExtras.amount.copyWith(
                   color: on,
-                  fontSize: 16,
+                  fontSize: 15,
                 ),
               ),
             ),
@@ -975,55 +914,45 @@ class _DepositTopRow extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsetsDirectional.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
+          horizontal: 8,
+          vertical: 4,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              AppStrings.activeShort,
-              style: cairo(12, 700, color: look.muted),
+              AppStrings.depositActiveCompact,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: cairo(11, 700, color: look.muted),
             ),
-            const SizedBox(width: AppSpacing.xs),
-            Text(
-              count == null ? AppStrings.dash : '$count',
-              key: const Key('deposit-active-count'),
-              textDirection: TextDirection.ltr,
-              style: cairo(15, 800, color: look.ink),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                count == null ? AppStrings.dash : '$count',
+                key: const Key('deposit-active-count'),
+                textDirection: TextDirection.ltr,
+                style: cairo(15, 800, color: look.ink),
+              ),
             ),
           ],
         ),
       ),
     );
-    final actions = [
-      active,
-      const SizedBox(width: AppSpacing.sm),
-      Flexible(child: add),
-      if (assign != null) ...[const SizedBox(width: AppSpacing.xs), assign!],
-    ];
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final scale = MediaQuery.textScalerOf(context).scale(1);
-        // Narrow or large text: the total on its own line.
-        if (constraints.maxWidth / scale < 400) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              total,
-              const SizedBox(height: AppSpacing.sm),
-              Row(children: actions),
-            ],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(child: total),
-            const SizedBox(width: AppSpacing.sm),
-            ...actions,
-          ],
-        );
-      },
+    return SizedBox(
+      height: 58 * scale.clamp(1.0, 1.45),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: total),
+          const SizedBox(width: 6),
+          Expanded(child: active),
+          const SizedBox(width: 6),
+          Expanded(
+            child: FittedBox(fit: BoxFit.scaleDown, child: add),
+          ),
+        ],
+      ),
     );
   }
 }
