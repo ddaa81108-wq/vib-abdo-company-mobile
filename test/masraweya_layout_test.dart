@@ -2,11 +2,14 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/masraweya/masraweya_screen.dart';
 import 'package:vib_abdo_company_mobile/features/masraweya/masraweya_share.dart';
+import 'package:vib_abdo_company_mobile/state/theme_controller.dart';
+import 'package:vib_abdo_company_mobile/ui/tokens.dart';
 
 import 'support/pump_app.dart';
 
@@ -122,7 +125,19 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/masraweya');
     final field = find.byKey(const Key('masraweya-entry-commission-field-0'));
+    final list = find.byKey(MasraweyaScreen.screenKey);
     await tester.ensureVisible(field);
+    await tester.pump();
+    final view = tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    for (var i = 0; i < 6; i++) {
+      final place = tester.getRect(field);
+      if (place.center.dy < view - 96 && place.center.dy > 72) break;
+      await tester.drag(
+        list,
+        Offset(0, place.center.dy > view - 96 ? -180 : 180),
+      );
+      await tester.pump();
+    }
     await tester.tap(field);
     await tester.pump();
     tester.view.viewInsets = const FakeViewPadding(bottom: 340);
@@ -202,6 +217,122 @@ void main() {
     expect(shared, Uint8List.fromList(const [7, 7, 7]));
     expect(tester.renderObject(capture).runtimeType, isNot(RenderView));
   });
+
+  testWidgets('four summary value frames share one left column', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(440, 956));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/masraweya');
+    _expectSummaryValueColumn(tester, dark: false);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byKey(HomeShell.shellKey)),
+    );
+    container.read(themeModeProvider.notifier).toggle();
+    await settle(tester);
+    _expectSummaryValueColumn(tester, dark: true);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+const _summaryValueFrames = [
+  'masraweya-value-frame-previous',
+  'masraweya-value-frame-purchases',
+  'masraweya-value-frame-work',
+  'masraweya-value-frame-remaining',
+];
+
+void _expectSummaryValueColumn(WidgetTester tester, {required bool dark}) {
+  final capture = find.byKey(const Key('masraweya-summary-capture'));
+  final captureRect = tester.getRect(capture);
+  final rects = <Rect>[];
+  BoxBorder? border;
+  for (final name in _summaryValueFrames) {
+    final frame = find.byKey(Key(name));
+    expect(find.descendant(of: capture, matching: frame), findsOneWidget);
+    final rect = tester.getRect(frame);
+    rects.add(rect);
+    final decoration =
+        tester.widget<Container>(frame).decoration! as BoxDecoration;
+    expect(decoration.border, isNotNull);
+    final side = (decoration.border! as Border).top;
+    expect(side.width, 1.4);
+    border ??= decoration.border;
+    expect(decoration.border, border);
+    expect(rect.left, closeTo(captureRect.left + AppSpacing.md, 0.5));
+    expect(rect.left, lessThan(captureRect.center.dx));
+    expect(
+      captureRect.right - rect.right,
+      greaterThan(rect.left - captureRect.left),
+    );
+  }
+  for (final rect in rects.skip(1)) {
+    expect(rect.width, closeTo(rects.first.width, 0.5));
+    expect(rect.height, closeTo(rects.first.height, 0.5));
+    expect(rect.left, closeTo(rects.first.left, 0.5));
+    expect(rect.right, closeTo(rects.first.right, 0.5));
+  }
+  for (var i = 1; i < rects.length; i++) {
+    expect(rects[i].top, greaterThan(rects[i - 1].bottom - 0.5));
+  }
+  for (final label in const [
+    'القيمة السابقة',
+    'مشتريات اليوم',
+    'إجمالي شغل اليوم',
+    'الرصيد المتبقي',
+  ]) {
+    final labelRect = tester.getRect(
+      find.descendant(of: capture, matching: find.text(label)),
+    );
+    expect(labelRect.center.dx, greaterThan(rects.first.right));
+  }
+  for (final name in const [
+    'masraweya-value-frame-previous',
+    'masraweya-value-frame-purchases',
+  ]) {
+    expect(
+      find.descendant(
+        of: find.byKey(Key(name)),
+        matching: find.byType(EditableText),
+      ),
+      findsOneWidget,
+    );
+  }
+  for (final name in const [
+    'masraweya-value-frame-work',
+    'masraweya-value-frame-remaining',
+  ]) {
+    final frame = find.byKey(Key(name));
+    expect(
+      find.descendant(of: frame, matching: find.byType(EditableText)),
+      findsNothing,
+    );
+    final symbol = tester.getRect(
+      find.descendant(of: frame, matching: find.text('ج.م')),
+    );
+    final number = tester.getRect(
+      find.descendant(
+        of: frame,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Text &&
+              widget.data != null &&
+              widget.data!.contains(RegExp(r'\d')),
+        ),
+      ),
+    );
+    expect(symbol.center.dx, lessThan(number.center.dx));
+  }
+  final remaining =
+      tester.widget<Container>(
+            find.byKey(const Key('masraweya-value-frame-remaining')),
+          ).decoration!
+          as BoxDecoration;
+  expect(
+    remaining.color,
+    dark ? const Color(0xFF1A3A2A) : const Color(0xFFDCF5E7),
+  );
 }
 
 Future<void> tapAddRow(WidgetTester tester) async {

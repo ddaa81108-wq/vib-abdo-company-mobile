@@ -784,6 +784,7 @@ class _DayViewState extends ConsumerState<_DayView> {
                   if (editing && _previous != null)
                     _summaryEditRow(
                       key: const Key('masraweya-previous'),
+                      frameKey: const Key('masraweya-value-frame-previous'),
                       fieldKey: const Key('masraweya-previous-field'),
                       label: AppStrings.previousValue,
                       controller: _previous!,
@@ -792,13 +793,14 @@ class _DayViewState extends ConsumerState<_DayView> {
                   else
                     _summaryPlainRow(
                       key: const Key('masraweya-previous'),
+                      frameKey: const Key('masraweya-value-frame-previous'),
                       label: AppStrings.previousValue,
                       value: _egp(day.previousValueUnits),
-                      boxed: true,
                     ),
                   if (editing)
                     _summaryEditRow(
                       key: const Key('masraweya-purchases'),
+                      frameKey: const Key('masraweya-value-frame-purchases'),
                       fieldKey: const Key('masraweya-purchases-field'),
                       label: _MText.purchasesToday,
                       controller: _purchases!,
@@ -807,24 +809,25 @@ class _DayViewState extends ConsumerState<_DayView> {
                   else
                     _summaryPlainRow(
                       key: const Key('masraweya-purchases'),
+                      frameKey: const Key('masraweya-value-frame-purchases'),
                       label: _MText.purchasesToday,
                       value: _egp(day.purchasesUnits),
-                      boxed: true,
                     ),
                   _summaryPlainRow(
                     key: const Key('masraweya-work-total'),
+                    frameKey: const Key('masraweya-value-frame-work'),
                     label: _MText.workToday,
                     hint: _MText.fromServer,
                     value: _egp(day.workTotalUnits),
-                    boxed: false,
                     background: _frameGold(context).withValues(alpha: 0.16),
+                    frameFill: _frameGold(context).withValues(alpha: 0.12),
                   ),
                   Offstage(
                     child: _summaryPlainRow(
                       key: const Key('masraweya-adjustment'),
+                      frameKey: const Key('masraweya-value-frame-adjustment'),
                       label: AppStrings.adjustment,
                       value: _egp(day.historicalAdjustmentUnits),
-                      boxed: false,
                     ),
                   ),
                   _remainingRow(context, day),
@@ -886,49 +889,21 @@ class _DayViewState extends ConsumerState<_DayView> {
     final mintDark = negative
         ? colors.cashNegative.withValues(alpha: 0.16)
         : const Color(0xFF1A3A2A);
-    return Container(
+    final wash = look.glass ? mintDark : mint;
+    return _summaryValueRow(
       key: const Key('masraweya-remaining'),
-      color: look.glass ? mintDark : mint,
-      padding: const EdgeInsetsDirectional.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.md,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Text(
-                    _MText.remaining,
-                    style: cairo(14, 800, color: color),
-                  ),
-                ),
-                Text(
-                  _MText.fromServer,
-                  style: cairo(11, 500, color: look.muted),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: AlignmentDirectional.centerEnd,
-              child: MoneyText(
-                _egp(day.remainingUnits),
-                style: context.textExtras.amountLarge.copyWith(
-                  color: color,
-                  fontSize: 22,
-                ),
-              ),
-            ),
-          ),
-        ],
+      frameKey: const Key('masraweya-value-frame-remaining'),
+      label: _MText.remaining,
+      hint: _MText.fromServer,
+      labelColor: color,
+      rowFill: wash,
+      frameFill: wash,
+      value: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: MoneyText(
+          _egp(day.remainingUnits),
+          style: context.textExtras.amount.copyWith(color: color, fontSize: 16),
+        ),
       ),
     );
   }
@@ -1167,80 +1142,97 @@ class _DayViewState extends ConsumerState<_DayView> {
 
   Widget _summaryEditRow({
     required Key key,
+    required Key frameKey,
     required Key fieldKey,
     required String label,
     required TextEditingController controller,
     required FocusNode focusNode,
   }) {
-    final look = context.look;
-    final gold = _frameGold(context);
-    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
-    return Container(
+    final theme = Theme.of(context);
+    return _summaryValueRow(
       key: key,
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: look.cardBorder)),
-      ),
-      padding: const EdgeInsetsDirectional.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: cairo(14, 800, color: look.ink),
+      frameKey: frameKey,
+      label: label,
+      value: Theme(
+        data: theme.copyWith(
+          inputDecorationTheme: theme.inputDecorationTheme.copyWith(
+            filled: false,
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 10,
             ),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
           ),
-          const SizedBox(width: AppSpacing.sm),
-          Flexible(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: FigureRow.valueWidth * scale,
-                minWidth: 72,
-              ),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: look.card,
-                  borderRadius: BorderRadius.circular(AppRadii.lg),
-                  border: Border.all(color: gold.withValues(alpha: 0.85)),
-                ),
-                child: UnitsField(
-                  key: fieldKey,
-                  controller: controller,
-                  focusNode: focusNode,
-                  label: '',
-                  showHint: false,
-                  dense: true,
-                  scrollPadding: _fieldScroll,
-                  textInputAction: TextInputAction.next,
-                  onSubmitted: (_) => _focusNext(focusNode),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
+        child: UnitsField(
+          key: fieldKey,
+          controller: controller,
+          focusNode: focusNode,
+          label: '',
+          showHint: false,
+          dense: true,
+          scrollPadding: _fieldScroll,
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) => _focusNext(focusNode),
+        ),
       ),
+      fitValue: false,
     );
   }
 
   Widget _summaryPlainRow({
     required Key key,
+    required Key frameKey,
     required String label,
     required String value,
     String? hint,
-    required bool boxed,
     Color? background,
+    Color? frameFill,
+  }) {
+    return _summaryValueRow(
+      key: key,
+      frameKey: frameKey,
+      label: label,
+      hint: hint,
+      rowFill: background,
+      frameFill: frameFill,
+      value: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: MoneyText(
+          value,
+          style: context.textExtras.amount.copyWith(
+            color: context.look.ink,
+            fontSize: 16,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Label on the right. The value frame is a fixed box on the physical left.
+  Widget _summaryValueRow({
+    required Key key,
+    required Key frameKey,
+    required String label,
+    required Widget value,
+    String? hint,
+    Color? labelColor,
+    Color? rowFill,
+    Color? frameFill,
+    bool fitValue = true,
   }) {
     final look = context.look;
-    final gold = _frameGold(context);
-    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.5);
+    final width = 156.0 * scale;
+    final height = 48.0 * scale;
     return Container(
       key: key,
       decoration: BoxDecoration(
-        color: background,
+        color: rowFill,
         border: Border(bottom: BorderSide(color: look.cardBorder)),
       ),
       padding: const EdgeInsetsDirectional.symmetric(
@@ -1248,6 +1240,7 @@ class _DayViewState extends ConsumerState<_DayView> {
         vertical: AppSpacing.sm,
       ),
       child: Row(
+        textDirection: TextDirection.rtl,
         children: [
           Expanded(
             child: Column(
@@ -1257,7 +1250,7 @@ class _DayViewState extends ConsumerState<_DayView> {
                   label,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: cairo(14, 800, color: look.ink),
+                  style: cairo(14, 800, color: labelColor ?? look.ink),
                 ),
                 if (hint != null)
                   Text(
@@ -1270,35 +1263,19 @@ class _DayViewState extends ConsumerState<_DayView> {
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
-          Flexible(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: FigureRow.valueWidth * scale,
-                minWidth: 64,
-              ),
-              child: Container(
-                height: 40 * scale,
-                alignment: AlignmentDirectional.centerEnd,
-                padding: const EdgeInsetsDirectional.symmetric(horizontal: 8),
-                decoration: boxed
-                    ? BoxDecoration(
-                        color: look.card,
-                        borderRadius: BorderRadius.circular(AppRadii.lg),
-                        border: Border.all(color: gold.withValues(alpha: 0.85)),
-                      )
-                    : null,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: MoneyText(
-                    value,
-                    style: context.textExtras.amount.copyWith(
-                      color: look.ink,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ),
+          Container(
+            key: frameKey,
+            width: width,
+            height: height,
+            clipBehavior: Clip.antiAlias,
+            alignment: fitValue ? Alignment.center : null,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            decoration: BoxDecoration(
+              color: frameFill ?? look.card,
+              borderRadius: BorderRadius.circular(AppRadii.lg),
+              border: Border.all(color: _frameGold(context), width: 1.4),
             ),
+            child: value,
           ),
         ],
       ),

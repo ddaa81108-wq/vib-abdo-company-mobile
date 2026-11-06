@@ -154,6 +154,25 @@ void main() {
     await saveShot(tester, 'treasury-egp-left-light');
     expect(tester.takeException(), isNull);
   }, tags: const ['screenshots']);
+
+  testWidgets('summary value column on a large phone, fake data', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(440, 956));
+    await tester.runAsync(loadScreenshotFonts);
+    await tester.pump();
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await _go(tester, '/masraweya');
+    await tester.ensureVisible(find.byKey(const Key('masraweya-summary')));
+    await tester.pump();
+    await saveShot(tester, 'masraweya-summary-column-light');
+    await saveBoundaryShot(
+      tester,
+      find.byKey(const Key('masraweya-summary-capture')),
+      'masraweya-summary-column-only',
+    );
+    expect(tester.takeException(), isNull);
+  }, tags: const ['screenshots']);
 }
 
 Future<void> _go(WidgetTester tester, String path) async {
