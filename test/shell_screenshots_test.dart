@@ -33,12 +33,15 @@ void main() {
     expect(find.text(AppStrings.retry), findsOneWidget);
     await saveShot(tester, 'splash-error-light-360');
 
-    const emptyStates = <String, (String, String)>{
-      '/settings/employees': ('settings-employees', AppStrings.employeesEmpty),
-      '/settings/audit': ('settings-audit', AppStrings.auditEmpty),
+    const emptyStates = <String, (String, Key)>{
+      '/settings/employees': (
+        'settings-employees',
+        Key('login-account-u_1'),
+      ),
+      '/settings/audit': ('settings-audit', Key('security-current-session')),
       '/settings/operations': (
         'settings-operations',
-        AppStrings.operationsEmpty,
+        Key('development-app-version'),
       ),
     };
     for (final dark in [false, true]) {
@@ -61,7 +64,7 @@ void main() {
         await saveShot(tester, 'settings-$suffix');
         for (final entry in emptyStates.entries) {
           await go(tester, entry.key);
-          expect(find.text(entry.value.$2), findsOneWidget);
+          expect(find.byKey(entry.value.$2), findsOneWidget);
           expect(find.text(AppStrings.unavailable), findsNothing);
           await saveShot(tester, '${entry.value.$1}-$suffix');
         }

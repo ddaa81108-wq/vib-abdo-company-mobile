@@ -8,7 +8,6 @@ import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notifications_screen.dart';
-import 'package:vib_abdo_company_mobile/features/settings/employee_totals_screen.dart';
 import 'package:vib_abdo_company_mobile/features/splash/splash_screen.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/state/notification_providers.dart';
@@ -191,9 +190,11 @@ void main() {
       tester,
       find.byKey(const Key('settings-link-account')),
     );
-    // The empty admin stand-ins are no longer linked (Ali, 2026-11-04).
-    expect(find.byKey(const Key('settings-link-audit')), findsNothing);
-    expect(find.byKey(const Key('settings-link-operations')), findsNothing);
+    expectChevronMirrors(tester, find.byKey(const Key('settings-link-audit')));
+    expectChevronMirrors(
+      tester,
+      find.byKey(const Key('settings-link-development')),
+    );
 
     await go(tester, '/');
     await tester.ensureVisible(find.byKey(const Key('bottom-tab-more')));
@@ -363,18 +364,18 @@ void main() {
 
     await tester.tap(find.byKey(const Key('settings-link-employees')));
     await settle(tester);
-    expect(find.byKey(EmployeeTotalsScreen.screenKey), findsOneWidget);
-    expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
-    expect(find.text(AppStrings.employeesEmpty), findsNothing);
-    expect(find.text('موظف استلام تجريبي'), findsNothing);
+    expect(find.byKey(const Key('screen-settings-employees')), findsOneWidget);
+    expect(find.byKey(const Key('login-account-u_1')), findsOneWidget);
+    expect(find.text('موظف استلام تجريبي'), findsOneWidget);
 
     await go(tester, '/settings/audit');
     expect(find.byKey(const Key('screen-settings-audit')), findsOneWidget);
-    expect(find.text(AppStrings.auditEmpty), findsOneWidget);
+    expect(find.byKey(const Key('security-current-session')), findsOneWidget);
+    expect(find.text('collection.unlinked.submit'), findsOneWidget);
 
     await go(tester, '/settings/operations');
     expect(find.byKey(const Key('screen-settings-operations')), findsOneWidget);
-    expect(find.text(AppStrings.operationsEmpty), findsOneWidget);
+    expect(find.byKey(const Key('development-app-version')), findsOneWidget);
   });
 
   testWidgets('phone status strip: role on the right, status on the left', (
@@ -568,28 +569,28 @@ void main() {
   ) async {
     await pumpFakeApp(tester, size: const Size(360, 1100));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    const routes = <String, (Key, String, String)>{
+    const routes = <String, (Key, String, Key)>{
       '/settings/employees': (
         Key('screen-settings-employees'),
         AppStrings.employeesTile,
-        AppStrings.employeesEmpty,
+        Key('login-account-u_1'),
       ),
       '/settings/audit': (
         Key('screen-settings-audit'),
         AppStrings.auditTile,
-        AppStrings.auditEmpty,
+        Key('security-current-session'),
       ),
       '/settings/operations': (
         Key('screen-settings-operations'),
         AppStrings.operationsTile,
-        AppStrings.operationsEmpty,
+        Key('development-app-version'),
       ),
     };
     for (final entry in routes.entries) {
       await go(tester, entry.key);
       expect(find.byKey(entry.value.$1), findsOneWidget);
       expect(find.text(entry.value.$2), findsWidgets);
-      expect(find.text(entry.value.$3), findsOneWidget);
+      expect(find.byKey(entry.value.$3), findsOneWidget);
       expect(find.text(AppStrings.unavailable), findsNothing);
       expect(find.textContaining('لا تتوفر بيانات من الخادم'), findsNothing);
     }
@@ -660,13 +661,13 @@ void main() {
     );
 
     await go(tester, '/settings/employees');
-    expect(find.text(AppStrings.employeesEmpty), findsOneWidget);
+    expect(find.byKey(const Key('login-account-u_12')), findsOneWidget);
     expect(find.textContaining('لا تتوفر بيانات من الخادم'), findsNothing);
     await go(tester, '/settings/audit');
-    expect(find.text(AppStrings.auditEmpty), findsOneWidget);
+    expect(find.byKey(const Key('audit-event-15')), findsOneWidget);
     expect(find.textContaining('لا تتوفر بيانات من الخادم'), findsNothing);
     await go(tester, '/settings/operations');
-    expect(find.text(AppStrings.operationsEmpty), findsOneWidget);
+    expect(find.byKey(const Key('development-no-updater')), findsOneWidget);
     expect(find.textContaining('لا تتوفر بيانات من الخادم'), findsNothing);
   });
 

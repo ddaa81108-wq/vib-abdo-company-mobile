@@ -243,18 +243,18 @@ void main() {
         find.byKey(const Key('screen-settings-employees')),
         findsOneWidget,
       );
-      expect(find.text(AppStrings.employeesEmpty), findsOneWidget);
+      expect(find.byKey(const Key('login-account-u_1')), findsOneWidget);
 
       await go(tester, '/settings/audit');
       expect(find.byKey(const Key('screen-settings-audit')), findsOneWidget);
-      expect(find.text(AppStrings.auditEmpty), findsOneWidget);
+      expect(find.byKey(const Key('audit-event-15')), findsOneWidget);
 
       await go(tester, '/settings/operations');
       expect(
         find.byKey(const Key('screen-settings-operations')),
         findsOneWidget,
       );
-      expect(find.text(AppStrings.operationsEmpty), findsOneWidget);
+      expect(find.byKey(const Key('development-app-version')), findsOneWidget);
     },
     tags: ['known-bug'],
   );

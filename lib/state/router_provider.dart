@@ -21,10 +21,12 @@ import '../features/purchases/purchases_screen.dart';
 import '../features/reports/reports_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/settings/account_screen.dart';
-import '../features/settings/admin_placeholder_screen.dart';
+import '../features/settings/development_screen.dart';
 import '../features/settings/employee_totals_screen.dart';
+import '../features/settings/financial_ledger_screen.dart';
+import '../features/settings/login_accounts_screen.dart';
+import '../features/settings/security_screen.dart';
 import '../features/settings/settings_screen.dart';
-import '../ui/strings.dart';
 import '../features/splash/splash_screen.dart';
 import '../features/treasury/treasury_screen.dart';
 
@@ -83,30 +85,36 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/settings/employees',
-            builder: (context, state) => const AdminPlaceholderScreen(
-              title: AppStrings.employeesTile,
-              message: AppStrings.employeesEmpty,
-              icon: Icons.groups_outlined,
-              screenKey: Key('screen-settings-employees'),
-            ),
+            builder: (context, state) => const LoginAccountsScreen(),
+          ),
+          GoRoute(
+            path: '/settings/users',
+            builder: (context, state) => const LoginAccountsScreen(),
+          ),
+          GoRoute(
+            path: '/settings/users/new',
+            builder: (context, state) => const LoginAccountCreateScreen(),
+          ),
+          GoRoute(
+            path: '/settings/users/:id',
+            builder: (context, state) =>
+                LoginAccountEditorScreen(id: state.pathParameters['id'] ?? ''),
           ),
           GoRoute(
             path: '/settings/audit',
-            builder: (context, state) => const AdminPlaceholderScreen(
-              title: AppStrings.auditTile,
-              message: AppStrings.auditEmpty,
-              icon: Icons.fact_check_outlined,
-              screenKey: Key('screen-settings-audit'),
-            ),
+            builder: (context, state) => const SecurityScreen(),
+          ),
+          GoRoute(
+            path: '/settings/ledger',
+            builder: (context, state) => const FinancialLedgerScreen(),
+          ),
+          GoRoute(
+            path: '/settings/development',
+            builder: (context, state) => const DevelopmentScreen(),
           ),
           GoRoute(
             path: '/settings/operations',
-            builder: (context, state) => const AdminPlaceholderScreen(
-              title: AppStrings.operationsTile,
-              message: AppStrings.operationsEmpty,
-              icon: Icons.monitor_heart_outlined,
-              screenKey: Key('screen-settings-operations'),
-            ),
+            builder: (context, state) => const DevelopmentScreen(),
           ),
           GoRoute(
             path: '/account',
