@@ -27,6 +27,7 @@ void main() {
     await _showLedger(tester);
     await _scrollLedgerHome(tester);
     _expectHeaderInView(tester, 'ت');
+    _expectHeaderInView(tester, '2026-10-19');
     await saveShot(tester, 'purchases-grid-light-ledger');
     await _scrollLedgerEnd(tester);
     for (final header in const ['الناتج', 'المسدد', 'الباقي', 'مستهلك فودافون', '✓']) {
@@ -45,6 +46,7 @@ void main() {
     await _showLedger(tester);
     await _scrollLedgerHome(tester);
     _expectHeaderInView(tester, 'ت');
+    _expectHeaderInView(tester, '2026-10-19');
     await saveShot(tester, 'purchases-grid-dark-ledger');
     await _scrollLedgerEnd(tester);
     for (final header in const ['الناتج', 'المسدد', 'الباقي', 'مستهلك فودافون', '✓']) {

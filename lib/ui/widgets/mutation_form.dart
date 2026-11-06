@@ -66,6 +66,7 @@ class GuardedMutation extends ConsumerStatefulWidget {
     this.normalizedValue,
     this.icon,
     this.glyph,
+    this.leading,
     this.tooltip,
     this.onVersionConflict,
   });
@@ -97,6 +98,9 @@ class GuardedMutation extends ConsumerStatefulWidget {
 
   /// Label mode with a symbol instead of the text (see [GatedButton.glyph]).
   final IconData? glyph;
+
+  /// Icon shown before [label]. The label stays visible.
+  final IconData? leading;
   final String? tooltip;
 
   /// Refetch the record this write was based on. Used for VERSION_CONFLICT and
@@ -136,6 +140,7 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
             destructive: widget.destructive,
             label: widget.label,
             glyph: widget.glyph,
+            leading: widget.leading,
             onPressed: _run,
           )
         : widget.allowed

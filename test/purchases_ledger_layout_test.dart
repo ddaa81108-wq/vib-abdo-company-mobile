@@ -107,6 +107,44 @@ void main() {
         expect(
           find.descendant(
             of: find.byKey(const Key('purchase-rollover-11')),
+            matching: find.text('2026-10-19'),
+          ),
+          findsOneWidget,
+        );
+        final booksTop = tester.getRect(find.byKey(const Key('purchase-books'))).top;
+        final vodafoneBottom = tester
+            .getRect(find.byKey(const Key('purchase-vodafone-ours')))
+            .bottom;
+        final textScale = MediaQuery.textScalerOf(
+          tester.element(find.byKey(PurchasesScreen.screenKey)),
+        ).scale(1);
+        expect(
+          vodafoneBottom - booksTop,
+          lessThan(textScale <= 1 ? 400 : 480),
+        );
+        expect(previous.height, lessThan(80));
+        final previousLabel = tester.getRect(
+          find.descendant(
+            of: find.byKey(const Key('purchase-total-previous')),
+            matching: find.text('القيمة السابقة'),
+          ),
+        );
+        expect(
+          (previousLabel.center.dx - previous.center.dx).abs(),
+          lessThan(16),
+        );
+        final addSize = tester.getSize(find.byKey(const Key('add-purchase-12')));
+        final finalizeSize = tester.getSize(
+          find.byKey(const Key('finalize-day-12')),
+        );
+        expect(addSize.width, closeTo(finalizeSize.width, 12));
+        expect(
+          tester.getRect(find.text('البيان')).center.dx,
+          greaterThan(tester.getRect(find.text('سمسم')).center.dx),
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('purchase-rollover-11')),
             matching: find.textContaining('2,000'),
           ),
           findsOneWidget,

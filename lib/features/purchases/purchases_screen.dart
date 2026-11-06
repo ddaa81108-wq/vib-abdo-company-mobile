@@ -46,8 +46,6 @@ class PurchasesScreen extends ConsumerWidget {
     final canWrite = permissions.canWrite(SectionKey.purchases);
     final canFinalize = permissions.canFinalizePurchases;
 
-    final look = context.look;
-    final gold = _frameGold(context);
     return SectionTheme(
       child: ListView(
         key: screenKey,
@@ -56,68 +54,7 @@ class PurchasesScreen extends ConsumerWidget {
         scrollCacheExtent: const ScrollCacheExtent.pixels(6000),
         padding: pagePadding(MediaQuery.sizeOf(context).width),
         children: [
-          const SectionHeading(_PText.title),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: look.card,
-              borderRadius: BorderRadius.circular(AppRadii.xl),
-              border: Border.all(color: gold, width: 1.6),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadii.xl),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    decoration: const BoxDecoration(
-                      gradient: sectionStripGradient,
-                    ),
-                    padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-                    child: Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: SegmentedButton<PurchaseBook>(
-                          key: const Key('purchase-books'),
-                          style: ButtonStyle(
-                            visualDensity: VisualDensity.compact,
-                            backgroundColor: WidgetStateProperty.resolveWith((
-                              states,
-                            ) {
-                              if (states.contains(WidgetState.selected)) {
-                                return const Color(0xFF111111);
-                              }
-                              return const Color(0xFF3A3F4B);
-                            }),
-                            foregroundColor: const WidgetStatePropertyAll(
-                              sectionStripInk,
-                            ),
-                            side: WidgetStatePropertyAll(
-                              BorderSide(color: gold.withValues(alpha: 0.9)),
-                            ),
-                            shape: const WidgetStatePropertyAll(
-                              StadiumBorder(),
-                            ),
-                          ),
-                          segments: const [
-                            ButtonSegment(
-                              value: PurchaseBook.alBayan,
-                              label: Text(AppStrings.alBayan),
-                            ),
-                            ButtonSegment(
-                              value: PurchaseBook.simsim,
-                              label: Text(AppStrings.simsim),
-                            ),
-                          ],
-                          selected: {book},
-                          onSelectionChanged: (value) =>
-                              ref.read(purchaseBookProvider.notifier).state =
-                                  value.first,
-                        ),
-                      ),
-                    ),
-                  ),
-                  KeptData<PurchasesPage>(
+          KeptData<PurchasesPage>(
                     value: page,
                     resetKey: book,
                     onRetry: () => ref.invalidate(purchasesProvider),
@@ -180,10 +117,6 @@ class PurchasesScreen extends ConsumerWidget {
                       );
                     },
                   ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -192,7 +125,6 @@ class PurchasesScreen extends ConsumerWidget {
 
 /// The website's words for المشتريات (display only).
 abstract final class _PText {
-  static const title = 'قسم المشتريات';
   static const lifetime = 'إجماليات السجل من البداية';
   static const lifeResult = 'إجمالي الناتج';
   static const lifePaid = 'إجمالي المسدد';
@@ -229,45 +161,65 @@ Color _gridLine(BuildContext context) =>
     ? const Color(0xFFD6D3D1)
     : const Color(0xFF292524);
 
-Widget _goldAdd(BuildContext context, Widget child) {
-  return Theme(
-    data: Theme.of(context).copyWith(
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: sectionButtonGold,
-          foregroundColor: sectionButtonInk,
-          disabledBackgroundColor: sectionButtonGold.withValues(alpha: 0.38),
-          disabledForegroundColor: sectionButtonInk.withValues(alpha: 0.7),
-          minimumSize: const Size(48, 48),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.lg),
-          ),
-        ),
-      ),
+const _pillRadius = 22.0;
+
+Widget _gradientPill(
+  BuildContext context, {
+  required Gradient gradient,
+  required Color ink,
+  required Widget child,
+}) {
+  final button = FilledButton.styleFrom(
+    backgroundColor: Colors.transparent,
+    disabledBackgroundColor: Colors.transparent,
+    shadowColor: Colors.transparent,
+    foregroundColor: ink,
+    disabledForegroundColor: ink.withValues(alpha: 0.65),
+    elevation: 0,
+    minimumSize: const Size(double.infinity, 46),
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(_pillRadius),
     ),
+  );
+  return DecoratedBox(
+    decoration: BoxDecoration(
+      gradient: gradient,
+      borderRadius: BorderRadius.circular(_pillRadius),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+    ),
+    child: Theme(
+      data: Theme.of(context).copyWith(
+        filledButtonTheme: FilledButtonThemeData(style: button),
+      ),
+      child: child,
+    ),
+  );
+}
+
+Widget _goldAdd(BuildContext context, Widget child) {
+  return _gradientPill(
+    context,
+    gradient: const LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Color(0xFFFFE082), Color(0xFFF5C02E), Color(0xFFE0A800)],
+    ),
+    ink: sectionButtonInk,
     child: child,
   );
 }
 
 Widget _greenFinalize(BuildContext context, Widget child) {
-  const green = Color(0xFF15803D);
-  return Theme(
-    data: Theme.of(context).copyWith(
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: green,
-          foregroundColor: Colors.white,
-          disabledBackgroundColor: green.withValues(alpha: 0.38),
-          disabledForegroundColor: Colors.white.withValues(alpha: 0.75),
-          minimumSize: const Size(48, 48),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.lg),
-          ),
-        ),
-      ),
+  return _gradientPill(
+    context,
+    gradient: const LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Color(0xFF4ADE80), Color(0xFF16A34A), Color(0xFF166534)],
     ),
+    ink: Colors.white,
     child: child,
   );
 }
@@ -345,154 +297,218 @@ class _DayCard extends ConsumerWidget {
     final showAdd = canWrite && editable && day.version != null;
     final showFinalize =
         canFinalize && day.status == 'draft' && day.version != null;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final redFill = dark ? const Color(0xFF3F1D1D) : const Color(0xFFFEE2E2);
-    final redInk = dark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C);
-    final blackFill = dark ? const Color(0xFF0B0B0F) : const Color(0xFF111111);
-    const blackInk = Color(0xFFF5F5F4);
-    final cream = dark ? const Color(0xFF14261C) : const Color(0xFFF3F7E8);
-    final greenInk = dark ? const Color(0xFF86EFAC) : const Color(0xFF166534);
-    return Padding(
-      key: Key('purchase-day-$label'),
-      padding: const EdgeInsetsDirectional.fromSTEB(
-        AppSpacing.md,
-        AppSpacing.md,
-        AppSpacing.md,
-        AppSpacing.sm,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              if (showAdd)
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: AlignmentDirectional.centerStart,
-                    child: _goldAdd(
-                      context,
-                      GatedButton(
-                        buttonKey: ValueKey('add-purchase-$label'),
-                        allowed: true,
-                        online: online,
-                        leading: Icons.add,
-                        label: _PText.addDeal,
-                        onPressed: () =>
-                            ref.read(_ledgerDraftProvider.notifier).state =
-                                const _LedgerDraft(),
+    final width = MediaQuery.sizeOf(context).width;
+    final cardH = (55 * width / 318).clamp(52.0, 76.0);
+    final gap = (5 * width / 318).clamp(4.0, 7.0);
+    final radius = (9 * width / 318).clamp(8.0, 12.0);
+    const white = Color(0xFFFFFFFF);
+    const paleGold = Color(0xFFF6E7A8);
+    const coral = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Color(0xFFFF6B6B), Color(0xFFE11D48), Color(0xFFBE123C)],
+    );
+    const glossBlack = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Color(0xFF3F3F46), Color(0xFF18181B), Color(0xFF09090B)],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFF141414),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _frameGold(context), width: 1.4),
+          ),
+          child: Padding(
+            key: Key('purchase-day-$label'),
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _bookPills(context, ref),
+                if (showAdd || showFinalize) ...[
+                  SizedBox(height: gap),
+                  Row(
+                    textDirection: TextDirection.rtl,
+                    children: [
+                      Expanded(
+                        child: showAdd
+                            ? _goldAdd(
+                                context,
+                                GatedButton(
+                                  buttonKey: ValueKey('add-purchase-$label'),
+                                  allowed: true,
+                                  online: online,
+                                  leading: Icons.add,
+                                  label: _PText.addDeal,
+                                  onPressed: () =>
+                                      ref
+                                              .read(
+                                                _ledgerDraftProvider.notifier,
+                                              )
+                                              .state =
+                                          const _LedgerDraft(),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
                       ),
-                    ),
-                  ),
-                )
-              else
-                const Spacer(),
-              const SizedBox(width: AppSpacing.sm),
-              if (showFinalize)
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: _greenFinalize(
-                      context,
-                      GuardedMutation(
-                        buttonKey: ValueKey('finalize-day-$label'),
-                        inputs: 'finalize:$label:${day.version}',
-                        expectedVersion: day.version,
-                        label: AppStrings.finalizeDay,
-                        confirmText: AppStrings.finalizeConfirm,
-                        onSubmit: (meta) => _finalize(context, ref, meta),
+                      SizedBox(width: gap),
+                      Expanded(
+                        child: showFinalize
+                            ? _greenFinalize(
+                                context,
+                                GuardedMutation(
+                                  buttonKey: ValueKey('finalize-day-$label'),
+                                  inputs: 'finalize:$label:${day.version}',
+                                  expectedVersion: day.version,
+                                  leading: Icons.check_circle_outline,
+                                  label: AppStrings.finalizeDay,
+                                  confirmText: AppStrings.finalizeConfirm,
+                                  onSubmit: (meta) =>
+                                      _finalize(context, ref, meta),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
                       ),
-                    ),
+                    ],
                   ),
-                )
-              else
-                const Spacer(),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.xs,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _CorrectionStatus(day: label, open: correctionOpen),
-              if (canFinalize && day.status == 'finalized' && !correctionOpen)
-                GuardedMutation(
-                  buttonKey: Key('open-correction-$label'),
-                  inputs: 'open-correction:$label:${day.version}',
-                  expectedVersion: day.version,
-                  label: AppStrings.openDayCorrection,
-                  confirmText: AppStrings.openCorrectionConfirm,
-                  onVersionConflict: () => ref.invalidate(purchasesProvider),
-                  onSubmit: (meta) => _correct(context, ref, meta, open: true),
-                ),
-              if (canFinalize && correctionOpen)
-                GuardedMutation(
-                  buttonKey: Key('close-correction-$label'),
-                  inputs: 'close-correction:$label:${day.version}',
-                  expectedVersion: day.version,
-                  label: AppStrings.closeDayCorrection,
-                  confirmText: AppStrings.closeCorrectionConfirm,
-                  onVersionConflict: () => ref.invalidate(purchasesProvider),
-                  onSubmit: (meta) => _correct(context, ref, meta, open: false),
-                ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _totalPair(
-            context,
-            _TotalTile(
-              tileKey: const Key('purchase-total-previous'),
-              label: _PText.previousValue,
-              value: f(day.previousDebtUnits, Currency.lyd),
-              fill: redFill,
-              ink: redInk,
-              border: redInk.withValues(alpha: 0.45),
-            ),
-            _TotalTile(
-              tileKey: const Key('purchase-total-work'),
-              label: _PText.workToday,
-              value: f(day.todayResultUnits, Currency.lyd),
-              fill: blackFill,
-              ink: blackInk,
-              border: _frameGold(context),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          _totalPair(
-            context,
-            _TotalTile(
-              tileKey: const Key('purchase-total-paid'),
-              label: _PText.paidTotal,
-              value: f(day.todayPaidUnits, Currency.lyd),
-              fill: blackFill,
-              ink: blackInk,
-              border: _frameGold(context),
-            ),
-            _TotalTile(
-              tileKey: const Key('purchase-total-debt'),
-              label: AppStrings.totalDebt,
-              value: f(day.totalDebtUnits, Currency.lyd),
-              fill: redFill,
-              ink: redInk,
-              border: redInk.withValues(alpha: 0.55),
-            ),
+        ),
+        SizedBox(height: gap),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _CorrectionStatus(day: label, open: correctionOpen),
+            if (canFinalize && day.status == 'finalized' && !correctionOpen)
+              GuardedMutation(
+                buttonKey: Key('open-correction-$label'),
+                inputs: 'open-correction:$label:${day.version}',
+                expectedVersion: day.version,
+                label: AppStrings.openDayCorrection,
+                confirmText: AppStrings.openCorrectionConfirm,
+                onVersionConflict: () => ref.invalidate(purchasesProvider),
+                onSubmit: (meta) => _correct(context, ref, meta, open: true),
+              ),
+            if (canFinalize && correctionOpen)
+              GuardedMutation(
+                buttonKey: Key('close-correction-$label'),
+                inputs: 'close-correction:$label:${day.version}',
+                expectedVersion: day.version,
+                label: AppStrings.closeDayCorrection,
+                confirmText: AppStrings.closeCorrectionConfirm,
+                onVersionConflict: () => ref.invalidate(purchasesProvider),
+                onSubmit: (meta) => _correct(context, ref, meta, open: false),
+              ),
+          ],
+        ),
+        SizedBox(height: gap),
+        _totalPair(
+          gap: gap,
+          height: cardH,
+          right: _TotalTile(
+            tileKey: const Key('purchase-total-previous'),
+            label: _PText.previousValue,
+            value: f(day.previousDebtUnits, Currency.lyd),
+            gradient: coral,
+            ink: white,
+            border: Colors.white.withValues(alpha: 0.45),
+            radius: radius,
           ),
-          const SizedBox(height: AppSpacing.sm),
-          _TotalTile(
-            tileKey: const Key('purchase-vodafone-ours'),
-            label: _PText.vodafoneOurs,
-            value: f(day.vodafoneRemainingUnits, vodafoneCurrency),
-            fill: cream,
-            ink: greenInk,
-            border: greenInk.withValues(alpha: 0.45),
-            note: owed ? caption : null,
-            wide: true,
+          left: _TotalTile(
+            tileKey: const Key('purchase-total-work'),
+            label: _PText.workToday,
+            value: f(day.todayResultUnits, Currency.lyd),
+            gradient: glossBlack,
+            ink: paleGold,
+            border: const Color(0xFFF5C02E),
+            radius: radius,
           ),
-        ],
+        ),
+        SizedBox(height: gap),
+        _totalPair(
+          gap: gap,
+          height: cardH,
+          right: _TotalTile(
+            tileKey: const Key('purchase-total-paid'),
+            label: _PText.paidTotal,
+            value: f(day.todayPaidUnits, Currency.lyd),
+            gradient: glossBlack,
+            ink: paleGold,
+            border: const Color(0xFFF5C02E),
+            radius: radius,
+          ),
+          left: _TotalTile(
+            tileKey: const Key('purchase-total-debt'),
+            label: AppStrings.totalDebt,
+            value: f(day.totalDebtUnits, Currency.lyd),
+            gradient: coral,
+            ink: white,
+            border: Colors.white.withValues(alpha: 0.45),
+            radius: radius,
+          ),
+        ),
+        SizedBox(height: gap),
+        _TotalTile(
+          tileKey: const Key('purchase-vodafone-ours'),
+          label: _PText.vodafoneOurs,
+          value: f(day.vodafoneRemainingUnits, vodafoneCurrency),
+          fill: const Color(0xFFF3F7E8),
+          ink: const Color(0xFF166534),
+          border: const Color(0xFF86EFAC),
+          radius: radius,
+          note: owed ? caption : null,
+          height: cardH + 8,
+        ),
+      ],
+    );
+  }
+
+  Widget _bookPills(BuildContext context, WidgetRef ref) {
+    final gold = _frameGold(context);
+    final book = ref.watch(purchaseBookProvider);
+    return SegmentedButton<PurchaseBook>(
+      key: const Key('purchase-books'),
+      expandedInsets: EdgeInsets.zero,
+      style: ButtonStyle(
+        visualDensity: VisualDensity.compact,
+        minimumSize: const WidgetStatePropertyAll(Size(0, 42)),
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const Color(0xFF1A1A1A);
+          }
+          return const Color(0xFF2A2F38);
+        }),
+        foregroundColor: const WidgetStatePropertyAll(Color(0xFFF5F5F4)),
+        side: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return BorderSide(
+            color: selected ? gold : const Color(0xFFD6D3D1),
+            width: selected ? 1.6 : 1,
+          );
+        }),
+        shape: const WidgetStatePropertyAll(StadiumBorder()),
       ),
+      segments: const [
+        ButtonSegment(
+          value: PurchaseBook.alBayan,
+          label: Text(AppStrings.alBayan),
+        ),
+        ButtonSegment(
+          value: PurchaseBook.simsim,
+          label: Text(AppStrings.simsim),
+        ),
+      ],
+      selected: {book},
+      onSelectionChanged: (value) =>
+          ref.read(purchaseBookProvider.notifier).state = value.first,
     );
   }
 
@@ -1157,76 +1173,84 @@ class _TotalTile extends StatelessWidget {
     required this.tileKey,
     required this.label,
     required this.value,
-    required this.fill,
     required this.ink,
     required this.border,
+    required this.radius,
+    this.gradient,
+    this.fill,
     this.note,
-    this.wide = false,
+    this.height,
   });
 
   final Key tileKey;
   final String label;
   final String value;
-  final Color fill;
   final Color ink;
   final Color border;
+  final double radius;
+  final Gradient? gradient;
+  final Color? fill;
   final String? note;
-  final bool wide;
+  final double? height;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       key: tileKey,
-      constraints: const BoxConstraints(minHeight: 88),
-      padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+      height: height,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
+        gradient: gradient,
+        color: gradient == null ? fill : null,
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: border, width: 1.2),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: cairo(13, 800, color: ink),
-          ),
-          if (note != null)
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             Text(
-              note!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: cairo(11, 600, color: ink),
+              label,
+              textAlign: TextAlign.center,
+              style: cairo(12, 800, color: ink),
             ),
-          const SizedBox(height: 8),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: AlignmentDirectional.centerStart,
-            child: MoneyText(
+            if (note != null)
+              Text(
+                note!,
+                textAlign: TextAlign.center,
+                style: cairo(11, 600, color: ink),
+              ),
+            const SizedBox(height: 2),
+            MoneyText(
               value,
+              align: TextAlign.center,
               style: context.textExtras.amount.copyWith(
                 color: ink,
-                fontSize: wide ? 22 : 18,
+                fontSize: 16,
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-Widget _totalPair(BuildContext context, Widget right, Widget left) {
-  return IntrinsicHeight(
+Widget _totalPair({
+  required double gap,
+  required double height,
+  required Widget right,
+  required Widget left,
+}) {
+  return SizedBox(
+    height: height,
     child: Row(
       textDirection: TextDirection.rtl,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(child: right),
-        const SizedBox(width: AppSpacing.sm),
+        SizedBox(width: gap),
         Expanded(child: left),
       ],
     ),
@@ -1275,9 +1299,16 @@ class _LedgerEntryLine extends _LedgerLine {
 }
 
 class _LedgerBreakLine extends _LedgerLine {
-  const _LedgerBreakLine({required this.dayId, required this.closing});
+  const _LedgerBreakLine({
+    required this.dayId,
+    required this.closing,
+    required this.nextDate,
+  });
   final String dayId;
   final MoneyValue? closing;
+
+  /// `businessDate` of the first row of the following day. Not today's clock.
+  final String? nextDate;
 }
 
 /// A visual break before the next day, using that closed day's
@@ -1293,6 +1324,7 @@ List<_LedgerLine> _ledgerLines(List<PurchaseEntryDto> entries) {
         _LedgerBreakLine(
           dayId: closed.dayId ?? 'unknown-$i',
           closing: closed.dayClosingDebtUnits,
+          nextDate: entry.businessDate,
         ),
       );
     }
@@ -1459,41 +1491,58 @@ class _PurchaseGrid extends ConsumerWidget {
 
     for (final line in lines) {
       switch (line) {
-        case _LedgerBreakLine(:final dayId, :final closing):
-          final label = Text(
-            _PText.lastRemaining,
-            style: cairo(13, 800, color: breakInk),
-          );
+        case _LedgerBreakLine(:final dayId, :final closing, :final nextDate):
+          final tableWidth =
+              _ledgerCols.fold<double>(0, (sum, col) => sum + col.$2 * scale) +
+              actionW;
           scrollBands.add(
-            SizedBox(
+            ConstrainedBox(
               key: Key('purchase-rollover-$dayId'),
-              height: breakH,
-              width: _ledgerCols.fold<double>(
-                    0,
-                    (sum, col) => sum + col.$2 * scale,
-                  ) +
-                  actionW,
+              constraints: BoxConstraints(
+                minHeight: breakH + 8,
+                minWidth: tableWidth,
+                maxWidth: tableWidth,
+              ),
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: breakFill,
-                  border: Border.all(color: _gridLine(context)),
+                  border: Border.symmetric(
+                    horizontal: BorderSide(color: _gridLine(context), width: 1),
+                  ),
                 ),
-                child: Row(
-                  textDirection: TextDirection.rtl,
-                  children: [
-                    const SizedBox(width: 12),
-                    label,
-                    const SizedBox(width: 12),
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: MoneyText(
-                          money.formatOrDash(closing, Currency.lyd),
-                          style: figure.copyWith(color: breakInk),
-                        ),
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 12, 8),
+                  child: Row(
+                    textDirection: TextDirection.rtl,
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            nextDate ?? AppStrings.dash,
+                            style: cairo(16, 800, color: breakInk),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            textDirection: TextDirection.rtl,
+                            children: [
+                              Text(
+                                _PText.lastRemaining,
+                                style: cairo(12, 700, color: breakInk),
+                              ),
+                              const SizedBox(width: 8),
+                              MoneyText(
+                                money.formatOrDash(closing, Currency.lyd),
+                                style: figure.copyWith(color: breakInk),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
