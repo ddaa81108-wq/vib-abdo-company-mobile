@@ -3,16 +3,12 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../api/api_providers.dart';
-import '../../error_handling/error_handler.dart';
-import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets/section_kit.dart';
-import '../../ui/widgets/export_pdf_button.dart';
 import '../../ui/widgets/soft_tile.dart';
 import '../../ui/widgets/environment_badge.dart';
 import '../../state/session_providers.dart';
@@ -245,7 +241,6 @@ class _SettingsCard extends StatelessWidget {
     required this.note,
     this.action,
     this.onTap,
-    this.child,
     super.key,
   });
 
@@ -254,7 +249,6 @@ class _SettingsCard extends StatelessWidget {
   final String note;
   final Widget? action;
   final VoidCallback? onTap;
-  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
@@ -324,7 +318,6 @@ class _SettingsCard extends StatelessWidget {
                       ],
                     ],
                   ),
-                  ?child,
                 ],
               ),
             ),
@@ -355,91 +348,24 @@ class _GroupLabel extends StatelessWidget {
   }
 }
 
-/// Page total as an Arabic currency label. The server key (`LYD`, `EGP`) is
-/// not shown beside the symbol.
-String _ledgerTotal(MoneyFormatter money, String code, MoneyValue units) {
-  final currency = Currency.fromCode(code);
-  if (units.isInvalid || units.units == null) return MoneyValue.invalidLabel;
-  if (currency == null) return money.formatNumber(units.units!);
-  return money.formatOrDash(units, currency);
-}
-
-class _LedgerTile extends ConsumerWidget {
+class _LedgerTile extends StatelessWidget {
   const _LedgerTile({required this.onOpen});
 
   final void Function(BuildContext context) onOpen;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (!permissionsOf(ref).canViewFinancialLedger) {
-      return const SizedBox.shrink();
-    }
-    final page = ref.watch(financialLedgerProvider);
-    final money = ref.watch(apiLayerProvider).money;
-    final online = ref.watch(onlineProvider);
-    final ink = cairo(
-      12.5,
-      700,
-      color: Theme.of(context).colorScheme.onSurface,
-    );
+  Widget build(BuildContext context) {
     return _SettingsCard(
       key: const Key('financial-ledger'),
       icon: Icons.menu_book_outlined,
       title: AppStrings.financialLedger,
-      note: SettingsText.ledgerNote,
-      child: DefaultTextStyle.merge(
-        style: ink,
-        child: Padding(
-          padding: const EdgeInsetsDirectional.only(top: AppSpacing.sm),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const ExportPdfButton(),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton(
-                  key: const Key('ledger-open'),
-                  onPressed: () => onOpen(context),
-                  child: const Text('عرض القيود'),
-                ),
-              ),
-              page.when(
-                loading: () => const SkeletonBox(height: 48),
-                error: (error, _) => presentFailure(
-                  ref.read(errorHandlerProvider).toFailure(error),
-                  onRetry: online
-                      ? () => ref.invalidate(financialLedgerProvider)
-                      : null,
-                  retryKey: const Key('settings-retry'),
-                ),
-                data: (data) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(AppStrings.pageTotals, style: ink),
-                    for (final entry in data.pageTotals.entries)
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                          top: AppSpacing.xs,
-                        ),
-                        child: MoneyText(
-                          _ledgerTotal(money, entry.key, entry.value),
-                          key: Key('ledger-total-${entry.key}'),
-                          style: cairo(
-                            14,
-                            800,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                    if (data.page.items.isEmpty)
-                      const EmptyPane(message: AppStrings.emptyLedger),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+      note: 'يفتح صفحة القيود. الإجماليات لا تظهر هنا.',
+      action: TextButton(
+        key: const Key('ledger-open'),
+        onPressed: () => onOpen(context),
+        child: const Text('فتح'),
       ),
+      onTap: () => onOpen(context),
     );
   }
 }

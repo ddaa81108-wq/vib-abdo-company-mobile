@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
+import 'package:vib_abdo_company_mobile/features/settings/financial_ledger_screen.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
@@ -162,18 +163,27 @@ void main() {
       tester,
       size: const Size(800, 1600),
       overrides: [
-        financialLedgerProvider.overrideWith((ref) async {
+        ledgerPageProvider.overrideWith((ref, query) async {
           gate.calls++;
           if (gate.failing) throw const NetworkException();
-          return ref.read(apiLayerProvider).reports.financialLedger();
+          return ref.read(apiLayerProvider).reports.financialLedger(
+            before: query.before,
+            sectionKey: query.section,
+            currency: query.currency,
+            q: query.q.isEmpty ? null : query.q,
+          );
         }),
       ],
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/settings');
-    expect(find.byKey(const Key('settings-retry')), findsOneWidget);
+    expect(find.byKey(const Key('financial-ledger')), findsOneWidget);
+    expect(find.text(AppStrings.pageTotals), findsNothing);
+    expect(find.byKey(const Key('settings-retry')), findsNothing);
+    await go(tester, '/settings/ledger');
+    expect(find.byKey(const Key('ledger-retry')), findsOneWidget);
     gate.failing = false;
-    await tester.tap(find.byKey(const Key('settings-retry')));
+    await tester.tap(find.byKey(const Key('ledger-retry')));
     await settle(tester);
     expect(find.text(AppStrings.pageTotals), findsOneWidget);
     expect(gate.calls, greaterThanOrEqualTo(2));
@@ -252,6 +262,8 @@ void main() {
     expect(find.byKey(const Key('export-pdf')), findsOneWidget);
     await go(tester, '/settings');
     expect(find.byKey(const Key('financial-ledger')), findsOneWidget);
+    expect(find.byKey(const Key('export-pdf')), findsNothing);
+    await go(tester, '/settings/ledger');
     expect(find.byKey(const Key('export-pdf')), findsOneWidget);
 
     layer.permissions.applyFromServer(

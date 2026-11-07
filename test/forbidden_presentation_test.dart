@@ -82,6 +82,8 @@ void main() {
     expect(find.byType(SettingsScreen), findsOneWidget);
     expect(find.text(AppStrings.employeesTile), findsOneWidget);
     expect(find.byKey(const Key('financial-ledger')), findsOneWidget);
+    expect(find.text(AppStrings.pageTotals), findsNothing);
+    await go(tester, '/settings/ledger');
     expect(find.text(AppStrings.pageTotals), findsOneWidget);
   });
 

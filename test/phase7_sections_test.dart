@@ -120,9 +120,9 @@ void main() {
   ) async {
     await pumpFakeApp(tester, size: const Size(800, 1600));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/settings');
+    await go(tester, '/settings/ledger');
 
-    expect(find.byKey(const Key('financial-ledger')), findsOneWidget);
+    expect(find.byKey(const Key('screen-financial-ledger')), findsOneWidget);
     expect(find.text(AppStrings.emptyLedger), findsNothing);
     expect(
       tester.widget<MoneyText>(find.byKey(const Key('ledger-total-LYD'))).text,

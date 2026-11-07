@@ -25,19 +25,25 @@ void main() {
           await tester.pumpAndSettle();
         }
         expect(find.byKey(SettingsScreen.screenKey), findsOneWidget);
+        expect(find.byKey(const Key('ledger-total-LYD')), findsNothing);
         await saveShot(tester, 'settings-accounts-$theme-440');
+        await saveShot(tester, 'settings-landing-$theme');
         await go(tester, '/settings/users');
         expect(find.byKey(const Key('login-account-create')), findsOneWidget);
         await saveShot(tester, 'login-accounts-$theme-440');
+        await saveShot(tester, 'accounts-list-$theme');
         await go(tester, '/settings/users/new');
         expect(find.byKey(const Key('screen-login-account-create')), findsOneWidget);
         await saveShot(tester, 'login-account-create-$theme-440');
         await go(tester, '/settings/users/u_12');
         expect(find.byKey(const Key('screen-login-account-edit')), findsOneWidget);
         await saveShot(tester, 'login-account-edit-$theme-440');
+        await saveShot(tester, 'account-edit-permissions-$theme');
         await go(tester, '/settings/ledger');
         expect(find.byKey(FinancialLedgerScreen.screenKey), findsOneWidget);
+        expect(find.byKey(const Key('ledger-total-LYD')), findsOneWidget);
         await saveShot(tester, 'financial-ledger-$theme-440');
+        await saveShot(tester, 'ledger-inner-$theme');
         await go(tester, '/settings/audit');
         expect(
           find.byKey(const Key('security-current-session')),

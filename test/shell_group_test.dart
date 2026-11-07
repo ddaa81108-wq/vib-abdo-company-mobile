@@ -653,6 +653,8 @@ void main() {
     expect(find.textContaining('لا تتوفر بيانات من الخادم'), findsNothing);
     expect(find.textContaining('LYD'), findsNothing);
     expect(find.textContaining('EGP'), findsNothing);
+    expect(find.byKey(const Key('ledger-total-LYD')), findsNothing);
+    await go(tester, '/settings/ledger');
     expect(find.byKey(const Key('ledger-total-LYD')), findsOneWidget);
     expect(find.byKey(const Key('ledger-total-EGP')), findsOneWidget);
     expect(
