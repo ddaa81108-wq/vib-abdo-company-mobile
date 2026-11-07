@@ -123,6 +123,16 @@ class FakeApiClient implements ApiClient {
   /// The next N older-page reads (`before`) fail (tests).
   int failOlderRemaining = 0;
 
+  /// Cursor advertised on the first purchases page. Null keeps the fixture.
+  int? purchaseFirstNextBefore;
+
+  /// Older purchases pages keyed by the integer `before` the previous page
+  /// advertised. Totals are not stored here; the fixture register totals stay.
+  final Map<int, Map<String, dynamic>> purchaseOlderPages = {};
+
+  /// Each purchases list read, including `before` when the app sent one.
+  final List<Map<String, dynamic>> purchaseQueries = [];
+
   /// The next N notification writes fail (tests).
   int failNotificationWritesRemaining = 0;
 
@@ -254,6 +264,7 @@ class FakeApiClient implements ApiClient {
       challenge.expiresAt = past;
     }
   }
+
   int _csrfSeq = 0;
   String? _jarId;
   String? _latestSessionId;
@@ -1181,9 +1192,8 @@ class FakeApiClient implements ApiClient {
   }
 
   String? _namedCookie(ApiRequestOptions options, String name) {
-    final raw = _hasHeader(options, 'cookie')
-        ? _header(options, 'cookie')
-        : null;
+    final raw =
+        _hasHeader(options, 'cookie') ? _header(options, 'cookie') : null;
     if (raw == null) return null;
     for (final part in raw.split(';')) {
       final piece = part.trim();
@@ -1432,7 +1442,15 @@ class FakeApiClient implements ApiClient {
       case 'purchases':
         if (method == 'GET') {
           _requireRead(SectionKey.purchases);
-          return _ok(_purchasesView(seg.length > 1 ? seg[1] : ''));
+          if (query != null) {
+            purchaseQueries.add(Map<String, dynamic>.from(query));
+          }
+          final before = _queryInt(query, 'before');
+          if (before != null && failOlderRemaining > 0) {
+            failOlderRemaining--;
+            _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
+          }
+          return _ok(_purchasesView(seg.length > 1 ? seg[1] : '', before));
         }
         if (seg.isNotEmpty && seg.last == 'finalize') {
           if (!_access.canFinalizePurchases) _fail(403, 'FORBIDDEN', _denied);
@@ -2268,7 +2286,7 @@ class FakeApiClient implements ApiClient {
     day['correctionOpen'] = false;
   }
 
-  Map<String, dynamic> _purchasesView(String book) {
+  Map<String, dynamic> _purchasesView(String book, int? before) {
     final body = _copy(FakeFixtures.purchases());
     final merchant = body['merchant'];
     if (merchant is Map) {
@@ -2278,14 +2296,30 @@ class FakeApiClient implements ApiClient {
           : PurchaseBook.alBayan.label;
     }
     final day = _openPurchaseDay(book);
-    if (day == null) return body;
-    body['day'] = day;
+    if (day != null) body['day'] = day;
+    if (before != null) {
+      final older = purchaseOlderPages[before];
+      final rawEntries = older?['entries'];
+      body['entries'] = day == null || rawEntries is! List
+          ? <Map<String, dynamic>>[]
+          : [
+              for (final raw in rawEntries)
+                if (raw is Map)
+                  _entryOnThisPage(Map<String, dynamic>.from(raw), day),
+            ];
+      final next = older?['nextBefore'];
+      body['nextBefore'] = next is int ? next : null;
+      return body;
+    }
     final entries = body['entries'];
-    if (entries is List) {
+    if (day != null && entries is List) {
       body['entries'] = [
         for (final raw in entries)
           if (raw is Map) _entryOnThisPage(Map<String, dynamic>.from(raw), day),
       ];
+    }
+    if (purchaseFirstNextBefore != null) {
+      body['nextBefore'] = purchaseFirstNextBefore;
     }
     return body;
   }
@@ -2982,8 +3016,8 @@ class FakeApiClient implements ApiClient {
       if (expected is int && expected != row['version']) {
         _fail(409, 'CONFLICT', 'تغيّر الحساب. أعد التحميل.');
       }
-      final protected =
-          row['isOwner'] == true || PermissionService.isDirectoryAdmin(row['role']);
+      final protected = row['isOwner'] == true ||
+          PermissionService.isDirectoryAdmin(row['role']);
       if (protected && !_isPrimaryOwner) {
         _fail(403, 'FORBIDDEN', 'تعديل حساب الإدارة للمدير الأساسي فقط.');
       }
@@ -3023,7 +3057,9 @@ class FakeApiClient implements ApiClient {
   }
 
   String _sectionAccessValue(Object? raw) {
-    if (raw == 'read' || raw == 'manage' || raw == 'none') return raw! as String;
+    if (raw == 'read' || raw == 'manage' || raw == 'none') {
+      return raw! as String;
+    }
     if (raw == null) return 'none';
     _fail(400, 'INVALID_INPUT', 'مستوى القسم غير معروف.');
   }
@@ -3144,6 +3180,13 @@ Map<String, dynamic> _filterLedgerPage(
     }
   }
   return {...page, 'items': items, 'pageTotals': totals};
+}
+
+int? _queryInt(Map<String, dynamic>? query, String key) {
+  final value = query?[key];
+  if (value is int) return value;
+  if (value is String) return int.tryParse(value);
+  return null;
 }
 
 String? _queryText(Map<String, dynamic>? query, String key) {
