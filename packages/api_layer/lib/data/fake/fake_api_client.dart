@@ -136,6 +136,9 @@ class FakeApiClient implements ApiClient {
   /// Cursor placed on the first financial-ledger page when set.
   String? financialLedgerFirstNextBefore;
 
+  /// Older audit pages keyed by the `before` cursor. Absent uses the fixture.
+  final Map<String, Map<String, dynamic>> auditOlderPages = {};
+
   /// Older financial-ledger pages keyed by the opaque `before` cursor.
   /// Each value is a full page body, including its own `pageTotals`.
   final Map<String, Map<String, dynamic>> financialLedgerOlderPages = {};
@@ -1578,7 +1581,16 @@ class FakeApiClient implements ApiClient {
       case 'health':
         return _ok(FakeFixtures.health());
       case 'audit-log':
-        return _ok(FakeFixtures.auditLog());
+        final before = _queryText(query, 'before');
+        if (before != null && failOlderRemaining > 0) {
+          failOlderRemaining--;
+          _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
+        }
+        return _ok(
+          before == null
+              ? FakeFixtures.auditLog()
+              : (auditOlderPages[before] ?? FakeFixtures.auditLog()),
+        );
       case 'account-requests':
         return _accountRequests(method, seg, b);
       case 'users':

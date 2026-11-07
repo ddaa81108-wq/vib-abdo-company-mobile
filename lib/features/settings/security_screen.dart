@@ -95,6 +95,7 @@ class _ServerAuditLogState extends ConsumerState<_ServerAuditLog> {
   Object? _error;
   var _loading = true;
   var _more = false;
+  var _ticket = 0;
 
   @override
   void initState() {
@@ -103,7 +104,9 @@ class _ServerAuditLogState extends ConsumerState<_ServerAuditLog> {
   }
 
   Future<void> _load() async {
-    if (!mounted) return;
+    if (!mounted || _more || (_loading && _items.isNotEmpty)) return;
+    final ticket = ++_ticket;
+    final before = _before;
     setState(() {
       if (_items.isEmpty) {
         _loading = true;
@@ -113,18 +116,22 @@ class _ServerAuditLogState extends ConsumerState<_ServerAuditLog> {
       _error = null;
     });
     try {
-      final page = await ref.read(apiLayerProvider).directory.auditLog(
-            before: _before,
-          );
-      if (!mounted) return;
+      final page = await ref
+          .read(apiLayerProvider)
+          .directory
+          .auditLog(before: before);
+      if (!mounted || ticket != _ticket) return;
+      final seen = {for (final item in _items) item.id};
       setState(() {
-        _items.addAll(page.items);
+        for (final item in page.items) {
+          if (seen.add(item.id)) _items.add(item);
+        }
         _before = page.nextBefore;
         _loading = false;
         _more = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || ticket != _ticket) return;
       setState(() {
         _error = error;
         _loading = false;
@@ -135,7 +142,7 @@ class _ServerAuditLogState extends ConsumerState<_ServerAuditLog> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const SkeletonBox(height: 72);
+    if (_loading && _items.isEmpty) return const SkeletonBox(height: 72);
     if (_error != null && _items.isEmpty) {
       return presentFailure(
         ref.read(errorHandlerProvider).toFailure(_error!),
@@ -153,6 +160,12 @@ class _ServerAuditLogState extends ConsumerState<_ServerAuditLog> {
               : 'عمليات دخول أو جلسة في الصفوف المحمّلة: $sessionRows',
           key: const Key('security-session-count'),
         ),
+        if (_error != null)
+          Text(
+            ref.read(errorHandlerProvider).toFailure(_error!).message,
+            key: const Key('audit-older-error'),
+            style: cairo(13, 700, color: Theme.of(context).colorScheme.error),
+          ),
         if (_items.isEmpty)
           const EmptyPane(message: AppStrings.auditEmpty)
         else
