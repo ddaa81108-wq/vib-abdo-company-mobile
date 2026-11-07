@@ -25,11 +25,22 @@ class MasraweyaRowDraft {
 
   bool get isEmpty => valueText.trim().isEmpty && commissionText.trim().isEmpty;
 
-  /// PUT items require both integers and `minimum: 0`.
+  /// القيمة is required. A blank العمولة is 0. A non-blank العمولة must
+  /// already be a non-negative integer; it is not turned into 0.
   bool get isComplete {
+    if (isEmpty) return false;
     final value = parseUnits(valueText);
+    if (value == null || value < 0) return false;
+    if (commissionText.trim().isEmpty) return true;
     final commission = parseUnits(commissionText);
-    return value != null && value >= 0 && commission != null && commission >= 0;
+    return commission != null && commission >= 0;
+  }
+
+  /// Units sent for العمولة. Blank is 0. Caller must already know the row
+  /// is complete, so a non-blank value parses.
+  int get commissionUnitsToSend {
+    if (commissionText.trim().isEmpty) return 0;
+    return parseUnits(commissionText)!;
   }
 
   bool get isPartial => !isEmpty && !isComplete;
@@ -108,7 +119,7 @@ class MasraweyaSavePlan {
         if (!row.isEmpty)
           MasraweyaEntryDto(
             valueUnits: MoneyValue.known(parseUnits(row.valueText)!),
-            commissionUnits: MoneyValue.known(parseUnits(row.commissionText)!),
+            commissionUnits: MoneyValue.known(row.commissionUnitsToSend),
           ),
     ];
     final request = SaveMasraweyaDayRequest(
@@ -126,17 +137,16 @@ class MasraweyaSavePlan {
   }
 }
 
-/// Display-only row total Ali confirmed: القيمة + العمولة.
-///
-/// Integer units from [parseUnits]. Empty, partial, negative, or invalid
-/// text is null so the cell stays a dash. The sum is not sent and is not
+/// Display-only row total: القيمة, plus العمولة when that cell is a valid
+/// integer. A blank العمولة is 0, so the total is the value at once.
+/// Invalid non-blank text stays a dash. The sum is not sent and is not
 /// `workTotalUnits` or `remainingUnits`.
 int? masraweyaRowDisplayUnits(String valueText, String commissionText) {
   final value = parseUnits(valueText);
+  if (value == null || value < 0) return null;
+  if (commissionText.trim().isEmpty) return value;
   final commission = parseUnits(commissionText);
-  if (value == null || value < 0 || commission == null || commission < 0) {
-    return null;
-  }
+  if (commission == null || commission < 0) return null;
   return value + commission;
 }
 

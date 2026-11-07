@@ -40,6 +40,7 @@ export 'core/permissions/permission_codes.dart';
 export 'core/permissions/permission_service.dart';
 export 'core/push/push_service.dart';
 export 'core/realtime/realtime_service.dart';
+export 'core/security/capture_policy.dart';
 export 'core/security/redactor.dart';
 export 'core/session/session_manager.dart';
 export 'core/session/token_storage.dart';
@@ -108,6 +109,7 @@ class ApiLayer {
     Duration? fakeLatency,
     HttpClientAdapter? httpClientAdapter,
     String? fakeDataset,
+    SessionCaptureGate? captureGate,
   }) {
     final cfg = config ?? ApiConfig.fromEnvironment();
     rejectFakeApiInRelease(cfg.useFakeApi);
@@ -148,6 +150,7 @@ class ApiLayer {
       authRepository: auth,
       profileRepository: profile,
       permissionService: permissions,
+      captureGate: captureGate,
       cleanups: [
         // Bearer storage is unused (AUTH_BEARER stays off). Logout still
         // clears it so a leftover token cannot outlive the cookie session.

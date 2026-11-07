@@ -155,7 +155,7 @@ void main() {
       purchasesText: '2000',
       rows: const [
         MasraweyaRowDraft(valueText: '3000', commissionText: '50'),
-        MasraweyaRowDraft(valueText: '5', commissionText: ''),
+        MasraweyaRowDraft(valueText: '', commissionText: '5'),
       ],
       summaryLeave: false,
     );
@@ -177,7 +177,7 @@ void main() {
     expect(masraweyaRowDisplayUnits('1,000', '250'), 1250);
     expect(masraweyaRowDisplayUnits('9007199254740993', '1'), 9007199254740994);
     expect(masraweyaRowDisplayUnits('', '5'), isNull);
-    expect(masraweyaRowDisplayUnits('5', ''), isNull);
+    expect(masraweyaRowDisplayUnits('5', ''), 5);
     expect(masraweyaRowDisplayUnits('12.5', '1'), isNull);
     expect(masraweyaRowDisplayUnits('-3', '5'), isNull);
     expect(masraweyaRowDisplayUnits('abc', '1'), isNull);
@@ -189,6 +189,112 @@ void main() {
     expect(body.containsKey('remainingUnits'), isFalse);
     final entries = body['entries'] as List;
     expect(entries[1].containsKey('totalUnits'), isFalse);
+  });
+
+  test('a value alone saves, a blank commission is 0, and bad text does not', () async {
+    final bodies = <Map<String, dynamic>>[];
+    final autosave = MasraweyaAutosave(
+      send: (request, meta) async {
+        bodies.add(request.toJson());
+        return day(bodies.length + 2);
+      },
+    );
+    MasraweyaDraft typed(List<MasraweyaRowDraft> rows) {
+      return MasraweyaDraft(
+        businessDate: '2026-10-19',
+        previousText: '10000',
+        previousEditable: true,
+        lockedPreviousUnits: 10000,
+        purchasesText: '2000',
+        rows: rows,
+        summaryLeave: false,
+      );
+    }
+
+    final initial = typed(const [
+      MasraweyaRowDraft(valueText: '3000', commissionText: '50'),
+    ]);
+    autosave.bindLoaded(day(2), initial);
+
+    final valueOnly = typed(const [
+      MasraweyaRowDraft(valueText: '3000', commissionText: '50'),
+      MasraweyaRowDraft(valueText: '500', commissionText: ''),
+    ]);
+    expect(masraweyaRowDisplayUnits('500', ''), 500);
+    autosave.noteLeave(valueOnly, leftRowIndex: 1, online: true);
+    await autosave.pump();
+    expect(autosave.phase, MasraweyaSavePhase.saved);
+    final first = (bodies.single['entries'] as List).last as Map;
+    expect(first, {'valueUnits': 500, 'commissionUnits': 0});
+
+    final explicitZero = typed(const [
+      MasraweyaRowDraft(valueText: '3000', commissionText: '50'),
+      MasraweyaRowDraft(valueText: '500', commissionText: '0'),
+    ]);
+    expect(masraweyaRowDisplayUnits('500', '0'), 500);
+    autosave.noteLeave(explicitZero, leftRowIndex: 1, online: true);
+    await autosave.pump();
+    expect(
+      ((bodies.last['entries'] as List).last as Map)['commissionUnits'],
+      0,
+    );
+
+    final withCommission = typed(const [
+      MasraweyaRowDraft(valueText: '3000', commissionText: '50'),
+      MasraweyaRowDraft(valueText: '500', commissionText: '25'),
+    ]);
+    expect(masraweyaRowDisplayUnits('500', '25'), 525);
+    autosave.noteLeave(withCommission, leftRowIndex: 1, online: true);
+    await autosave.pump();
+    expect((bodies.last['entries'] as List).last, {
+      'valueUnits': 500,
+      'commissionUnits': 25,
+    });
+
+    final sent = bodies.length;
+    final blankRow = typed(const [
+      MasraweyaRowDraft(valueText: '3000', commissionText: '50'),
+      MasraweyaRowDraft(valueText: '500', commissionText: '25'),
+      MasraweyaRowDraft(valueText: '', commissionText: ''),
+    ]);
+    autosave.noteLeave(blankRow, leftRowIndex: 2, online: true);
+    await autosave.pump();
+    expect(bodies, hasLength(sent));
+    expect(autosave.phase, MasraweyaSavePhase.saved);
+
+    final commissionOnly = typed(const [
+      MasraweyaRowDraft(valueText: '3000', commissionText: '50'),
+      MasraweyaRowDraft(valueText: '', commissionText: '25'),
+    ]);
+    expect(masraweyaRowDisplayUnits('', '25'), isNull);
+    autosave.noteLeave(commissionOnly, leftRowIndex: 1, online: true);
+    await autosave.pump();
+    expect(bodies, hasLength(sent));
+    expect(autosave.issue, MasraweyaDraftIssue.partialRow);
+    expect(autosave.blocksNavigation, isTrue);
+
+    final invalidCommission = typed(const [
+      MasraweyaRowDraft(valueText: '3000', commissionText: '50'),
+      MasraweyaRowDraft(valueText: '500', commissionText: '12.5'),
+    ]);
+    expect(masraweyaRowDisplayUnits('500', '12.5'), isNull);
+    expect(masraweyaRowDisplayUnits('500', 'abc'), isNull);
+    autosave.noteLeave(invalidCommission, leftRowIndex: 1, online: true);
+    await autosave.pump();
+    expect(bodies, hasLength(sent));
+    expect(autosave.issue, MasraweyaDraftIssue.partialRow);
+
+    autosave.noteLeave(withCommission, leftRowIndex: 1, online: true);
+    await autosave.pump();
+    expect(bodies, hasLength(sent));
+
+    autosave.noteLeave(valueOnly, leftRowIndex: 1, online: true);
+    await autosave.pump();
+    expect(bodies.length, sent + 1);
+    expect((bodies.last['entries'] as List).last, {
+      'valueUnits': 500,
+      'commissionUnits': 0,
+    });
   });
 
   test(

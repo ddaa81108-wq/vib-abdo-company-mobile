@@ -106,6 +106,24 @@ bool showCustomerZeroReview({
   return readZeroReview(card.zeroReview) == ZeroReviewRead.pending;
 }
 
+/// Display order for customers: server order, then cards whose `zeroReview`
+/// the server has already closed. Pending and unknown rows stay put. This
+/// does not change status and does not run before a successful confirm.
+List<AccountCardDto> customersWithClosedZeroReviewLast(
+  List<AccountCardDto> cards,
+) {
+  final open = <AccountCardDto>[];
+  final closed = <AccountCardDto>[];
+  for (final card in cards) {
+    if (readZeroReview(card.zeroReview) == ZeroReviewRead.closed) {
+      closed.add(card);
+    } else {
+      open.add(card);
+    }
+  }
+  return [...open, ...closed];
+}
+
 /// The website rule on 537f073 (`balanceUnits > 0 && !activeAssigneeName`),
 /// plus system-managed cards, which are read-only. The server refuses the
 /// whole request (409 ASSIGNMENT_REQUIRES_POSITIVE_DEBT or

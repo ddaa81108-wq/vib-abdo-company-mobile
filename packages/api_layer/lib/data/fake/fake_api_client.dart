@@ -858,6 +858,10 @@ class FakeApiClient implements ApiClient {
     return false;
   }
 
+  /// Extra cards tests append. Empty in ordinary use. Merged with later writes.
+  final List<({String section, Map<String, dynamic> card})>
+      appendedAccountCards = [];
+
   /// Account sections whose list summary is the home figure for that section.
   static const _accountSections = {
     'customers',
@@ -906,6 +910,11 @@ class FakeApiClient implements ApiClient {
   }
 
   Map<String, dynamic>? _cardOrNull(String head, String id) {
+    for (final extra in appendedAccountCards) {
+      if (extra.section == head && extra.card['id'] == id) {
+        return Map<String, dynamic>.from(extra.card);
+      }
+    }
     if (_large) {
       final generated = FakeLargeCatalog.cardOrNull(head, id);
       if (generated != null) return Map<String, dynamic>.from(generated);
@@ -1563,6 +1572,9 @@ class FakeApiClient implements ApiClient {
     if (method == 'PATCH' && seg.length == 3 && seg[2] == 'pin') {
       return _applyPin(head, seg[1], b);
     }
+    if (method == 'POST' && seg.length == 3 && seg[2] == 'zero-review') {
+      return _applyZeroReview(head, seg[1], b);
+    }
     if (b['expectedVersion'] == -1) {
       _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
     }
@@ -1604,7 +1616,8 @@ class FakeApiClient implements ApiClient {
       _requireAction(ManagementAction.collectionsAssign);
       return _engine(
         () => {
-          'items': collectionsEngine.overview(_collectionsCaller)['assignments'],
+          'items':
+              collectionsEngine.overview(_collectionsCaller)['assignments'],
         },
       );
     }
@@ -1703,17 +1716,17 @@ class FakeApiClient implements ApiClient {
   );
 
   FakeCollectionsCaller get _collectionsCaller => FakeCollectionsCaller(
-    id: _userId,
-    name: _displayName() ?? '',
-    seesEverything: _seesEveryCollection,
-  );
+        id: _userId,
+        name: _displayName() ?? '',
+        seesEverything: _seesEveryCollection,
+      );
 
   /// Payroll is admin-scoped by the payroll manage action, not by decide.
   FakeCollectionsCaller get _payrollCaller => FakeCollectionsCaller(
-    id: _userId,
-    name: _displayName() ?? '',
-    seesEverything: _managesPayroll,
-  );
+        id: _userId,
+        name: _displayName() ?? '',
+        seesEverything: _managesPayroll,
+      );
 
   ApiResponse _engine(
     Map<String, dynamic> Function() run, {
@@ -1817,6 +1830,14 @@ class FakeApiClient implements ApiClient {
       if (state != null) card.addAll(state);
       _overlayAssignee(section, card);
       items.add(card);
+    }
+    for (final extra in appendedAccountCards) {
+      if (extra.section != section) continue;
+      final card = Map<String, dynamic>.from(extra.card);
+      final state = _cardState['$section|${card['id']}'];
+      if (state != null) card.addAll(state);
+      _overlayAssignee(section, card);
+      items.insert(0, card);
     }
     body['items'] = items;
     if (delta != 0) {
@@ -2080,6 +2101,31 @@ class FakeApiClient implements ApiClient {
     });
   }
 
+  /// POST /customers/{id}/zero-review. Stores the documented closed review
+  /// (`pending: false`) so the next list read is the server status. Does not
+  /// change the balance.
+  ApiResponse _applyZeroReview(String section, String accountId, Map b) {
+    if (section != 'customers') {
+      _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
+    }
+    final card = _cardView(section, accountId);
+    if (b.containsKey('expectedFinancialVersion')) {
+      _requireVersion(b['expectedFinancialVersion'], card['version']);
+    }
+    final version = card['version'] is int ? card['version'] as int : 0;
+    final review = {
+      'pending': false,
+      'financialVersion': version,
+      'reviewedAt': '2026-10-22T22:00:00.000Z',
+      'reviewedByName': _displayName() ?? 'مدير تجريبي',
+    };
+    _cardState['$section|$accountId'] = {
+      ...?_cardState['$section|$accountId'],
+      'zeroReview': review,
+    };
+    return _ok({'zeroReview': review});
+  }
+
   String? _displayName() {
     final user = _me['user'];
     if (user is Map && user['displayName'] is String) {
@@ -2210,20 +2256,21 @@ class FakeApiClient implements ApiClient {
   /// not a sum of rows. `openingEditable` is false: the contract says opening
   /// is automatic except the first seed day.
   Map<String, dynamic> _emptyMasraweyaDay(String date) => {
-    'businessDate': date,
-    'version': 0,
-    'previousValueUnits': 0,
-    'purchasesUnits': 0,
-    'entries': <Map<String, dynamic>>[],
-    'workTotalUnits': 0,
-    'remainingUnits': 0,
-    'finalUnits': 0,
-    'historicalAdjustmentUnits': 0,
-    'openingEditable': false,
-    'status': 'open',
-  };
+        'businessDate': date,
+        'version': 0,
+        'previousValueUnits': 0,
+        'purchasesUnits': 0,
+        'entries': <Map<String, dynamic>>[],
+        'workTotalUnits': 0,
+        'remainingUnits': 0,
+        'finalUnits': 0,
+        'historicalAdjustmentUnits': 0,
+        'openingEditable': false,
+        'status': 'open',
+      };
 
-  Map<String, dynamic> _decorateMasraweya(Map<String, dynamic> day, String date) {
+  Map<String, dynamic> _decorateMasraweya(
+      Map<String, dynamic> day, String date) {
     final today = DateTime.parse(masraweyaToday);
     final earliest = DateTime(
       today.year,
@@ -2231,16 +2278,14 @@ class FakeApiClient implements ApiClient {
       today.day,
     ).subtract(const Duration(days: 7));
     final parsed = DateTime.tryParse(date);
-    final dayDate = parsed == null
-        ? null
-        : DateTime(parsed.year, parsed.month, parsed.day);
+    final dayDate =
+        parsed == null ? null : DateTime(parsed.year, parsed.month, parsed.day);
     final end = DateTime(today.year, today.month, today.day);
     final editable =
         dayDate != null && !dayDate.isBefore(earliest) && !dayDate.isAfter(end);
     day['businessDate'] = date;
     day['today'] = masraweyaToday;
-    day['earliestEditableDate'] =
-        '${earliest.year.toString().padLeft(4, '0')}-'
+    day['earliestEditableDate'] = '${earliest.year.toString().padLeft(4, '0')}-'
         '${earliest.month.toString().padLeft(2, '0')}-'
         '${earliest.day.toString().padLeft(2, '0')}';
     day['editable'] = editable;

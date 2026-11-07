@@ -110,7 +110,8 @@ abstract final class _MText {
   static const share = 'مشاركة الملخص';
   static const saving = 'جارٍ الحفظ…';
   static const saved = 'تم الحفظ';
-  static const partial = 'أكمل القيمة والعمولة في الصف قبل الحفظ.';
+  static const partial =
+      'القيمة مطلوبة. العمولة اختيارية، وإن كُتبت فيجب أن تكون عددًا صحيحًا غير سالب.';
   static const previousInvalid = 'القيمة السابقة عدد صحيح.';
   static const purchasesInvalid = 'مشتريات اليوم عدد صحيح غير سالب.';
   static const offline = 'غير متصل. التعديل لم يُرسل.';
