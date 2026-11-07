@@ -181,12 +181,11 @@ class _HeaderBand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final gold = sectionGold(context);
-    final sidebar = context.sidebarPalette;
     return Container(
       key: const Key('settings-header'),
       padding: const EdgeInsetsDirectional.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: sidebar.base,
+        color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(AppRadii.card),
         border: Border.all(color: gold.withValues(alpha: 0.55)),
       ),
