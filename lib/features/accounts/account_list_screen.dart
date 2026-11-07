@@ -667,7 +667,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       return message;
     }
     try {
-      final ack = await ref
+      await ref
           .read(apiLayerProvider)
           .accounts
           .confirmZeroReview(card.id, meta);
