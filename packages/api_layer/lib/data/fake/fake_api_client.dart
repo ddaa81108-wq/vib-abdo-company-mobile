@@ -123,6 +123,9 @@ class FakeApiClient implements ApiClient {
   /// The next N older-page reads (`before`) fail (tests).
   int failOlderRemaining = 0;
 
+  /// The next N account-list reads that carry `cursor` fail (tests).
+  int failNextAccountPageRemaining = 0;
+
   /// Cursor advertised on the first purchases page. Null keeps the fixture.
   int? purchaseFirstNextBefore;
 
@@ -1636,6 +1639,12 @@ class FakeApiClient implements ApiClient {
         accountListQueries.add(
           AccountListQuery(section: head, filter: filter, q: q, cursor: cursor),
         );
+        if (cursor != null &&
+            cursor.isNotEmpty &&
+            failNextAccountPageRemaining > 0) {
+          failNextAccountPageRemaining--;
+          _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الصفحة التالية.');
+        }
         if (_large && FakeLargeCatalog.pagesAccounts(head)) {
           final generated = FakeLargeCatalog.accountPage(
             section: head,

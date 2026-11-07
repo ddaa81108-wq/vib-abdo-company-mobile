@@ -41,6 +41,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   var _assigning = false;
   var _showAllDebts = false;
   var _paging = false;
+  String? _moreError;
   var _scrollArmed = true;
   final _selected = <String>{};
   String? _reply;
@@ -342,12 +343,19 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                           ),
                   ),
                 ),
+              if (_moreError != null)
+                Text(
+                  _moreError!,
+                  key: const Key('load-more-accounts-error'),
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: Theme.of(context).colorScheme.error),
+                ),
               if (_loadMoreCursor(data.page.nextCursor) != null)
                 Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: TextButton(
                     key: const Key('load-more-accounts'),
-                    onPressed: online
+                    onPressed: online && !_paging
                         ? () => _more(
                             _loadMoreCursor(data.page.nextCursor)!,
                             retainLimit: _accountRetainLimit(data.page.items),
@@ -572,8 +580,9 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   }
 
   Future<void> _more(String cursor, {int? retainLimit}) async {
-    if (_paging) return;
+    if (_paging || !ref.read(onlineProvider)) return;
     _paging = true;
+    if (mounted) setState(() => _moreError = null);
     try {
       final query = ref.read(accountQueryProvider(section)).trim();
       final filter = ref.read(accountFilterProvider(section));
@@ -596,6 +605,9 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             nextCursor: next.page.nextCursor,
             retainLimit: retainLimit,
           );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _moreError = _message(error));
     } finally {
       _paging = false;
     }
@@ -712,8 +724,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
 
   Future<String?> _zero(AccountCardDto card, MutationMeta meta) async {
     if (meta.expectedVersion == null) {
-      const message =
-          'لا يوجد إصدار مالي على الكارت. لم تُرسل مراجعة التصفير.';
+      const message = 'لا يوجد إصدار مالي على الكارت. لم تُرسل مراجعة التصفير.';
       if (mounted) setState(() => _reply = message);
       return message;
     }
