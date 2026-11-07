@@ -168,6 +168,71 @@ void main() {
     );
   });
 
+  testWidgets(
+    'the settings page hides ledger figures and an edit sends section access',
+    (tester) async {
+      final layer = await pumpFakeApp(tester, size: const Size(440, 1200));
+      final fake = layer.client as FakeApiClient;
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/settings');
+      expect(find.byKey(const Key('financial-ledger')), findsOneWidget);
+      expect(find.byKey(const Key('ledger-total-LYD')), findsNothing);
+      expect(find.byKey(const Key('ledger-entry-4')), findsNothing);
+      expect(find.text('480 د.ل'), findsNothing);
+      expect(find.textContaining('10,000'), findsNothing);
+
+      await go(tester, '/settings/users/u_12');
+      expect(find.byKey(const Key('screen-login-account-edit')), findsOneWidget);
+      expect(
+        find.byKey(const Key('edit-access-customerDebts'), skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(
+        find.text('قراءة ديون العملاء', skipOffstage: false),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(find.byKey(const Key('login-account-cancel')));
+      await tester.tap(find.byKey(const Key('login-account-cancel')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('screen-settings-employees')), findsOneWidget);
+      expect(
+        fake.mutationPaths.where((path) => path.contains('/api/users')),
+        isEmpty,
+      );
+
+      await go(tester, '/settings/users/u_12');
+      final readChip = find.descendant(
+        of: find.byKey(
+          const Key('edit-access-customerDebts'),
+          skipOffstage: false,
+        ),
+        matching: find.text('قراءة'),
+        skipOffstage: false,
+      );
+      await tester.scrollUntilVisible(
+        readChip,
+        400,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('screen-login-account-edit')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.tap(readChip);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('login-account-save-permissions')),
+      );
+      await tester.tap(find.byKey(const Key('login-account-save-permissions')));
+      await tester.pumpAndSettle();
+      final body = fake.mutationBodies.join('\n');
+      expect(body, contains('"customerDebtsAccess":"read"'));
+      expect(body, contains('"collections.read"'));
+      expect(find.byKey(const Key('screen-settings-employees')), findsOneWidget);
+    },
+  );
+
   testWidgets('a created admin cannot open account creation', (tester) async {
     await pumpFakeApp(tester, size: const Size(440, 956));
     await signIn(tester, username: 'created.admin', password: 'demo-only');

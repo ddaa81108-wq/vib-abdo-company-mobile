@@ -2996,6 +2996,26 @@ class FakeApiClient implements ApiClient {
           for (final code in b['permissions'] as List) '$code',
         ];
       }
+      final access = row['sectionAccess'] is Map
+          ? Map<String, dynamic>.from(row['sectionAccess'] as Map)
+          : <String, dynamic>{};
+      var accessTouched = false;
+      for (final key in const [
+        'customerDebts',
+        'companyDebts',
+        'libyanDeposits',
+        'egyptianDeposits',
+        'masraweya',
+        'purchases',
+        'treasury',
+        'reports',
+      ]) {
+        final field = '${key}Access';
+        if (!b.containsKey(field)) continue;
+        access[key] = _sectionAccessValue(b[field]);
+        accessTouched = true;
+      }
+      if (accessTouched) row['sectionAccess'] = access;
       row['version'] = (row['version'] as int? ?? 1) + 1;
       return _ok({'user': row});
     }
