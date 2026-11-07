@@ -1,12 +1,49 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 
-/// Repeats the last allow so the native hold does not lock a live session.
-///
-/// The native hold is 2000ms ([CaptureLock.DEFAULT_HOLD_MS]). This refresh
-/// stays shorter than that hold.
+/// `generation` then role. An empty role line means the window must lock.
+String captureIntentText({required int generation, String? role}) =>
+    '$generation\n${role ?? ''}\n';
+
+/// Writes the capture intent where Android reads it without the method channel.
+abstract class CaptureIntentSink {
+  void write({required int generation, String? role});
+}
+
+class FileCaptureIntentSink implements CaptureIntentSink {
+  FileCaptureIntentSink([String? path])
+    : _file = File(path ?? '/data/user/0/com.vip2100.vib/files/capture-intent.txt');
+
+  final File _file;
+
+  @override
+  void write({required int generation, String? role}) {
+    _file.parent.createSync(recursive: true);
+    _file.writeAsStringSync(
+      captureIntentText(generation: generation, role: role),
+      flush: true,
+    );
+  }
+}
+
+class MemoryCaptureIntentSink implements CaptureIntentSink {
+  int? generation;
+  String? role;
+
+  @override
+  void write({required int generation, String? role}) {
+    this.generation = generation;
+    this.role = role;
+  }
+}
+
+/// Repeats the last allow so the last-resort native hold does not lock a
+/// live session. Logout does not wait for that hold: the intent file and
+/// the channel update are written first. The hold remains only when both
+/// of those updates are lost.
 abstract class CaptureTicker {
   void start(Duration interval, void Function() onTick);
   void stop();
@@ -36,12 +73,15 @@ class AndroidCaptureGate implements SessionCaptureGate {
   AndroidCaptureGate({
     MethodChannel? channel,
     CaptureTicker? ticker,
+    CaptureIntentSink? intent,
     this.refreshInterval = const Duration(milliseconds: 500),
   }) : _channel = channel ?? const MethodChannel('app/screen_security'),
-       _ticker = ticker ?? PeriodicTicker();
+       _ticker = ticker ?? PeriodicTicker(),
+       _intent = intent ?? FileCaptureIntentSink();
 
   final MethodChannel _channel;
   final CaptureTicker _ticker;
+  final CaptureIntentSink _intent;
   final Duration refreshInterval;
   int _appliedGeneration = -1;
 
@@ -106,6 +146,11 @@ class AndroidCaptureGate implements SessionCaptureGate {
     if (!force && generation < _appliedGeneration) return;
     if (generation > _appliedGeneration) _appliedGeneration = generation;
     final verified = PermissionService.verifiedCaptureRole(role);
+    try {
+      _intent.write(generation: generation, role: verified);
+    } catch (_) {
+      // The channel update still runs. The hold is the remaining backstop.
+    }
     Object? lastError;
     for (var attempt = 0; attempt < 2; attempt++) {
       if (!force && generation < _appliedGeneration) return;

@@ -127,14 +127,24 @@ bool isCsrfRejection(Object error) =>
     error.statusCode == 403 &&
     error.code == 'CSRF_REJECTED';
 
-/// `401 MFA_REQUIRED`. The app has no MFA flow.
+/// `401 MFA_REQUIRED`. The challenge cookie is not a session.
 class MfaRequiredException extends ApiException {
   const MfaRequiredException({
-    super.message = 'غير مدعوم في التطبيق',
+    super.message = 'أدخل رمز التحقق',
     super.statusCode,
     super.correlationId,
     super.details,
   }) : super(code: 'MFA_REQUIRED');
+}
+
+/// `MFA_INVALID` on verify. The code is not stored on the exception.
+class MfaInvalidException extends ApiException {
+  const MfaInvalidException({
+    super.message = 'رمز التحقق غير صحيح',
+    super.statusCode,
+    super.correlationId,
+    super.details,
+  }) : super(code: 'MFA_INVALID');
 }
 
 /// `401 INVALID_CURRENT_PASSWORD` on change-password. Does not end the session.

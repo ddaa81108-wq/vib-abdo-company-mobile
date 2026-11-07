@@ -497,6 +497,11 @@ class _Auth implements AuthRepository {
   }
 
   @override
+  Future<LoginResult> verifyMfa({required String code}) async {
+    throw const MfaInvalidException(message: 'لا يوجد تحقق قائم');
+  }
+
+  @override
   Future<void> logout() async {
     onLogout?.call();
   }
@@ -542,6 +547,12 @@ class _Strategy implements AuthStrategy {
 
   @override
   Future<bool> hasPersistedSession() async => persisted;
+
+  @override
+  Future<bool> hasMfaChallenge() async => false;
+
+  @override
+  Future<void> clearMfaChallenge() async {}
 
   @override
   Future<AuthErrorAction> handleAuthError(

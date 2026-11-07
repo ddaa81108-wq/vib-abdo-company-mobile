@@ -10,6 +10,14 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// The real session cookie is `abdo_session` (HttpOnly, Secure, SameSite=Strict).
 /// The jar stores every name `Set-Cookie` sends, including a cleared `abdo_mfa`
 /// (`Max-Age=0`), and does not look up an older cookie name.
+
+/// True when [header] contains a cookie named [name]. The value is not returned.
+bool cookieHeaderHas(String? header, String name) {
+  if (header == null || header.isEmpty) return false;
+  final prefix = '$name=';
+  return header.split(';').any((part) => part.trim().startsWith(prefix));
+}
+
 abstract interface class CookieStore {
   Future<String?> cookieHeader();
   Future<void> saveFromSetCookie(List<String> setCookieHeaders);

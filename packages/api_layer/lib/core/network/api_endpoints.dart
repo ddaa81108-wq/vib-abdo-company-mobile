@@ -10,6 +10,7 @@ class ApiEndpoints {
 
   // Auth & session (cookie + X-CSRF-Token)
   static const login = '/api/auth/login';
+  static const mfaVerify = '/api/auth/mfa/verify';
   static const csrf = '/api/auth/csrf';
   static const me = '/api/me';
   static const logout = '/api/auth/logout';
@@ -104,6 +105,7 @@ class ApiEndpoints {
   static const employees = '/api/employees';
   static const admins = '/api/admins';
   static const audit = '/api/audit';
+  static const auditLog = '/api/audit-log';
   static const operations = '/api/operations';
 
   // Realtime & notifications

@@ -379,6 +379,11 @@ class FinancialLedgerEntryDto {
     this.sourceStatus,
     this.sourceStatusRaw,
     this.occurredAt,
+    this.counterpartyName,
+    this.referenceNo,
+    this.entryKind,
+    this.effectUnits,
+    this.actorName,
   });
 
   final String id;
@@ -411,6 +416,11 @@ class FinancialLedgerEntryDto {
   /// Contract `occurredAt`. Parsed with [dateOrNull] (UTC for `Z` and for an
   /// explicit offset). Absent or unparseable is null and does not throw.
   final DateTime? occurredAt;
+  final String? counterpartyName;
+  final String? referenceNo;
+  final String? entryKind;
+  final MoneyValue? effectUnits;
+  final String? actorName;
 
   factory FinancialLedgerEntryDto.fromJson(Json j) {
     final sectionKey = _readEnum(
@@ -446,6 +456,15 @@ class FinancialLedgerEntryDto {
       sourceStatus: sourceStatus.value,
       sourceStatusRaw: sourceStatus.raw,
       occurredAt: occurredAt,
+      counterpartyName: strOrNull(j['counterpartyName']),
+      referenceNo: strOrNull(j['referenceNo']),
+      entryKind: strOrNull(j['entryKind']),
+      effectUnits: unitsOrNull(
+        j['effectUnits'],
+        fieldPath: 'effectUnits',
+        rowId: strOrNull(j['id']),
+      ),
+      actorName: strOrNull(j['actorName']),
     );
   }
 }

@@ -32,6 +32,13 @@ class PermissionService extends ChangeNotifier {
 
   /// Role string release capture may reveal. Any other value, including a
   /// missing role, is null. Permissions and fullAccess are not read.
+  /// Exact login-account roles the user directory accepts.
+  static bool isDirectoryRole(Object? role) =>
+      role == adminRoleValue || role == employeeRoleValue;
+
+  /// Exact admin role. Not the primary-owner flag.
+  static bool isDirectoryAdmin(Object? role) => role == adminRoleValue;
+
   static String? verifiedCaptureRole(String? role) {
     if (role == adminRoleValue) return adminRoleValue;
     if (role == employeeRoleValue) return employeeRoleValue;

@@ -262,12 +262,7 @@ Future<void> _open(WidgetTester tester) async {
   if (shell.evaluate().isEmpty) {
     fail('home shell is not on screen');
   }
-  GoRouter.of(tester.element(shell)).go('/settings');
-  await settle(tester);
-  final tile = find.byKey(const Key('settings-link-employees'));
-  expect(tile, findsOneWidget);
-  await tester.ensureVisible(tile);
-  await tester.tap(tile);
+  GoRouter.of(tester.element(shell)).go('/settings/employee-totals');
   await settle(tester);
   expect(find.byKey(EmployeeTotalsScreen.screenKey), findsOneWidget);
 }

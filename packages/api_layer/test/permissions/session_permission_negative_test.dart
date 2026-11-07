@@ -330,6 +330,12 @@ class _LogoutOnExpiry implements AuthStrategy {
   Future<bool> hasPersistedSession() async => false;
 
   @override
+  Future<bool> hasMfaChallenge() async => false;
+
+  @override
+  Future<void> clearMfaChallenge() async {}
+
+  @override
   Future<void> onLoginSucceeded(Map<String, dynamic> loginData) async {}
 
   @override

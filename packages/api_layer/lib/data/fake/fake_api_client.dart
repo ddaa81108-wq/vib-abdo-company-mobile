@@ -244,7 +244,16 @@ class FakeApiClient implements ApiClient {
 
   /// Server-side cookie sessions. The id is the `abdo_session` cookie value.
   final Map<String, _FakeSession> _sessions = {};
+  final Map<String, _MfaChallenge> _mfaChallenges = {};
   int _sessionSeq = 0;
+
+  /// Marks every pending MFA challenge expired. Tests only.
+  void expireMfaChallenges() {
+    final past = DateTime.now().toUtc().subtract(const Duration(seconds: 1));
+    for (final challenge in _mfaChallenges.values) {
+      challenge.expiresAt = past;
+    }
+  }
   int _csrfSeq = 0;
   String? _jarId;
   String? _latestSessionId;
@@ -978,6 +987,18 @@ class FakeApiClient implements ApiClient {
           authenticated: false,
         );
       }
+      final username = '${b['username']}';
+      if (username.startsWith('mfa.')) {
+        final id = 'mfa-${++_sessionSeq}';
+        _mfaChallenges[id] = _MfaChallenge(
+          username,
+          DateTime.now().toUtc().add(const Duration(minutes: 5)),
+        );
+        setCookie?.add(
+          '${ApiConfig.mfaCookieName}=$id; Path=/api/auth; HttpOnly; Secure; SameSite=Lax; Max-Age=300',
+        );
+        _fail(401, 'MFA_REQUIRED', 'أدخل رمز التحقق', authenticated: false);
+      }
       final previous = _jarId;
       if (previous != null) {
         _sessions.remove(previous);
@@ -992,6 +1013,9 @@ class FakeApiClient implements ApiClient {
         '${ApiConfig.sessionCookieName}=$id; Path=/; HttpOnly; Secure; SameSite=Strict',
       );
       return _ok({..._me, 'csrfToken': csrfToken});
+    }
+    if (method == 'POST' && path == ApiEndpoints.mfaVerify) {
+      return _verifyMfa(options, b, setCookie);
     }
     if (path == '/api/auth/csrf') {
       return _rotateCsrf(options);
@@ -1111,6 +1135,66 @@ class FakeApiClient implements ApiClient {
       _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تسجيل الجهاز.');
     }
     return _ok(const <String, Object?>{});
+  }
+
+  ApiResponse _verifyMfa(
+    ApiRequestOptions options,
+    Map b,
+    List<String>? setCookie,
+  ) {
+    final id = _namedCookie(options, ApiConfig.mfaCookieName);
+    final challenge = id == null ? null : _mfaChallenges[id];
+    if (challenge == null ||
+        !DateTime.now().toUtc().isBefore(challenge.expiresAt)) {
+      if (id != null) _mfaChallenges.remove(id);
+      setCookie?.add('${ApiConfig.mfaCookieName}=; Path=/api/auth; Max-Age=0');
+      _fail(401, 'MFA_INVALID', 'انتهت صلاحية التحقق', authenticated: false);
+    }
+    final code = b['code'];
+    if (code is! String || code != FakeFixtures.mfaFixtureCode) {
+      challenge.failures += 1;
+      if (challenge.failures >= 8) {
+        _fail(
+          429,
+          'LOGIN_RATE_LIMITED',
+          'محاولات كثيرة. أعد المحاولة لاحقًا.',
+          authenticated: false,
+        );
+      }
+      _fail(401, 'MFA_INVALID', 'رمز التحقق غير صحيح', authenticated: false);
+    }
+    _mfaChallenges.remove(id);
+    setCookie?.add('${ApiConfig.mfaCookieName}=; Path=/api/auth; Max-Age=0');
+    final previous = _jarId;
+    if (previous != null) _sessions.remove(previous);
+    _activate(FakeFixtures.meFor(challenge.username));
+    final sessionId = 'fake-session-${++_sessionSeq}';
+    final csrfToken = _allocateCsrf();
+    _sessions[sessionId] =
+        _FakeSession(id: sessionId, me: _me, csrfToken: csrfToken);
+    _latestSessionId = sessionId;
+    _jarId = sessionId;
+    setCookie?.add(
+      '${ApiConfig.sessionCookieName}=$sessionId; Path=/; HttpOnly; Secure; SameSite=Strict',
+    );
+    return _ok({..._me, 'csrfToken': csrfToken});
+  }
+
+  String? _namedCookie(ApiRequestOptions options, String name) {
+    final raw = _hasHeader(options, 'cookie')
+        ? _header(options, 'cookie')
+        : null;
+    if (raw == null) return null;
+    for (final part in raw.split(';')) {
+      final piece = part.trim();
+      final eq = piece.indexOf('=');
+      if (eq <= 0) continue;
+      if (piece.substring(0, eq).trim().toLowerCase() == name) {
+        final value = piece.substring(eq + 1).trim();
+        return value.isEmpty ? null : value;
+      }
+    }
+    return null;
   }
 
   /// Cookie session check. A missing, revoked, or expired cookie is 401
@@ -1436,20 +1520,24 @@ class FakeApiClient implements ApiClient {
             sectionKey: _queryText(query, 'sectionKey'),
           ),
         );
-        return _ok(
-          FakeFixtures.financialLedger(
-            sectionKey: section ?? _queryText(query, 'sectionKey'),
-          ),
+        final page = FakeFixtures.financialLedger(
+          sectionKey: section ?? _queryText(query, 'sectionKey'),
         );
+        return _ok(_filterLedgerPage(page, query));
       case 'notifications':
         return _notifications(method, seg, b, query);
       case 'notification-preferences':
         return _ok({'soundEnabled': true, 'speechEnabled': false});
       case 'event-changes':
         return _ok({'events': [], 'latest': 0, 'fullResync': false});
+      case 'health':
+        return _ok(FakeFixtures.health());
+      case 'audit-log':
+        return _ok(FakeFixtures.auditLog());
       case 'account-requests':
-        return _accountRequests(seg, b);
+        return _accountRequests(method, seg, b);
       case 'users':
+        return _loginUsers(method, seg, b);
       case 'staff':
       case 'employees':
       case 'admins':
@@ -2778,15 +2866,159 @@ class FakeApiClient implements ApiClient {
         jsonDecode(jsonEncode(result)) as Map<String, dynamic>;
   }
 
-  ApiResponse _accountRequests(List<String> seg, Map b) {
-    if (seg.length >= 3 && seg[2] == 'decision') {
-      return _ok({'id': seg[1], 'status': '${b['decision'] ?? 'approved'}'});
+  List<Map<String, dynamic>>? _loginUserRows;
+  List<Map<String, dynamic>>? _accountRequestRows;
+
+  bool get _isPrimaryOwner {
+    final user = _me['user'];
+    if (user is! Map) return false;
+    return user['isOwner'] == true;
+  }
+
+  List<Map<String, dynamic>> get _loginUserStore =>
+      _loginUserRows ??= FakeFixtures.loginUsers()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+
+  List<Map<String, dynamic>> get _accountRequestStore =>
+      _accountRequestRows ??= FakeFixtures.accountRequests()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+
+  ApiResponse _loginUsers(String method, List<String> seg, Map b) {
+    if (method == 'POST' && seg.length == 1) {
+      if (!_isPrimaryOwner) {
+        _fail(403, 'FORBIDDEN', 'إنشاء الحسابات للمدير الأساسي فقط.');
+      }
+      final username = b['username'];
+      final displayName = b['displayName'];
+      final role = b['role'];
+      final password = b['password'];
+      if (username is! String || username.trim().isEmpty) {
+        _fail(400, 'INVALID_INPUT', 'اسم الدخول مطلوب.');
+      }
+      if (displayName is! String || displayName.trim().isEmpty) {
+        _fail(400, 'INVALID_INPUT', 'الاسم الظاهر مطلوب.');
+      }
+      if (!PermissionService.isDirectoryRole(role)) {
+        _fail(400, 'INVALID_INPUT', 'الدور يجب أن يكون إدارة أو موظفًا.');
+      }
+      if (password is! String || password.length < 10) {
+        _fail(400, 'PASSWORD_POLICY', 'كلمة المرور المؤقتة أقصر من المطلوب.');
+      }
+      if (PermissionService.isDirectoryAdmin(role) &&
+          (b['email'] is! String || '${b['email']}'.isEmpty)) {
+        _fail(400, 'INVALID_INPUT', 'بريد الإدارة مطلوب عند إنشاء مدير.');
+      }
+      for (final row in _loginUserStore) {
+        if (row['username'] == username) {
+          _fail(409, 'CONFLICT', 'اسم الدخول مستخدم.');
+        }
+      }
+      final permissions = b['permissions'];
+      final codes = permissions is List
+          ? [for (final code in permissions) '$code']
+          : <String>[];
+      for (final code in codes) {
+        if (!FakeFixtures.assignablePermissions.contains(code)) {
+          _fail(400, 'INVALID_INPUT', 'صلاحية غير قابلة للتعيين.');
+        }
+      }
+      final created = <String, dynamic>{
+        'id': 'u_new_${_loginUserStore.length}',
+        'username': username,
+        'displayName': displayName,
+        'role': role,
+        'isOwner': false,
+        'isActive': true,
+        'version': 1,
+        'email': b['email'] is String ? b['email'] : null,
+        'mustChangePassword': !PermissionService.isDirectoryAdmin(role),
+        'permissions': codes,
+        'sectionAccess': {
+          for (final key in const [
+            'customerDebts',
+            'companyDebts',
+            'libyanDeposits',
+            'egyptianDeposits',
+            'masraweya',
+            'purchases',
+            'treasury',
+            'reports',
+          ])
+            key: _sectionAccessValue(b['${key}Access']),
+        },
+      };
+      _loginUserStore.add(created);
+      return _ok({'user': created});
     }
-    return _ok({
-      'items': [
-        {'id': 'ar_1', 'status': 'pending'},
-      ],
-    });
+    if (method == 'GET' && seg.length == 1) {
+      return _ok({
+        'items': _loginUserStore,
+        'assignablePermissions': FakeFixtures.assignablePermissions,
+      });
+    }
+    if (method == 'PATCH' && seg.length == 2) {
+      final row = _loginUserStore.cast<Map<String, dynamic>?>().firstWhere(
+            (item) => item?['id'] == seg[1],
+            orElse: () => null,
+          );
+      if (row == null) _fail(404, 'NOT_FOUND', _notFound);
+      final expected = b['expectedVersion'];
+      if (expected is int && expected != row['version']) {
+        _fail(409, 'CONFLICT', 'تغيّر الحساب. أعد التحميل.');
+      }
+      final protected =
+          row['isOwner'] == true || PermissionService.isDirectoryAdmin(row['role']);
+      if (protected && !_isPrimaryOwner) {
+        _fail(403, 'FORBIDDEN', 'تعديل حساب الإدارة للمدير الأساسي فقط.');
+      }
+      if (b['displayName'] is String && '${b['displayName']}'.isNotEmpty) {
+        row['displayName'] = b['displayName'];
+      }
+      if (b['isActive'] is bool) row['isActive'] = b['isActive'];
+      if (b['permissions'] is List) {
+        row['permissions'] = [
+          for (final code in b['permissions'] as List) '$code',
+        ];
+      }
+      row['version'] = (row['version'] as int? ?? 1) + 1;
+      return _ok({'user': row});
+    }
+    return _adminCatalog('users', seg);
+  }
+
+  String _sectionAccessValue(Object? raw) {
+    if (raw == 'read' || raw == 'manage' || raw == 'none') return raw! as String;
+    if (raw == null) return 'none';
+    _fail(400, 'INVALID_INPUT', 'مستوى القسم غير معروف.');
+  }
+
+  ApiResponse _accountRequests(String method, List<String> seg, Map b) {
+    if (seg.length >= 3 && seg[2] == 'decision' && method != 'POST') {
+      return _ok({'id': seg[1], 'status': 'pending'});
+    }
+    if (method == 'POST' && seg.length >= 3 && seg[2] == 'decision') {
+      final row = _accountRequestStore.cast<Map<String, dynamic>?>().firstWhere(
+            (item) => item?['id'] == seg[1],
+            orElse: () => null,
+          );
+      if (row == null) _fail(404, 'NOT_FOUND', _notFound);
+      final decision = b['decision'];
+      if (decision != 'approve' && decision != 'reject') {
+        _fail(400, 'INVALID_INPUT', 'القرار غير معروف.');
+      }
+      final expected = b['expectedVersion'];
+      if (expected is int && expected != row['version']) {
+        _fail(409, 'CONFLICT', 'تغيّر الطلب. أعد التحميل.');
+      }
+      row['status'] = decision == 'approve' ? 'approved' : 'rejected';
+      row['decisionNote'] = b['note'];
+      row['decidedAt'] = '2026-10-22T22:01:00.000Z';
+      row['version'] = (row['version'] as int? ?? 1) + 1;
+      return _ok({'request': row});
+    }
+    return _ok({'items': _accountRequestStore});
   }
 
   /// 🔶 Proposed admin catalog. Callers who fail [_authorize] never reach this.
@@ -2816,6 +3048,14 @@ class FakeApiClient implements ApiClient {
   }
 }
 
+class _MfaChallenge {
+  _MfaChallenge(this.username, this.expiresAt);
+
+  final String username;
+  DateTime expiresAt;
+  int failures = 0;
+}
+
 /// One in-memory cookie session. Lifetime is not counted down locally.
 class _FakeSession {
   _FakeSession({
@@ -2841,6 +3081,35 @@ class FakeHttpResult {
   final int status;
   final String body;
   final List<String> setCookie;
+}
+
+Map<String, dynamic> _filterLedgerPage(
+  Map<String, dynamic> page,
+  Map<String, dynamic>? query,
+) {
+  final currency = _queryText(query, 'currency');
+  final q = _queryText(query, 'q');
+  if (currency == null && (q == null || q.isEmpty)) return page;
+  final raw = page['items'];
+  final items = <Map<String, dynamic>>[
+    for (final row in raw is List ? raw : const [])
+      if (row is Map &&
+          (currency == null || row['currency'] == currency) &&
+          (q == null ||
+              q.isEmpty ||
+              '${row['counterpartyName'] ?? ''}${row['description'] ?? ''}'
+                  .contains(q)))
+        Map<String, dynamic>.from(row),
+  ];
+  final totals = <String, int>{};
+  for (final row in items) {
+    final code = row['currency'];
+    final effect = row['effectUnits'];
+    if (code is String && effect is int) {
+      totals[code] = (totals[code] ?? 0) + effect;
+    }
+  }
+  return {...page, 'items': items, 'pageTotals': totals};
 }
 
 String? _queryText(Map<String, dynamic>? query, String key) {

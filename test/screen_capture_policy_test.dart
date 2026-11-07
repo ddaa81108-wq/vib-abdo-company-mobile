@@ -19,6 +19,9 @@ void main() {
   final messages = File(
     'android/app/src/main/kotlin/com/vip2100/vib/CaptureMessages.kt',
   ).readAsStringSync();
+  final intents = File(
+    'android/app/src/main/kotlin/com/vip2100/vib/CaptureIntents.kt',
+  ).readAsStringSync();
   final gate = File('lib/security/android_capture_gate.dart')
       .readAsStringSync();
   final permissions = File(
@@ -54,12 +57,19 @@ void main() {
     expect(activity, isNot(contains('clearFlags')));
   });
 
-  test('a missed secure update still locks when the hold elapses', () {
+  test('logout does not wait on the hold, and the hold remains a last resort', () {
     expect(lock, contains('const val DEFAULT_HOLD_MS = 2000L'));
     expect(lock, contains('fun onHoldElapsed(token: Long)'));
-    expect(lock, contains('secure = false\n        arm()'));
+    expect(lock, contains('fun onHostPause()'));
+    expect(lock, contains('if (hostPaused) return false'));
+    expect(activity, contains('onHostPause()'));
+    expect(activity, contains('onHostResume()'));
+    expect(intents, contains('capture-intent.txt'));
+    expect(activity, contains('FileObserver'));
+    expect(activity, contains('shouldApply'));
+    expect(intents, contains('fun shouldApply'));
+    expect(gate, contains('captureIntentText'));
     expect(gate, contains('Duration(milliseconds: 500)'));
-    expect(gate.indexOf('Duration(milliseconds: 500)'), greaterThan(0));
     expect(activity, contains('onCaptureHoldElapsed'));
     expect(activity, contains('captureLock.disarm()'));
     expect(activity, contains('captureLock.resetForNewEngine()'));

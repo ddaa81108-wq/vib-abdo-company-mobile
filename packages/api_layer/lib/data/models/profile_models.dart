@@ -16,6 +16,7 @@ class UserProfile {
     required this.permissions,
     this.sectionAccess,
     this.fullAccess,
+    this.isOwner = false,
     required this.mustChangePassword,
   });
 
@@ -35,6 +36,11 @@ class UserProfile {
   /// When sent (true/false) it takes precedence over the role (PermissionService).
   final bool? fullAccess;
 
+  /// Server `isOwner` from `/api/me`. True only when the JSON value is boolean
+  /// true. A missing value, a string, or false is not the primary manager.
+  /// Role `admin` and [fullAccess] do not set this.
+  final bool isOwner;
+
   factory UserProfile.fromJson(Json j) => UserProfile(
         id: str(j['id'] ?? j['userId']),
         username: str(j['username']),
@@ -43,6 +49,7 @@ class UserProfile {
         permissions: strList(j['permissions']),
         sectionAccess: sectionAccessFromJson(j['sectionAccess']),
         fullAccess: _boolOrNull(j['fullAccess'] ?? j['isSuperuser']),
+        isOwner: boolOf(j['isOwner']),
         mustChangePassword: boolOf(j['mustChangePassword']),
       );
 }

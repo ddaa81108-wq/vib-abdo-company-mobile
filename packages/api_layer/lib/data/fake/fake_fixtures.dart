@@ -4,6 +4,9 @@
 class FakeFixtures {
   FakeFixtures._();
 
+  /// Fake-only MFA code. Not a production secret and not written into errors.
+  static const mfaFixtureCode = '000000';
+
   /// Ordinary collections employee. Own-data routes key off this id.
   static const demoEmployeeId = 'u_12';
 
@@ -69,6 +72,42 @@ class FakeFixtures {
   /// - `mustchange…`      -> that employee with `mustChangePassword: true`.
   /// - anything else      -> observed collector (collections codes, no sectionAccess).
   static Map<String, dynamic> meFor(String username) {
+    if (username.startsWith('mfa.mustchange')) {
+      return _me(
+        id: 'u_31',
+        username: 'mfa.mustchange@example.invalid',
+        name: 'مدير تحقق تجريبي',
+        role: 'admin',
+        permissions: const [],
+        sectionAccess: null,
+        isOwner: true,
+        mustChangePassword: true,
+      );
+    }
+    if (username.startsWith('mfa.')) {
+      return _me(
+        id: 'u_32',
+        username: 'mfa.admin@example.invalid',
+        name: 'مدير تحقق تجريبي',
+        role: 'admin',
+        permissions: const [],
+        sectionAccess: null,
+        isOwner: true,
+      );
+    }
+    if (username.startsWith('created.admin')) {
+      // A full admin the primary manager created. Role admin with empty
+      // lists is full access. isOwner stays false.
+      return _me(
+        id: 'u_30',
+        username: 'created.admin@example.invalid',
+        name: 'مدير منشأ تجريبي',
+        role: 'admin',
+        permissions: const [],
+        sectionAccess: null,
+        isOwner: false,
+      );
+    }
     if (username.startsWith('limited.admin')) {
       return _me(
         id: 'u_2',
@@ -1371,4 +1410,142 @@ class FakeFixtures {
           'recipientUserId': 'u_1',
         },
       ];
+
+  static const assignablePermissions = [
+    'debts.read',
+    'debts.write',
+    'companies.read',
+    'companies.write',
+    'libyan_deposits.read',
+    'libyan_deposits.write',
+    'egyptian_deposits.read',
+    'egyptian_deposits.write',
+    'collections.read',
+    'collections.write',
+    'masraweya.read',
+    'masraweya.write',
+    'purchases.read',
+    'purchases.write',
+    'purchases.finalize',
+    'treasury.read',
+    'treasury.write',
+    'reports.read',
+  ];
+
+  static List<Map<String, dynamic>> loginUsers() => [
+        {
+          'id': 'u_1',
+          'username': 'admin.demo',
+          'displayName': 'مدير تجريبي',
+          'role': 'admin',
+          'isOwner': true,
+          'isActive': true,
+          'version': 1,
+          'email': 'owner@example.invalid',
+          'mustChangePassword': false,
+          'permissions': <String>[],
+          'sectionAccess': {
+            'customerDebts': 'manage',
+            'companyDebts': 'manage',
+            'libyanDeposits': 'manage',
+            'egyptianDeposits': 'manage',
+            'masraweya': 'manage',
+            'purchases': 'manage',
+            'treasury': 'manage',
+            'reports': 'manage',
+          },
+        },
+        {
+          'id': 'u_30',
+          'username': 'created.admin',
+          'displayName': 'مدير منشأ تجريبي',
+          'role': 'admin',
+          'isOwner': false,
+          'isActive': true,
+          'version': 1,
+          'email': 'created-admin@example.invalid',
+          'mustChangePassword': false,
+          'permissions': <String>[],
+          'sectionAccess': {
+            'customerDebts': 'manage',
+            'companyDebts': 'none',
+            'libyanDeposits': 'none',
+            'egyptianDeposits': 'none',
+            'masraweya': 'none',
+            'purchases': 'none',
+            'treasury': 'none',
+            'reports': 'none',
+          },
+        },
+        {
+          'id': demoEmployeeId,
+          'username': 'employee.demo',
+          'displayName': 'موظف استلام تجريبي',
+          'role': 'employee',
+          'isOwner': false,
+          'isActive': true,
+          'version': 1,
+          'email': null,
+          'mustChangePassword': true,
+          'permissions': collectorPermissions,
+          'sectionAccess': {
+            'customerDebts': 'none',
+            'companyDebts': 'none',
+            'libyanDeposits': 'none',
+            'egyptianDeposits': 'none',
+            'masraweya': 'none',
+            'purchases': 'none',
+            'treasury': 'none',
+            'reports': 'none',
+          },
+        },
+      ];
+
+  static List<Map<String, dynamic>> accountRequests() => [
+        {
+          'id': 'ar_1',
+          'provider': 'google',
+          'email': 'test@example.invalid',
+          'displayName': 'اختبار',
+          'pictureUrl': null,
+          'status': 'pending',
+          'decisionNote': null,
+          'requestedAt': '2026-10-22T22:00:00.000Z',
+          'decidedAt': null,
+          'version': 1,
+        },
+      ];
+
+  /// Server action log. These rows are not a login or session history.
+  static Map<String, dynamic> auditLog() => {
+        'items': [
+          {
+            'id': 15,
+            'action': 'collection.unlinked.submit',
+            'entityType': 'collection_submission',
+            'entityId': 'sub-1',
+            'correlationId': 'fake-fixture',
+            'outcome': 'success',
+            'details': {'subjectName': 'استلام مستقل تجريبي', 'amountUnits': 75},
+            'actorName': 'موظف استلام تجريبي',
+            'actorUsername': 'employee.demo',
+            'createdAt': '2026-10-22T22:33:25.792Z',
+          },
+        ],
+        'nextBefore': null,
+      };
+
+  static Map<String, dynamic> health() => {
+        'status': 'ready',
+        'apiVersion': '1',
+        'schemaVersion': '50',
+        'uiVersion': '0.15.0',
+        'build': {
+          'version': '0.15.0',
+          'commit': null,
+          'builtAt': null,
+          'dirty': false,
+        },
+        'time': '2026-10-22T22:33:44.700Z',
+      };
 }

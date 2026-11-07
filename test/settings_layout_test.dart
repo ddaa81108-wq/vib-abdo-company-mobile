@@ -28,8 +28,8 @@ void main() {
       ]) {
         expect(find.byKey(Key(key)), findsOneWidget, reason: key);
       }
-      // Placeholders are not linked.
-      expect(find.byKey(const Key('settings-link-audit')), findsNothing);
+      expect(find.byKey(const Key('settings-link-audit')), findsOneWidget);
+      expect(find.byKey(const Key('settings-link-development')), findsOneWidget);
       // Theme switch is local and flips the app theme.
       final before = Theme.of(
         tester.element(find.byKey(SettingsScreen.screenKey)),
