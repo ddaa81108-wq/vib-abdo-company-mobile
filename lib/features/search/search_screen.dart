@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_providers.dart';
 import '../../error_handling/app_failure.dart';
 import '../../error_handling/error_handler.dart';
+import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/section_labels.dart';
 import '../../ui/strings.dart';
@@ -26,6 +27,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _results = <SectionKey, List<AccountSuggestionDto>>{};
   var _busy = false;
   AppFailure? _failure;
+  var _ticket = 0;
 
   static const _sections = [
     AccountSection.customers,
@@ -84,8 +86,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _run() async {
+    final ticket = ++_ticket;
     final permissions = permissionsOf(ref);
     final query = _query.text.trim();
+    final userId = _signedInUserId();
     setState(() {
       _busy = true;
       _failure = null;
@@ -94,17 +98,32 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     try {
       for (final section in _sections) {
         if (!permissions.canRead(section.sectionKey)) continue;
+        if (!_current(ticket, query, userId)) return;
         final items = await ref
             .read(apiLayerProvider)
             .accounts
             .suggestions(section, query);
+        if (!_current(ticket, query, userId)) return;
         _results[section.sectionKey] = items;
       }
     } catch (error) {
-      if (!mounted) return;
+      if (!_current(ticket, query, userId)) return;
       _failure = ref.read(errorHandlerProvider).toFailure(error);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && ticket == _ticket) setState(() => _busy = false);
     }
+  }
+
+  bool _current(int ticket, String query, String? userId) {
+    if (!mounted || ticket != _ticket || _query.text.trim() != query) {
+      return false;
+    }
+    final session = ref.read(sessionStateProvider);
+    return session is SessionAuthenticated && session.profile.id == userId;
+  }
+
+  String? _signedInUserId() {
+    final session = ref.read(sessionStateProvider);
+    return session is SessionAuthenticated ? session.profile.id : null;
   }
 }
