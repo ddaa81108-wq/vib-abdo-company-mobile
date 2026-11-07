@@ -103,10 +103,14 @@ void main() {
     await go(tester, '/purchases');
     await tester.tap(find.byKey(const Key('add-purchase-12')));
     await settle(tester);
+    await tester.ensureVisible(find.byKey(const Key('purchase-kind-custom')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('purchase-kind-custom')));
     await tester.pump();
     expect(find.byKey(const Key('purchase-custom-label')), findsOneWidget);
 
+    await tester.ensureVisible(find.byKey(const Key('save-purchase')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('save-purchase')));
     await tester.pump();
     expect(find.text(AppStrings.customItemRequired), findsOneWidget);
@@ -121,6 +125,8 @@ void main() {
     await fillLabeled(tester, AppStrings.paid, '500');
     final gate = Completer<void>();
     fake.pauseMutations = gate;
+    await tester.ensureVisible(find.byKey(const Key('save-purchase')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('save-purchase')));
     await tester.pump();
     await tester.pump(Duration.zero);
@@ -321,10 +327,17 @@ Future<void> fillLabeled(
   String label,
   String value,
 ) async {
-  final field = find.byWidgetPredicate(
-    (widget) => widget is TextField && widget.decoration?.labelText == label,
-  );
-  await tester.enterText(field.hitTestable(), value);
+  final field = switch (label) {
+    AppStrings.egpValue => find.byKey(const Key('purchase-field-value')),
+    AppStrings.exchangeRate => find.byKey(const Key('purchase-field-rate')),
+    AppStrings.paid => find.byKey(const Key('purchase-field-paid')),
+    _ => find.byWidgetPredicate(
+      (widget) => widget is TextField && widget.decoration?.labelText == label,
+    ),
+  };
+  await tester.ensureVisible(field);
+  await tester.pump();
+  await tester.enterText(field, value);
   await tester.pump();
 }
 

@@ -51,6 +51,8 @@ void main() {
         MutationMeta(expectedVersion: 3, requestId: 'finalize-before-save'),
       ),
     );
+    await tester.ensureVisible(find.byKey(const Key('save-purchase')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('save-purchase')));
     await settle(tester);
 
@@ -121,10 +123,17 @@ Future<void> fillLabeled(
   String label,
   String value,
 ) async {
-  final field = find.byWidgetPredicate(
-    (widget) => widget is TextField && widget.decoration?.labelText == label,
-  );
-  await tester.enterText(field.hitTestable(), value);
+  final field = switch (label) {
+    AppStrings.egpValue => find.byKey(const Key('purchase-field-value')),
+    AppStrings.exchangeRate => find.byKey(const Key('purchase-field-rate')),
+    AppStrings.paid => find.byKey(const Key('purchase-field-paid')),
+    _ => find.byWidgetPredicate(
+      (widget) => widget is TextField && widget.decoration?.labelText == label,
+    ),
+  };
+  await tester.ensureVisible(field);
+  await tester.pump();
+  await tester.enterText(field, value);
   await tester.pump();
 }
 
@@ -140,4 +149,13 @@ Future<void> show(WidgetTester tester, Finder finder) async {
     ),
   );
   await tester.pump();
+  final horizontal = find.byKey(const Key('purchase-ledger-scroll'));
+  if (horizontal.evaluate().isEmpty) return;
+  final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+  for (var i = 0; i < 5; i++) {
+    final rect = tester.getRect(finder);
+    if (rect.left >= 0 && rect.right <= width - 4) return;
+    await tester.drag(horizontal, const Offset(420, 0));
+    await tester.pump();
+  }
 }
