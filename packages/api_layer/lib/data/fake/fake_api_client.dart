@@ -286,13 +286,18 @@ class FakeApiClient implements ApiClient {
   /// Opening amounts echoed on the next purchases GET. Keyed by book.
   final Map<String, Map<String, dynamic>> _openingByBook = {};
 
-  /// Masraweya day after a successful PUT. Null until the first save.
+  /// Masraweya days after a successful PUT, keyed by `businessDate`.
+  /// Null until the first read builds the fixture day.
   ///
-  /// Submitted inputs replace the stored day. `workTotalUnits`,
-  /// `remainingUnits`, and `historicalAdjustmentUnits` stay as last stored
-  /// by the server fixture: this repo does not confirm a formula for them,
-  /// and the fake does not invent one.
-  Map<String, dynamic>? _masraweyaDay;
+  /// Submitted inputs replace that date only. `workTotalUnits`,
+  /// `remainingUnits`, and `historicalAdjustmentUnits` stay as last stored:
+  /// this fake does not invent a formula, does not propagate a previous
+  /// balance onto the next date, and does not run a 04:00 closure.
+  /// `editable` is a stored flag the app reads; it is not computed on device.
+  Map<String, Map<String, dynamic>>? _masraweyaByDate;
+
+  /// The fixture's current business date. Not the device clock.
+  static const masraweyaToday = '2026-10-19';
 
   /// Posted lines added by a direct partial payment. Keyed by section.
   final Map<String, List<Map<String, dynamic>>> _extraLedger = {};
@@ -1326,11 +1331,11 @@ class FakeApiClient implements ApiClient {
       case 'masraweya':
         if (method == 'GET') {
           _requireRead(SectionKey.masraweya);
-          return _ok(_masraweyaView());
+          return _ok(_masraweyaView(query));
         }
         _requireWrite(SectionKey.masraweya);
         if (method == 'PUT') return _saveMasraweyaDay(b);
-        return _ok(_masraweyaView());
+        return _ok(_masraweyaView(query));
       case 'purchases':
         if (method == 'GET') {
           _requireRead(SectionKey.purchases);
@@ -2190,15 +2195,78 @@ class FakeApiClient implements ApiClient {
     });
   }
 
-  Map<String, dynamic> _masraweyaView() =>
-      _copy(_masraweyaDay ?? FakeFixtures.masraweyaDay());
+  Map<String, dynamic> _masraweyaView([Map<String, dynamic>? query]) {
+    final requested = query?['date'];
+    final date = requested == null || '$requested'.isEmpty
+        ? masraweyaToday
+        : '$requested';
+    _masraweyaByDate ??= {masraweyaToday: _copy(FakeFixtures.masraweyaDay())};
+    final stored = _masraweyaByDate![date];
+    final day = stored == null ? _emptyMasraweyaDay(date) : _copy(stored);
+    return _decorateMasraweya(day, date);
+  }
+
+  /// Contract-shaped empty day. Totals are the documented empty example (0),
+  /// not a sum of rows. `openingEditable` is false: the contract says opening
+  /// is automatic except the first seed day.
+  Map<String, dynamic> _emptyMasraweyaDay(String date) => {
+    'businessDate': date,
+    'version': 0,
+    'previousValueUnits': 0,
+    'purchasesUnits': 0,
+    'entries': <Map<String, dynamic>>[],
+    'workTotalUnits': 0,
+    'remainingUnits': 0,
+    'finalUnits': 0,
+    'historicalAdjustmentUnits': 0,
+    'openingEditable': false,
+    'status': 'open',
+  };
+
+  Map<String, dynamic> _decorateMasraweya(Map<String, dynamic> day, String date) {
+    final today = DateTime.parse(masraweyaToday);
+    final earliest = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    ).subtract(const Duration(days: 7));
+    final parsed = DateTime.tryParse(date);
+    final dayDate = parsed == null
+        ? null
+        : DateTime(parsed.year, parsed.month, parsed.day);
+    final end = DateTime(today.year, today.month, today.day);
+    final editable =
+        dayDate != null && !dayDate.isBefore(earliest) && !dayDate.isAfter(end);
+    day['businessDate'] = date;
+    day['today'] = masraweyaToday;
+    day['earliestEditableDate'] =
+        '${earliest.year.toString().padLeft(4, '0')}-'
+        '${earliest.month.toString().padLeft(2, '0')}-'
+        '${earliest.day.toString().padLeft(2, '0')}';
+    day['editable'] = editable;
+    day.putIfAbsent('openingEditable', () => date == masraweyaToday);
+    if (!day.containsKey('finalUnits') && day.containsKey('remainingUnits')) {
+      day['finalUnits'] = day['remainingUnits'];
+    }
+    return day;
+  }
 
   /// Persists the submitted day. Version, idempotency, and the permission
   /// check are the caller's: [_mutate] stores the first success for
   /// `requestId`, and the route calls [_requireWrite] before this method.
   /// A mismatched `expectedVersion` is 409 and does not change the stored day.
+  /// A date outside the documented current-and-previous-7 window is 403 and
+  /// does not change any day. Other dates are not updated.
   ApiResponse _saveMasraweyaDay(Map b) {
-    final current = _masraweyaView();
+    final businessDate = b['businessDate'];
+    if (businessDate == null || '$businessDate'.isEmpty) {
+      _fail(400, 'INVALID_FIELD', 'businessDate مطلوب');
+    }
+    final date = '$businessDate';
+    final current = _masraweyaView({'date': date});
+    if (current['editable'] != true) {
+      _fail(403, 'FORBIDDEN', 'هذا اليوم غير قابل للتعديل.');
+    }
     _requireVersion(b['expectedVersion'], current['version']);
     final version = current['version'];
     if (version is! int) {
@@ -2206,8 +2274,7 @@ class FakeApiClient implements ApiClient {
     }
     final next = _copy(current);
     next['version'] = version + 1;
-    final businessDate = b['businessDate'];
-    if (businessDate != null) next['businessDate'] = '$businessDate';
+    next['businessDate'] = date;
     if (b.containsKey('previousValueUnits')) {
       next['previousValueUnits'] = b['previousValueUnits'];
     }
@@ -2221,8 +2288,9 @@ class FakeApiClient implements ApiClient {
           if (raw is Map) Map<String, dynamic>.from(raw),
       ];
     }
-    _masraweyaDay = next;
-    return _ok(next);
+    // Totals stay as stored. Do not recompute and do not touch other dates.
+    _masraweyaByDate![date] = next;
+    return _ok(_decorateMasraweya(next, date));
   }
 
   /// Create is `POST /api/purchases/{book}`. Update and delete are

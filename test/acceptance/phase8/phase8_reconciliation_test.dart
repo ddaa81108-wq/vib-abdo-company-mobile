@@ -113,11 +113,12 @@ void main() {
         findsOneWidget,
       );
       expect(
-        _inside(
-          const Key('screen-treasury'),
-          _fmt(money, treasury.egyptianSourceUnits, Currency.egp),
-        ),
+        _inside(const Key('screen-treasury'), '95,000'),
         findsOneWidget,
+      );
+      expect(
+        _inside(const Key('screen-treasury'), 'ج.م'),
+        findsWidgets,
       );
       expect(_fmt(money, treasury.netUnits, Currency.lyd), '51,000 د.ل');
       expect(
@@ -394,11 +395,12 @@ void main() {
     fake.treasuryTotalsPatch = const <String, Object?>{'egyptianRate': null};
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/treasury');
-    expect(find.text('95,000 ج.م'), findsWidgets);
+    expect(find.text('95,000'), findsWidgets);
+    expect(find.text('ج.م'), findsWidgets);
     expect(find.text('يلزم سعر تحويل معتمد'), findsOneWidget);
     expect(find.byKey(const Key('rate-missing')), findsOneWidget);
     expect(find.text('10,000 د.ل'), findsNothing);
-    expect(find.text('0 ج.م'), findsNothing);
+    expect(find.text('0'), findsNothing);
     expect(find.text('0 د.ل'), findsNothing);
     final summary = await _flushed(tester, () => layer.treasury.summary());
     expect(summary.egyptianRate, isNull);
@@ -466,10 +468,20 @@ Future<void> _expectSummary(
 ) async {
   await go(tester, '/${section.path}');
   final page = await _flushed(tester, () => layer.accounts.list(section));
-  final total = _fmt(money, page.summary.totalDebtUnits, currency);
-  final net = _fmt(money, page.summary.netBalanceUnits, currency);
+  final total = _visibleMoney(_fmt(money, page.summary.totalDebtUnits, currency));
+  final net = _visibleMoney(_fmt(money, page.summary.netBalanceUnits, currency));
   expect(_inside(screen, total), findsWidgets);
   expect(_inside(screen, net), findsWidgets);
+  if (currency == Currency.egp) {
+    expect(_inside(screen, 'ج.م'), findsWidgets);
+  }
+}
+
+String _visibleMoney(String formatted) {
+  const suffix = ' ج.م';
+  return formatted.endsWith(suffix)
+      ? formatted.substring(0, formatted.length - suffix.length)
+      : formatted;
 }
 
 String _fmt(MoneyFormatter money, MoneyValue? value, Currency currency) {

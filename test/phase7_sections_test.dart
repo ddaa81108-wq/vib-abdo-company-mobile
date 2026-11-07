@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -56,25 +55,13 @@ void main() {
 
     await go(tester, '/egyptian-deposits');
     expect(find.byKey(const Key('screen-egyptian-deposits')), findsOneWidget);
-    expect(find.text('23,750 ج.م'), findsWidgets);
+    expect(find.text('23,750'), findsWidgets);
+    expect(find.text('ج.م'), findsWidgets);
 
     await go(tester, '/masraweya');
     expect(find.byKey(const Key('screen-masraweya')), findsOneWidget);
-    final money = MoneyFormatter();
-    expect(
-      _inside(
-        const Key('masraweya-work-total'),
-        money.format(3050, Currency.egp),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      _inside(
-        const Key('masraweya-remaining'),
-        money.format(8950, Currency.egp),
-      ),
-      findsOneWidget,
-    );
+    expect(_inside(const Key('masraweya-work-total'), '3,050'), findsOneWidget);
+    expect(_inside(const Key('masraweya-remaining'), '8,950'), findsOneWidget);
 
     await go(tester, '/purchases');
     expect(find.byKey(const Key('screen-purchases')), findsOneWidget);

@@ -815,9 +815,13 @@ Future<void> _pumpUntilHeader(WidgetTester tester, String text) async {
 }
 
 Finder _header(String text) {
+  const suffix = ' ج.م';
+  final shown = text.endsWith(suffix)
+      ? text.substring(0, text.length - suffix.length)
+      : text;
   return find.descendant(
     of: find.byKey(const Key('ledger-header-balance'), skipOffstage: false),
-    matching: find.text(text, skipOffstage: false),
+    matching: find.text(shown, skipOffstage: false),
     skipOffstage: false,
   );
 }

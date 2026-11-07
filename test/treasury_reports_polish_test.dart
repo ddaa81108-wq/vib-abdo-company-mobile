@@ -38,7 +38,8 @@ void main() {
     expect(find.text('45,000 د.ل'), findsWidgets);
     expect(find.text('12,000 د.ل'), findsWidgets);
     expect(find.text('8,000 د.ل'), findsWidgets);
-    expect(find.text('95,000 ج.م'), findsWidgets);
+    expect(find.text('95,000'), findsWidgets);
+    expect(find.text('ج.م'), findsWidgets);
     expect(find.text('9.5'), findsWidgets);
     expect(find.text('10,000 د.ل'), findsWidgets);
     expect(find.text(AppStrings.rateMissing), findsNothing);
@@ -392,7 +393,8 @@ void main() {
     final card = tester.widget<Card>(find.byKey(const Key('active-cash-card')));
     expect(card.color, isNull);
     // DEF-032: the missing rate hides the converted LYD row, not this EGP amount.
-    expect(find.text('90 ج.م'), findsOneWidget);
+    expect(find.text('90'), findsOneWidget);
+    expect(find.text('ج.م'), findsWidgets);
     expect(find.text('90 د.ل'), findsNothing);
     expect(find.text(AppStrings.converted), findsNothing);
   });

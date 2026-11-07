@@ -262,10 +262,28 @@ final notificationPrefsProvider = FutureProvider<Map<String, dynamic>>((
   return ref.read(apiLayerProvider).notifications.preferences();
 });
 
-final masraweyaProvider = FutureProvider<MasraweyaDayDto>((ref) async {
-  watchSignedIn(ref);
-  return ref.read(apiLayerProvider).masraweya.getDay();
-});
+/// Null asks the server for its current business day (no `date` query).
+/// A value is `GET /api/masraweya/day?date=`.
+final masraweyaDateProvider = StateProvider<String?>((ref) => null);
+
+class MasraweyaDayController extends AsyncNotifier<MasraweyaDayDto> {
+  @override
+  Future<MasraweyaDayDto> build() {
+    watchSignedIn(ref);
+    final date = ref.watch(masraweyaDateProvider);
+    return ref.read(apiLayerProvider).masraweya.getDay(date: date);
+  }
+
+  /// Keeps a successful save in the cache without a loading gap.
+  void adopt(MasraweyaDayDto day) {
+    state = AsyncData(day);
+  }
+}
+
+final masraweyaProvider =
+    AsyncNotifierProvider<MasraweyaDayController, MasraweyaDayDto>(
+      MasraweyaDayController.new,
+    );
 
 /// Sends a masraweya day through the API layer's save method.
 ///

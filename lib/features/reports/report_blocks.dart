@@ -397,19 +397,13 @@ class ReportSources extends ConsumerWidget {
     );
   }
 
-  Widget _pair(BuildContext context, String label, String value) => Text.rich(
-    TextSpan(
-      children: [
-        TextSpan(
-          text: '$label ',
-          style: cairo(11.5, 700, color: context.look.muted),
-        ),
-        TextSpan(
-          text: '\u2066$value\u2069',
-          style: cairo(12, 800, color: context.look.ink),
-        ),
-      ],
-    ),
+  Widget _pair(BuildContext context, String label, String value) => Wrap(
+    crossAxisAlignment: WrapCrossAlignment.center,
+    spacing: 4,
+    children: [
+      Text(label, style: cairo(11.5, 700, color: context.look.muted)),
+      MoneyText(value, style: cairo(12, 800, color: context.look.ink)),
+    ],
   );
 }
 
