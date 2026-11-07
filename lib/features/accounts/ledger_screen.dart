@@ -78,6 +78,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   final _innerRows = ScrollController();
   final _columnsScroll = ScrollController();
   final _headerScroll = ScrollController();
+  final _composerScroll = ScrollController();
   var _syncingColumns = false;
   var _showJumpTop = false;
   var _showJumpBottom = false;
@@ -85,27 +86,27 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   @override
   void initState() {
     super.initState();
-    _columnsScroll.addListener(
-      () => _syncColumns(_columnsScroll, _headerScroll),
-    );
-    _headerScroll.addListener(
-      () => _syncColumns(_headerScroll, _columnsScroll),
-    );
+    for (final controller in [_columnsScroll, _headerScroll, _composerScroll]) {
+      controller.addListener(() => _syncColumns(controller));
+    }
     _rows.addListener(_updateJumpButtons);
     _innerRows.addListener(_updateJumpButtons);
   }
 
-  /// The sticky names and the rows scroll sideways as one table.
-  void _syncColumns(ScrollController from, ScrollController to) {
-    if (_syncingColumns || !from.hasClients || !to.hasClients) return;
-    final position = to.position;
-    final target = from.offset.clamp(
-      position.minScrollExtent,
-      position.maxScrollExtent,
-    );
-    if ((to.offset - target).abs() < 0.5) return;
+  /// The sticky names, the rows and the entry row scroll sideways as one table.
+  void _syncColumns(ScrollController from) {
+    if (_syncingColumns || !from.hasClients) return;
     _syncingColumns = true;
-    to.jumpTo(target);
+    for (final to in [_columnsScroll, _headerScroll, _composerScroll]) {
+      if (identical(to, from) || !to.hasClients) continue;
+      final position = to.position;
+      final target = from.offset.clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      if ((to.offset - target).abs() < 0.5) continue;
+      to.jumpTo(target);
+    }
     _syncingColumns = false;
   }
 
@@ -115,7 +116,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   /// date may start off screen. Wide screens stay at the start.
   void _toValueField([int frames = 12]) {
     if (!mounted) return;
-    for (final c in [_columnsScroll, _headerScroll]) {
+    for (final c in [_columnsScroll, _headerScroll, _composerScroll]) {
       if (!c.hasClients) continue;
       final position = c.position;
       final target = _LedgerColumns.valueOffset(position.viewportDimension)
@@ -161,6 +162,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     _innerRows.dispose();
     _columnsScroll.dispose();
     _headerScroll.dispose();
+    _composerScroll.dispose();
     super.dispose();
   }
 
@@ -453,19 +455,6 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     final showBalance = balances != null;
     final cardReady = _cardReadyForWrite(card);
     final columns = _LedgerColumns(showBalance: showBalance, section: section);
-    final composer = canWrite
-        ? _InlineComposer(
-            key: const Key('ledger-composer'),
-            section: section,
-            accountId: id,
-            cardReady: cardReady,
-            online: online,
-            cardVersion: card.asData?.value.version,
-            columns: columns,
-            onPosted: _posted,
-            onFull: (meta) => _full(context, ref, meta),
-          )
-        : null;
     // م counts the drawn rows 1..n, oldest first, once every page is in.
     Widget row(int index) => _EntryTile(
       key: ValueKey('ledger-row-${rows[index].id}'),
@@ -489,6 +478,22 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final viewport = constraints.maxWidth - padding.horizontal;
+        final composer = canWrite
+            ? _InlineComposer(
+                key: const Key('ledger-composer'),
+                section: section,
+                accountId: id,
+                cardReady: cardReady,
+                online: online,
+                cardVersion: card.asData?.value.version,
+                columns: columns,
+                fieldsScroll: _composerScroll,
+                tableWidth: columns.width,
+                viewport: viewport,
+                onPosted: _posted,
+                onFull: (meta) => _full(context, ref, meta),
+              )
+            : null;
         // Pinned when there is room for it; on a very short screen (e.g.
         // 320x568 at text x2) the names scroll with the rows instead.
         final sticky =
@@ -554,6 +559,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                   width: columns.width,
                   viewport: viewport,
                   columns: columns,
+                  leadingGutter: composer != null,
                 ),
               ),
             Expanded(
@@ -702,6 +708,9 @@ class _MovementForm extends ConsumerStatefulWidget {
     this.columns,
     this.typeCell,
     this.onFull,
+    this.fieldsScroll,
+    this.tableWidth = 0,
+    this.scrollPort = 0,
     super.key,
   });
 
@@ -714,6 +723,9 @@ class _MovementForm extends ConsumerStatefulWidget {
   final _LedgerColumns? columns;
   final Widget? typeCell;
   final Future<String?> Function(MutationMeta meta)? onFull;
+  final ScrollController? fieldsScroll;
+  final double tableWidth;
+  final double scrollPort;
 
   /// Inline use at the bottom of the ledger table: called after the server
   /// accepted the movement, instead of closing a sheet. Same request.
@@ -942,38 +954,31 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
             },
             onSubmit: _submit,
           );
-    // ✓ in the first (rightmost) cell: on screen at the RTL start, no
-    // swipe. An error line may spill under the row.
-    final saveCell = OverflowBox(
-      maxWidth: 240,
-      maxHeight: double.infinity,
-      alignment: AlignmentDirectional.topStart,
-      child: Padding(
-        padding: const EdgeInsetsDirectional.only(start: 8, top: 10),
-        child: SectionTheme(
-          child: Builder(
-            builder: (context) {
-              final theme = Theme.of(context);
-              return Theme(
-                data: theme.copyWith(
-                  filledButtonTheme: FilledButtonThemeData(
-                    style: theme.filledButtonTheme.style?.copyWith(
-                      minimumSize: const WidgetStatePropertyAll(Size(40, 40)),
-                      fixedSize: const WidgetStatePropertyAll(Size(40, 40)),
-                      padding: const WidgetStatePropertyAll(EdgeInsets.zero),
-                      shape: const WidgetStatePropertyAll(CircleBorder()),
-                    ),
+    // Published to the left gutter. Same button, same request.
+    final saveCell = Padding(
+      padding: const EdgeInsets.all(6),
+      child: SectionTheme(
+        child: Builder(
+          builder: (context) {
+            final theme = Theme.of(context);
+            return Theme(
+              data: theme.copyWith(
+                filledButtonTheme: FilledButtonThemeData(
+                  style: theme.filledButtonTheme.style?.copyWith(
+                    minimumSize: const WidgetStatePropertyAll(Size(40, 40)),
+                    fixedSize: const WidgetStatePropertyAll(Size(40, 40)),
+                    padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+                    shape: const WidgetStatePropertyAll(CircleBorder()),
                   ),
                 ),
-                child: save,
-              );
-            },
-          ),
+              ),
+              child: save,
+            );
+          },
         ),
       ),
     );
-    final viewport = _InlineViewport.of(context);
-    return Column(
+    final fields = Column(
       key: const Key('movement-inline'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1027,18 +1032,8 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
                     ],
                   ),
                 ),
-                // ✓ pinned at the visible RTL start edge of the row, so it
-                // stays next to القيمة when the table opens scrolled.
-                PositionedDirectional(
-                  start: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: _LedgerColumns.seq,
-                  child: _PinnedToStart(
-                    key: const Key('composer-save-pin'),
-                    child: saveCell,
-                  ),
-                ),
+                // The ✓ is drawn in the left gutter (see _LedgerTable), from
+                // this same row, so sideways scrolling cannot take it away.
               ],
             ),
           ),
@@ -1047,7 +1042,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: SizedBox(
-              width: viewport,
+              width: widget.scrollPort,
               child: Padding(
                 padding: const EdgeInsetsDirectional.all(AppSpacing.sm),
                 child: Column(
@@ -1073,6 +1068,38 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
               ),
             ),
           ),
+      ],
+    );
+    final scroll = widget.fieldsScroll;
+    if (scroll == null) return fields;
+    final tableWidth = widget.tableWidth > widget.scrollPort
+        ? widget.tableWidth
+        : widget.scrollPort;
+    return Row(
+      textDirection: TextDirection.ltr,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: _LedgerColumns.tickGutter,
+          height: MediaQuery.textScalerOf(context).scale(_composerHeight),
+          child: OverflowBox(
+            alignment: Alignment.topCenter,
+            maxWidth: _LedgerColumns.tickGutter,
+            maxHeight: 420,
+            child: saveCell,
+          ),
+        ),
+        SizedBox(
+          width: widget.scrollPort,
+          child: SingleChildScrollView(
+            controller: scroll,
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: tableWidth,
+              child: _InlineViewport(width: widget.scrollPort, child: fields),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -1656,8 +1683,9 @@ class _LedgerColumns {
   /// Where القيمة ends, from the RTL start of the row.
   static const valueEnd = seq + when + by + type + note + value;
 
-  /// The pinned ✓ may slide over التاريخ and بواسطة only.
-  static const pinLimit = when + by;
+  /// Blank strip on the physical left. The entry-row ✓ sits here and does
+  /// not cover a field. Header and rows share it so the columns still line up.
+  static const tickGutter = 56.0;
 
   /// Sideways offset that shows القيمة whole (0 when it already fits).
   static double valueOffset(double viewport) {
@@ -1721,7 +1749,11 @@ class _LedgerTable extends StatelessWidget {
     final radius = attachedTop
         ? BorderRadius.vertical(bottom: corner)
         : BorderRadius.all(corner);
-    final tableWidth = width > viewport ? width : viewport;
+    final gutter = composer != null;
+    final scrollPort = gutter
+        ? math.max(0.0, viewport - _LedgerColumns.tickGutter)
+        : viewport;
+    final tableWidth = width > scrollPort ? width : scrollPort;
     final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
       key: const Key('ledger-table'),
@@ -1742,22 +1774,37 @@ class _LedgerTable extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SingleChildScrollView(
-              key: const Key('ledger-columns-scroll'),
-              controller: controller,
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: tableWidth,
-                child: _InlineViewport(
-                  width: viewport,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [...children, ?composer],
+            Row(
+              textDirection: TextDirection.ltr,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (gutter)
+                  const SizedBox(
+                    key: Key('composer-save-pin'),
+                    width: _LedgerColumns.tickGutter,
+                  ),
+                SizedBox(
+                  width: scrollPort,
+                  child: SingleChildScrollView(
+                    key: const Key('ledger-columns-scroll'),
+                    controller: controller,
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: tableWidth,
+                      child: _InlineViewport(
+                        width: scrollPort,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: children,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-            if (width > viewport)
+            ?composer,
+            if (width > scrollPort)
               Container(
                 color: look.strip,
                 padding: const EdgeInsetsDirectional.symmetric(
@@ -1810,12 +1857,18 @@ class _StickyColumnHeader extends StatelessWidget {
     required this.width,
     required this.viewport,
     required this.columns,
+    this.leadingGutter = false,
   });
 
   final ScrollController controller;
   final double width;
   final double viewport;
   final _LedgerColumns columns;
+  final bool leadingGutter;
+
+  double get _scrollPort => leadingGutter
+      ? math.max(0.0, viewport - _LedgerColumns.tickGutter)
+      : viewport;
 
   @override
   Widget build(BuildContext context) {
@@ -1830,14 +1883,23 @@ class _StickyColumnHeader extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: radius,
-        child: SingleChildScrollView(
-          key: const Key('ledger-header-scroll'),
-          controller: controller,
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: width > viewport ? width : viewport,
-            child: _LedgerColumnHeader(columns: columns),
-          ),
+        child: Row(
+          textDirection: TextDirection.ltr,
+          children: [
+            if (leadingGutter) const SizedBox(width: _LedgerColumns.tickGutter),
+            SizedBox(
+              width: _scrollPort,
+              child: SingleChildScrollView(
+                key: const Key('ledger-header-scroll'),
+                controller: controller,
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: width > _scrollPort ? width : _scrollPort,
+                  child: _LedgerColumnHeader(columns: columns),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1916,43 +1978,6 @@ Color _gridLine(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
     ? const Color(0xFF2E3A57)
     : const Color(0xFFD3DCE8);
-
-/// Keeps its child at the visible start edge of the sideways table scroll.
-class _PinnedToStart extends StatelessWidget {
-  const _PinnedToStart({required this.child, super.key});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final scrollable = Scrollable.maybeOf(context, axis: Axis.horizontal);
-    if (scrollable == null) return child;
-    final position = scrollable.position;
-    final rtl = Directionality.of(context) == TextDirection.rtl;
-    return AnimatedBuilder(
-      animation: position,
-      child: child,
-      builder: (context, child) {
-        // Follows the start edge only up to the opening offset, and never
-        // past the بواسطة column: it never covers the type chips or a field.
-        // (On a 320dp phone that leaves ✓ one short swipe away.)
-        final pixels = position.hasPixels && position.hasContentDimensions
-            ? (position.pixels - position.minScrollExtent).clamp(
-                0.0,
-                math.min<double>(
-                  _LedgerColumns.valueOffset(position.viewportDimension),
-                  _LedgerColumns.pinLimit,
-                ),
-              )
-            : 0.0;
-        return Transform.translate(
-          offset: Offset(rtl ? -pixels : pixels, 0),
-          child: child,
-        );
-      },
-    );
-  }
-}
 
 class _Cell extends StatelessWidget {
   const _Cell(this.width, this.child, {this.alignment, this.divider = true});
@@ -2363,10 +2388,16 @@ class _InlineComposer extends StatefulWidget {
     required this.onPosted,
     required this.onFull,
     required this.columns,
+    required this.fieldsScroll,
+    required this.tableWidth,
+    required this.viewport,
     super.key,
   });
 
   final _LedgerColumns columns;
+  final ScrollController fieldsScroll;
+  final double tableWidth;
+  final double viewport;
   final AccountSection section;
   final String accountId;
   final bool cardReady;
@@ -2464,6 +2495,9 @@ class _InlineComposerState extends State<_InlineComposer> {
       id: widget.accountId,
       type: _type == 'full' && _deposits ? 'debt' : _type,
       columns: widget.columns,
+      fieldsScroll: widget.fieldsScroll,
+      tableWidth: widget.tableWidth,
+      scrollPort: math.max(0, widget.viewport - _LedgerColumns.tickGutter),
       typeCell: chips,
       onFull: widget.onFull,
       onSaved: (posted) {

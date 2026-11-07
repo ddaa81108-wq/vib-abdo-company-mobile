@@ -87,6 +87,10 @@ abstract final class AppStrings {
   static const activeCardsCount = 'البطاقات النشطة';
   static const activeShort = 'النشطة';
   static const depositSectionNet = 'صافي إجمالي القسم';
+
+  /// Compact faces of the same deposit figures (net balance, active cards).
+  static const depositTotalCompact = 'الإجمالي';
+  static const depositActiveCompact = 'النشط';
   static const rateRowLabel = 'سعر التحويل 1 د.ل =';
   static const customerDebtWord = 'دين';
   static const customerCreditWord = 'أمانة';
