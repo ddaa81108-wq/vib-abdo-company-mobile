@@ -30,6 +30,14 @@ class PermissionService extends ChangeNotifier {
   static const adminRoleValue = 'admin';
   static const employeeRoleValue = 'employee';
 
+  /// Role string release capture may reveal. Any other value, including a
+  /// missing role, is null. Permissions and fullAccess are not read.
+  static String? verifiedCaptureRole(String? role) {
+    if (role == adminRoleValue) return adminRoleValue;
+    if (role == employeeRoleValue) return employeeRoleValue;
+    return null;
+  }
+
   Set<Permission> _granted = const {};
   Set<String> _rawCodes = const {};
   Map<String, SectionAccessLevel> _sectionAccess = const {};

@@ -15,6 +15,7 @@ import 'notifications/app_push_service.dart';
 import 'notifications/device_token_registrar.dart';
 import 'notifications/device_token_store.dart';
 import 'notifications/push_providers.dart';
+import 'security/android_capture_gate.dart';
 import 'secure_storage/app_secure_stores.dart';
 
 void main() {
@@ -47,6 +48,7 @@ void main() {
     tokenStorage: stores.tokens,
     push: AppPushService(),
     cleanups: [pushGate.forget],
+    captureGate: AndroidCaptureGate(),
   );
   runApp(
     buildAppRoot(

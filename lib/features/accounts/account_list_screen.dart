@@ -162,7 +162,10 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
         ),
       ),
       builder: (data) {
-        final cards = [...data.page.items, ...extra];
+        final loaded = [...data.page.items, ...extra];
+        final cards = section == AccountSection.customers
+            ? customersWithClosedZeroReviewLast(loaded)
+            : loaded;
         HistoryWindowTrace.accountWindow = [for (final card in cards) card.id];
         return RefreshIndicator(
           key: const Key('accounts-refresh'),
@@ -1121,14 +1124,21 @@ class _AccountCard extends StatelessWidget {
                   ),
                 const Spacer(),
                 if (showZero)
-                  GuardedMutation(
-                    buttonKey: ValueKey('zero-review-${card.id}'),
-                    inputs: 'zero:${card.id}:${card.version}',
-                    expectedVersion: card.version,
-                    label: AppStrings.zeroReview,
-                    tooltip: AppStrings.zeroReview,
-                    icon: Icons.check_circle_outline,
-                    onSubmit: (meta) => onZero!(meta),
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: GuardedMutation(
+                      buttonKey: ValueKey('zero-review-${card.id}'),
+                      inputs: 'zero:${card.id}:${card.version}',
+                      expectedVersion: card.version,
+                      label: AppStrings.zeroReview,
+                      tooltip: AppStrings.zeroReview,
+                      icon: Icons.check_circle_outline,
+                      // The full failure stays on the list reply. Painting it
+                      // under the icon overflows the fixed-height card.
+                      reportErrorInline: false,
+                      onSubmit: (meta) => onZero!(meta),
+                    ),
                   ),
               ],
             ),
