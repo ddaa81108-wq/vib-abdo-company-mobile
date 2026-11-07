@@ -167,7 +167,6 @@ void main() {
           gate.calls++;
           if (gate.failing) throw const NetworkException();
           return ref.read(apiLayerProvider).reports.financialLedger(
-            before: query.before,
             sectionKey: query.section,
             currency: query.currency,
             q: query.q.isEmpty ? null : query.q,

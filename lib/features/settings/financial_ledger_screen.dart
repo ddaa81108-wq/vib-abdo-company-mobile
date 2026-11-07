@@ -14,25 +14,21 @@ import '../../ui/widgets/export_pdf_button.dart';
 import '../../ui/widgets/section_kit.dart';
 
 class LedgerQuery {
-  const LedgerQuery({this.section, this.currency, this.q = '', this.before});
+  const LedgerQuery({this.section, this.currency, this.q = ''});
 
   final FinancialLedgerSectionKey? section;
   final String? currency;
   final String q;
-
-  /// Server `before` cursor. Null is the first page.
-  final String? before;
 
   @override
   bool operator ==(Object other) =>
       other is LedgerQuery &&
       other.section == section &&
       other.currency == currency &&
-      other.q == q &&
-      other.before == before;
+      other.q == q;
 
   @override
-  int get hashCode => Object.hash(section, currency, q, before);
+  int get hashCode => Object.hash(section, currency, q);
 }
 
 final ledgerPageProvider =
@@ -43,7 +39,6 @@ final ledgerPageProvider =
         throw const ForbiddenException(code: 'FORBIDDEN', message: 'غير مصرح');
       }
       return layer.reports.financialLedger(
-        before: query.before,
         sectionKey: query.section,
         currency: query.currency,
         q: query.q.isEmpty ? null : query.q,
@@ -64,7 +59,10 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
   final _search = TextEditingController();
   FinancialLedgerSectionKey? _section;
   String? _currency;
-  String? _before;
+  FinancialLedgerPage? _older;
+  String? _olderError;
+  var _olderBusy = false;
+  var _olderTicket = 0;
 
   @override
   void dispose() {
@@ -76,8 +74,14 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
     section: _section,
     currency: _currency,
     q: _search.text.trim(),
-    before: _before,
   );
+
+  void _dropOlder() {
+    _olderTicket++;
+    _older = null;
+    _olderError = null;
+    _olderBusy = false;
+  }
 
   void _retarget({
     FinancialLedgerSectionKey? section,
@@ -90,8 +94,49 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
       if (section != null || clearSection) _section = section;
       if (clearCurrency) _currency = null;
       if (currency != null || clearCurrency) _currency = currency;
-      _before = null;
+      _dropOlder();
     });
+  }
+
+  Future<void> _loadOlder(String? cursor) async {
+    if (cursor == null || _olderBusy) return;
+    final ticket = ++_olderTicket;
+    final section = _section;
+    final currency = _currency;
+    final q = _search.text.trim();
+    setState(() {
+      _olderBusy = true;
+      _olderError = null;
+    });
+    try {
+      final page = await ref
+          .read(apiLayerProvider)
+          .reports
+          .financialLedger(
+            before: cursor,
+            sectionKey: section,
+            currency: currency,
+            q: q.isEmpty ? null : q,
+          );
+      if (!mounted || ticket != _olderTicket) return;
+      if (section != _section ||
+          currency != _currency ||
+          q != _search.text.trim()) {
+        return;
+      }
+      setState(() {
+        _older = page;
+        _olderBusy = false;
+      });
+    } catch (error) {
+      if (!mounted || ticket != _olderTicket) return;
+      setState(() {
+        _olderBusy = false;
+        _olderError = failureText(
+          ref.read(errorHandlerProvider).toFailure(error),
+        );
+      });
+    }
   }
 
   @override
@@ -124,7 +169,7 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
                     key: const Key('ledger-search'),
                     controller: _search,
                     decoration: const InputDecoration(labelText: 'بحث'),
-                    onSubmitted: (_) => setState(() => _before = null),
+                    onSubmitted: (_) => setState(_dropOlder),
                   ),
                   DropdownButtonFormField<String?>(
                     key: const Key('ledger-currency'),
@@ -136,8 +181,10 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
                       DropdownMenuItem(value: 'LYD', child: Text('دينار')),
                       DropdownMenuItem(value: 'EGP', child: Text('جنيه')),
                     ],
-                    onChanged: (value) =>
-                        _retarget(currency: value, clearCurrency: value == null),
+                    onChanged: (value) => _retarget(
+                      currency: value,
+                      clearCurrency: value == null,
+                    ),
                   ),
                   DropdownButtonFormField<FinancialLedgerSectionKey?>(
                     key: const Key('ledger-section'),
@@ -156,10 +203,8 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
                             child: Text(_sectionLabel(section)),
                           ),
                     ],
-                    onChanged: (value) => _retarget(
-                      section: value,
-                      clearSection: value == null,
-                    ),
+                    onChanged: (value) =>
+                        _retarget(section: value, clearSection: value == null),
                   ),
                 ],
               ),
@@ -174,43 +219,60 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
               onRetry: () => ref.invalidate(ledgerPageProvider(_query)),
               retryKey: const Key('ledger-retry'),
             ),
-            data: (data) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(AppStrings.pageTotals, style: cairo(14, 800)),
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: [
-                    for (final entry in data.pageTotals.entries)
-                      _TotalFrame(
-                        label: _currencyLabel(entry.key),
-                        child: MoneyText(
-                          _money(money, entry.key, entry.value),
-                          key: Key('ledger-total-${entry.key}'),
+            data: (data) {
+              final shown = _older ?? data;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(AppStrings.pageTotals, style: cairo(14, 800)),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      for (final entry in shown.pageTotals.entries)
+                        _TotalFrame(
+                          label: _currencyLabel(entry.key),
+                          child: MoneyText(
+                            _money(money, entry.key, entry.value),
+                            key: Key('ledger-total-${entry.key}'),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  if (shown.page.items.isEmpty)
+                    const EmptyPane(message: AppStrings.emptyLedger)
+                  else
+                    for (final row in shown.page.items) _LedgerRow(row: row),
+                  if (_olderError != null)
+                    Text(
+                      _olderError!,
+                      key: const Key('ledger-older-error'),
+                      style: cairo(
+                        13,
+                        700,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  if (shown.page.nextCursor != null)
+                    Align(
+                      alignment: AlignmentDirectional.center,
+                      child: OutlinedButton(
+                        key: const Key('ledger-older'),
+                        onPressed: _olderBusy
+                            ? null
+                            : () => _loadOlder(shown.page.nextCursor),
+                        child: Text(
+                          _olderBusy
+                              ? AppStrings.ledgerLoadingOlder
+                              : AppStrings.loadOlder,
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
-                if (data.page.items.isEmpty)
-                  const EmptyPane(message: AppStrings.emptyLedger)
-                else
-                  for (final row in data.page.items) _LedgerRow(row: row),
-                if (data.page.nextCursor != null)
-                  Align(
-                    alignment: AlignmentDirectional.center,
-                    child: OutlinedButton(
-                      key: const Key('ledger-older'),
-                      onPressed: () => setState(
-                        () => _before = data.page.nextCursor,
-                      ),
-                      child: const Text('أقدم'),
                     ),
-                  ),
-              ],
-            ),
+                ],
+              );
+            },
           ),
         ],
       ),

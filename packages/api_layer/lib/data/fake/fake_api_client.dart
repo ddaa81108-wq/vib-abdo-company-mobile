@@ -133,6 +133,13 @@ class FakeApiClient implements ApiClient {
   /// Each purchases list read, including `before` when the app sent one.
   final List<Map<String, dynamic>> purchaseQueries = [];
 
+  /// Cursor placed on the first financial-ledger page when set.
+  String? financialLedgerFirstNextBefore;
+
+  /// Older financial-ledger pages keyed by the opaque `before` cursor.
+  /// Each value is a full page body, including its own `pageTotals`.
+  final Map<String, Map<String, dynamic>> financialLedgerOlderPages = {};
+
   /// The next N notification writes fail (tests).
   int failNotificationWritesRemaining = 0;
 
@@ -1538,10 +1545,30 @@ class FakeApiClient implements ApiClient {
             sectionKey: _queryText(query, 'sectionKey'),
           ),
         );
+        final before = _queryText(query, 'before');
+        if (before != null && failOlderRemaining > 0) {
+          failOlderRemaining--;
+          _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
+        }
+        if (before != null) {
+          final older = financialLedgerOlderPages[before];
+          if (older == null) {
+            return _ok({
+              'items': <Map<String, dynamic>>[],
+              'pageTotals': <String, int>{},
+              'nextBefore': null,
+            });
+          }
+          return _ok(older);
+        }
         final page = FakeFixtures.financialLedger(
           sectionKey: section ?? _queryText(query, 'sectionKey'),
         );
-        return _ok(_filterLedgerPage(page, query));
+        final filtered = _filterLedgerPage(page, query);
+        if (financialLedgerFirstNextBefore != null) {
+          filtered['nextBefore'] = financialLedgerFirstNextBefore;
+        }
+        return _ok(filtered);
       case 'notifications':
         return _notifications(method, seg, b, query);
       case 'notification-preferences':
