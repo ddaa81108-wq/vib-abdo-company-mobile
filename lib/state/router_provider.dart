@@ -30,6 +30,8 @@ import '../features/settings/security_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/splash/splash_screen.dart';
 import '../security/capture_harness.dart';
+import '../security/capture_harness_screen.dart'
+    if (dart.vm.product) '../security/capture_harness_screen_stub.dart';
 import '../features/treasury/treasury_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
