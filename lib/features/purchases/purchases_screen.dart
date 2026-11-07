@@ -55,68 +55,78 @@ class PurchasesScreen extends ConsumerWidget {
         padding: pagePadding(MediaQuery.sizeOf(context).width),
         children: [
           KeptData<PurchasesPage>(
-                    value: page,
-                    resetKey: book,
-                    onRetry: () => ref.invalidate(purchasesProvider),
-                    messageOf: (error) => failureText(
-                      ref.read(errorHandlerProvider).toFailure(error),
-                    ),
-                    failureOf: (error) =>
-                        ref.read(errorHandlerProvider).toFailure(error),
-                    loading: const Column(
-                      key: Key('purchases-loading'),
-                      children: [
-                        SkeletonBox(),
-                        SizedBox(height: AppSpacing.md),
-                        SkeletonBox(),
-                      ],
-                    ),
-                    builder: (data) {
-                      final day = data.day;
-                      final draft = ref.watch(_ledgerDraftProvider);
-                      final empty =
-                          day == null && data.entries.isEmpty && draft == null;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (day != null)
-                            _DayCard(
-                              day: day,
-                              money: money,
-                              canWrite: canWrite,
-                              canFinalize: canFinalize,
-                              online: online,
-                              book: book,
-                            ),
-                          if (empty)
-                            const EmptyPane(
-                              key: Key('purchases-empty'),
-                              message: AppStrings.emptyPurchases,
-                            ),
-                          if (data.entries.isNotEmpty || draft != null)
-                            _PurchaseGrid(
-                              entries: data.entries,
-                              money: money,
-                              book: book,
-                              openDay: day,
-                              canWrite: canWrite,
-                              online: online,
-                            ),
-                          _OpeningCard(
-                            book: book,
-                            day: day,
-                            money: money,
-                            canWrite: canWrite,
-                            online: online,
-                          ),
-                          _RegisterTotals(
-                            totals: data.registerTotals,
-                            money: money,
-                          ),
-                        ],
-                      );
-                    },
-                  ),
+            value: page,
+            resetKey: book,
+            onRetry: () => ref.invalidate(purchasesProvider),
+            messageOf: (error) =>
+                failureText(ref.read(errorHandlerProvider).toFailure(error)),
+            failureOf: (error) =>
+                ref.read(errorHandlerProvider).toFailure(error),
+            loading: const Column(
+              key: Key('purchases-loading'),
+              children: [
+                SkeletonBox(),
+                SizedBox(height: AppSpacing.md),
+                SkeletonBox(),
+              ],
+            ),
+            builder: (data) {
+              final day = data.day;
+              return _PurchaseHistory(
+                key: ValueKey(book),
+                book: book,
+                first: data.entries,
+                firstCursor: data.nextBefore,
+                online: online,
+                builder: (context, entries, controls) {
+                  final draft = ref.watch(_ledgerDraftProvider);
+                  final empty = day == null && entries.isEmpty && draft == null;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (day != null)
+                        _DayCard(
+                          day: day,
+                          money: money,
+                          canWrite: canWrite,
+                          canFinalize: canFinalize,
+                          online: online,
+                          book: book,
+                        ),
+                      if (empty)
+                        const EmptyPane(
+                          key: Key('purchases-empty'),
+                          message: AppStrings.emptyPurchases,
+                        ),
+                      if (entries.isNotEmpty || draft != null)
+                        _PurchaseGrid(
+                          entries: entries,
+                          money: money,
+                          book: book,
+                          openDay: day,
+                          canWrite: canWrite,
+                          online: online,
+                        ),
+                      _OlderPurchasesBar(controls: controls),
+                      _OpeningCard(
+                        book: book,
+                        day: day,
+                        money: money,
+                        canWrite: canWrite,
+                        online: online,
+                      ),
+                      // registerTotals cover the whole merchant register.
+                      // Later pages are not added into this figure.
+                      _RegisterTotals(
+                        totals: data.registerTotals,
+                        money: money,
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
         ],
       ),
     );
@@ -190,9 +200,8 @@ Widget _gradientPill(
       border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
     ),
     child: Theme(
-      data: Theme.of(context).copyWith(
-        filledButtonTheme: FilledButtonThemeData(style: button),
-      ),
+      data: Theme.of(context)
+          .copyWith(filledButtonTheme: FilledButtonThemeData(style: button)),
       child: child,
     ),
   );
@@ -222,6 +231,170 @@ Widget _greenFinalize(BuildContext context, Widget child) {
     ink: Colors.white,
     child: child,
   );
+}
+
+class _OlderControls {
+  const _OlderControls({
+    required this.cursor,
+    required this.busy,
+    required this.error,
+    required this.load,
+  });
+
+  final int? cursor;
+  final bool busy;
+  final String? error;
+  final VoidCallback? load;
+}
+
+class _PurchaseHistory extends ConsumerStatefulWidget {
+  const _PurchaseHistory({
+    required this.book,
+    required this.first,
+    required this.firstCursor,
+    required this.online,
+    required this.builder,
+    super.key,
+  });
+
+  final PurchaseBook book;
+  final List<PurchaseEntryDto> first;
+  final int? firstCursor;
+  final bool online;
+  final Widget Function(
+    BuildContext context,
+    List<PurchaseEntryDto> entries,
+    _OlderControls controls,
+  )
+  builder;
+
+  @override
+  ConsumerState<_PurchaseHistory> createState() => _PurchaseHistoryState();
+}
+
+class _PurchaseHistoryState extends ConsumerState<_PurchaseHistory> {
+  final _extra = <PurchaseEntryDto>[];
+  int? _cursor;
+  String? _error;
+  var _busy = false;
+  var _ticket = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _cursor = widget.firstCursor;
+  }
+
+  @override
+  void didUpdateWidget(covariant _PurchaseHistory oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.book != widget.book ||
+        oldWidget.firstCursor != widget.firstCursor ||
+        !_sameIds(oldWidget.first, widget.first)) {
+      _ticket++;
+      _extra.clear();
+      _cursor = widget.firstCursor;
+      _error = null;
+      _busy = false;
+    }
+  }
+
+  Future<void> _load() async {
+    final cursor = _cursor;
+    if (cursor == null || _busy || !widget.online) return;
+    final ticket = ++_ticket;
+    final book = widget.book;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final page = await ref
+          .read(apiLayerProvider)
+          .purchases
+          .list(book, before: cursor);
+      if (!mounted || ticket != _ticket || book != widget.book) return;
+      final seen = {
+        ...widget.first.map((entry) => entry.id),
+        ..._extra.map((entry) => entry.id),
+      };
+      setState(() {
+        for (final entry in page.entries) {
+          if (seen.add(entry.id)) _extra.add(entry);
+        }
+        _cursor = page.nextBefore;
+        _busy = false;
+      });
+    } catch (error) {
+      if (!mounted || ticket != _ticket || book != widget.book) return;
+      setState(() {
+        _busy = false;
+        _error = failureText(ref.read(errorHandlerProvider).toFailure(error));
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = [...widget.first, ..._extra];
+    return widget.builder(
+      context,
+      entries,
+      _OlderControls(
+        cursor: _cursor,
+        busy: _busy,
+        error: _error,
+        load: _cursor != null && widget.online && !_busy ? _load : null,
+      ),
+    );
+  }
+}
+
+bool _sameIds(List<PurchaseEntryDto> a, List<PurchaseEntryDto> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i].id != b[i].id) return false;
+  }
+  return true;
+}
+
+class _OlderPurchasesBar extends StatelessWidget {
+  const _OlderPurchasesBar({required this.controls});
+
+  final _OlderControls controls;
+
+  @override
+  Widget build(BuildContext context) {
+    if (controls.cursor == null && controls.error == null && !controls.busy) {
+      return const SizedBox.shrink();
+    }
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (controls.error != null)
+            Text(
+              controls.error!,
+              key: const Key('purchases-older-error'),
+              style: cairo(13, 700, color: scheme.error),
+            ),
+          if (controls.cursor != null)
+            OutlinedButton(
+              key: const Key('purchases-older'),
+              onPressed: controls.load,
+              style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
+              child: Text(
+                controls.busy
+                    ? AppStrings.ledgerLoadingOlder
+                    : AppStrings.loadOlder,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _RegisterTotals extends StatelessWidget {
@@ -724,188 +897,188 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
     return Theme(
       data: quietFields,
       child: Row(
-      key: const Key('purchase-inline-row'),
-      textDirection: TextDirection.rtl,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        cell(
-          index: 0,
-          child: Center(
-            child: Text(
-              existing?.sequence?.toString() ?? '—',
-              style: cairo(14, 800, color: context.look.ink),
+        key: const Key('purchase-inline-row'),
+        textDirection: TextDirection.rtl,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          cell(
+            index: 0,
+            child: Center(
+              child: Text(
+                existing?.sequence?.toString() ?? '—',
+                style: cairo(14, 800, color: context.look.ink),
+              ),
             ),
           ),
-        ),
-        cell(
-          index: 1,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                height: 48,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      for (final kind in _kinds)
-                        Padding(
-                          padding: const EdgeInsetsDirectional.only(end: 4),
-                          child: ChoiceChip(
-                            key: Key('purchase-kind-${kind.$1}'),
-                            label: Text(kind.$2),
-                            selected: _itemCode == kind.$1,
-                            onSelected: (_) =>
-                                setState(() => _itemCode = kind.$1),
+          cell(
+            index: 1,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 48,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final kind in _kinds)
+                          Padding(
+                            padding: const EdgeInsetsDirectional.only(end: 4),
+                            child: ChoiceChip(
+                              key: Key('purchase-kind-${kind.$1}'),
+                              label: Text(kind.$2),
+                              selected: _itemCode == kind.$1,
+                              onSelected: (_) =>
+                                  setState(() => _itemCode = kind.$1),
+                            ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              if (custom)
-                TextField(
-                  key: const Key('purchase-custom-label'),
-                  controller: _customLabel,
-                  decoration: const InputDecoration(
-                    labelText: AppStrings.customItemName,
-                    isDense: true,
+                if (custom)
+                  TextField(
+                    key: const Key('purchase-custom-label'),
+                    controller: _customLabel,
+                    decoration: const InputDecoration(
+                      labelText: AppStrings.customItemName,
+                      isDense: true,
+                    ),
                   ),
+              ],
+            ),
+          ),
+          cell(
+            index: 2,
+            focused: _valueFocus.hasFocus,
+            child: UnitsField(
+              key: const Key('purchase-field-value'),
+              controller: _egp,
+              focusNode: _valueFocus,
+              label: '',
+              showHint: false,
+              dense: true,
+              scrollPadding: fieldPad,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => _next(_rateFocus),
+              onSubmitted: (_) => _next(_rateFocus),
+            ),
+          ),
+          cell(
+            index: 3,
+            focused: _opFocus.hasFocus,
+            child: DropdownButton<CalculationMode>(
+              focusNode: _opFocus,
+              value: _mode,
+              isExpanded: true,
+              items: const [
+                DropdownMenuItem(
+                  value: CalculationMode.divide,
+                  child: CalculationMark(CalculationMode.divide),
                 ),
-            ],
+                DropdownMenuItem(
+                  value: CalculationMode.multiply,
+                  child: CalculationMark(CalculationMode.multiply),
+                ),
+              ],
+              onChanged: (value) {
+                setState(() => _mode = value ?? CalculationMode.divide);
+                _next(_rateFocus);
+              },
+            ),
           ),
-        ),
-        cell(
-          index: 2,
-          focused: _valueFocus.hasFocus,
-          child: UnitsField(
-            key: const Key('purchase-field-value'),
-            controller: _egp,
-            focusNode: _valueFocus,
-            label: '',
-            showHint: false,
-            dense: true,
-            scrollPadding: fieldPad,
-            textInputAction: TextInputAction.next,
-            onEditingComplete: () => _next(_rateFocus),
-            onSubmitted: (_) => _next(_rateFocus),
-          ),
-        ),
-        cell(
-          index: 3,
-          focused: _opFocus.hasFocus,
-          child: DropdownButton<CalculationMode>(
-            focusNode: _opFocus,
-            value: _mode,
-            isExpanded: true,
-            items: const [
-              DropdownMenuItem(
-                value: CalculationMode.divide,
-                child: CalculationMark(CalculationMode.divide),
+          cell(
+            index: 4,
+            focused: _rateFocus.hasFocus,
+            child: TextField(
+              key: const Key('purchase-field-rate'),
+              controller: _rate,
+              focusNode: _rateFocus,
+              textDirection: TextDirection.ltr,
+              textInputAction: TextInputAction.next,
+              scrollPadding: fieldPad,
+              decoration: const InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
               ),
-              DropdownMenuItem(
-                value: CalculationMode.multiply,
-                child: CalculationMark(CalculationMode.multiply),
+              onEditingComplete: () => _next(_paidFocus),
+              onSubmitted: (_) => _next(_paidFocus),
+            ),
+          ),
+          cell(
+            index: 5,
+            child: Center(
+              child: Text(
+                result,
+                textAlign: TextAlign.center,
+                style: cairo(12, 700, color: context.look.muted),
               ),
-            ],
-            onChanged: (value) {
-              setState(() => _mode = value ?? CalculationMode.divide);
-              _next(_rateFocus);
-            },
-          ),
-        ),
-        cell(
-          index: 4,
-          focused: _rateFocus.hasFocus,
-          child: TextField(
-            key: const Key('purchase-field-rate'),
-            controller: _rate,
-            focusNode: _rateFocus,
-            textDirection: TextDirection.ltr,
-            textInputAction: TextInputAction.next,
-            scrollPadding: fieldPad,
-            decoration: const InputDecoration(
-              isDense: true,
-              border: InputBorder.none,
-            ),
-            onEditingComplete: () => _next(_paidFocus),
-            onSubmitted: (_) => _next(_paidFocus),
-          ),
-        ),
-        cell(
-          index: 5,
-          child: Center(
-            child: Text(
-              result,
-              textAlign: TextAlign.center,
-              style: cairo(12, 700, color: context.look.muted),
             ),
           ),
-        ),
-        cell(
-          index: 6,
-          focused: _paidFocus.hasFocus,
-          child: UnitsField(
-            key: const Key('purchase-field-paid'),
-            controller: _paid,
-            focusNode: _paidFocus,
-            label: '',
-            showHint: false,
-            dense: true,
-            scrollPadding: fieldPad,
-            textInputAction: TextInputAction.next,
-            onEditingComplete: () => _next(_vodafoneFocus),
-            onSubmitted: (_) => _next(_vodafoneFocus),
-          ),
-        ),
-        cell(
-          index: 7,
-          child: Center(
-            child: Text(
-              remaining,
-              textAlign: TextAlign.center,
-              style: cairo(12, 700, color: context.look.muted),
+          cell(
+            index: 6,
+            focused: _paidFocus.hasFocus,
+            child: UnitsField(
+              key: const Key('purchase-field-paid'),
+              controller: _paid,
+              focusNode: _paidFocus,
+              label: '',
+              showHint: false,
+              dense: true,
+              scrollPadding: fieldPad,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => _next(_vodafoneFocus),
+              onSubmitted: (_) => _next(_vodafoneFocus),
             ),
           ),
-        ),
-        cell(
-          index: 8,
-          focused: _vodafoneFocus.hasFocus,
-          child: UnitsField(
-            key: const Key('purchase-field-vodafone'),
-            controller: _vodafone,
-            focusNode: _vodafoneFocus,
-            label: '',
-            showHint: false,
-            dense: true,
-            scrollPadding: fieldPad,
-            textInputAction: TextInputAction.done,
-          ),
-        ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: sectionButtonGold.withValues(alpha: 0.14),
-            border: Border.all(color: line),
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: widget.actionWidth,
-              maxWidth: widget.actionWidth,
-              minHeight: 72,
-            ),
-            child: GuardedMutation(
-              buttonKey: const Key('save-purchase'),
-              inputs:
-                  '$_itemCode|${_customLabel.text}|$_mode|${_egp.text}|${_rate.text}|${_paid.text}|${_vodafone.text}',
-              expectedVersion: widget.version,
-              glyph: Icons.check,
-              label: AppStrings.save,
-              onSubmit: _submit,
+          cell(
+            index: 7,
+            child: Center(
+              child: Text(
+                remaining,
+                textAlign: TextAlign.center,
+                style: cairo(12, 700, color: context.look.muted),
+              ),
             ),
           ),
-        ),
-      ],
-    ),
+          cell(
+            index: 8,
+            focused: _vodafoneFocus.hasFocus,
+            child: UnitsField(
+              key: const Key('purchase-field-vodafone'),
+              controller: _vodafone,
+              focusNode: _vodafoneFocus,
+              label: '',
+              showHint: false,
+              dense: true,
+              scrollPadding: fieldPad,
+              textInputAction: TextInputAction.done,
+            ),
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: sectionButtonGold.withValues(alpha: 0.14),
+              border: Border.all(color: line),
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: widget.actionWidth,
+                maxWidth: widget.actionWidth,
+                minHeight: 72,
+              ),
+              child: GuardedMutation(
+                buttonKey: const Key('save-purchase'),
+                inputs:
+                    '$_itemCode|${_customLabel.text}|$_mode|${_egp.text}|${_rate.text}|${_paid.text}|${_vodafone.text}',
+                expectedVersion: widget.version,
+                glyph: Icons.check,
+                label: AppStrings.save,
+                onSubmit: _submit,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1548,10 +1721,8 @@ class _PurchaseGrid extends ConsumerWidget {
             ),
           );
         case _LedgerEntryLine(:final entry):
-          final stripe = lines.whereType<_LedgerEntryLine>().toList().indexOf(
-                line,
-              ) %
-              2;
+          final stripe =
+              lines.whereType<_LedgerEntryLine>().toList().indexOf(line) % 2;
           final fill = stripe == 0
               ? look.card
               : (dark ? const Color(0xFF1C2433) : const Color(0xFFFFFBF3));
@@ -1569,56 +1740,64 @@ class _PurchaseGrid extends ConsumerWidget {
                       entry: entry,
                     )
                   : band(
-                height: rowH,
-                color: fill,
-                lineColor: _gridLine(context),
-                cellKey: Key('purchase-grid-cell-${entry.id}'),
-                cells: dataCells(line, look.ink),
-                tail: _writable(entry)
-                    ? Theme(
-                        data: Theme.of(context).copyWith(
-                          textButtonTheme: TextButtonThemeData(
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(44, 44),
-                              padding: EdgeInsets.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
-                        ),
-                        child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          GatedButton(
-                            buttonKey: Key('edit-${entry.id}'),
-                            allowed: true,
-                            online: online,
-                            filled: false,
-                            glyph: Icons.edit_outlined,
-                            label: AppStrings.edit,
-                            onPressed: () =>
-                                ref.read(_ledgerDraftProvider.notifier).state =
-                                    _LedgerDraft(entryId: entry.id),
-                          ),
-                          Expanded(
-                            child: GuardedMutation(
-                              buttonKey: Key('delete-${entry.id}'),
-                              inputs:
-                                  'delete:${entry.id}:${entry.dayVersion}:${entry.version}',
-                              expectedVersion: entry.dayVersion,
-                              label: AppStrings.delete,
-                              glyph: Icons.delete_outline,
-                              filled: false,
-                              destructive: true,
-                              confirmText: AppStrings.confirmDelete,
-                              onSubmit: (meta) =>
-                                  _deleteEntry(context, ref, entry, meta),
-                            ),
-                          ),
-                        ],
-                        ),
-                      )
-                    : null,
-              ),
+                      height: rowH,
+                      color: fill,
+                      lineColor: _gridLine(context),
+                      cellKey: Key('purchase-grid-cell-${entry.id}'),
+                      cells: dataCells(line, look.ink),
+                      tail: _writable(entry)
+                          ? Theme(
+                              data: Theme.of(context).copyWith(
+                                textButtonTheme: TextButtonThemeData(
+                                  style: TextButton.styleFrom(
+                                    minimumSize: const Size(44, 44),
+                                    padding: EdgeInsets.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  GatedButton(
+                                    buttonKey: Key('edit-${entry.id}'),
+                                    allowed: true,
+                                    online: online,
+                                    filled: false,
+                                    glyph: Icons.edit_outlined,
+                                    label: AppStrings.edit,
+                                    onPressed: () =>
+                                        ref
+                                            .read(_ledgerDraftProvider.notifier)
+                                            .state = _LedgerDraft(
+                                          entryId: entry.id,
+                                        ),
+                                  ),
+                                  Expanded(
+                                    child: GuardedMutation(
+                                      buttonKey: Key('delete-${entry.id}'),
+                                      inputs:
+                                          'delete:${entry.id}:${entry.dayVersion}:${entry.version}',
+                                      expectedVersion: entry.dayVersion,
+                                      label: AppStrings.delete,
+                                      glyph: Icons.delete_outline,
+                                      filled: false,
+                                      destructive: true,
+                                      confirmText: AppStrings.confirmDelete,
+                                      onSubmit: (meta) => _deleteEntry(
+                                        context,
+                                        ref,
+                                        entry,
+                                        meta,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : null,
+                    ),
             ),
           );
       }

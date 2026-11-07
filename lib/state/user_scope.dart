@@ -7,6 +7,7 @@ import 'pending_mutation.dart';
 import 'router_provider.dart';
 import 'section_providers.dart';
 import 'session_providers.dart';
+import 'shell_history.dart';
 
 String? _userId(SessionState? session) => switch (session) {
   SessionAuthenticated(:final profile) => profile.id,
@@ -62,6 +63,7 @@ void onSessionTransition(
     return;
   }
   invalidateUserScope(ref);
+  ref.read(shellHistoryProvider.notifier).clear();
   final router = ref.read(routerProvider);
   final path = router.state.uri.path;
   if (path != '/login' && path != '/signup-info') {

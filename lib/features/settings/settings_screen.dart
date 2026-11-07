@@ -3,16 +3,12 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../api/api_providers.dart';
-import '../../error_handling/error_handler.dart';
-import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets/section_kit.dart';
-import '../../ui/widgets/export_pdf_button.dart';
 import '../../ui/widgets/soft_tile.dart';
 import '../../ui/widgets/environment_badge.dart';
 import '../../state/session_providers.dart';
@@ -104,6 +100,25 @@ class SettingsScreen extends ConsumerWidget {
         icon: Icons.manage_accounts_outlined,
       ),
     ];
+    Widget linkCard(_SettingsLink link) => _SettingsCard(
+      key: link.tileKey,
+      icon: link.icon,
+      title: link.title,
+      note: link.note,
+      action: forwardChevron(context),
+      onTap: () => context.go(link.path),
+    );
+    _SettingsLink? take(Key key) {
+      for (final link in links) {
+        if (link.tileKey == key) return link;
+      }
+      return null;
+    }
+
+    final account = take(const Key('settings-link-account'));
+    final employees = take(const Key('settings-link-employees'));
+    final audit = take(const Key('settings-link-audit'));
+    final development = take(const Key('settings-link-development'));
     return SectionTheme(
       child: ListView(
         key: screenKey,
@@ -113,17 +128,8 @@ class SettingsScreen extends ConsumerWidget {
             name: summary?.displayName,
             role: summary == null ? null : roleLabel(summary.role),
           ),
-          const SizedBox(height: AppSpacing.md),
-          for (final link in links)
-            _SettingsCard(
-              key: link.tileKey,
-              icon: link.icon,
-              title: link.title,
-              note: link.note,
-              action: forwardChevron(context),
-              onTap: () => context.go(link.path),
-            ),
-          // Device-local: the theme, same switch as حسابي (no server call).
+          const _GroupLabel('الحساب'),
+          if (account != null) linkCard(account),
           _SettingsCard(
             key: const Key('settings-theme'),
             icon: dark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
@@ -137,7 +143,13 @@ class SettingsScreen extends ConsumerWidget {
             ),
             onTap: () => ref.read(themeModeProvider.notifier).setDark(!dark),
           ),
+          if (employees != null || audit != null || ledger)
+            const _GroupLabel('الإدارة'),
+          if (employees != null) linkCard(employees),
+          if (audit != null) linkCard(audit),
           if (ledger) const _LedgerTile(onOpen: _openLedger),
+          const _GroupLabel('التطبيق'),
+          if (development != null) linkCard(development),
           _SettingsCard(
             key: const Key('settings-about'),
             icon: Icons.info_outline_rounded,
@@ -169,13 +181,9 @@ class _HeaderBand extends StatelessWidget {
       key: const Key('settings-header'),
       padding: const EdgeInsetsDirectional.all(AppSpacing.md),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF0E7A55), Color(0xFF064E36)],
-        ),
+        color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: gold.withValues(alpha: 0.8), width: 1.2),
+        border: Border.all(color: gold.withValues(alpha: 0.55)),
       ),
       child: Wrap(
         alignment: WrapAlignment.spaceBetween,
@@ -215,11 +223,11 @@ class _HeaderBand extends StatelessWidget {
       horizontal: AppSpacing.md,
       vertical: AppSpacing.sm,
     ),
-    decoration: BoxDecoration(
-      color: Colors.black.withValues(alpha: 0.25),
-      borderRadius: BorderRadius.circular(999),
-      border: Border.all(color: sectionGold(context).withValues(alpha: 0.7)),
-    ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: sectionGold(context).withValues(alpha: 0.45)),
+      ),
     child: child,
   );
 }
@@ -233,7 +241,6 @@ class _SettingsCard extends StatelessWidget {
     required this.note,
     this.action,
     this.onTap,
-    this.child,
     super.key,
   });
 
@@ -242,81 +249,76 @@ class _SettingsCard extends StatelessWidget {
   final String note;
   final Widget? action;
   final VoidCallback? onTap;
-  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
     final gold = sectionGold(context);
-    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
+      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
       child: Material(
-        color: const Color(0xFF0B0B0F),
+        color: scheme.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.card),
-          side: BorderSide(color: gold.withValues(alpha: 0.8), width: 1.2),
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          side: BorderSide(color: gold.withValues(alpha: 0.4)),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Ink(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF2A2A2E), Color(0xFF0B0B0F)],
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 64),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
               ),
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: 92 * scale),
-              child: Padding(
-                padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFFF5C02E),
-                            border: Border.all(color: Colors.white24),
-                          ),
-                          child: Icon(icon, color: sectionButtonInk),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          color: gold.withValues(alpha: 0.16),
                         ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                style: cairo(15, 800, color: Colors.white),
+                        child: Icon(icon, size: 20, color: gold),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: cairo(15, 800, color: scheme.onSurface),
+                            ),
+                            Text(
+                              note,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: cairo(
+                                12,
+                                600,
+                                color: scheme.onSurfaceVariant,
                               ),
-                              Text(
-                                note,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: cairo(11.5, 600, color: Colors.white70),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                        if (action != null) ...[
-                          const SizedBox(width: AppSpacing.sm),
-                          IconTheme.merge(
-                            data: const IconThemeData(color: Color(0xFFF5C02E)),
-                            child: action!,
-                          ),
-                        ],
+                      ),
+                      if (action != null) ...[
+                        const SizedBox(width: AppSpacing.sm),
+                        IconTheme.merge(
+                          data: IconThemeData(color: gold),
+                          child: action!,
+                        ),
                       ],
-                    ),
-                    ?child,
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
@@ -326,83 +328,44 @@ class _SettingsCard extends StatelessWidget {
   }
 }
 
-/// Page total as an Arabic currency label. The server key (`LYD`, `EGP`) is
-/// not shown beside the symbol.
-String _ledgerTotal(MoneyFormatter money, String code, MoneyValue units) {
-  final currency = Currency.fromCode(code);
-  if (units.isInvalid || units.units == null) return MoneyValue.invalidLabel;
-  if (currency == null) return money.formatNumber(units.units!);
-  return money.formatOrDash(units, currency);
+class _GroupLabel extends StatelessWidget {
+  const _GroupLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(
+        top: AppSpacing.md,
+        bottom: AppSpacing.xs,
+      ),
+      child: Text(
+        text,
+        style: cairo(13, 800, color: sectionGold(context)),
+      ),
+    );
+  }
 }
 
-class _LedgerTile extends ConsumerWidget {
+class _LedgerTile extends StatelessWidget {
   const _LedgerTile({required this.onOpen});
 
   final void Function(BuildContext context) onOpen;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (!permissionsOf(ref).canViewFinancialLedger) {
-      return const SizedBox.shrink();
-    }
-    final page = ref.watch(financialLedgerProvider);
-    final money = ref.watch(apiLayerProvider).money;
-    final online = ref.watch(onlineProvider);
-    final ink = cairo(12.5, 700, color: Colors.white);
+  Widget build(BuildContext context) {
     return _SettingsCard(
       key: const Key('financial-ledger'),
       icon: Icons.menu_book_outlined,
       title: AppStrings.financialLedger,
-      note: SettingsText.ledgerNote,
-      child: DefaultTextStyle.merge(
-        style: ink,
-        child: Padding(
-          padding: const EdgeInsetsDirectional.only(top: AppSpacing.sm),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const ExportPdfButton(),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton(
-                  key: const Key('ledger-open'),
-                  onPressed: () => onOpen(context),
-                  child: const Text('عرض القيود'),
-                ),
-              ),
-              page.when(
-                loading: () => const SkeletonBox(height: 48),
-                error: (error, _) => presentFailure(
-                  ref.read(errorHandlerProvider).toFailure(error),
-                  onRetry: online
-                      ? () => ref.invalidate(financialLedgerProvider)
-                      : null,
-                  retryKey: const Key('settings-retry'),
-                ),
-                data: (data) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(AppStrings.pageTotals, style: ink),
-                    for (final entry in data.pageTotals.entries)
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                          top: AppSpacing.xs,
-                        ),
-                        child: MoneyText(
-                          _ledgerTotal(money, entry.key, entry.value),
-                          key: Key('ledger-total-${entry.key}'),
-                          style: cairo(14, 800, color: const Color(0xFFF5C02E)),
-                        ),
-                      ),
-                    if (data.page.items.isEmpty)
-                      const EmptyPane(message: AppStrings.emptyLedger),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+      note: 'يفتح صفحة القيود. الإجماليات لا تظهر هنا.',
+      action: TextButton(
+        key: const Key('ledger-open'),
+        onPressed: () => onOpen(context),
+        child: const Text('فتح'),
       ),
+      onTap: () => onOpen(context),
     );
   }
 }

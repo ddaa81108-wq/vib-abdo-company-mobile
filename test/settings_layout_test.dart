@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
+import 'package:vib_abdo_company_mobile/features/settings/financial_ledger_screen.dart';
 import 'package:vib_abdo_company_mobile/features/settings/settings_screen.dart';
 
 import 'support/pump_app.dart';
@@ -47,6 +48,27 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('inner ledger and login accounts hold at 360 and text scale 2', (
+    tester,
+  ) async {
+  tester.platformDispatcher.textScaleFactorTestValue = 2;
+  addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+  await pumpFakeApp(tester, size: const Size(360, 800));
+  await signIn(tester, username: 'admin.demo', password: 'demo-only');
+  await go(tester, '/settings');
+  expect(find.byKey(const Key('ledger-total-LYD')), findsNothing);
+  await go(tester, '/settings/ledger');
+  expect(find.byKey(FinancialLedgerScreen.screenKey), findsOneWidget);
+  expect(find.byKey(const Key('ledger-total-LYD')), findsOneWidget);
+  await go(tester, '/settings/users');
+  expect(find.byKey(const Key('login-account-u_12')), findsOneWidget);
+  await go(tester, '/settings/users/new');
+  expect(find.byKey(const Key('create-account-submit')), findsOneWidget);
+  await go(tester, '/settings/users/u_12');
+  expect(find.byKey(const Key('login-account-save-permissions')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> go(WidgetTester tester, String path) async {

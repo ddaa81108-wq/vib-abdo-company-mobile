@@ -123,6 +123,29 @@ class FakeApiClient implements ApiClient {
   /// The next N older-page reads (`before`) fail (tests).
   int failOlderRemaining = 0;
 
+  /// The next N account-list reads that carry `cursor` fail (tests).
+  int failNextAccountPageRemaining = 0;
+
+  /// Cursor advertised on the first purchases page. Null keeps the fixture.
+  int? purchaseFirstNextBefore;
+
+  /// Older purchases pages keyed by the integer `before` the previous page
+  /// advertised. Totals are not stored here; the fixture register totals stay.
+  final Map<int, Map<String, dynamic>> purchaseOlderPages = {};
+
+  /// Each purchases list read, including `before` when the app sent one.
+  final List<Map<String, dynamic>> purchaseQueries = [];
+
+  /// Cursor placed on the first financial-ledger page when set.
+  String? financialLedgerFirstNextBefore;
+
+  /// Older audit pages keyed by the `before` cursor. Absent uses the fixture.
+  final Map<String, Map<String, dynamic>> auditOlderPages = {};
+
+  /// Older financial-ledger pages keyed by the opaque `before` cursor.
+  /// Each value is a full page body, including its own `pageTotals`.
+  final Map<String, Map<String, dynamic>> financialLedgerOlderPages = {};
+
   /// The next N notification writes fail (tests).
   int failNotificationWritesRemaining = 0;
 
@@ -254,6 +277,7 @@ class FakeApiClient implements ApiClient {
       challenge.expiresAt = past;
     }
   }
+
   int _csrfSeq = 0;
   String? _jarId;
   String? _latestSessionId;
@@ -1181,9 +1205,8 @@ class FakeApiClient implements ApiClient {
   }
 
   String? _namedCookie(ApiRequestOptions options, String name) {
-    final raw = _hasHeader(options, 'cookie')
-        ? _header(options, 'cookie')
-        : null;
+    final raw =
+        _hasHeader(options, 'cookie') ? _header(options, 'cookie') : null;
     if (raw == null) return null;
     for (final part in raw.split(';')) {
       final piece = part.trim();
@@ -1432,7 +1455,15 @@ class FakeApiClient implements ApiClient {
       case 'purchases':
         if (method == 'GET') {
           _requireRead(SectionKey.purchases);
-          return _ok(_purchasesView(seg.length > 1 ? seg[1] : ''));
+          if (query != null) {
+            purchaseQueries.add(Map<String, dynamic>.from(query));
+          }
+          final before = _queryInt(query, 'before');
+          if (before != null && failOlderRemaining > 0) {
+            failOlderRemaining--;
+            _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
+          }
+          return _ok(_purchasesView(seg.length > 1 ? seg[1] : '', before));
         }
         if (seg.isNotEmpty && seg.last == 'finalize') {
           if (!_access.canFinalizePurchases) _fail(403, 'FORBIDDEN', _denied);
@@ -1520,10 +1551,30 @@ class FakeApiClient implements ApiClient {
             sectionKey: _queryText(query, 'sectionKey'),
           ),
         );
+        final before = _queryText(query, 'before');
+        if (before != null && failOlderRemaining > 0) {
+          failOlderRemaining--;
+          _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
+        }
+        if (before != null) {
+          final older = financialLedgerOlderPages[before];
+          if (older == null) {
+            return _ok({
+              'items': <Map<String, dynamic>>[],
+              'pageTotals': <String, int>{},
+              'nextBefore': null,
+            });
+          }
+          return _ok(older);
+        }
         final page = FakeFixtures.financialLedger(
           sectionKey: section ?? _queryText(query, 'sectionKey'),
         );
-        return _ok(_filterLedgerPage(page, query));
+        final filtered = _filterLedgerPage(page, query);
+        if (financialLedgerFirstNextBefore != null) {
+          filtered['nextBefore'] = financialLedgerFirstNextBefore;
+        }
+        return _ok(filtered);
       case 'notifications':
         return _notifications(method, seg, b, query);
       case 'notification-preferences':
@@ -1533,7 +1584,16 @@ class FakeApiClient implements ApiClient {
       case 'health':
         return _ok(FakeFixtures.health());
       case 'audit-log':
-        return _ok(FakeFixtures.auditLog());
+        final before = _queryText(query, 'before');
+        if (before != null && failOlderRemaining > 0) {
+          failOlderRemaining--;
+          _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الأقدم.');
+        }
+        return _ok(
+          before == null
+              ? FakeFixtures.auditLog()
+              : (auditOlderPages[before] ?? FakeFixtures.auditLog()),
+        );
       case 'account-requests':
         return _accountRequests(method, seg, b);
       case 'users':
@@ -1579,6 +1639,12 @@ class FakeApiClient implements ApiClient {
         accountListQueries.add(
           AccountListQuery(section: head, filter: filter, q: q, cursor: cursor),
         );
+        if (cursor != null &&
+            cursor.isNotEmpty &&
+            failNextAccountPageRemaining > 0) {
+          failNextAccountPageRemaining--;
+          _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحميل الصفحة التالية.');
+        }
         if (_large && FakeLargeCatalog.pagesAccounts(head)) {
           final generated = FakeLargeCatalog.accountPage(
             section: head,
@@ -2197,11 +2263,25 @@ class FakeApiClient implements ApiClient {
       _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
     }
     final card = _cardView(section, accountId);
-    if (b.containsKey('expectedFinancialVersion')) {
+    if (!b.containsKey('expectedFinancialVersion')) {
+      _fail(400, 'INVALID_REVIEW_VERSION', 'الإصدار المالي مطلوب.');
+    }
+    final review = card['zeroReview'];
+    final financial = review is Map && review['financialVersion'] is int
+        ? review['financialVersion'] as int
+        : null;
+    if (financial != null && b['expectedFinancialVersion'] != financial) {
+      _fail(
+        409,
+        'ZERO_REVIEW_CHANGED',
+        'تغيرت الحالة المالية؛ حدّث بيانات الكارت.',
+      );
+    }
+    if (financial == null) {
       _requireVersion(b['expectedFinancialVersion'], card['version']);
     }
     final version = card['version'] is int ? card['version'] as int : 0;
-    final review = {
+    final closed = {
       'pending': false,
       'financialVersion': version,
       'reviewedAt': '2026-10-22T22:00:00.000Z',
@@ -2209,9 +2289,9 @@ class FakeApiClient implements ApiClient {
     };
     _cardState['$section|$accountId'] = {
       ...?_cardState['$section|$accountId'],
-      'zeroReview': review,
+      'zeroReview': closed,
     };
-    return _ok({'zeroReview': review});
+    return _ok({'zeroReview': closed});
   }
 
   String? _displayName() {
@@ -2254,7 +2334,7 @@ class FakeApiClient implements ApiClient {
     day['correctionOpen'] = false;
   }
 
-  Map<String, dynamic> _purchasesView(String book) {
+  Map<String, dynamic> _purchasesView(String book, int? before) {
     final body = _copy(FakeFixtures.purchases());
     final merchant = body['merchant'];
     if (merchant is Map) {
@@ -2264,14 +2344,30 @@ class FakeApiClient implements ApiClient {
           : PurchaseBook.alBayan.label;
     }
     final day = _openPurchaseDay(book);
-    if (day == null) return body;
-    body['day'] = day;
+    if (day != null) body['day'] = day;
+    if (before != null) {
+      final older = purchaseOlderPages[before];
+      final rawEntries = older?['entries'];
+      body['entries'] = day == null || rawEntries is! List
+          ? <Map<String, dynamic>>[]
+          : [
+              for (final raw in rawEntries)
+                if (raw is Map)
+                  _entryOnThisPage(Map<String, dynamic>.from(raw), day),
+            ];
+      final next = older?['nextBefore'];
+      body['nextBefore'] = next is int ? next : null;
+      return body;
+    }
     final entries = body['entries'];
-    if (entries is List) {
+    if (day != null && entries is List) {
       body['entries'] = [
         for (final raw in entries)
           if (raw is Map) _entryOnThisPage(Map<String, dynamic>.from(raw), day),
       ];
+    }
+    if (purchaseFirstNextBefore != null) {
+      body['nextBefore'] = purchaseFirstNextBefore;
     }
     return body;
   }
@@ -2968,8 +3064,8 @@ class FakeApiClient implements ApiClient {
       if (expected is int && expected != row['version']) {
         _fail(409, 'CONFLICT', 'تغيّر الحساب. أعد التحميل.');
       }
-      final protected =
-          row['isOwner'] == true || PermissionService.isDirectoryAdmin(row['role']);
+      final protected = row['isOwner'] == true ||
+          PermissionService.isDirectoryAdmin(row['role']);
       if (protected && !_isPrimaryOwner) {
         _fail(403, 'FORBIDDEN', 'تعديل حساب الإدارة للمدير الأساسي فقط.');
       }
@@ -2982,6 +3078,26 @@ class FakeApiClient implements ApiClient {
           for (final code in b['permissions'] as List) '$code',
         ];
       }
+      final access = row['sectionAccess'] is Map
+          ? Map<String, dynamic>.from(row['sectionAccess'] as Map)
+          : <String, dynamic>{};
+      var accessTouched = false;
+      for (final key in const [
+        'customerDebts',
+        'companyDebts',
+        'libyanDeposits',
+        'egyptianDeposits',
+        'masraweya',
+        'purchases',
+        'treasury',
+        'reports',
+      ]) {
+        final field = '${key}Access';
+        if (!b.containsKey(field)) continue;
+        access[key] = _sectionAccessValue(b[field]);
+        accessTouched = true;
+      }
+      if (accessTouched) row['sectionAccess'] = access;
       row['version'] = (row['version'] as int? ?? 1) + 1;
       return _ok({'user': row});
     }
@@ -2989,7 +3105,9 @@ class FakeApiClient implements ApiClient {
   }
 
   String _sectionAccessValue(Object? raw) {
-    if (raw == 'read' || raw == 'manage' || raw == 'none') return raw! as String;
+    if (raw == 'read' || raw == 'manage' || raw == 'none') {
+      return raw! as String;
+    }
     if (raw == null) return 'none';
     _fail(400, 'INVALID_INPUT', 'مستوى القسم غير معروف.');
   }
@@ -3110,6 +3228,13 @@ Map<String, dynamic> _filterLedgerPage(
     }
   }
   return {...page, 'items': items, 'pageTotals': totals};
+}
+
+int? _queryInt(Map<String, dynamic>? query, String key) {
+  final value = query?[key];
+  if (value is int) return value;
+  if (value is String) return int.tryParse(value);
+  return null;
 }
 
 String? _queryText(Map<String, dynamic>? query, String key) {

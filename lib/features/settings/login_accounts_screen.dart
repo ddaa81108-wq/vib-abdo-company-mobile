@@ -109,18 +109,53 @@ class LoginAccountsScreen extends ConsumerWidget {
                       for (final account in page.items)
                         Card(
                           margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: ListTile(
+                          child: InkWell(
                             key: Key('login-account-${account.id}'),
-                            minTileHeight: 64,
-                            title: Text(account.displayName ?? account.username),
-                            subtitle: Text(
-                              '${account.username} · ${_roleLabel(account.role)}'
-                              '${account.isOwner ? ' · المدير الأساسي' : ''}'
-                              '${account.isActive ? '' : ' · موقوف'}',
-                            ),
-                            trailing: const Icon(Icons.chevron_left),
                             onTap: () =>
                                 context.go('/settings/users/${account.id}'),
+                            child: Padding(
+                              padding: const EdgeInsetsDirectional.all(
+                                AppSpacing.md,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          account.displayName ??
+                                              account.username,
+                                          style: cairo(16, 800),
+                                        ),
+                                      ),
+                                      const Icon(Icons.chevron_left),
+                                    ],
+                                  ),
+                                  Text(
+                                    account.username,
+                                    style: cairo(
+                                      12,
+                                      600,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: [
+                                      _Tag(_roleLabel(account.role)),
+                                      if (account.isOwner)
+                                        const _Tag('المدير الأساسي'),
+                                      _Tag(account.isActive ? 'نشط' : 'موقوف'),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                     ],
@@ -151,7 +186,12 @@ class _RequestTile extends ConsumerWidget {
               key: Key('account-request-${request.id}'),
               style: cairo(14, 800),
             ),
-            Text('${request.email ?? '—'} · ${request.status ?? '—'}'),
+            if (request.email != null) Text(request.email!),
+            const SizedBox(height: AppSpacing.xs),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: _Tag(_requestStatus(request.status)),
+            ),
             if (request.pending)
               Wrap(
                 spacing: 8,
@@ -194,6 +234,37 @@ class _RequestTile extends ConsumerWidget {
     }
   }
 }
+
+class _Tag extends StatelessWidget {
+  const _Tag(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final gold = sectionGold(context);
+    return Container(
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: 8,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: gold.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: gold.withValues(alpha: 0.4)),
+      ),
+      child: Text(text, style: cairo(11, 700, color: gold)),
+    );
+  }
+}
+
+String _requestStatus(String? status) => switch (status) {
+  'pending' => AppStrings.pendingApproval,
+  'approved' => AppStrings.approved,
+  'rejected' => AppStrings.rejected,
+  null || '' => '—',
+  _ => status,
+};
 
 String _roleLabel(String? role) => switch (role) {
   'admin' => 'إدارة',
@@ -266,29 +337,26 @@ class _LoginAccountEditorScreenState
         }
         final owner = _primaryOwner(ref);
         final locked = account.isOwner || account.role == 'admin';
-        return ListView(
-          key: const Key('screen-login-account-edit'),
-          padding: pagePadding(MediaQuery.sizeOf(context).width),
-          children: [
-            Text(
-              account.displayName ?? account.username,
-              style: cairo(18, 800),
-            ),
-            Text(account.username),
-            if (locked && !owner)
+        if (locked && !owner) {
+          return ListView(
+            key: const Key('screen-login-account-edit'),
+            padding: pagePadding(MediaQuery.sizeOf(context).width),
+            children: [
+              _AccountHeading(account: account),
               const Text(
                 'تعديل حساب الإدارة للمدير الأساسي. الخادم يرفض غيره.',
                 key: Key('login-account-edit-closed'),
-              )
-            else
-              _PermissionEditor(
-                account: account,
-                assignable: page.assignablePermissions,
-                saving: _saving,
-                error: _error,
-                onSave: (body) => _save(account, body),
               ),
-          ],
+            ],
+          );
+        }
+        return _PermissionEditor(
+          account: account,
+          assignable: page.assignablePermissions,
+          saving: _saving,
+          error: _error,
+          onSave: (body) => _save(account, body),
+          onCancel: _saving ? null : () => context.go('/settings/users'),
         );
       },
     );
@@ -360,12 +428,15 @@ class _LoginAccountCreateScreenState
         ref.read(errorHandlerProvider).toFailure(error),
         onRetry: () => ref.invalidate(loginAccountsProvider),
       ),
-      data: (page) => SingleChildScrollView(
+      data: (page) => Column(
         key: LoginAccountCreateScreen.screenKey,
-        padding: pagePadding(MediaQuery.sizeOf(context).width),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: pagePadding(MediaQuery.sizeOf(context).width),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
             Text('إنشاء حساب دخول', style: cairo(18, 800)),
             const Text(
               'يظهر للمدير الأساسي فقط. الحساب الجديد لا يصبح مديرًا أساسيًا.',
@@ -405,48 +476,120 @@ class _LoginAccountCreateScreenState
               obscureText: true,
               decoration: const InputDecoration(labelText: 'كلمة مرور مؤقتة'),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Text('الصلاحيات', style: cairo(14, 800)),
-          for (final code in page.assignablePermissions)
-            Row(
+            const SizedBox(height: AppSpacing.md),
+            Text('صلاحيات عامة', style: cairo(14, 800)),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
               children: [
-                Checkbox(
-                  key: Key('create-permission-$code'),
-                  value: _permissions.contains(code),
-                  onChanged: (value) => setState(() {
-                    if (value ?? false) {
-                      _permissions.add(code);
-                    } else {
-                      _permissions.remove(code);
-                    }
-                  }),
-                ),
-                Expanded(child: Text(permissionLabel(code))),
+                for (final code in page.assignablePermissions)
+                  FilterChip(
+                    key: Key('create-permission-$code'),
+                    label: Text(permissionLabel(code)),
+                    selected: _permissions.contains(code),
+                    onSelected: (value) => setState(() {
+                      if (value) {
+                        _permissions.add(code);
+                      } else {
+                        _permissions.remove(code);
+                      }
+                    }),
+                  ),
               ],
             ),
-            Text('أقسام', style: cairo(14, 800)),
+            const SizedBox(height: AppSpacing.md),
+            Text('صلاحيات الأقسام', style: cairo(14, 800)),
             for (final entry in loginAccountSections.entries)
-              DropdownButtonFormField<String>(
+              Card(
                 key: Key('create-access-${entry.key}'),
-                initialValue: _access[entry.key],
-                decoration: InputDecoration(labelText: entry.value),
-                items: const [
-                  DropdownMenuItem(value: 'none', child: Text('لا شيء')),
-                  DropdownMenuItem(value: 'read', child: Text('قراءة')),
-                  DropdownMenuItem(value: 'manage', child: Text('إدارة')),
-                ],
-                onChanged: (value) =>
-                    setState(() => _access[entry.key] = value ?? 'none'),
+                margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.all(AppSpacing.sm),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(entry.value, style: cairo(13, 800)),
+                      Wrap(
+                        spacing: 6,
+                        children: [
+                          for (final choice in const [
+                            ('none', 'لا شيء'),
+                            ('read', 'قراءة'),
+                            ('manage', 'إدارة'),
+                          ])
+                            ChoiceChip(
+                              label: Text(choice.$2),
+                              selected: _access[entry.key] == choice.$1,
+                              onSelected: (_) => setState(
+                                () => _access[entry.key] = choice.$1,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            if (_error != null)
-              Text(_error!, key: const Key('create-account-error')),
-            FilledButton(
-              key: const Key('create-account-submit'),
-              onPressed: _saving ? null : () => _submit(),
-              child: const Text(AppStrings.save),
+                ],
+              ),
             ),
-          ],
-        ),
+          ),
+          Material(
+            color: Theme.of(context).colorScheme.surface,
+            child: Padding(
+              padding: pagePadding(MediaQuery.sizeOf(context).width),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(
+                        bottom: AppSpacing.sm,
+                      ),
+                      child: Text(
+                        _error!,
+                        key: const Key('create-account-error'),
+                        style: cairo(
+                          13,
+                          700,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          key: const Key('create-account-cancel'),
+                          onPressed: _saving
+                              ? null
+                              : () => context.go('/settings/users'),
+                          child: const Text(AppStrings.cancel),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: FilledButton(
+                          key: const Key('create-account-submit'),
+                          onPressed: _saving ? null : () => _submit(),
+                          child: _saving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(AppStrings.save),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -503,6 +646,7 @@ class _PermissionEditor extends StatefulWidget {
     required this.saving,
     required this.error,
     required this.onSave,
+    required this.onCancel,
   });
 
   final LoginAccount account;
@@ -510,6 +654,7 @@ class _PermissionEditor extends StatefulWidget {
   final bool saving;
   final String? error;
   final Future<void> Function(Map<String, Object?> body) onSave;
+  final VoidCallback? onCancel;
 
   @override
   State<_PermissionEditor> createState() => _PermissionEditorState();
@@ -517,42 +662,201 @@ class _PermissionEditor extends StatefulWidget {
 
 class _PermissionEditorState extends State<_PermissionEditor> {
   late final Set<String> _permissions;
+  late final Map<String, String> _access;
 
   @override
   void initState() {
     super.initState();
     _permissions = {...widget.account.permissions};
+    _access = {
+      for (final key in loginAccountSections.keys)
+        key: _knownAccess(widget.account.sectionAccess[key]),
+    };
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
+      key: const Key('screen-login-account-edit'),
       children: [
-        for (final code in widget.assignable)
-          Row(
+        Expanded(
+          child: ListView(
+            padding: pagePadding(MediaQuery.sizeOf(context).width),
             children: [
-              Checkbox(
-                value: _permissions.contains(code),
-                onChanged: (value) => setState(() {
-                  if (value ?? false) {
-                    _permissions.add(code);
-                  } else {
-                    _permissions.remove(code);
-                  }
-                }),
+        _AccountHeading(account: widget.account),
+        Text('صلاحيات عامة', style: cairo(16, 800)),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'المحدد الآن ظاهر بلون مختلف. الحفظ يرسل هذه القائمة ومستوى كل قسم.',
+          style: cairo(12, 600, color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final code in widget.assignable)
+              FilterChip(
+                key: Key('edit-permission-$code'),
+                label: Text(permissionLabel(code)),
+                selected: _permissions.contains(code),
+                onSelected: widget.saving
+                    ? null
+                    : (value) => setState(() {
+                        if (value) {
+                          _permissions.add(code);
+                        } else {
+                          _permissions.remove(code);
+                        }
+                      }),
               ),
-              Expanded(child: Text(permissionLabel(code))),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text('صلاحيات الأقسام', style: cairo(16, 800)),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'لا شيء أو قراءة أو إدارة، كما يعرّفها الخادم.',
+          style: cairo(12, 600, color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        for (final entry in loginAccountSections.entries)
+          Card(
+            key: Key('edit-access-${entry.key}'),
+            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.all(AppSpacing.sm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(entry.value, style: cairo(14, 800)),
+                  Text(
+                    'المحدد: ${_accessLabel(_access[entry.key])}',
+                    style: cairo(12, 600, color: scheme.onSurfaceVariant),
+                  ),
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      for (final choice in const [
+                        ('none', 'لا شيء'),
+                        ('read', 'قراءة'),
+                        ('manage', 'إدارة'),
+                      ])
+                        ChoiceChip(
+                          label: Text(choice.$2),
+                          selected: _access[entry.key] == choice.$1,
+                          onSelected: widget.saving
+                              ? null
+                              : (_) => setState(
+                                  () => _access[entry.key] = choice.$1,
+                                ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
             ],
           ),
-        if (widget.error != null) Text(widget.error!),
-        FilledButton(
-          key: const Key('login-account-save-permissions'),
-          onPressed: widget.saving
-              ? null
-              : () => widget.onSave({'permissions': _permissions.toList()}),
-          child: const Text('حفظ الصلاحيات'),
+        ),
+        Material(
+          color: scheme.surface,
+          child: Padding(
+            padding: pagePadding(MediaQuery.sizeOf(context).width),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.error != null)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                      bottom: AppSpacing.sm,
+                    ),
+                    child: Text(
+                      widget.error!,
+                      key: const Key('login-account-save-error'),
+                      style: cairo(13, 700, color: scheme.error),
+                    ),
+                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        key: const Key('login-account-cancel'),
+                        onPressed: widget.saving ? null : widget.onCancel,
+                        child: const Text(AppStrings.cancel),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: FilledButton(
+                        key: const Key('login-account-save-permissions'),
+                        onPressed: widget.saving
+                            ? null
+                            : () => widget.onSave({
+                                'permissions': _permissions.toList(),
+                                for (final entry in _access.entries)
+                                  '${entry.key}Access': entry.value,
+                              }),
+                        child: widget.saving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('حفظ الصلاحيات'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
   }
 }
+
+class _AccountHeading extends StatelessWidget {
+  const _AccountHeading({required this.account});
+
+  final LoginAccount account;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('حساب الدخول', style: cairo(13, 700)),
+          Text(account.displayName ?? account.username, style: cairo(22, 800)),
+          Text(account.username, style: cairo(14, 600)),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _Tag(_roleLabel(account.role)),
+              if (account.isOwner) const _Tag('المدير الأساسي'),
+              _Tag(account.isActive ? 'نشط' : 'موقوف'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _knownAccess(String? raw) =>
+    raw == 'read' || raw == 'manage' || raw == 'none' ? raw! : 'none';
+
+String _accessLabel(String? raw) => switch (raw) {
+  'read' => 'قراءة',
+  'manage' => 'إدارة',
+  _ => 'لا شيء',
+};

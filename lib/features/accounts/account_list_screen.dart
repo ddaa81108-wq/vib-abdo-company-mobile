@@ -19,6 +19,7 @@ import '../../ui/widgets/common.dart';
 import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/mutation_form.dart';
 import 'account_list_logic.dart';
+import 'zero_review_preview.dart';
 import 'account_name_suggestions.dart';
 import 'company_card_tone.dart';
 import 'customer_card_tone.dart';
@@ -40,6 +41,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   var _assigning = false;
   var _showAllDebts = false;
   var _paging = false;
+  String? _moreError;
   var _scrollArmed = true;
   final _selected = <String>{};
   String? _reply;
@@ -199,6 +201,14 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                 ),
               // Deposits: الإجمالي, النشط, إضافة أمانة on one row, then a
               // full-width search. The Egyptian rate stays under that search.
+              if (section != AccountSection.customers)
+                const Padding(
+                  padding: EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
+                  child: Text(
+                    'مراجعة التصفير منشورة لبطاقات العملاء فقط. الشركات والأمانات لا تملك مسار المراجعة في العقد.',
+                    key: Key('zero-review-unavailable'),
+                  ),
+                ),
               if (deposits)
                 _DepositTopRow(
                   summary: data.summary,
@@ -333,12 +343,19 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                           ),
                   ),
                 ),
+              if (_moreError != null)
+                Text(
+                  _moreError!,
+                  key: const Key('load-more-accounts-error'),
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: Theme.of(context).colorScheme.error),
+                ),
               if (_loadMoreCursor(data.page.nextCursor) != null)
                 Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: TextButton(
                     key: const Key('load-more-accounts'),
-                    onPressed: online
+                    onPressed: online && !_paging
                         ? () => _more(
                             _loadMoreCursor(data.page.nextCursor)!,
                             retainLimit: _accountRetainLimit(data.page.items),
@@ -424,13 +441,14 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             : _selected.add(card.id);
       }),
       onPin: (meta) => _pin(card, meta),
-      onZero:
+      zeroOnline: ref.watch(onlineProvider),
+      onZeroPreview:
           showCustomerZeroReview(
             permissions: permissions,
             section: section,
             card: card,
           )
-          ? (meta) => _zero(card, meta)
+          ? () => _openZeroPreview(card)
           : null,
     );
   }
@@ -562,8 +580,9 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   }
 
   Future<void> _more(String cursor, {int? retainLimit}) async {
-    if (_paging) return;
+    if (_paging || !ref.read(onlineProvider)) return;
     _paging = true;
+    if (mounted) setState(() => _moreError = null);
     try {
       final query = ref.read(accountQueryProvider(section)).trim();
       final filter = ref.read(accountFilterProvider(section));
@@ -586,6 +605,9 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             nextCursor: next.page.nextCursor,
             retainLimit: retainLimit,
           );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _moreError = _message(error));
     } finally {
       _paging = false;
     }
@@ -651,14 +673,68 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     }
   }
 
+  Future<void> _openZeroPreview(AccountCardDto card) async {
+    final financial = zeroReviewFinancialVersion(card);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => ZeroReviewPreview(
+        name: card.name,
+        balance: ref
+            .read(apiLayerProvider)
+            .money
+            .formatOrDash(card.balanceUnits, card.currency),
+        financialVersion: financial,
+        onConfirm: financial == null
+            ? null
+            : () => _confirmZeroPreview(card.id, financial),
+      ),
+    );
+  }
+
+  Future<String?> _confirmZeroPreview(String id, int financial) async {
+    final latest = _financialVersionNow(id);
+    if (latest != financial) {
+      return 'تغيرت بيانات الكارت. أعد فتح المعاينة.';
+    }
+    final current = _cardNow(id);
+    if (current == null) return 'الكارت لم يعد في القائمة.';
+    final message = await _zero(
+      current,
+      MutationMeta(expectedVersion: financial),
+    );
+    // The open preview owns the error. The list banner stays clear so the
+    // same sentence is not painted twice behind the dialog.
+    if (message != null && mounted) setState(() => _reply = null);
+    return message;
+  }
+
+  AccountCardDto? _cardNow(String id) {
+    final page = ref.read(accountsProvider(section)).asData?.value;
+    final extra = ref.read(accountExtraCardsProvider(section));
+    for (final card in [...?page?.page.items, ...extra]) {
+      if (card.id == id) return card;
+    }
+    return null;
+  }
+
+  int? _financialVersionNow(String id) {
+    final card = _cardNow(id);
+    return card == null ? null : zeroReviewFinancialVersion(card);
+  }
+
   Future<String?> _zero(AccountCardDto card, MutationMeta meta) async {
+    if (meta.expectedVersion == null) {
+      const message = 'لا يوجد إصدار مالي على الكارت. لم تُرسل مراجعة التصفير.';
+      if (mounted) setState(() => _reply = message);
+      return message;
+    }
     try {
-      final ack = await ref
+      await ref
           .read(apiLayerProvider)
           .accounts
           .confirmZeroReview(card.id, meta);
       if (!mounted) return null;
-      setState(() => _reply = _ack(ack));
+      setState(() => _reply = 'تمت مراجعة التصفير.');
       ref.invalidate(accountsProvider(section));
       return null;
     } catch (error) {
@@ -1010,7 +1086,8 @@ class _AccountCard extends StatelessWidget {
     required this.onOpen,
     required this.onToggle,
     required this.onPin,
-    required this.onZero,
+    required this.onZeroPreview,
+    required this.zeroOnline,
   });
 
   final AccountSection section;
@@ -1022,7 +1099,8 @@ class _AccountCard extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback onToggle;
   final Future<String?> Function(MutationMeta meta) onPin;
-  final Future<String?> Function(MutationMeta meta)? onZero;
+  final VoidCallback? onZeroPreview;
+  final bool zeroOnline;
 
   /// Customers: name, value under it, the assigned employee if any, and the
   /// existing zero-review action as a check button (Ali, 2026-11-02).
@@ -1127,17 +1205,14 @@ class _AccountCard extends StatelessWidget {
                   SizedBox(
                     width: 48,
                     height: 48,
-                    child: GuardedMutation(
-                      buttonKey: ValueKey('zero-review-${card.id}'),
-                      inputs: 'zero:${card.id}:${card.version}',
-                      expectedVersion: card.version,
-                      label: AppStrings.zeroReview,
+                    child: IconButton(
+                      key: ValueKey('zero-review-${card.id}'),
                       tooltip: AppStrings.zeroReview,
-                      icon: Icons.check_circle_outline,
-                      // The full failure stays on the list reply. Painting it
-                      // under the icon overflows the fixed-height card.
-                      reportErrorInline: false,
-                      onSubmit: (meta) => onZero!(meta),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                      ),
+                      onPressed: zeroOnline ? onZeroPreview : null,
+                      icon: const Icon(Icons.check_circle_outline),
                     ),
                   ),
               ],
@@ -1167,7 +1242,7 @@ class _AccountCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final showPin = canWrite;
-    final showZero = onZero != null && !card.systemManaged;
+    final showZero = onZeroPreview != null && !card.systemManaged;
     final showAssign = assigning && canSelectAccountForAssignment(card);
     final look0 = context.look;
     // Customers: debt / credit / zero tone from the balance sign (Ali,
@@ -1383,13 +1458,11 @@ extension on _AccountCard {
                       onChanged: (_) => onToggle(),
                     ),
                   if (showZero)
-                    GuardedMutation(
-                      buttonKey: ValueKey('zero-review-${card.id}'),
-                      inputs: 'zero:${card.id}:${card.version}',
-                      expectedVersion: card.version,
-                      label: AppStrings.zeroReview,
-                      filled: false,
-                      onSubmit: (meta) => onZero!(meta),
+                    IconButton(
+                      key: ValueKey('zero-review-${card.id}'),
+                      tooltip: AppStrings.zeroReview,
+                      onPressed: zeroOnline ? onZeroPreview : null,
+                      icon: const Icon(Icons.check_circle_outline),
                     ),
                 ],
               ),

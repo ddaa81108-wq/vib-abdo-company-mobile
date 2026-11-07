@@ -8,7 +8,9 @@ import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
+import '../../ui/theme.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/export_pdf_button.dart';
 import '../../ui/widgets/section_kit.dart';
 
 class LedgerQuery {
@@ -57,6 +59,10 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
   final _search = TextEditingController();
   FinancialLedgerSectionKey? _section;
   String? _currency;
+  FinancialLedgerPage? _older;
+  String? _olderError;
+  var _olderBusy = false;
+  var _olderTicket = 0;
 
   @override
   void dispose() {
@@ -70,6 +76,69 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
     q: _search.text.trim(),
   );
 
+  void _dropOlder() {
+    _olderTicket++;
+    _older = null;
+    _olderError = null;
+    _olderBusy = false;
+  }
+
+  void _retarget({
+    FinancialLedgerSectionKey? section,
+    String? currency,
+    bool clearSection = false,
+    bool clearCurrency = false,
+  }) {
+    setState(() {
+      if (clearSection) _section = null;
+      if (section != null || clearSection) _section = section;
+      if (clearCurrency) _currency = null;
+      if (currency != null || clearCurrency) _currency = currency;
+      _dropOlder();
+    });
+  }
+
+  Future<void> _loadOlder(String? cursor) async {
+    if (cursor == null || _olderBusy) return;
+    final ticket = ++_olderTicket;
+    final section = _section;
+    final currency = _currency;
+    final q = _search.text.trim();
+    setState(() {
+      _olderBusy = true;
+      _olderError = null;
+    });
+    try {
+      final page = await ref
+          .read(apiLayerProvider)
+          .reports
+          .financialLedger(
+            before: cursor,
+            sectionKey: section,
+            currency: currency,
+            q: q.isEmpty ? null : q,
+          );
+      if (!mounted || ticket != _olderTicket) return;
+      if (section != _section ||
+          currency != _currency ||
+          q != _search.text.trim()) {
+        return;
+      }
+      setState(() {
+        _older = page;
+        _olderBusy = false;
+      });
+    } catch (error) {
+      if (!mounted || ticket != _olderTicket) return;
+      setState(() {
+        _olderBusy = false;
+        _olderError = failureText(
+          ref.read(errorHandlerProvider).toFailure(error),
+        );
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!permissionsOf(ref).canViewFinancialLedger) {
@@ -82,44 +151,67 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
         key: FinancialLedgerScreen.screenKey,
         padding: pagePadding(MediaQuery.sizeOf(context).width),
         children: [
+          Text('سجل الأستاذ', style: cairo(22, 800)),
+          const SizedBox(height: AppSpacing.xs),
           const Text(
             'قيود الصفحة كما أرسلها الخادم. إجمالي الصفحة ليس إجمالي المؤسسة.',
             key: Key('ledger-page-note'),
           ),
-          TextField(
-            key: const Key('ledger-search'),
-            controller: _search,
-            decoration: const InputDecoration(labelText: 'بحث'),
-            onSubmitted: (_) => setState(() {}),
-          ),
-          DropdownButtonFormField<String?>(
-            key: const Key('ledger-currency'),
-            initialValue: _currency,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'العملة'),
-            items: const [
-              DropdownMenuItem(value: null, child: Text('الكل')),
-              DropdownMenuItem(value: 'LYD', child: Text('دينار')),
-              DropdownMenuItem(value: 'EGP', child: Text('جنيه')),
-            ],
-            onChanged: (value) => setState(() => _currency = value),
-          ),
-          DropdownButtonFormField<FinancialLedgerSectionKey?>(
-            key: const Key('ledger-section'),
-            initialValue: _section,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'القسم'),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('كل الأقسام')),
-              for (final section in FinancialLedgerSectionKey.values)
-                if (section != FinancialLedgerSectionKey.unknown)
-                  DropdownMenuItem(
-                    value: section,
-                    child: Text(_sectionLabel(section)),
+          const SizedBox(height: AppSpacing.md),
+          Card(
+            child: Padding(
+              padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('تصفية الصفحة', style: cairo(14, 800)),
+                  TextField(
+                    key: const Key('ledger-search'),
+                    controller: _search,
+                    decoration: const InputDecoration(labelText: 'بحث'),
+                    onSubmitted: (_) => setState(_dropOlder),
                   ),
-            ],
-            onChanged: (value) => setState(() => _section = value),
+                  DropdownButtonFormField<String?>(
+                    key: const Key('ledger-currency'),
+                    initialValue: _currency,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'العملة'),
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('الكل')),
+                      DropdownMenuItem(value: 'LYD', child: Text('دينار')),
+                      DropdownMenuItem(value: 'EGP', child: Text('جنيه')),
+                    ],
+                    onChanged: (value) => _retarget(
+                      currency: value,
+                      clearCurrency: value == null,
+                    ),
+                  ),
+                  DropdownButtonFormField<FinancialLedgerSectionKey?>(
+                    key: const Key('ledger-section'),
+                    initialValue: _section,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'القسم'),
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('كل الأقسام'),
+                      ),
+                      for (final section in FinancialLedgerSectionKey.values)
+                        if (section != FinancialLedgerSectionKey.unknown)
+                          DropdownMenuItem(
+                            value: section,
+                            child: Text(_sectionLabel(section)),
+                          ),
+                    ],
+                    onChanged: (value) =>
+                        _retarget(section: value, clearSection: value == null),
+                  ),
+                ],
+              ),
+            ),
           ),
+          const SizedBox(height: AppSpacing.sm),
+          const ExportPdfButton(),
           page.when(
             loading: () => const SkeletonBox(height: 120),
             error: (error, _) => presentFailure(
@@ -127,24 +219,60 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
               onRetry: () => ref.invalidate(ledgerPageProvider(_query)),
               retryKey: const Key('ledger-retry'),
             ),
-            data: (data) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(AppStrings.pageTotals),
-                for (final entry in data.pageTotals.entries)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: MoneyText(
-                      _money(money, entry.key, entry.value),
-                      key: Key('ledger-screen-total-${entry.key}'),
-                    ),
+            data: (data) {
+              final shown = _older ?? data;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(AppStrings.pageTotals, style: cairo(14, 800)),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      for (final entry in shown.pageTotals.entries)
+                        _TotalFrame(
+                          label: _currencyLabel(entry.key),
+                          child: MoneyText(
+                            _money(money, entry.key, entry.value),
+                            key: Key('ledger-total-${entry.key}'),
+                          ),
+                        ),
+                    ],
                   ),
-                if (data.page.items.isEmpty)
-                  const EmptyPane(message: AppStrings.emptyLedger)
-                else
-                  for (final row in data.page.items) _LedgerRow(row: row),
-              ],
-            ),
+                  const SizedBox(height: AppSpacing.md),
+                  if (shown.page.items.isEmpty)
+                    const EmptyPane(message: AppStrings.emptyLedger)
+                  else
+                    for (final row in shown.page.items) _LedgerRow(row: row),
+                  if (_olderError != null)
+                    Text(
+                      _olderError!,
+                      key: const Key('ledger-older-error'),
+                      style: cairo(
+                        13,
+                        700,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  if (shown.page.nextCursor != null)
+                    Align(
+                      alignment: AlignmentDirectional.center,
+                      child: OutlinedButton(
+                        key: const Key('ledger-older'),
+                        onPressed: _olderBusy
+                            ? null
+                            : () => _loadOlder(shown.page.nextCursor),
+                        child: Text(
+                          _olderBusy
+                              ? AppStrings.ledgerLoadingOlder
+                              : AppStrings.loadOlder,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -159,6 +287,41 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
   }
 }
 
+class _TotalFrame extends StatelessWidget {
+  const _TotalFrame({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final gold = sectionGold(context);
+    return Container(
+      constraints: const BoxConstraints(minWidth: 140),
+      padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: gold.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: cairo(12, 700, color: gold)),
+          const SizedBox(height: AppSpacing.xs),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+String _currencyLabel(String code) => switch (code) {
+  'LYD' => 'دينار',
+  'EGP' => 'جنيه',
+  _ => code,
+};
+
 class _LedgerRow extends ConsumerWidget {
   const _LedgerRow({required this.row});
 
@@ -171,26 +334,77 @@ class _LedgerRow extends ConsumerWidget {
     final text = amount == null || amount.isInvalid || amount.units == null
         ? MoneyValue.invalidLabel
         : money.formatOrDash(amount, row.currency);
-    final detail = [
-      if (row.sectionKeyRaw != null) row.sectionKeyRaw,
-      if (row.sourceStatusRaw != null) row.sourceStatusRaw,
-      if (row.referenceNo != null) row.referenceNo,
-      if (row.actorName != null) row.actorName,
-    ].join(' · ');
-    return Padding(
+    final scheme = Theme.of(context).colorScheme;
+    final title = row.counterpartyName ?? row.description ?? row.id;
+    final note = row.description != null && row.description != title
+        ? row.description!
+        : null;
+    return Container(
       key: Key('ledger-entry-${row.id}'),
-      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
+      margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(row.counterpartyName ?? row.description ?? row.id),
-          if (detail.isNotEmpty) Text(detail),
+          Text(title, style: cairo(15, 800)),
+          if (note != null)
+            Text(note, style: cairo(12, 600, color: scheme.onSurfaceVariant)),
+          const SizedBox(height: AppSpacing.sm),
+          _Fact('القسم', _sectionText(row)),
+          _Fact('الحالة', _statusText(row)),
+          _Fact('المرجع', row.referenceNo ?? '—'),
+          _Fact('المنفّذ', row.actorName ?? '—'),
+          const SizedBox(height: AppSpacing.xs),
           Align(alignment: Alignment.centerLeft, child: MoneyText(text)),
         ],
       ),
     );
   }
 }
+
+class _Fact extends StatelessWidget {
+  const _Fact(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(bottom: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 72, child: Text(label, style: cairo(12, 800))),
+          Expanded(
+            child: Text(value, style: cairo(12, 600, color: muted)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _sectionText(FinancialLedgerEntryDto row) {
+  final key = row.sectionKey;
+  if (key != null && key != FinancialLedgerSectionKey.unknown) {
+    return _sectionLabel(key);
+  }
+  return row.sectionKeyRaw ?? row.section;
+}
+
+/// Names the contract `sourceStatus`. An unknown value stays as the server sent it.
+String _statusText(FinancialLedgerEntryDto row) => switch (row.sourceStatus) {
+  FinancialLedgerSourceStatus.draft => AppStrings.draft,
+  FinancialLedgerSourceStatus.posted => 'مُثبت',
+  _ => row.sourceStatusRaw ?? '—',
+};
 
 String _sectionLabel(FinancialLedgerSectionKey section) => switch (section) {
   FinancialLedgerSectionKey.customerDebts => 'ديون العملاء',
