@@ -2197,11 +2197,25 @@ class FakeApiClient implements ApiClient {
       _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
     }
     final card = _cardView(section, accountId);
-    if (b.containsKey('expectedFinancialVersion')) {
+    if (!b.containsKey('expectedFinancialVersion')) {
+      _fail(400, 'INVALID_REVIEW_VERSION', 'الإصدار المالي مطلوب.');
+    }
+    final review = card['zeroReview'];
+    final financial = review is Map && review['financialVersion'] is int
+        ? review['financialVersion'] as int
+        : null;
+    if (financial != null && b['expectedFinancialVersion'] != financial) {
+      _fail(
+        409,
+        'ZERO_REVIEW_CHANGED',
+        'تغيرت الحالة المالية؛ حدّث بيانات الكارت.',
+      );
+    }
+    if (financial == null) {
       _requireVersion(b['expectedFinancialVersion'], card['version']);
     }
     final version = card['version'] is int ? card['version'] as int : 0;
-    final review = {
+    final closed = {
       'pending': false,
       'financialVersion': version,
       'reviewedAt': '2026-10-22T22:00:00.000Z',
@@ -2209,9 +2223,9 @@ class FakeApiClient implements ApiClient {
     };
     _cardState['$section|$accountId'] = {
       ...?_cardState['$section|$accountId'],
-      'zeroReview': review,
+      'zeroReview': closed,
     };
-    return _ok({'zeroReview': review});
+    return _ok({'zeroReview': closed});
   }
 
   String? _displayName() {

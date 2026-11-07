@@ -106,6 +106,13 @@ bool showCustomerZeroReview({
   return readZeroReview(card.zeroReview) == ZeroReviewRead.pending;
 }
 
+/// `expectedFinancialVersion` is `zeroReview.financialVersion`, not the card
+/// `version`. The published customer sample carries both, and they differ.
+int? zeroReviewFinancialVersion(AccountCardDto card) {
+  final value = card.zeroReview?['financialVersion'];
+  return value is int ? value : null;
+}
+
 /// Display order for customers: server order, then cards whose `zeroReview`
 /// the server has already closed. Pending and unknown rows stay put. This
 /// does not change status and does not run before a successful confirm.

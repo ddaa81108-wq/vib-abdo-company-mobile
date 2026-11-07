@@ -10,6 +10,7 @@ import '../../models/home_summary.dart';
 import '../../notifications/unread_badge.dart';
 import '../../state/notification_providers.dart';
 import '../../state/session_providers.dart';
+import '../../state/shell_history.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/bars_style.dart';
 import '../../ui/section_labels.dart';
@@ -51,6 +52,7 @@ class HomeShell extends ConsumerStatefulWidget {
   static const roleKey = Key('role-label');
   static const homeLoadingKey = Key('home-loading');
   static const menuKey = Key('open-menu');
+  static const backKey = Key('app-back');
   static const bottomBarKey = Key('phone-bottom-bar');
   static const railKey = Key('nav-rail');
   static const panelKey = Key('nav-panel');
@@ -69,21 +71,39 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   var _collapsed = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(shellHistoryProvider.notifier).note(widget.location);
+    });
+  }
+
+  @override
+  void didUpdateWidget(HomeShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.location == widget.location) return;
+    final location = widget.location;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(shellHistoryProvider.notifier).note(location);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Back on a section reached from home (or a ledger opened by a link)
     // goes home instead of closing the app. Home itself keeps the system
     // behaviour. Ali, 2026-11-03.
     final atHome = widget.location == '/';
+    final history = ref.watch(shellHistoryProvider);
+    final router = GoRouter.of(context);
+    final canLeavePage = router.canPop() || history.isNotEmpty || !atHome;
     return PopScope(
-      canPop: atHome,
+      canPop: !canLeavePage,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop || !mounted) return;
-        final router = GoRouter.of(context);
-        if (router.canPop()) {
-          router.pop();
-        } else {
-          router.go('/');
-        }
+        _goBack();
       },
       child: _shell(context),
     );
@@ -131,30 +151,22 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             )
           : null,
       appBar: AppBar(
-        leading: phone
-            ? Builder(
-                builder: (barContext) => IconButton(
-                  key: HomeShell.menuKey,
-                  tooltip: AppStrings.menu,
-                  onPressed: () => Scaffold.of(barContext).openDrawer(),
-                  icon: const Icon(Icons.menu),
-                ),
-              )
-            : panel
-            ? IconButton(
-                tooltip: _collapsed
-                    ? AppStrings.showSidebar
-                    : AppStrings.hideSidebar,
-                onPressed: () => setState(() => _collapsed = !_collapsed),
-                icon: Icon(_collapsed ? Icons.menu_open : Icons.menu),
-              )
-            : const SizedBox.shrink(),
+        leading: _leading(phone: phone, panel: panel),
         title: FittedBox(
           fit: BoxFit.scaleDown,
           alignment: AlignmentDirectional.centerStart,
           child: Text(_title(widget.location)),
         ),
         actions: [
+          if (phone && _showBack)
+            Builder(
+              builder: (barContext) => IconButton(
+                key: HomeShell.menuKey,
+                tooltip: AppStrings.menu,
+                onPressed: () => Scaffold.of(barContext).openDrawer(),
+                icon: const Icon(Icons.menu),
+              ),
+            ),
           IconButton(
             tooltip: AppStrings.search,
             onPressed: () => context.go('/search'),
@@ -282,6 +294,61 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       if (_matches(items[i].path, location)) return i;
     }
     return 0;
+  }
+
+  bool get _showBack {
+    if (ref.watch(shellHistoryProvider).isEmpty) return false;
+    const nested = [
+      '/customers/',
+      '/companies/',
+      '/libyan-deposits/',
+      '/egyptian-deposits/',
+    ];
+    return !nested.any(widget.location.contains);
+  }
+
+  void _goBack() {
+    final router = GoRouter.of(context);
+    if (router.canPop()) {
+      router.pop();
+      return;
+    }
+    final previous = ref.read(shellHistoryProvider.notifier).takeBack();
+    if (previous != null) {
+      router.go(previous);
+      return;
+    }
+    if (widget.location != '/') router.go('/');
+  }
+
+  Widget _leading({required bool phone, required bool panel}) {
+    if (_showBack) {
+      return IconButton(
+        key: HomeShell.backKey,
+        tooltip: AppStrings.back,
+        style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+        onPressed: _goBack,
+        icon: const Icon(Icons.arrow_back),
+      );
+    }
+    if (phone) {
+      return Builder(
+        builder: (barContext) => IconButton(
+          key: HomeShell.menuKey,
+          tooltip: AppStrings.menu,
+          onPressed: () => Scaffold.of(barContext).openDrawer(),
+          icon: const Icon(Icons.menu),
+        ),
+      );
+    }
+    if (panel) {
+      return IconButton(
+        tooltip: _collapsed ? AppStrings.showSidebar : AppStrings.hideSidebar,
+        onPressed: () => setState(() => _collapsed = !_collapsed),
+        icon: Icon(_collapsed ? Icons.menu_open : Icons.menu),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   String _title(String location) {

@@ -43,7 +43,11 @@ void main() {
           'currency': 'LYD',
           'version': 4,
           'ageStatus': 'zero',
-          'zeroReview': {'status': 'pending', 'pending': true},
+          'zeroReview': {
+            'status': 'pending',
+            'pending': true,
+            'financialVersion': 4,
+          },
         },
       ));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
@@ -81,6 +85,43 @@ void main() {
       );
     },
   );
+
+  testWidgets('the review sends financialVersion, not the card version', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(tester, size: const Size(440, 900));
+    final fake = layer.client as FakeApiClient;
+    fake.appendedAccountCards.add((
+      section: 'customers',
+      card: {
+        'id': 'c_fin',
+        'name': 'إصدار مختلف',
+        'balanceUnits': 0,
+        'currency': 'LYD',
+        'version': 4,
+        'zeroReview': {
+          'pending': true,
+          'financialVersion': 9,
+        },
+      },
+    ));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers');
+    await tester.tap(find.byKey(const ValueKey('zero-review-c_fin')));
+    await tester.pumpAndSettle();
+    final body = fake.mutationBodies.join('\n');
+    expect(body, contains('"expectedFinancialVersion":9'));
+    expect(body, isNot(contains('"expectedFinancialVersion":4')));
+    expect(find.byKey(const ValueKey('zero-review-c_fin')), findsNothing);
+  });
+
+  testWidgets('companies do not pretend to review a zero card', (tester) async {
+    await pumpFakeApp(tester, size: const Size(440, 900));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/companies');
+    expect(find.byKey(const Key('zero-review-unavailable')), findsOneWidget);
+    expect(find.byKey(const ValueKey('zero-review-co_1')), findsNothing);
+  });
 
   testWidgets('an employee does not get the zero-review check', (tester) async {
     final layer = await pumpFakeApp(tester, size: const Size(440, 956));

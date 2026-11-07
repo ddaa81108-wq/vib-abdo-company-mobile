@@ -199,6 +199,14 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                 ),
               // Deposits: الإجمالي, النشط, إضافة أمانة on one row, then a
               // full-width search. The Egyptian rate stays under that search.
+              if (section != AccountSection.customers)
+                const Padding(
+                  padding: EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
+                  child: Text(
+                    'مراجعة التصفير منشورة لبطاقات العملاء فقط. الشركات والأمانات لا تملك مسار المراجعة في العقد.',
+                    key: Key('zero-review-unavailable'),
+                  ),
+                ),
               if (deposits)
                 _DepositTopRow(
                   summary: data.summary,
@@ -652,13 +660,19 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   }
 
   Future<String?> _zero(AccountCardDto card, MutationMeta meta) async {
+    if (meta.expectedVersion == null) {
+      const message =
+          'لا يوجد إصدار مالي على الكارت. لم تُرسل مراجعة التصفير.';
+      if (mounted) setState(() => _reply = message);
+      return message;
+    }
     try {
       final ack = await ref
           .read(apiLayerProvider)
           .accounts
           .confirmZeroReview(card.id, meta);
       if (!mounted) return null;
-      setState(() => _reply = _ack(ack));
+      setState(() => _reply = 'تمت مراجعة التصفير.');
       ref.invalidate(accountsProvider(section));
       return null;
     } catch (error) {
@@ -1129,8 +1143,9 @@ class _AccountCard extends StatelessWidget {
                     height: 48,
                     child: GuardedMutation(
                       buttonKey: ValueKey('zero-review-${card.id}'),
-                      inputs: 'zero:${card.id}:${card.version}',
-                      expectedVersion: card.version,
+                      inputs:
+                          'zero:${card.id}:${zeroReviewFinancialVersion(card)}',
+                      expectedVersion: zeroReviewFinancialVersion(card),
                       label: AppStrings.zeroReview,
                       tooltip: AppStrings.zeroReview,
                       icon: Icons.check_circle_outline,
