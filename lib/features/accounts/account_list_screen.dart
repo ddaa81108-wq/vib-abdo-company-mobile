@@ -19,6 +19,7 @@ import '../../ui/widgets/common.dart';
 import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/mutation_form.dart';
 import 'account_list_logic.dart';
+import 'zero_review_preview.dart';
 import 'account_name_suggestions.dart';
 import 'company_card_tone.dart';
 import 'customer_card_tone.dart';
@@ -432,13 +433,14 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             : _selected.add(card.id);
       }),
       onPin: (meta) => _pin(card, meta),
-      onZero:
+      zeroOnline: ref.watch(onlineProvider),
+      onZeroPreview:
           showCustomerZeroReview(
             permissions: permissions,
             section: section,
             card: card,
           )
-          ? (meta) => _zero(card, meta)
+          ? () => _openZeroPreview(card)
           : null,
     );
   }
@@ -657,6 +659,55 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       setState(() => _reply = message);
       return message;
     }
+  }
+
+  Future<void> _openZeroPreview(AccountCardDto card) async {
+    final financial = zeroReviewFinancialVersion(card);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => ZeroReviewPreview(
+        name: card.name,
+        balance: ref
+            .read(apiLayerProvider)
+            .money
+            .formatOrDash(card.balanceUnits, card.currency),
+        financialVersion: financial,
+        onConfirm: financial == null
+            ? null
+            : () => _confirmZeroPreview(card.id, financial),
+      ),
+    );
+  }
+
+  Future<String?> _confirmZeroPreview(String id, int financial) async {
+    final latest = _financialVersionNow(id);
+    if (latest != financial) {
+      return 'تغيرت بيانات الكارت. أعد فتح المعاينة.';
+    }
+    final current = _cardNow(id);
+    if (current == null) return 'الكارت لم يعد في القائمة.';
+    final message = await _zero(
+      current,
+      MutationMeta(expectedVersion: financial),
+    );
+    // The open preview owns the error. The list banner stays clear so the
+    // same sentence is not painted twice behind the dialog.
+    if (message != null && mounted) setState(() => _reply = null);
+    return message;
+  }
+
+  AccountCardDto? _cardNow(String id) {
+    final page = ref.read(accountsProvider(section)).asData?.value;
+    final extra = ref.read(accountExtraCardsProvider(section));
+    for (final card in [...?page?.page.items, ...extra]) {
+      if (card.id == id) return card;
+    }
+    return null;
+  }
+
+  int? _financialVersionNow(String id) {
+    final card = _cardNow(id);
+    return card == null ? null : zeroReviewFinancialVersion(card);
   }
 
   Future<String?> _zero(AccountCardDto card, MutationMeta meta) async {
@@ -1024,7 +1075,8 @@ class _AccountCard extends StatelessWidget {
     required this.onOpen,
     required this.onToggle,
     required this.onPin,
-    required this.onZero,
+    required this.onZeroPreview,
+    required this.zeroOnline,
   });
 
   final AccountSection section;
@@ -1036,7 +1088,8 @@ class _AccountCard extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback onToggle;
   final Future<String?> Function(MutationMeta meta) onPin;
-  final Future<String?> Function(MutationMeta meta)? onZero;
+  final VoidCallback? onZeroPreview;
+  final bool zeroOnline;
 
   /// Customers: name, value under it, the assigned employee if any, and the
   /// existing zero-review action as a check button (Ali, 2026-11-02).
@@ -1141,18 +1194,14 @@ class _AccountCard extends StatelessWidget {
                   SizedBox(
                     width: 48,
                     height: 48,
-                    child: GuardedMutation(
-                      buttonKey: ValueKey('zero-review-${card.id}'),
-                      inputs:
-                          'zero:${card.id}:${zeroReviewFinancialVersion(card)}',
-                      expectedVersion: zeroReviewFinancialVersion(card),
-                      label: AppStrings.zeroReview,
+                    child: IconButton(
+                      key: ValueKey('zero-review-${card.id}'),
                       tooltip: AppStrings.zeroReview,
-                      icon: Icons.check_circle_outline,
-                      // The full failure stays on the list reply. Painting it
-                      // under the icon overflows the fixed-height card.
-                      reportErrorInline: false,
-                      onSubmit: (meta) => onZero!(meta),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                      ),
+                      onPressed: zeroOnline ? onZeroPreview : null,
+                      icon: const Icon(Icons.check_circle_outline),
                     ),
                   ),
               ],
@@ -1182,7 +1231,7 @@ class _AccountCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final showPin = canWrite;
-    final showZero = onZero != null && !card.systemManaged;
+    final showZero = onZeroPreview != null && !card.systemManaged;
     final showAssign = assigning && canSelectAccountForAssignment(card);
     final look0 = context.look;
     // Customers: debt / credit / zero tone from the balance sign (Ali,
@@ -1398,13 +1447,11 @@ extension on _AccountCard {
                       onChanged: (_) => onToggle(),
                     ),
                   if (showZero)
-                    GuardedMutation(
-                      buttonKey: ValueKey('zero-review-${card.id}'),
-                      inputs: 'zero:${card.id}:${card.version}',
-                      expectedVersion: card.version,
-                      label: AppStrings.zeroReview,
-                      filled: false,
-                      onSubmit: (meta) => onZero!(meta),
+                    IconButton(
+                      key: ValueKey('zero-review-${card.id}'),
+                      tooltip: AppStrings.zeroReview,
+                      onPressed: zeroOnline ? onZeroPreview : null,
+                      icon: const Icon(Icons.check_circle_outline),
                     ),
                 ],
               ),
