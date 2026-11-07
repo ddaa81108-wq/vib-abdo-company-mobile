@@ -18,7 +18,8 @@ const _name = 'not-a-real-name';
 
 const _fixedMessages = <String, String>{
   'CSRF_REJECTED': 'رمز حماية الطلب غير صالح',
-  'MFA_REQUIRED': 'غير مدعوم في التطبيق',
+  'MFA_REQUIRED': 'أدخل رمز التحقق',
+  'MFA_INVALID': 'رمز التحقق غير صحيح',
   'INVALID_CURRENT_PASSWORD': 'كلمة المرور الحالية غير صحيحة',
   'CLIENT_VERSION_MISMATCH': 'حدّث التطبيق',
   'PENDING_SUBMISSION_EXISTS': 'يوجد تقديم معلّق لهذا التكليف',
@@ -71,7 +72,7 @@ void main() {
           );
           expect(login, isA<MfaRequiredException>());
           expect(login, isNot(isA<InvalidCredentialsException>()));
-          expect(login.message, 'غير مدعوم في التطبيق');
+          expect(login.message, 'أدخل رمز التحقق');
           _expectNoSecrets(login);
         }
         if (code == 'INVALID_CURRENT_PASSWORD') {
@@ -202,6 +203,8 @@ Type _expected(String code, int status, {required bool authenticated}) {
   switch (code) {
     case 'MFA_REQUIRED':
       return MfaRequiredException;
+    case 'MFA_INVALID':
+      return MfaInvalidException;
     case 'INVALID_CURRENT_PASSWORD':
       return InvalidCurrentPasswordException;
     case 'CLIENT_VERSION_MISMATCH':

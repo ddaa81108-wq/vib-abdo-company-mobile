@@ -90,6 +90,30 @@ class CaptureWindowRobolectricTest {
     }
 
     @Test
+    fun pauseSetsTheFlagWithoutWaitingForTheHold() {
+        val window = window()
+        val lock = CaptureLock(
+            debuggable = false,
+            scheduleHold = { _, _ -> },
+            cancelHold = {},
+        )
+        fun push() = ScreenCapturePolicy.push(window, lock.secure)
+        lock.apply("admin", 1)
+        push()
+        assertSecure(window, false)
+        lock.onHostPause()
+        push()
+        assertSecure(window, true)
+        val late = lock.apply("admin", 2)
+        push()
+        assertFalse(late)
+        assertSecure(window, true)
+        lock.onHostResume()
+        push()
+        assertSecure(window, true)
+    }
+
+    @Test
     fun debugWindowStaysClear() {
         val window = window()
         val lock = CaptureLock(

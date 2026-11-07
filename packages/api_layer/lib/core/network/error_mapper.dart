@@ -290,6 +290,9 @@ class ErrorMapper {
       case 'MFA_REQUIRED':
         return MfaRequiredException(
             statusCode: status, correlationId: correlationId, details: details);
+      case 'MFA_INVALID':
+        return MfaInvalidException(
+            statusCode: status, correlationId: correlationId, details: details);
       case 'INVALID_CURRENT_PASSWORD':
         return InvalidCurrentPasswordException(
             statusCode: status, correlationId: correlationId, details: details);

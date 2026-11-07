@@ -21,10 +21,13 @@ class LoginResult {
   String toString() => 'LoginResult(***)';
 }
 
-/// Only used by the PROPOSED mobile token scheme / future 2FA. Not produced today.
+/// Marker that login is waiting for `POST /api/auth/mfa/verify`.
+///
+/// The challenge is the `abdo_mfa` cookie. This object does not hold the
+/// code or the cookie value.
 class LoginChallenge {
   const LoginChallenge(
-      {required this.loginTicket, this.channel, this.maskedDestination});
+      {this.loginTicket = '', this.channel, this.maskedDestination});
   final String loginTicket;
   final String? channel;
   final String? maskedDestination;

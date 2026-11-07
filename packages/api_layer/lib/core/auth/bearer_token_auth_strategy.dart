@@ -65,6 +65,12 @@ class BearerTokenAuthStrategy implements AuthStrategy {
       (await _tokens.readRefreshToken()) != null;
 
   @override
+  Future<bool> hasMfaChallenge() async => false;
+
+  @override
+  Future<void> clearMfaChallenge() async {}
+
+  @override
   Future<AuthErrorAction> handleAuthError(
       ApiException error, RequestOptions request,
       {required bool authenticated}) async {

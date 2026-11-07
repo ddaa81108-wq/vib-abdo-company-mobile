@@ -40,7 +40,8 @@ class _SettingsLink {
 }
 
 class SettingsText {
-  static const employeesNote = 'تحصيل كل موظف: المحصّل، المعلّق، والنقد لديه.';
+  static const employeesNote =
+      'حسابات الدخول وصلاحيات الأقسام. ليست حسابات التحصيل.';
   static const accountTitle = 'حسابي والمظهر';
   static const accountNote =
       'الوضع الليلي، صوت الإشعارات ونطقها، كلمة المرور، وتسجيل الخروج.';
@@ -53,6 +54,8 @@ class SettingsText {
   static const production = 'الخادم الرسمي';
   static const ownerRole = 'المستخدم الحالي';
 }
+
+void _openLedger(BuildContext context) => context.go('/settings/ledger');
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -74,8 +77,24 @@ class SettingsScreen extends ConsumerWidget {
           tileKey: Key('settings-link-employees'),
           title: AppStrings.employeesTile,
           note: SettingsText.employeesNote,
-          path: '/settings/employee-totals',
+          path: '/settings/users',
           icon: Icons.groups_outlined,
+        ),
+      if (manage)
+        const _SettingsLink(
+          tileKey: Key('settings-link-audit'),
+          title: 'الأمان والسجل',
+          note: 'الجلسة الحالية وسجل عمليات الخادم.',
+          path: '/settings/audit',
+          icon: Icons.fact_check_outlined,
+        ),
+      if (manage || ledger)
+        const _SettingsLink(
+          tileKey: Key('settings-link-development'),
+          title: 'تطوير التطبيق',
+          note: 'إصدار التطبيق وحالة الخادم، بلا محدّث عن بعد.',
+          path: '/settings/development',
+          icon: Icons.build_circle_outlined,
         ),
       const _SettingsLink(
         tileKey: Key('settings-link-account'),
@@ -118,7 +137,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
             onTap: () => ref.read(themeModeProvider.notifier).setDark(!dark),
           ),
-          if (ledger) const _LedgerTile(),
+          if (ledger) const _LedgerTile(onOpen: _openLedger),
           _SettingsCard(
             key: const Key('settings-about'),
             icon: Icons.info_outline_rounded,
@@ -317,7 +336,9 @@ String _ledgerTotal(MoneyFormatter money, String code, MoneyValue units) {
 }
 
 class _LedgerTile extends ConsumerWidget {
-  const _LedgerTile();
+  const _LedgerTile({required this.onOpen});
+
+  final void Function(BuildContext context) onOpen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -341,6 +362,14 @@ class _LedgerTile extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const ExportPdfButton(),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton(
+                  key: const Key('ledger-open'),
+                  onPressed: () => onOpen(context),
+                  child: const Text('عرض القيود'),
+                ),
+              ),
               page.when(
                 loading: () => const SkeletonBox(height: 48),
                 error: (error, _) => presentFailure(

@@ -1,5 +1,6 @@
 import 'package:flutter_api_layer/api_layer.dart';
 
+import '../security/capture_harness.dart';
 import '../ui/strings.dart';
 
 /// Signed-in users who open a section or admin path they cannot read land here.
@@ -7,8 +8,8 @@ const forbiddenLocation = '/forbidden';
 
 /// Where the router should send the user for the current server session.
 ///
-/// Returns null to stay on [location]. [SessionOtpRequired] is treated as
-/// signed out: the current server does not issue that state.
+/// Returns null to stay on [location]. [SessionOtpRequired] stays on the
+/// code screen and does not open the signed-in shell.
 ///
 /// When [permissions] is set, a signed-in user who opens a section they cannot
 /// read is sent to [forbiddenLocation]. Search, notifications, the account
@@ -19,29 +20,44 @@ String? authRedirect(
   String location, {
   PermissionService? permissions,
 }) {
+  if (kCaptureHarness && location == captureHarnessPath) return null;
   final atSplash = location == '/splash';
   final atLogin = location == '/login';
   switch (session) {
     case SessionUnknown():
       return atSplash ? null : '/splash';
     case SessionUnauthenticated():
-    case SessionOtpRequired():
       if (atLogin || location == '/signup-info') return null;
       return '/login';
+    case SessionOtpRequired():
+      return location == '/mfa' ? null : '/mfa';
     case SessionAuthenticated(:final profile):
       if (profile.mustChangePassword) {
         return location == '/change-password' ? null : '/change-password';
       }
-      if (atSplash || atLogin || location == '/change-password') return '/';
+      if (atSplash ||
+          atLogin ||
+          location == '/mfa' ||
+          location == '/change-password') {
+        return '/';
+      }
       return permissions == null
           ? null
-          : permissionRedirect(location, permissions);
+          : permissionRedirect(
+              location,
+              permissions,
+              primaryOwner: profile.isOwner,
+            );
   }
 }
 
 /// [forbiddenLocation] when [location] is a section or admin path the user
 /// cannot read. Null to stay. [forbiddenLocation] itself is never redirected.
-String? permissionRedirect(String location, PermissionService permissions) {
+String? permissionRedirect(
+  String location,
+  PermissionService permissions, {
+  bool primaryOwner = false,
+}) {
   final path = location.split('?').first;
   if (path == '/' ||
       path == forbiddenLocation ||
@@ -53,6 +69,10 @@ String? permissionRedirect(String location, PermissionService permissions) {
   }
   if (path == '/settings' || path.startsWith('/settings/')) {
     final manage = permissions.canDo(ManagementAction.settingsManage);
+    if (path == '/settings/users/new') {
+      if (!primaryOwner || !manage) return forbiddenLocation;
+      return null;
+    }
     if (path != '/settings') return manage ? null : forbiddenLocation;
     if (permissions.canViewFinancialLedger || manage) return null;
     return forbiddenLocation;

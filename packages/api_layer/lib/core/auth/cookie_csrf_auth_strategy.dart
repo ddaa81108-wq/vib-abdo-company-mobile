@@ -251,7 +251,19 @@ class CookieCsrfAuthStrategy implements AuthStrategy {
   }
 
   @override
-  Future<bool> hasPersistedSession() async => !(await _cookies.isEmpty());
+  Future<bool> hasPersistedSession() async =>
+      cookieHeaderHas(await _cookies.cookieHeader(), ApiConfig.sessionCookieName);
+
+  @override
+  Future<bool> hasMfaChallenge() async =>
+      cookieHeaderHas(await _cookies.cookieHeader(), ApiConfig.mfaCookieName);
+
+  @override
+  Future<void> clearMfaChallenge() async {
+    await _cookies.saveFromSetCookie(
+      ['${ApiConfig.mfaCookieName}=; Path=/; Max-Age=0'],
+    );
+  }
 
   @override
   Future<AuthErrorAction> handleAuthError(

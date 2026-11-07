@@ -23,8 +23,7 @@ class SessionUnauthenticated extends SessionState {
   final String? reason; // 'logout' | 'session_expired' | 'restore_failed'
 }
 
-/// Not produced by the current server (no OTP). Kept so the router's exhaustive
-/// switch (per API contract) stays valid and for a possible future mobile token scheme.
+/// Login returned `MFA_REQUIRED`. The challenge cookie is not a session.
 class SessionOtpRequired extends SessionState {
   const SessionOtpRequired(this.challenge);
   final LoginChallenge challenge;
@@ -83,6 +82,7 @@ class SessionManager {
   /// Bumped before logout, expiry, and account switch. An in-flight profile
   /// read keeps the generation it started with and cannot publish after it.
   int _transitionEpoch = 0;
+  int _mfaTicket = 0;
   int _reloadSerial = 0;
 
   final _controller = StreamController<SessionState>.broadcast();
@@ -110,6 +110,7 @@ class SessionManager {
   Future<void> restore() async {
     await _secureNow(_transitionEpoch);
     if (!await _strategy.hasPersistedSession()) {
+      await _strategy.clearMfaChallenge();
       await _publish(const SessionUnauthenticated());
       return;
     }
@@ -136,6 +137,7 @@ class SessionManager {
         state is SessionAuthenticated || state is SessionOtpRequired;
     if (switching) {
       _transitionEpoch++;
+      _mfaTicket++;
       await _secureNow(_transitionEpoch);
     }
     final epoch = _transitionEpoch;
@@ -146,6 +148,12 @@ class SessionManager {
       await _strategy.onLoginSucceeded(result.raw);
       if (epoch != _transitionEpoch) return;
       await reloadProfileAndPermissions();
+    } on MfaRequiredException {
+      if (epoch != _transitionEpoch) {
+        if (state is! SessionOtpRequired) await _strategy.clearMfaChallenge();
+        return;
+      }
+      await _publish(const SessionOtpRequired(LoginChallenge()));
     } catch (_) {
       if (switching &&
           epoch == _transitionEpoch &&
@@ -154,6 +162,62 @@ class SessionManager {
       }
       rethrow;
     }
+  }
+
+  /// Completes a pending MFA challenge. `/api/me` runs only after success.
+  Future<void> verifyMfa(String code) async {
+    if (state is! SessionOtpRequired) {
+      throw const MfaInvalidException(message: 'لا يوجد تحقق قائم');
+    }
+    final epoch = _transitionEpoch;
+    final ticket = _mfaTicket;
+    try {
+      final result = await _auth.verifyMfa(code: code);
+      final stale = ticket != _mfaTicket ||
+          epoch != _transitionEpoch ||
+          state is! SessionOtpRequired;
+      if (stale) {
+        if (state is! SessionAuthenticated) {
+          await _dropUnadoptedMfaSession(result.raw);
+        }
+        return;
+      }
+      await _strategy.onLoginSucceeded(result.raw);
+      if (ticket != _mfaTicket ||
+          epoch != _transitionEpoch ||
+          state is! SessionOtpRequired) {
+        if (state is! SessionAuthenticated) {
+          await _dropUnadoptedMfaSession(result.raw);
+        }
+        return;
+      }
+      await reloadProfileAndPermissions();
+    } on MfaInvalidException {
+      if (!await _strategy.hasMfaChallenge() && epoch == _transitionEpoch) {
+        await _strategy.clearMfaChallenge();
+        await _publish(const SessionUnauthenticated());
+      }
+      rethrow;
+    }
+  }
+
+  /// Leaves the challenge. Does not create a session and does not call logout.
+  Future<void> cancelMfa() async {
+    if (state is! SessionOtpRequired) return;
+    _transitionEpoch++;
+    _mfaTicket++;
+    await _secureNow(_transitionEpoch);
+    await _strategy.clearMfaChallenge();
+    await _publish(const SessionUnauthenticated());
+  }
+
+  /// A verify response arrived after cancel or logout. Revoke it and drop the cookie.
+  Future<void> _dropUnadoptedMfaSession(Map<String, dynamic> raw) async {
+    await _strategy.onLoginSucceeded(raw);
+    try {
+      await _auth.logout();
+    } catch (_) {}
+    await _strategy.clear();
   }
 
   Future<void> changePassword(
@@ -192,6 +256,7 @@ class SessionManager {
   Future<void> logout() async {
     _logoutRequested = true;
     _transitionEpoch++;
+    _mfaTicket++;
     await _secureNow(_transitionEpoch);
     try {
       await _auth.logout();
@@ -260,13 +325,16 @@ class SessionManager {
     await _applyCapture(epoch);
   }
 
+  /// Sends the current session to the window again after the activity resumes.
+  Future<void> reapplyCapture() => _applyCapture(_transitionEpoch);
+
   Future<void> _secureNow(int generation) async {
     final gate = _captureGate;
     if (gate == null) return;
     try {
       await gate.secure(generation: generation);
     } catch (_) {
-      // A release hold still locks if this update never reaches the window.
+      // The intent file and the activity pause still lock. The hold is last.
     }
   }
 

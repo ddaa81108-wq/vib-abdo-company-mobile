@@ -31,10 +31,11 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
-  AndroidCaptureGate gate() {
+  AndroidCaptureGate gate({CaptureIntentSink? intent}) {
     final created = AndroidCaptureGate(
       channel: channel,
       ticker: ManualTicker(),
+      intent: intent ?? MemoryCaptureIntentSink(),
     );
     gates.add(created);
     return created;
@@ -126,6 +127,24 @@ void main() {
     expect(argsOf(calls.first)['role'], admin);
     expect(argsOf(calls.last)['role'], isNull);
     expect(calls.every((call) => call.method == 'applyVerifiedRole'), isTrue);
+  });
+
+  test('the intent is written before the channel and holds no secret', () async {
+    final intent = MemoryCaptureIntentSink();
+    final capture = gate(intent: intent);
+    await capture.applySession(
+      generation: 3,
+      state: SessionAuthenticated(_person(role: admin)),
+    );
+    expect(intent.generation, 3);
+    expect(intent.role, admin);
+    await capture.secure(generation: 4);
+    expect(intent.generation, 4);
+    expect(intent.role, isNull);
+    final text = captureIntentText(generation: 4);
+    expect(text, isNot(contains('abdo_')));
+    expect(text, isNot(contains('demo-only')));
+    expect(capture, isNotNull);
   });
 }
 

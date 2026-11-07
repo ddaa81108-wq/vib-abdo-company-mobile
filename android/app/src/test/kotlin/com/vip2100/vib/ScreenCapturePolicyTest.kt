@@ -99,6 +99,57 @@ class ScreenCapturePolicyTest {
     }
 
     @Test
+    fun pauseLocksImmediatelyAndARefreshCannotOpenUntilResume() {
+        val harness = LockHarness()
+        harness.lock.apply("admin", 2)
+        harness.lock.onHostPause()
+        assertTrue(harness.lock.secure)
+        assertFalse(harness.lock.apply("admin", 3))
+        assertTrue(harness.lock.secure)
+        harness.lock.onHostResume()
+        assertTrue(harness.lock.secure)
+        assertTrue(harness.lock.apply("admin", 3))
+        assertFalse(harness.lock.secure)
+    }
+
+    @Test
+    fun aSecureIntentLocksWithoutTheHoldAndALateRefreshStaysClosed() {
+        val harness = LockHarness()
+        harness.lock.apply("admin", 5)
+        assertFalse(harness.lock.secure)
+        val intent = CaptureIntents.parse("6\n\n")
+        assertTrue(intent != null)
+        assertTrue(CaptureIntents.shouldApply(channelAccepted = true, intent!!))
+        assertTrue(harness.lock.apply(intent.role, intent.generation))
+        assertTrue(harness.lock.secure)
+        assertFalse(harness.lock.apply("admin", 5))
+        assertTrue(harness.lock.secure)
+        harness.elapse()
+        assertTrue(harness.lock.secure)
+    }
+
+    @Test
+    fun anAllowIntentIsIgnoredUntilTheChannelHasSpoken() {
+        val allow = CaptureIntents.parse("4\nadmin\n")
+        assertTrue(allow != null)
+        assertFalse(CaptureIntents.shouldApply(channelAccepted = false, allow!!))
+        assertTrue(CaptureIntents.shouldApply(channelAccepted = true, allow))
+        val secure = CaptureIntents.parse("5\n\n")
+        assertTrue(secure != null)
+        assertTrue(CaptureIntents.shouldApply(channelAccepted = false, secure!!))
+        assertNull(CaptureIntents.parse("nope"))
+    }
+
+    @Test
+    fun debugPauseDoesNotLock() {
+        val harness = LockHarness(debuggable = true)
+        harness.lock.onHostPause()
+        assertFalse(harness.lock.secure)
+        harness.lock.onHostResume()
+        assertFalse(harness.lock.secure)
+    }
+
+    @Test
     fun aSameGenerationRefreshExtendsTheHoldOnce() {
         val harness = LockHarness()
         harness.lock.apply("admin", 5)

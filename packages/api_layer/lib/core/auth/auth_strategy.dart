@@ -50,8 +50,14 @@ abstract interface class AuthStrategy {
   /// Called after a persisted session was confirmed with GET /api/me.
   Future<void> onSessionResumed();
 
-  /// Whether there is anything persisted that may represent a live session.
+  /// Whether an `abdo_session` cookie is stored. An MFA challenge is not a session.
   Future<bool> hasPersistedSession();
+
+  /// Whether the short-lived `abdo_mfa` cookie is still stored.
+  Future<bool> hasMfaChallenge();
+
+  /// Drops the MFA challenge cookie. Does not call logout.
+  Future<void> clearMfaChallenge();
 
   Future<AuthErrorAction> handleAuthError(
       ApiException error, RequestOptions request,
