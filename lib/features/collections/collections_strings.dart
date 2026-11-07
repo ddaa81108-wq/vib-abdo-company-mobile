@@ -145,6 +145,8 @@ abstract final class CollectionsText {
   static const searchView = 'بحث في العرض';
   static const searchViewHint = 'اسم العميل أو الموظف أو الهاتف';
   static const payrollButton = 'المرتبات';
+  static const closeShort = 'الإغلاق';
+  static const exportShort = 'الكشف';
   static const payrollBack = 'رجوع إلى الاستلامات';
   static const exportBatch = 'كشف PDF للدفعة';
   static const exportDay = 'كشف PDF لليوم';
