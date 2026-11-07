@@ -153,10 +153,10 @@ void main() {
       overview.submissions.singleWhere((s) => s.id == 'sb_1').status,
       'pending',
     );
-    // The collections read is allowed. The fake body still includes the
-    // totals board. Stripping that field is not implemented; see P5-32.
+    // The collections read is allowed. 537f073 omits the totals board for
+    // an employee (`employeeTotals` is admin only).
     final rawCollections = await api.client.get('/api/collections');
-    expect(rawCollections.dataMap['employeeTotals'], isNotEmpty);
+    expect(rawCollections.dataMap.containsKey('employeeTotals'), isFalse);
 
     await _expectForbidden(api, const [
       '/api/reports',
@@ -195,7 +195,7 @@ void main() {
       expect(response.statusCode, 200);
       final ids = [
         for (final row in (response.dataMap['employees'] as List))
-          (row as Map)['userId'],
+          (row as Map)['employeeId'],
       ];
       expect(ids, ['u_12']);
     }

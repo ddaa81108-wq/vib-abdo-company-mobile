@@ -11,6 +11,9 @@
 /// the newest page. Approved by Ali on 2026-10-22, enabled by default.
 /// `--dart-define=HISTORY_WINDOW_TRIM=false` turns it off.
 /// See docs/testing/PHASE7_PERFORMANCE.md.
+///
+/// Since 2026-11-03 the ledger loads every page so row 1 is the first
+/// movement (Ali); the trim applies to accounts and notifications only.
 abstract final class HistoryWindow {
   static const eagerLimit = 24;
 

@@ -77,10 +77,9 @@ void main() {
     expect(approved.id, 'sb_1');
     expect(approved.version, isNull);
     expect(approved.raw['status'], 'approved');
-    expect(approved.raw['transactionId'], 'collection-sb_1');
-    // sb_1 is not linked to a card. The amount is not a balance.
-    expect(approved.balanceUnits, isNull);
-    expect(approved.raw.containsKey('balanceUnits'), isFalse);
+    expect(approved.raw['transactionId'], 'tx-sb_1');
+    // 537f073 posts sb_1 (100) onto its card as_2 / c_56 (150).
+    expect(approved.balanceUnits?.units, 50);
     expect(approved.raw['eventSequences'], [3]);
     expect(approved.raw.containsKey('version'), isFalse);
 
@@ -102,7 +101,8 @@ void main() {
     );
     expect(fake.lastWireBody, isNull);
     expect(cash.raw['id'], 'sb_2');
-    expect(cash.raw['cashReceivedAt'], '2026-10-22T22:00:00.000Z');
+    // The collections engine's fixed clock.
+    expect(cash.raw['cashReceivedAt'], '2026-10-18T10:03:00.000Z');
     expect(cash.raw['eventSequences'], [4]);
     expect(cash.version, isNull);
 
@@ -135,7 +135,7 @@ void main() {
       MutationMeta(requestId: 'ucash-not-sent', expectedVersion: 2),
     );
     expect(fake.lastWireBody, isNull);
-    expect(unlinkedCash.raw['cashReceivedAt'], '2026-10-22T22:00:00.000Z');
+    expect(unlinkedCash.raw['cashReceivedAt'], '2026-10-18T10:05:00.000Z');
     expect(unlinkedCash.version, isNull);
 
     final overview = await api.collections.overview();
@@ -156,8 +156,8 @@ void main() {
       'rejected',
     );
     expect(
-      overview.submissions.firstWhere((row) => row.id == 'sb_2').cashStatus,
-      CashStatus.received,
+      overview.submissions.firstWhere((row) => row.id == 'sb_2').cashReceivedAt,
+      isNotNull,
     );
     expect(
       overview.unlinkedReceipts.firstWhere((row) => row.id == 'ur_1').status,
@@ -208,7 +208,7 @@ void main() {
         .submissions
         .firstWhere((item) => item.id == 'sb_9');
     expect(stillPending.status, 'pending');
-    expect(stillPending.cashStatus, CashStatus.notApplicable);
+    expect(stillPending.awaitingCash, isFalse);
   });
 }
 

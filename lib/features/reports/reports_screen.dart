@@ -10,8 +10,10 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/export_pdf_button.dart';
 import '../../ui/widgets/labeled_money.dart';
+import 'report_blocks.dart';
 
 class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
@@ -27,155 +29,154 @@ class ReportsScreen extends ConsumerWidget {
     final width = MediaQuery.sizeOf(context).width;
     final phone = width <= AppBreakpoints.phone;
 
-    return ListView(
-      key: screenKey,
-      padding: pagePadding(width),
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Expanded(child: ScreenTitle(AppStrings.reports)),
-            IconButton(
-              key: const Key('reports-refresh'),
-              tooltip: AppStrings.refresh,
-              onPressed: () => ref.invalidate(reportsProvider),
-              icon: const Icon(Icons.refresh),
+    return SectionTheme(
+      child: ListView(
+        key: screenKey,
+        padding: pagePadding(width),
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Expanded(child: SectionHeading(AppStrings.reports)),
+              IconButton(
+                key: const Key('reports-refresh'),
+                tooltip: AppStrings.refresh,
+                onPressed: () => ref.invalidate(reportsProvider),
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
+          ),
+          Text(
+            AppStrings.reportsReadOnly,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: ExportPdfButton(),
+          ),
+          KeptData<ReportsDto>(
+            value: reports,
+            resetKey: 'reports',
+            onRetry: () => ref.invalidate(reportsProvider),
+            messageOf: (error) =>
+                failureText(ref.read(errorHandlerProvider).toFailure(error)),
+            failureOf: (error) =>
+                ref.read(errorHandlerProvider).toFailure(error),
+            loading: const SkeletonBox(
+              key: Key('reports-loading'),
+              height: 160,
             ),
-          ],
-        ),
-        Text(
-          AppStrings.reportsReadOnly,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: ExportPdfButton(),
-        ),
-        KeptData<ReportsDto>(
-          value: reports,
-          resetKey: 'reports',
-          onRetry: () => ref.invalidate(reportsProvider),
-          messageOf: (error) =>
-              failureText(ref.read(errorHandlerProvider).toFailure(error)),
-          failureOf: (error) => ref.read(errorHandlerProvider).toFailure(error),
-          loading: const SkeletonBox(key: Key('reports-loading'), height: 160),
-          builder: (data) {
-            if (data.rows.isEmpty) {
-              return const EmptyPane(
-                key: Key('reports-empty'),
-                message: AppStrings.emptyReports,
+            builder: (data) {
+              if (data.rows.isEmpty) {
+                return const EmptyPane(
+                  key: Key('reports-empty'),
+                  message: AppStrings.emptyReports,
+                );
+              }
+              final showChange = data.rows.any(
+                (row) => row.netChangeUnits != null,
               );
-            }
-            final showChange = data.rows.any(
-              (row) => row.netChangeUnits != null,
-            );
-            final current = data.rows.first;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _CurrentDay(row: current, money: money),
-                const SizedBox(height: AppSpacing.md),
-                if (phone)
-                  _ReportCards(
-                    rows: data.rows,
-                    money: money,
-                    showChange: showChange,
-                  )
-                else
-                  _ReportTable(
-                    rows: data.rows,
-                    money: money,
-                    showChange: showChange,
+              final current = data.current ?? data.rows.first;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Arranged like the website (Ali, 2026-11-04); the
+                  // 05:00 panel is the most prominent block.
+                  _ReportLayout(
+                    fiveAm: ReportFiveAm(rows: data.rows, money: money),
+                    hero: ReportHero(row: current, money: money),
+                    rest: [
+                      ReportBalances(row: current, money: money),
+                      ReportSources(row: current, money: money),
+                      ReportToday(row: current, money: money),
+                      ReportFollowUp(row: current, money: money),
+                    ],
                   ),
-                if (data.formula != null || data.methodologyNote != null) ...[
                   const SizedBox(height: AppSpacing.lg),
-                  Text(
-                    AppStrings.methodology,
-                    style: Theme.of(context).textTheme.titleSmall,
+                  const Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: PillTitle(AppStrings.dailyHistory),
                   ),
-                  if (data.formula != null) Text(data.formula!),
-                  if (data.methodologyNote != null) Text(data.methodologyNote!),
+                  const SizedBox(height: AppSpacing.sm),
+                  if (phone)
+                    _ReportCards(
+                      rows: data.rows,
+                      money: money,
+                      showChange: showChange,
+                    )
+                  else
+                    _ReportTable(
+                      rows: data.rows,
+                      money: money,
+                      showChange: showChange,
+                    ),
+                  if (data.formula != null || data.methodologyNote != null) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    const Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: PillTitle(AppStrings.methodology),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    if (data.formula != null) Text(data.formula!),
+                    if (data.methodologyNote != null)
+                      Text(data.methodologyNote!),
+                  ],
                 ],
-              ],
-            );
-          },
-        ),
-      ],
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _CurrentDay extends StatelessWidget {
-  const _CurrentDay({required this.row, required this.money});
+/// Phone: hero, then the 05:00 panel, then the rest. Wide: the 05:00
+/// panel on the right half (RTL start), everything else on the left.
+class _ReportLayout extends StatelessWidget {
+  const _ReportLayout({
+    required this.fiveAm,
+    required this.hero,
+    required this.rest,
+  });
 
-  final DailyReportRowDto row;
-  final MoneyFormatter money;
+  final Widget fiveAm;
+  final Widget hero;
+  final List<Widget> rest;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-    return Card(
-      key: const Key('report-current'),
-      color: scheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              AppStrings.currentDay,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: scheme.onPrimaryContainer,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            SizedBox(
-              width: double.infinity,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: AlignmentDirectional.centerStart,
-                child: LtrText(
-                  row.date ?? AppStrings.dash,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: scheme.onPrimaryContainer,
-                  ),
-                ),
-              ),
-            ),
-            if (row.note != null && row.note!.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                row.note!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
-              ),
+    const gap = SizedBox(height: AppSpacing.md);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 900) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              hero,
+              gap,
+              fiveAm,
+              for (final block in rest) ...[gap, block],
             ],
-            const SizedBox(height: AppSpacing.sm),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: ReportStatusChip(status: row.status),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              AppStrings.net,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onPrimaryContainer,
-              ),
-            ),
-            SizedBox(
-              width: double.infinity,
-              child: ScaledMoney(
-                money.formatOrDash(row.netUnits, Currency.lyd),
-                style: context.textExtras.amountLarge.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: fiveAm),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  hero,
+                  for (final block in rest) ...[gap, block],
+                ],
               ),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -221,6 +222,10 @@ class _ReportCard extends StatelessWidget {
     return Card(
       key: Key('report-card-${row.sequence}'),
       margin: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        side: BorderSide(color: context.look.cardBorder),
+      ),
       child: Padding(
         padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
         child: Column(

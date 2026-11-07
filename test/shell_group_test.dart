@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
-import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
@@ -15,10 +14,8 @@ import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/state/notification_providers.dart';
 import 'package:vib_abdo_company_mobile/state/session_providers.dart';
 import 'package:vib_abdo_company_mobile/state/theme_controller.dart';
-import 'package:vib_abdo_company_mobile/ui/presentation.dart';
 import 'package:vib_abdo_company_mobile/ui/section_labels.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
-import 'package:vib_abdo_company_mobile/ui/theme.dart';
 import 'package:vib_abdo_company_mobile/ui/widgets/common.dart';
 import 'package:vib_abdo_company_mobile/ui/widgets/soft_tile.dart';
 
@@ -176,17 +173,13 @@ void main() {
     await pumpFakeApp(tester, size: const Size(360, 1400));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     expectRtl(tester);
-    await tester.scrollUntilVisible(
-      find.byKey(HomeShell.sectionKey(SectionKey.customers)),
-      300,
-      scrollable: find.descendant(
-        of: find.byKey(HomeDashboard.screenKey),
-        matching: find.byType(Scrollable),
+    // Home section tiles (icon grid) carry no disclosure chevron.
+    expect(
+      find.descendant(
+        of: find.byKey(HomeShell.sectionKey(SectionKey.customers)),
+        matching: find.byIcon(Icons.chevron_right),
       ),
-    );
-    expectChevronMirrors(
-      tester,
-      find.byKey(HomeShell.sectionKey(SectionKey.customers)),
+      findsNothing,
     );
 
     await go(tester, '/settings');
@@ -194,11 +187,13 @@ void main() {
       tester,
       find.byKey(const Key('settings-link-employees')),
     );
-    expectChevronMirrors(tester, find.byKey(const Key('settings-link-audit')));
     expectChevronMirrors(
       tester,
-      find.byKey(const Key('settings-link-operations')),
+      find.byKey(const Key('settings-link-account')),
     );
+    // The empty admin stand-ins are no longer linked (Ali, 2026-11-04).
+    expect(find.byKey(const Key('settings-link-audit')), findsNothing);
+    expect(find.byKey(const Key('settings-link-operations')), findsNothing);
 
     await go(tester, '/');
     await tester.ensureVisible(find.byKey(const Key('bottom-tab-more')));
@@ -251,13 +246,20 @@ void main() {
     await pumpFakeApp(tester, size: const Size(360, 900));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     expect(find.byType(PhoneBottomNav), findsOneWidget);
-    expect(find.text(AppStrings.settings), findsNothing);
+    // Home shows the settings tile; the drawer lists its own settings row.
+    expect(find.byKey(HomeDashboard.settingsTileKey), findsOneWidget);
 
     await tester.tap(find.byKey(HomeShell.menuKey));
     await settle(tester);
     final drawer = tester.getRect(find.byType(Drawer));
     expect(drawer.right, moreOrLessEquals(360, epsilon: 1));
-    expect(find.text(AppStrings.settings), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(Drawer),
+        matching: find.text(AppStrings.settings),
+      ),
+      findsOneWidget,
+    );
     expect(find.text(AppStrings.employeesTile), findsNothing);
     Navigator.of(tester.element(find.byType(Drawer))).pop();
     await settle(tester);
@@ -280,11 +282,13 @@ void main() {
       find.byKey(HomeShell.sectionKey(SectionKey.collections)),
       findsOneWidget,
     );
+    // The tiles show names only; write access stays in the home summary.
+    expect(homeWritable(tester), contains(SectionKey.collections));
+    expect(homeWritable(tester), isNot(contains(SectionKey.customers)));
     expect(
       find.byKey(HomeShell.writeKey(SectionKey.collections)),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.byKey(HomeShell.writeKey(SectionKey.customers)), findsNothing);
     expect(find.byKey(HomeShell.sectionKey(SectionKey.treasury)), findsNothing);
     expect(find.text(AppStrings.settings), findsNothing);
 
@@ -373,97 +377,191 @@ void main() {
     expect(find.text(AppStrings.operationsEmpty), findsOneWidget);
   });
 
-  testWidgets('home fallback keeps server section figures without a total', (
+  testWidgets('phone status strip: role on the right, status on the left', (
     tester,
   ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(360, 1000));
-    (layer.client as FakeApiClient).failHomeRemaining = 8;
-    await signIn(tester, username: 'other.employee', password: 'demo-only');
-    expect(find.byKey(const Key('home-fallback-banner')), findsOneWidget);
-    expect(find.text(AppStrings.homeFallbackNote), findsOneWidget);
-    expect(find.textContaining(AppStrings.netDebt), findsWidgets);
-    expect(find.textContaining('ج.م'), findsNothing);
-    expect(find.byKey(HomeShell.sectionKey(SectionKey.treasury)), findsNothing);
-    expect(find.byKey(const Key('home-fallback-banner')), findsOneWidget);
-  });
-
-  testWidgets('a normal home read does not show the fallback note', (
-    tester,
-  ) async {
-    await pumpFakeApp(tester, size: const Size(360, 900));
+    await pumpFakeApp(tester, size: const Size(360, 800));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    expect(find.byKey(const Key('home-fallback-banner')), findsNothing);
-    expect(find.text('2026-10-19'), findsOneWidget);
-    expect(find.textContaining('320 د.ل'), findsWidgets);
-  });
 
-  testWidgets('companies-only debts open the companies section', (
-    tester,
-  ) async {
-    await pumpFakeApp(
-      tester,
-      size: const Size(800, 1400),
-      overrides: [
-        homeDashboardProvider.overrideWith((ref) async {
-          return const HomeDto(
-            summaries: [],
-            counters: {},
-            oldDebts: [
-              OldDebtDto(
-                id: 'co_1',
-                section: 'companies',
-                name: 'شركة تجريبية',
-                balanceUnits: MoneyValue.known(10),
-                currency: Currency.lyd,
-              ),
-            ],
-          );
-        }),
-      ],
+    // The old centred identity block is gone from the page body.
+    expect(find.text(AppStrings.signedInAs), findsNothing);
+    final strip = find.byType(ConnectionBanner);
+    expect(strip, findsOneWidget);
+    final role = find.descendant(
+      of: strip,
+      matching: find.byKey(HomeShell.roleKey),
     );
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    expect(find.byKey(const Key('show-all-companies')), findsOneWidget);
-    expect(find.byKey(const Key('show-all-customers')), findsNothing);
-    await tester.ensureVisible(find.byKey(const Key('show-all-companies')));
-    await tester.tap(find.byKey(const Key('show-all-companies')));
-    await settle(tester);
-    expect(find.byKey(const Key('screen-companies')), findsOneWidget);
+    expect(role, findsOneWidget);
+    expect(tester.widget<Text>(role).data, AppStrings.roleAdmin);
+    final status = find.byKey(const Key('online-banner'));
+    expect(tester.widget<Text>(status).data, 'متصل • محفوظ');
+    // RTL: the role hugs the right edge, the status sits to its left.
+    // The role sits in the right part of the strip (a chip may pad it).
+    expect(tester.getRect(role).left, greaterThan(360 * 0.6));
+    expect(tester.getRect(status).right, lessThan(tester.getRect(role).left));
+    expect(tester.getRect(status).center.dx, lessThan(180));
+    expect(tester.takeException(), isNull);
   });
 
-  for (final section in SectionKey.values) {
-    testWidgets('DEF-010 view all for ${section.key} opens /${section.key}', (
-      tester,
-    ) async {
-      await pumpFakeApp(
-        tester,
-        size: const Size(430, 1400),
-        overrides: [
-          homeDashboardProvider.overrideWith(
-            (ref) async => HomeDto(
-              summaries: const <HomeSummaryDto>[],
-              counters: const <String, int>{},
-              oldDebts: [
-                OldDebtDto(
-                  id: 'row-${section.key}',
-                  section: section.key,
-                  name: 'سجل ${section.key}',
-                  balanceUnits: MoneyValue.known(10),
-                  currency: Currency.lyd,
-                ),
-              ],
-            ),
-          ),
-        ],
+  testWidgets('a wide window keeps the role in the side list only', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(1100, 900));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    expect(find.byKey(HomeShell.roleKey), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(ConnectionBanner),
+        matching: find.byKey(HomeShell.roleKey),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('home tiles fill a tall phone and scroll on a small one', (
+    tester,
+  ) async {
+    // 430x932: five rows grow to the bottom bar, no empty band below.
+    await pumpFakeApp(tester, size: const Size(430, 932));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    final barTop = tester.getRect(find.byType(PhoneBottomNav)).top;
+    final settings = tester.getRect(find.byKey(HomeDashboard.settingsTileKey));
+    expect(barTop - settings.bottom, lessThan(40));
+    expect(settings.height, greaterThan(120));
+    expect(settings.height, lessThanOrEqualTo(190));
+    expect(tester.takeException(), isNull);
+
+    // 320x568: tiles keep their minimum height and the grid scrolls.
+    await pumpFakeApp(tester, size: const Size(320, 568));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    final first = tester.getRect(
+      find.byKey(HomeShell.sectionKey(SectionKey.customers)),
+    );
+    expect(first.height, greaterThanOrEqualTo(112));
+    final small = tester.getRect(find.byKey(HomeDashboard.settingsTileKey));
+    expect(small.top, greaterThan(568));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('bottom bar: short debt names, full names everywhere else', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await pumpFakeApp(tester, size: const Size(430, 932));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    final bar = find.byType(PhoneBottomNav);
+    Finder inBar(String text) =>
+        find.descendant(of: bar, matching: find.text(text));
+    expect(inBar(AppStrings.bottomTabCustomers), findsOneWidget);
+    expect(inBar(AppStrings.bottomTabCompanies), findsOneWidget);
+    expect(inBar(AppStrings.bottomTabCollections), findsOneWidget);
+    expect(inBar(sectionLabel(SectionKey.collections)), findsNothing);
+    expect(
+      find.descendant(
+        of: bar,
+        matching: find.bySemanticsLabel(sectionLabel(SectionKey.collections)),
+      ),
+      findsOneWidget,
+    );
+    expect(inBar(sectionLabel(SectionKey.customers)), findsNothing);
+    expect(inBar(sectionLabel(SectionKey.companies)), findsNothing);
+    // Screen readers still hear the full names.
+    expect(
+      find.descendant(
+        of: bar,
+        matching: find.bySemanticsLabel(sectionLabel(SectionKey.customers)),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: bar,
+        matching: find.bySemanticsLabel(sectionLabel(SectionKey.companies)),
+      ),
+      findsOneWidget,
+    );
+    // Home tiles keep the full names; the short ones appear only in the bar.
+    expect(find.text(sectionLabel(SectionKey.customers)), findsOneWidget);
+    expect(find.text(AppStrings.bottomTabCustomers), findsOneWidget);
+
+    // App bar title and drawer keep the full name.
+    await go(tester, '/customers');
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text(sectionLabel(SectionKey.customers)),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(HomeShell.menuKey));
+    await settle(tester);
+    final drawer = find.byType(Drawer);
+    expect(
+      find.descendant(
+        of: drawer,
+        matching: find.text(sectionLabel(SectionKey.companies)),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: drawer,
+        matching: find.text(AppStrings.bottomTabCompanies),
+      ),
+      findsNothing,
+    );
+    semantics.dispose();
+  });
+
+  testWidgets('home is the icon grid only, ending with the settings tile', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(430, 1400));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    final grid = find.byKey(const Key('home-tile-grid'));
+    expect(grid, findsOneWidget);
+    for (final section in SectionKey.values) {
+      expect(
+        find.descendant(
+          of: grid,
+          matching: find.byKey(HomeShell.sectionKey(section)),
+        ),
+        findsOneWidget,
       );
-      await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      final button = find.byKey(Key('show-all-${section.key}'));
-      expect(button, findsOneWidget);
-      await tester.ensureVisible(button);
-      await tester.tap(button);
-      await settle(tester);
-      expect(find.byKey(Key(_sectionScreen(section))), findsOneWidget);
-    });
-  }
+    }
+    expect(find.byKey(HomeDashboard.settingsTileKey), findsOneWidget);
+    // The settings tile is last, after the nine sections.
+    final tiles = find.descendant(of: grid, matching: find.byType(HomeTile));
+    expect(tiles, findsNWidgets(SectionKey.values.length + 1));
+    final settingsTop = tester
+        .getRect(find.byKey(HomeDashboard.settingsTileKey))
+        .top;
+    for (final element in tiles.evaluate()) {
+      expect(
+        tester.getRect(find.byWidget(element.widget)).top,
+        lessThanOrEqualTo(settingsTop),
+      );
+    }
+    // Removed from home (Ali, 2026-11-01): summary, bulletin, actions, date.
+    expect(find.text(AppStrings.homeCardsTitle), findsNothing);
+    expect(find.text(AppStrings.oldDebtsTitle), findsNothing);
+    expect(find.text(AppStrings.actionsTitle), findsNothing);
+    expect(find.byKey(const Key('home-business-date')), findsNothing);
+    expect(find.byKey(const Key('home-fallback-banner')), findsNothing);
+    expect(find.byKey(const Key('old-debt-c_55')), findsNothing);
+    expect(find.byKey(const Key('show-all-customers')), findsNothing);
+    for (final action in ManagementAction.values) {
+      expect(find.byKey(HomeShell.actionKey(action)), findsNothing);
+    }
+
+    await tester.ensureVisible(find.byKey(HomeDashboard.settingsTileKey));
+    await tester.tap(find.byKey(HomeDashboard.settingsTileKey));
+    await settle(tester);
+    expect(
+      GoRouter.of(tester.element(find.byType(Scaffold).first)).state.uri.path,
+      '/settings',
+    );
+  });
 
   testWidgets('DEF-012 admin settings replace the old unavailable sentence', (
     tester,
@@ -539,123 +637,6 @@ void main() {
       isNotNull,
     );
   });
-
-  testWidgets('home debt amount and age stay on separate lines', (
-    tester,
-  ) async {
-    await pumpFakeApp(
-      tester,
-      size: const Size(360, 900),
-      overrides: [
-        homeDashboardProvider.overrideWith(
-          (ref) async => const HomeDto(
-            summaries: <HomeSummaryDto>[],
-            counters: <String, int>{},
-            oldDebts: [
-              OldDebtDto(
-                id: 'labeled',
-                section: 'customers',
-                name: 'عميل موسوم',
-                balanceUnits: MoneyValue.known(15),
-                currency: Currency.lyd,
-                debtAgeDays: 2,
-                ageStatus: 'warning',
-                ageStatusLabel: 'منذ 4 أيام',
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    final labeled = find.byKey(const Key('old-debt-labeled'));
-    expect(
-      tester.widget<Text>(find.byKey(const Key('old-debt-age-labeled'))).data,
-      'منذ 4 أيام',
-    );
-    expect(find.text('منذ 2 أيام'), findsNothing);
-    var amount = tester.widget<MoneyText>(
-      find.descendant(of: labeled, matching: find.byType(MoneyText)),
-    );
-    expect(amount.text, '15 د.ل');
-    expect(amount.text.contains('منذ'), isFalse);
-
-    await pumpFakeApp(
-      tester,
-      size: const Size(360, 900),
-      overrides: [
-        homeDashboardProvider.overrideWith(
-          (ref) async => const HomeDto(
-            summaries: <HomeSummaryDto>[],
-            counters: <String, int>{},
-            oldDebts: [
-              OldDebtDto(
-                id: 'counted',
-                section: 'customers',
-                name: 'عميل بلا وسم',
-                balanceUnits: MoneyValue.known(8),
-                currency: Currency.lyd,
-                debtAgeDays: 2,
-                ageStatus: 'warning',
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    expect(
-      tester.widget<Text>(find.byKey(const Key('old-debt-age-counted'))).data,
-      sinceDays(2),
-    );
-    final counted = find.byKey(const Key('old-debt-counted'));
-    amount = tester.widget<MoneyText>(
-      find.descendant(of: counted, matching: find.byType(MoneyText)),
-    );
-    expect(amount.text, '8 د.ل');
-    expect(amount.text.contains('منذ'), isFalse);
-  });
-
-  for (final dark in [false, true]) {
-    testWidgets(
-      'P4-002 home debt row uses the ageStatus gradient (${dark ? 'dark' : 'light'})',
-      (tester) async {
-        await pumpFakeApp(tester, size: const Size(360, 900));
-        if (dark) {
-          await tester.tap(find.byKey(LoginScreen.themeKey));
-          await settle(tester);
-        }
-        await signIn(tester, username: 'admin.demo', password: 'demo-only');
-        final row = find.byKey(const Key('old-debt-c_55'));
-        await tester.scrollUntilVisible(
-          row,
-          400,
-          scrollable: find.descendant(
-            of: find.byKey(HomeDashboard.screenKey),
-            matching: find.byType(Scrollable),
-          ),
-        );
-        expect(row, findsOneWidget);
-        final context = tester.element(row);
-        final ink = tester.widget<Ink>(
-          find.descendant(of: row, matching: find.byType(Ink)),
-        );
-        final decoration = ink.decoration! as BoxDecoration;
-        expect(decoration.gradient, context.statusColors.warningDebt);
-        expect(find.text('منذ 4 أيام'), findsOneWidget);
-        final amount = tester.widget<MoneyText>(
-          find.descendant(of: row, matching: find.byType(MoneyText)),
-        );
-        expect(amount.text, '320 د.ل');
-        expect(amount.text.contains('منذ'), isFalse);
-        final age = tester.widget<Text>(
-          find.byKey(const Key('old-debt-age-c_55')),
-        );
-        expect(age.data, 'منذ 4 أيام');
-        expect(age.data!.contains('د.ل'), isFalse);
-      },
-    );
-  }
 
   testWidgets('P4-003 settings empty states and Arabic ledger labels', (
     tester,
@@ -813,12 +794,3 @@ class _Gate {
   var failing = true;
   var calls = 0;
 }
-
-String _sectionScreen(SectionKey section) => switch (section) {
-  SectionKey.collections => 'screen-collections',
-  SectionKey.masraweya => 'screen-masraweya',
-  SectionKey.purchases => 'screen-purchases',
-  SectionKey.treasury => 'screen-treasury',
-  SectionKey.reports => 'screen-reports',
-  _ => 'screen-${section.key}',
-};

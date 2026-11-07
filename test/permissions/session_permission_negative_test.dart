@@ -59,10 +59,7 @@ void main() {
     expect(find.byKey(LoginScreen.submitKey), findsOneWidget);
     expect(find.text(AppStrings.sessionExpired), findsNothing);
     expect(find.byKey(HomeShell.shellKey), findsNothing);
-    expect(
-      (layer.session.state as SessionUnauthenticated).reason,
-      'logout',
-    );
+    expect((layer.session.state as SessionUnauthenticated).reason, 'logout');
     expect(container.read(accountQueryProvider(AccountSection.customers)), '');
     expect(layer.permissions.canRead(SectionKey.customers), isFalse);
 
@@ -75,7 +72,9 @@ void main() {
     expect(find.text('secret-admin'), findsNothing);
   });
 
-  testWidgets('the next user does not see the previous account', (tester) async {
+  testWidgets('the next user does not see the previous account', (
+    tester,
+  ) async {
     final layer = await pumpFakeApp(tester, size: const Size(800, 1400));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     expect(find.text('مدير تجريبي'), findsWidgets);
@@ -96,10 +95,7 @@ void main() {
 
     expect(find.text('دور غير معروف'), findsOneWidget);
     expect(find.text('مدير تجريبي'), findsNothing);
-    expect(
-      find.byKey(HomeShell.sectionKey(SectionKey.treasury)),
-      findsNothing,
-    );
+    expect(find.byKey(HomeShell.sectionKey(SectionKey.treasury)), findsNothing);
     expect(find.textContaining('10,635'), findsNothing);
     expect(container.read(accountQueryProvider(AccountSection.customers)), '');
     expect(layer.permissions.fullAccess, isFalse);
@@ -119,9 +115,15 @@ void main() {
 
       final gate = Completer<void>();
       fake.pauseMutations = gate;
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('add-payment')));
       await settle(tester);
       await enterAmount(tester, '100');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+      await tester.ensureVisible(find.byKey(const Key('save-movement')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('save-movement')));
       await tester.pump();
       await tester.pump(Duration.zero);
@@ -144,16 +146,28 @@ void main() {
       expect(after.balanceUnits, before.balanceUnits);
       expect(after.version, before.version);
       await go(tester, '/customers/c_55');
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('add-payment')));
       await settle(tester);
       await enterAmount(tester, '100');
       await tester.pump();
       expect(fake.mutationRequestIds, [requestId]);
 
+      FocusManager.instance.primaryFocus?.unfocus();
+
+      await tester.pump();
+
+      await tester.ensureVisible(find.byKey(const Key('save-movement')));
+
+      await tester.pump(const Duration(milliseconds: 400));
+
       await tester.tap(find.byKey(const Key('save-movement')));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
       expect(fake.mutationRequestIds, [requestId, requestId]);
+      // The ledger fetches its older page by itself; let it finish.
+      await tester.pump(const Duration(seconds: 1));
     },
   );
 }

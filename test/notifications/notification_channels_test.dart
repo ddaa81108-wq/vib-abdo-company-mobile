@@ -21,10 +21,7 @@ void main() {
       NotificationImportance.high,
     );
     expect(NotificationChannels.smallIcon, 'ic_stat_notification');
-    expect(
-      NotificationChannels.applicationId,
-      'com.vip2100.vib',
-    );
+    expect(NotificationChannels.applicationId, 'com.vip2100.vib');
     expect(NotificationChannels.minSdkCeiling, 29);
     expect(NotificationChannels.runtimePermissionSdk, 33);
   });

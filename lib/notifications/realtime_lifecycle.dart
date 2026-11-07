@@ -82,6 +82,7 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
         ref.invalidate(unreadCountProvider);
         ref.invalidate(homeDashboardProvider);
         ref.invalidate(collectionsProvider);
+        ref.invalidate(payrollProvider);
         ref.invalidate(ledgerProvider);
         _bridge?.onSignal(signal);
       });

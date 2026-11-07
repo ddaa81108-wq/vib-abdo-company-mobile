@@ -16,9 +16,12 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/mutation_form.dart';
 import 'account_list_logic.dart';
 import 'account_name_suggestions.dart';
+import 'company_card_tone.dart';
+import 'customer_card_tone.dart';
 
 /// Customers, companies, Libyan deposits, and Egyptian deposits share this
 /// screen. [section] selects the repository path, currency, and labels.
@@ -66,12 +69,76 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     final canWrite = permissions.canWrite(section.sectionKey);
     final home = ref.watch(homeDashboardProvider);
     final width = MediaQuery.sizeOf(context).width;
-    final columns = accountListColumns(
+    final gridColumns = accountListColumns(
       width,
       textScale: MediaQuery.textScalerOf(context).scale(1),
     );
+    // Customers and companies share the debt-card design (the website's
+    // `customers || companies` layout): two equal cards per row on every
+    // phone (Ali, 2026-11-02; companies 2026-11-03). Each keeps its own data.
+    final isCustomers = section == AccountSection.customers;
+    final debtLook = isDebtLookSection(section);
+    final columns = debtLook && gridColumns < 2 ? 2 : gridColumns;
 
-    return KeptData<AccountsPage>(
+    final Widget searchField = TextField(
+      key: const Key('account-search'),
+      controller: _search,
+      textInputAction: TextInputAction.search,
+      // Fills the toolbar height like the two buttons.
+      expands: debtLook,
+      maxLines: debtLook ? null : 1,
+      textAlignVertical: debtLook ? TextAlignVertical.center : null,
+      decoration: InputDecoration(
+        labelText: debtLook ? null : AppStrings.filterSearch,
+        hintText: debtLook ? AppStrings.filterSearch : null,
+        hintMaxLines: 1,
+        isDense: false,
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _search,
+          builder: (context, value, _) {
+            if (value.text.isEmpty) return const SizedBox.shrink();
+            return IconButton(
+              key: const Key('clear-account-search'),
+              tooltip: AppStrings.clearSearch,
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                _search.clear();
+                ref.read(accountExtraCardsProvider(section).notifier).clear();
+                ref.read(accountQueryProvider(section).notifier).state = '';
+              },
+            );
+          },
+        ),
+      ),
+      onSubmitted: (value) {
+        ref.read(accountExtraCardsProvider(section).notifier).clear();
+        ref.read(accountQueryProvider(section).notifier).state = value;
+      },
+    );
+    final Widget addButton = GatedButton(
+      buttonKey: const Key('add-account'),
+      allowed: permissions.canWrite(section.sectionKey),
+      online: online,
+      label: _addLabel,
+      onPressed: () => _create(context),
+    );
+    final Widget assignButton = GatedButton(
+      buttonKey: const Key('assign-mode'),
+      allowed: _canAssign(permissions),
+      online: online,
+      filled: false,
+      label: AppStrings.assign,
+      onPressed: () => setState(() {
+        _assigning = !_assigning;
+        _selected.clear();
+      }),
+    );
+
+    final deposits =
+        section == AccountSection.libyanDeposits ||
+        section == AccountSection.egyptianDeposits;
+    final Widget body = KeptData<AccountsPage>(
       value: page,
       resetKey: section,
       expand: true,
@@ -109,8 +176,14 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: pagePadding(width),
             children: [
-              ScreenTitle(sectionLabel(section.sectionKey)),
-              const SizedBox(height: AppSpacing.md),
+              // Customers and companies: no page title (Ali, 2026-11-02).
+              if (deposits) ...[
+                _DepositTitleBar(sectionLabel(section.sectionKey)),
+                const SizedBox(height: AppSpacing.md),
+              ] else if (!debtLook) ...[
+                ScreenTitle(sectionLabel(section.sectionKey)),
+                const SizedBox(height: AppSpacing.md),
+              ],
               if (_showTicker)
                 _ticker(
                   home,
@@ -123,78 +196,79 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                       ? HistoryWindow.retainLimit
                       : null,
                 ),
-              _SummaryStrip(
-                summary: data.summary,
-                currency: section.currency,
-                money: money,
-              ),
+              // Deposits (Ali's device shots, 2026-11-04): one row with the
+              // section total, the active count and add; then the rate row.
+              if (deposits)
+                _DepositTopRow(
+                  summary: data.summary,
+                  currency: section.currency,
+                  money: money,
+                  add: addButton,
+                  assign: _canAssign(permissions)
+                      ? GatedButton(
+                          buttonKey: const Key('assign-mode'),
+                          allowed: true,
+                          online: online,
+                          filled: false,
+                          label: AppStrings.assign,
+                          glyph: Icons.assignment_ind_outlined,
+                          onPressed: () => setState(() {
+                            _assigning = !_assigning;
+                            _selected.clear();
+                          }),
+                        )
+                      : null,
+                )
+              else
+                _SummaryStrip(
+                  section: section,
+                  summary: data.summary,
+                  currency: section.currency,
+                  money: money,
+                ),
               if (section == AccountSection.egyptianDeposits) const _RateCard(),
               const SizedBox(height: AppSpacing.md),
-              _Tabs(section: section, summary: data.summary),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                key: const Key('account-search'),
-                controller: _search,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  labelText: AppStrings.filterSearch,
-                  isDense: false,
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _search,
-                    builder: (context, value, _) {
-                      if (value.text.isEmpty) return const SizedBox.shrink();
-                      return IconButton(
-                        key: const Key('clear-account-search'),
-                        tooltip: AppStrings.clearSearch,
-                        icon: const Icon(Icons.close),
-                        onPressed: () {
-                          _search.clear();
-                          ref
-                              .read(accountExtraCardsProvider(section).notifier)
-                              .clear();
-                          ref
-                                  .read(accountQueryProvider(section).notifier)
-                                  .state =
-                              '';
-                        },
-                      );
-                    },
+              // Customers and companies: no filter chips (Ali, 2026-11-02).
+              // Deposits: no filter chips (Ali, 2026-11-04).
+              if (!debtLook && !deposits) ...[
+                _Tabs(section: section, summary: data.summary),
+                const SizedBox(height: AppSpacing.md),
+              ],
+              if (debtLook)
+                _CustomersToolbar(
+                  toolbarKey: Key(
+                    isCustomers ? 'customers-toolbar' : 'companies-toolbar',
                   ),
-                ),
-                onSubmitted: (value) {
-                  ref.read(accountExtraCardsProvider(section).notifier).clear();
-                  ref.read(accountQueryProvider(section).notifier).state =
-                      value;
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Wrap(
-                spacing: AppSpacing.md,
-                runSpacing: AppSpacing.md,
-                children: [
-                  GatedButton(
-                    buttonKey: const Key('add-account'),
-                    allowed: permissions.canWrite(section.sectionKey),
-                    online: online,
-                    label: _addLabel,
-                    onPressed: () => _create(context),
-                  ),
-                  GatedButton(
-                    buttonKey: const Key('assign-mode'),
-                    allowed: _canAssign(permissions),
-                    online: online,
-                    filled: false,
-                    label: AppStrings.assign,
-                    onPressed: () => setState(() => _assigning = !_assigning),
+                  add: addButton,
+                  search: searchField,
+                  assign: assignButton,
+                )
+              else ...[
+                searchField,
+                // Deposits: add and assign sit in the top row.
+                if (!deposits) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Wrap(
+                    spacing: AppSpacing.md,
+                    runSpacing: AppSpacing.md,
+                    children: [addButton, assignButton],
                   ),
                 ],
-              ),
+              ],
               if (_assigning)
                 _AssignSubmit(
                   section: section,
                   customerIds: assignmentTargetIds(_selected, cards),
                   online: online,
+                  onCancel: () => setState(() {
+                    _assigning = false;
+                    _selected.clear();
+                  }),
+                  onAssigned: (message) => setState(() {
+                    _assigning = false;
+                    _selected.clear();
+                    _reply = message;
+                  }),
                 ),
               if (_reply != null) ...[
                 const SizedBox(height: AppSpacing.sm),
@@ -220,23 +294,55 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                   child: NotificationListener<ScrollNotification>(
                     onNotification: (notification) =>
                         _onCardsScroll(notification, data.page.nextCursor),
-                    child: ListView.builder(
-                      key: const Key('account-cards-list'),
-                      itemCount: cards.length,
-                      itemBuilder: (context, index) {
-                        final card = cards[index];
-                        return Padding(
-                          padding: const EdgeInsetsDirectional.only(
-                            bottom: AppSpacing.md,
+                    child: debtLook
+                        ? ListView.builder(
+                            key: const Key('account-cards-list'),
+                            itemCount: (cards.length + 1) ~/ 2,
+                            itemBuilder: (context, row) => Padding(
+                              padding: const EdgeInsetsDirectional.only(
+                                bottom: AppSpacing.md,
+                              ),
+                              child: SizedBox(
+                                height: customerCardHeight(context),
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    for (final i in [row * 2, row * 2 + 1]) ...[
+                                      if (i == row * 2 + 1)
+                                        const SizedBox(width: AppSpacing.md),
+                                      Expanded(
+                                        child: i < cards.length
+                                            ? _accountCard(
+                                                card: cards[i],
+                                                canWrite: canWrite,
+                                                permissions: permissions,
+                                              )
+                                            : const SizedBox.shrink(),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            key: const Key('account-cards-list'),
+                            itemCount: cards.length,
+                            itemBuilder: (context, index) {
+                              final card = cards[index];
+                              return Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  bottom: AppSpacing.md,
+                                ),
+                                child: _accountCard(
+                                  card: card,
+                                  canWrite: canWrite,
+                                  permissions: permissions,
+                                ),
+                              );
+                            },
                           ),
-                          child: _accountCard(
-                            card: card,
-                            canWrite: canWrite,
-                            permissions: permissions,
-                          ),
-                        );
-                      },
-                    ),
                   ),
                 ),
               if (_loadMoreCursor(data.page.nextCursor) != null)
@@ -258,6 +364,8 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
         );
       },
     );
+    // Deposits use the app's gold buttons (Ali's device shots).
+    return deposits ? SectionTheme(child: body) : body;
   }
 
   /// Approved by Ali on 2026-10-22, enabled by default.
@@ -293,6 +401,9 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             for (final card in cards)
               SizedBox(
                 width: cardWidth,
+                height: isDebtLookSection(section)
+                    ? customerCardHeight(context)
+                    : null,
                 child: _accountCard(
                   card: card,
                   canWrite: canWrite,
@@ -339,8 +450,9 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   double _cardWidth(double maxWidth, int columns) {
     if (columns <= 1 || maxWidth <= 0) return maxWidth;
     final raw = (maxWidth - AppSpacing.md * (columns - 1)) / columns;
-    if (raw < 160) return maxWidth;
-    return raw.clamp(160.0, maxWidth);
+    final min = isDebtLookSection(section) ? 120.0 : 160.0;
+    if (raw < min) return maxWidth;
+    return raw.clamp(min, maxWidth);
   }
 
   bool get _showTicker =>
@@ -388,26 +500,30 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             ],
           );
     if (width <= AppBreakpoints.phone && !_showAllDebts) {
-      return ExpansionTile(
-        tilePadding: const EdgeInsetsDirectional.symmetric(
-          horizontal: AppSpacing.sm,
-        ),
-        childrenPadding: const EdgeInsetsDirectional.only(
-          bottom: AppSpacing.sm,
-        ),
-        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        title: const Text(AppStrings.oldDebtsTitle),
-        children: [
-          body,
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: TextButton(
-              key: const Key('show-all-debts'),
-              onPressed: () => _showAll(nextCursor, retainLimit: retainLimit),
-              child: const Text(AppStrings.showAll),
-            ),
+      // Its own Material, so its ink stays visible under page transitions.
+      return Material(
+        type: MaterialType.transparency,
+        child: ExpansionTile(
+          tilePadding: const EdgeInsetsDirectional.symmetric(
+            horizontal: AppSpacing.sm,
           ),
-        ],
+          childrenPadding: const EdgeInsetsDirectional.only(
+            bottom: AppSpacing.sm,
+          ),
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          title: const Text(AppStrings.oldDebtsTitle),
+          children: [
+            body,
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                key: const Key('show-all-debts'),
+                onPressed: () => _showAll(nextCursor, retainLimit: retainLimit),
+                child: const Text(AppStrings.showAll),
+              ),
+            ),
+          ],
+        ),
       );
     }
     return Column(
@@ -582,11 +698,13 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
 
 class _SummaryStrip extends StatelessWidget {
   const _SummaryStrip({
+    required this.section,
     required this.summary,
     required this.currency,
     required this.money,
   });
 
+  final AccountSection section;
   final AccountsSummaryDto summary;
   final Currency currency;
   final MoneyFormatter money;
@@ -594,28 +712,318 @@ class _SummaryStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-        child: Wrap(
-          spacing: AppSpacing.xl,
-          runSpacing: AppSpacing.md,
-          children: [
-            _Metric(
-              label: AppStrings.netDebt,
-              value: money.formatOrDash(summary.netBalanceUnits, currency),
-              valueStyle: theme.textTheme.titleSmall,
-              amountStyle: context.textExtras.amountLarge,
+    // Customers show only the server totalDebt, as the headline (Ali,
+    // 2026-11-02). Other sections keep net and total.
+    if (isDebtLookSection(section)) {
+      final isCustomers = section == AccountSection.customers;
+      final prefix = isCustomers ? 'customers' : 'companies';
+      // Right: this section's own server netBalance (total debts minus credits). Left: server
+      // activeCards. No client arithmetic (Ali, 2026-11-02).
+      final count = summary.activeCards;
+      // Glossy headline in both themes (Ali, 2026-11-03): vivid gradient,
+      // white sheen, bright border, coloured glow, white text.
+      final look = context.look;
+      final gloss = look.glossHero;
+      final label = theme.textTheme.titleSmall?.copyWith(
+        color: look.onHeroMuted,
+        fontWeight: FontWeight.w500,
+      );
+      final figure = context.textExtras.amountLarge.copyWith(
+        color: look.heroFigure,
+      );
+      final radius = BorderRadius.circular(AppRadii.xxl);
+      return DecoratedBox(
+        key: Key('$prefix-summary'),
+        decoration: gloss
+            .decoration(radius)
+            .copyWith(boxShadow: gloss.glowShadow),
+        child: ClipRRect(
+          borderRadius: radius,
+          child: GlossSheen(
+            gloss: gloss,
+            radius: radius,
+            child: Padding(
+              padding: const EdgeInsetsDirectional.all(AppSpacing.xl),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isCustomers
+                              ? AppStrings.customersTotalDebt
+                              : AppStrings.netDebt,
+                          style: label,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.centerStart,
+                          child: MoneyText(
+                            money.formatOrDash(
+                              summary.netBalanceUnits,
+                              currency,
+                            ),
+                            key: Key('$prefix-summary-amount'),
+                            style: figure.copyWith(color: look.heroFigure),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Flexible(
+                    flex: 2,
+                    // Scales down instead of breaking a word at large text.
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.topEnd,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            isCustomers
+                                ? AppStrings.activeCardsCount
+                                : AppStrings.companiesActiveCards,
+                            textAlign: TextAlign.end,
+                            style: label,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            count == null ? AppStrings.dash : '$count',
+                            key: Key('$prefix-summary-count'),
+                            textDirection: TextDirection.ltr,
+                            style: figure,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            _Metric(
-              label: AppStrings.totalDebt,
-              value: money.formatOrDash(summary.totalDebtUnits, currency),
-              valueStyle: theme.textTheme.bodySmall,
-              amountStyle: context.textExtras.amount,
+          ),
+        ),
+      );
+    }
+    // Deposits: the app's glossy gold headline (Ali's device shots).
+    // Same two server figures; display only.
+    const ink = Color(0xFF1A1300);
+    const gold = Gloss(
+      top: Color(0xFFFCD34D),
+      bottom: Color(0xFFD97706),
+      border: Color(0xFFFDE68A),
+      glow: Color(0x40D97706),
+      ink: ink,
+      amount: ink,
+      sheen: 0.22,
+    );
+    final radius = BorderRadius.circular(AppRadii.xxl);
+    return DecoratedBox(
+      decoration: gold.decoration(radius).copyWith(boxShadow: gold.glowShadow),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: GlossSheen(
+          gloss: gold,
+          radius: radius,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+            child: Wrap(
+              spacing: AppSpacing.xl,
+              runSpacing: AppSpacing.md,
+              children: [
+                _Metric(
+                  label: AppStrings.netDebt,
+                  value: money.formatOrDash(summary.netBalanceUnits, currency),
+                  valueStyle: theme.textTheme.titleSmall?.copyWith(color: ink),
+                  amountStyle: context.textExtras.amountLarge.copyWith(
+                    color: ink,
+                  ),
+                ),
+                _Metric(
+                  label: AppStrings.totalDebt,
+                  value: money.formatOrDash(summary.totalDebtUnits, currency),
+                  valueStyle: theme.textTheme.bodySmall?.copyWith(color: ink),
+                  amountStyle: context.textExtras.amount.copyWith(color: ink),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The deposits' title band: dark glass with the title in gold.
+class _DepositTitleBar extends StatelessWidget {
+  const _DepositTitleBar(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final gold = sectionGold(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        gradient: LinearGradient(
+          begin: AlignmentDirectional.centerStart,
+          end: AlignmentDirectional.centerEnd,
+          colors: [
+            look.card,
+            Color.alphaBlend(gold.withValues(alpha: 0.10), look.card),
+          ],
+        ),
+        border: Border.all(color: look.cardBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
+        ),
+        child: Text(
+          title,
+          key: const Key('deposit-title'),
+          style: cairo(20, 800, color: gold),
+        ),
+      ),
+    );
+  }
+}
+
+/// One row: gold section total pill, النشطة N pill, then the actions.
+/// Server figures only (netBalance, activeCards).
+class _DepositTopRow extends StatelessWidget {
+  const _DepositTopRow({
+    required this.summary,
+    required this.currency,
+    required this.money,
+    required this.add,
+    this.assign,
+  });
+
+  final AccountsSummaryDto summary;
+  final Currency currency;
+  final MoneyFormatter money;
+  final Widget add;
+  final Widget? assign;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = context.look;
+    final gold = sectionGold(context);
+    final on = onSectionGold(context);
+    final count = summary.activeCards;
+    final total = DecoratedBox(
+      key: const Key('deposit-total-pill'),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color.lerp(gold, Colors.white, 0.25)!, gold],
+        ),
+        border: Border.all(color: Color.lerp(gold, Colors.white, 0.4)!),
+        boxShadow: [
+          BoxShadow(
+            color: gold.withValues(alpha: 0.35),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              AppStrings.depositSectionNet,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: cairo(11, 700, color: on),
+            ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: MoneyText(
+                money.formatOrDash(summary.netBalanceUnits, currency),
+                key: const Key('deposit-total'),
+                style: context.textExtras.amount.copyWith(
+                  color: on,
+                  fontSize: 16,
+                ),
+              ),
             ),
           ],
         ),
       ),
+    );
+    final active = DecoratedBox(
+      key: const Key('deposit-active-pill'),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: look.card,
+        border: Border.all(color: gold, width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              AppStrings.activeShort,
+              style: cairo(12, 700, color: look.muted),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              count == null ? AppStrings.dash : '$count',
+              key: const Key('deposit-active-count'),
+              textDirection: TextDirection.ltr,
+              style: cairo(15, 800, color: look.ink),
+            ),
+          ],
+        ),
+      ),
+    );
+    final actions = [
+      active,
+      const SizedBox(width: AppSpacing.sm),
+      Flexible(child: add),
+      if (assign != null) ...[const SizedBox(width: AppSpacing.xs), assign!],
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scale = MediaQuery.textScalerOf(context).scale(1);
+        // Narrow or large text: the total on its own line.
+        if (constraints.maxWidth / scale < 400) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              total,
+              const SizedBox(height: AppSpacing.sm),
+              Row(children: actions),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: total),
+            const SizedBox(width: AppSpacing.sm),
+            ...actions,
+          ],
+        );
+      },
     );
   }
 }
@@ -684,123 +1092,274 @@ class _AccountCard extends StatelessWidget {
   final Future<String?> Function(MutationMeta meta) onPin;
   final Future<String?> Function(MutationMeta meta)? onZero;
 
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final colors = context.statusColors;
-    final visual = ageVisual(
-      colors: colors,
-      ageStatus: card.ageStatus,
-      section: section,
-      serverLabel: card.ageStatusLabel,
-    );
-    final flat = useFlatAgeCard(width, Theme.of(context).brightness);
-    final colored = visual.colored;
-    final scheme = Theme.of(context).colorScheme;
-    final fg = colored ? colors.onStatus : scheme.onSurface;
-    final accent = colored
-        ? (visual.accent ?? colors.onStatus)
-        : scheme.onSurfaceVariant;
-    final age = singleAgeText(
-      serverLabel: card.ageStatusLabel,
-      ageStatus: card.ageStatus,
-      section: section,
-      debtAgeDays: card.debtAgeDays,
-    );
-    final showPin = canWrite;
-    final showZero = onZero != null && !card.systemManaged;
-    final showAssign = assigning && canSelectAccountForAssignment(card);
-    final showActions = showAssign || showPin || showZero;
-    return Material(
-      key: Key('account-card-${card.id}'),
-      color: colored
-          ? (flat ? visual.flat : colors.neutralCard)
-          : scheme.surface,
-      borderRadius: BorderRadius.circular(AppRadii.card),
-      clipBehavior: Clip.antiAlias,
-      child: Ink(
-        decoration: BoxDecoration(
-          gradient: colored && !flat ? visual.gradient : null,
-          color: colored && flat ? visual.flat : null,
-          borderRadius: BorderRadius.circular(AppRadii.card),
-          border: Border.all(
-            color: card.ageStatus == 'zero'
-                ? colors.zeroCardBorder
-                : colored
-                ? colors.onStatus.withValues(alpha: 0.2)
-                : scheme.outline,
-          ),
-        ),
-        child: InkWell(
-          onTap: onOpen,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 118),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+  /// Customers: name, value under it, the assigned employee if any, and the
+  /// existing zero-review action as a check button (Ali, 2026-11-02).
+  Widget _customerBody(
+    BuildContext context, {
+    required CustomerTone tone,
+    required bool showAssign,
+    required bool showZero,
+  }) {
+    final word = section == AccountSection.companies
+        ? companyCardWord(companyCardKind(card.balanceUnits))
+        : switch (customerBalanceKind(card.balanceUnits)) {
+            CustomerBalanceKind.debt => AppStrings.customerDebtWord,
+            CustomerBalanceKind.credit => AppStrings.customerCreditWord,
+            _ => null,
+          };
+    final body = Padding(
+      padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // The facts clip instead of overflowing when text is large.
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (age != null)
-                    Text(
-                      age,
-                      key: Key('account-age-${card.id}'),
-                      style: cairo(11, 800, color: accent),
-                    ),
-                  Text(card.name, style: cairo(16, 800, color: fg)),
-                  if (card.phone != null)
-                    _StartAlignedText(
-                      card.phone!,
-                      style: cairo(12, 500, color: accent),
-                    ),
-                  const SizedBox(height: AppSpacing.sm),
-                  MoneyText(
-                    money.formatOrDash(card.balanceUnits, card.currency),
-                    style: context.textExtras.amountLarge.copyWith(color: fg),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          card.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: cairo(16, 800, color: tone.ink),
+                        ),
+                      ),
+                      if (card.systemManaged)
+                        Tooltip(
+                          message: AppStrings.systemCard,
+                          child: Icon(
+                            Icons.lock_outline,
+                            size: 16,
+                            color: tone.ink,
+                          ),
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    '${AppStrings.lastActivity}: ${formatIsoDate(card.lastActivityAt)}',
-                    style: cairo(11, 500, color: accent),
+                  const SizedBox(height: AppSpacing.xs),
+                  if (word != null)
+                    Text(
+                      word,
+                      key: Key('account-kind-${card.id}'),
+                      style: cairo(12, 800, color: tone.amount),
+                    ),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: MoneyText(
+                        money.formatOrDash(card.balanceUnits, card.currency),
+                        style: context.textExtras.amountLarge.copyWith(
+                          color: tone.amount,
+                          fontSize: 22,
+                        ),
+                      ),
+                    ),
                   ),
                   if (card.activeAssigneeName != null)
                     Text(
                       '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
-                      style: cairo(11, 600, color: accent),
+                      key: Key('account-assignee-${card.id}'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: cairo(
+                        12,
+                        700,
+                        color: tone.ink.withValues(alpha: 0.75),
+                      ),
                     ),
-                  if (card.systemManaged)
-                    Row(
-                      children: [
-                        Icon(Icons.lock_outline, size: 16, color: fg),
-                        const SizedBox(width: AppSpacing.xs),
-                        Expanded(
-                          child: Text(
-                            AppStrings.systemCard,
-                            style: cairo(11, 800, color: fg),
-                          ),
-                        ),
-                      ],
+                ],
+              ),
+            ),
+          ),
+          if (showAssign || showZero)
+            Row(
+              children: [
+                if (showAssign)
+                  SizedBox.square(
+                    dimension: 32,
+                    child: Checkbox(
+                      key: ValueKey('assign-select-${card.id}'),
+                      value: selected,
+                      onChanged: (_) => onToggle(),
                     ),
-                  if (showActions) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    Divider(
-                      height: 1,
-                      color: colored
-                          ? colors.onStatus.withValues(alpha: 0.24)
-                          : scheme.outlineVariant,
+                  ),
+                const Spacer(),
+                if (showZero)
+                  GuardedMutation(
+                    buttonKey: ValueKey('zero-review-${card.id}'),
+                    inputs: 'zero:${card.id}:${card.version}',
+                    expectedVersion: card.version,
+                    label: AppStrings.zeroReview,
+                    tooltip: AppStrings.zeroReview,
+                    icon: Icons.check_circle_outline,
+                    onSubmit: (meta) => onZero!(meta),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+    // Icons on the glossy card (lock, zero review) take the card ink.
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(
+        iconTheme: theme.iconTheme.copyWith(color: tone.ink),
+        iconButtonTheme: IconButtonThemeData(
+          style: IconButton.styleFrom(
+            minimumSize: const Size(48, 48),
+            foregroundColor: tone.ink,
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(foregroundColor: tone.ink),
+        ),
+      ),
+      child: body,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final showPin = canWrite;
+    final showZero = onZero != null && !card.systemManaged;
+    final showAssign = assigning && canSelectAccountForAssignment(card);
+    final look0 = context.look;
+    // Customers: debt / credit / zero tone from the balance sign (Ali,
+    // 2026-11-02) instead of the age gradient.
+    final CustomerTone tone = switch (section) {
+      AccountSection.customers => customerTone(
+        context,
+        customerBalanceKind(card.balanceUnits),
+      ),
+      // Companies: the customers' colours from the company's own balance
+      // sign (Ali, 2026-11-03).
+      AccountSection.companies => _companyTone(
+        companyCardGloss(context, companyCardKind(card.balanceUnits)),
+      ),
+      // Deposits (Ali's device shots): red for the server's overdue status
+      // (دين على العميل / دين علينا للعميل), black for zero, green otherwise.
+      _ => _companyTone(switch (card.ageStatus) {
+        'overdue' => look0.glossDebt,
+        'zero' => look0.glossZero,
+        _ => look0.glossCredit,
+      }),
+    };
+    // Every list card is glossy from its tone (customers, companies,
+    // deposits).
+    final Gloss gloss = tone.gloss ?? context.look.glossGrey;
+    final radius = BorderRadius.circular(AppRadii.card);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: gloss.glowShadow,
+      ),
+      child: Material(
+        key: Key('account-card-${card.id}'),
+        color: tone.background,
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: gloss.fill,
+            borderRadius: radius,
+            border: Border.all(color: tone.border),
+          ),
+          child: InkWell(
+            onTap: onOpen,
+            child: GlossSheen(
+              gloss: gloss,
+              radius: radius,
+              child: isDebtLookSection(section)
+                  ? _customerBody(
+                      context,
+                      tone: tone,
+                      showAssign: showAssign,
+                      showZero: showZero,
+                    )
+                  : _depositBody(
+                      context,
+                      tone: tone,
+                      // The status words (أمانة للعميل، دين على العميل،
+                      // دين علينا للعميل، لصالح المنظومة) from the server.
+                      age: ageVisual(
+                        colors: context.statusColors,
+                        ageStatus: card.ageStatus,
+                        section: section,
+                        // A day count (منذ N أيام) is not a status word.
+                        serverLabel:
+                            (card.ageStatusLabel ?? '').startsWith(
+                              AppStrings.sinceDays,
+                            )
+                            ? null
+                            : card.ageStatusLabel,
+                      ).label,
+                      showAssign: showAssign,
+                      showPin: showPin,
+                      showZero: showZero,
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Wrap(
-                      spacing: AppSpacing.xs,
-                      runSpacing: AppSpacing.xs,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (showAssign)
-                          Checkbox(
-                            value: selected,
-                            onChanged: (_) => onToggle(),
-                          ),
-                        if (showPin)
-                          GuardedMutation(
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+extension on _AccountCard {
+  /// Deposit card (Ali's device shots): pin at the corner, status label,
+  /// name, amount, then «آخر حركة» under a thin line. Server values only.
+  Widget _depositBody(
+    BuildContext context, {
+    required CustomerTone tone,
+    required String? age,
+    required bool showAssign,
+    required bool showPin,
+    required bool showZero,
+  }) {
+    final ink = tone.ink;
+    final gold = const Color(0xFFFBBF24);
+    final last = card.lastActivityAt;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 150),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(10, 8, 10, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    age ?? '',
+                    key: Key('account-age-${card.id}'),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: cairo(11, 800, color: ink.withValues(alpha: 0.9)),
+                  ),
+                ),
+                if (showPin)
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF1A1300).withValues(alpha: 0.7),
+                      border: Border.all(color: gold.withValues(alpha: 0.8)),
+                    ),
+                    child: IconTheme.merge(
+                      data: IconThemeData(color: gold, size: 18),
+                      child: SizedBox(
+                        width: 34,
+                        height: 34,
+                        child: FittedBox(
+                          child: GuardedMutation(
                             buttonKey: Key('pin-${card.id}'),
                             inputs:
                                 'pin:${card.id}:${card.pinned}:${card.version}',
@@ -816,23 +1375,209 @@ class _AccountCard extends StatelessWidget {
                                 : Icons.push_pin_outlined,
                             onSubmit: (meta) => onPin(meta),
                           ),
-                        if (showZero)
-                          GuardedMutation(
-                            buttonKey: ValueKey('zero-review-${card.id}'),
-                            inputs: 'zero:${card.id}:${card.version}',
-                            expectedVersion: card.version,
-                            label: AppStrings.zeroReview,
-                            filled: false,
-                            onSubmit: (meta) => onZero!(meta),
-                          ),
-                      ],
+                        ),
+                      ),
                     ),
-                  ],
-                ],
+                  ),
+              ],
+            ),
+            Text(
+              card.name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: cairo(16, 800, color: ink),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: MoneyText(
+                  money.formatOrDash(card.balanceUnits, card.currency),
+                  style: context.textExtras.amountLarge.copyWith(
+                    color: tone.amount,
+                  ),
+                ),
               ),
             ),
-          ),
+            if (card.systemManaged)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.lock_outline, size: 14, color: ink),
+                  const SizedBox(width: AppSpacing.xxs),
+                  Flexible(
+                    child: Text(
+                      AppStrings.systemCard,
+                      style: cairo(10.5, 800, color: ink),
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: AppSpacing.xs),
+            Divider(height: 1, color: ink.withValues(alpha: 0.25)),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              '${AppStrings.lastActivity}: ${formatIsoDate(last)}'
+              '${last == null ? '' : '، ${_clockText(last)}'}',
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: cairo(10.5, 700, color: ink.withValues(alpha: 0.9)),
+            ),
+            if (card.activeAssigneeName != null)
+              Text(
+                '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
+                textAlign: TextAlign.center,
+                style: cairo(10.5, 600, color: ink.withValues(alpha: 0.85)),
+              ),
+            if (showAssign || showZero)
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: AppSpacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (showAssign)
+                    Checkbox(
+                      key: ValueKey('assign-select-${card.id}'),
+                      value: selected,
+                      onChanged: (_) => onToggle(),
+                    ),
+                  if (showZero)
+                    GuardedMutation(
+                      buttonKey: ValueKey('zero-review-${card.id}'),
+                      inputs: 'zero:${card.id}:${card.version}',
+                      expectedVersion: card.version,
+                      label: AppStrings.zeroReview,
+                      filled: false,
+                      onSubmit: (meta) => onZero!(meta),
+                    ),
+                ],
+              ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+String _clockText(DateTime value) {
+  final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
+  final minute = value.minute.toString().padLeft(2, '0');
+  return '$hour:$minute ${value.hour < 12 ? 'ص' : 'م'}';
+}
+
+CustomerTone _companyTone(Gloss gloss) => CustomerTone(
+  background: gloss.bottom,
+  border: gloss.border,
+  ink: gloss.ink,
+  amount: gloss.amount,
+  gloss: gloss,
+);
+
+/// One height for every customer card, grown with the text scale.
+double customerCardHeight(BuildContext context) {
+  final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
+  return 128 * scale;
+}
+
+/// Customers: add on the right, search in the middle, assign on the left.
+/// Very narrow or large-text screens put the buttons above the search.
+class _CustomersToolbar extends StatelessWidget {
+  const _CustomersToolbar({
+    required this.toolbarKey,
+    required this.add,
+    required this.search,
+    required this.assign,
+  });
+
+  final Key toolbarKey;
+  final Widget add;
+  final Widget search;
+  final Widget assign;
+
+  /// One height for all three controls, grown with the text scale.
+  static double heightFor(double scale) => 24 + 28 * scale.clamp(1.0, 2.0);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final look = context.look;
+    final scale = MediaQuery.textScalerOf(context).scale(1);
+    final height = heightFor(scale);
+    final radius = BorderRadius.circular(AppRadii.lg);
+    final side = BorderSide(color: look.cardBorder);
+    const padding = EdgeInsetsDirectional.symmetric(horizontal: AppSpacing.lg);
+    final outline = OutlineInputBorder(borderRadius: radius, borderSide: side);
+    final themed = theme.copyWith(
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: Size(0, height),
+          padding: padding,
+          shape: RoundedRectangleBorder(borderRadius: radius),
+          backgroundColor: look.button,
+          foregroundColor: look.onButton,
+          textStyle: cairo(15, 700),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          minimumSize: Size(0, height),
+          padding: padding,
+          shape: RoundedRectangleBorder(borderRadius: radius, side: side),
+          foregroundColor: look.accent,
+          backgroundColor: look.card,
+          textStyle: cairo(15, 700),
+        ),
+      ),
+      inputDecorationTheme: theme.inputDecorationTheme.copyWith(
+        isDense: true,
+        filled: true,
+        fillColor: look.card,
+        contentPadding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.md,
+        ),
+        border: outline,
+        enabledBorder: outline,
+        focusedBorder: outline.copyWith(
+          borderSide: BorderSide(color: look.accent, width: 2),
+        ),
+      ),
+    );
+    Widget sized(Widget child) => SizedBox(height: height, child: child);
+    return Theme(
+      data: themed,
+      child: LayoutBuilder(
+        key: toolbarKey,
+        builder: (context, constraints) {
+          if (constraints.maxWidth / scale >= 330) {
+            return Row(
+              children: [
+                sized(add),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(child: sized(search)),
+                const SizedBox(width: AppSpacing.sm),
+                sized(assign),
+              ],
+            );
+          }
+          // Narrow or large text: the two buttons share one row at equal
+          // width, the search sits under them at the same height.
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(child: sized(add)),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(child: sized(assign)),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              sized(search),
+            ],
+          );
+        },
       ),
     );
   }
@@ -872,8 +1617,16 @@ class _RateCardState extends ConsumerState<_RateCard> {
     return Card(
       key: const Key('exchange-rate-card'),
       margin: const EdgeInsetsDirectional.only(top: AppSpacing.md),
+      color: context.look.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.xl),
+        side: BorderSide(color: sectionGold(context).withValues(alpha: 0.6)),
+      ),
       child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
         child: rate.when(
           loading: () => const SkeletonBox(height: 72),
           error: (error, _) => presentFailure(
@@ -883,46 +1636,70 @@ class _RateCardState extends ConsumerState<_RateCard> {
           data: (data) {
             final canEdit = permissions.canWrite(SectionKey.egyptianDeposits);
             final theme = Theme.of(context);
+            final look = context.look;
+            final current = money.formatDecimalOrDash(data.egpPerLyd);
+            // One row (Ali's device shot): «سعر التحويل 1 د.ل =» [rate] ج.م
+            // and a save symbol. The current server rate is the hint.
             return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(AppStrings.rateTitle, style: theme.textTheme.titleSmall),
-                const SizedBox(height: AppSpacing.xs),
-                _StartAlignedText(
-                  money.formatDecimalOrDash(data.egpPerLyd),
-                  style: context.textExtras.amountLarge.copyWith(
-                    fontFamily: 'JetBrainsMono',
-                  ),
-                  mono: true,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  '${AppStrings.date}: ${formatIsoDate(data.updatedAt)}',
-                  style: theme.textTheme.bodySmall,
-                ),
-                if (canEdit) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  TextField(
-                    key: const Key('rate-field'),
-                    controller: _rate,
-                    textDirection: TextDirection.ltr,
-                    textAlign: TextAlign.start,
-                    decoration: const InputDecoration(
-                      labelText: AppStrings.rate,
-                      isDense: false,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        AppStrings.rateRowLabel,
+                        maxLines: 2,
+                        style: cairo(13, 800, color: look.ink),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  GuardedMutation(
-                    buttonKey: const Key('save-rate'),
-                    inputs: _rate.text,
-                    expectedVersion: data.version,
-                    label: AppStrings.save,
-                    confirmText: AppStrings.confirm,
-                    normalizedValue: DecimalString.tryParse(_rate.text)?.value,
-                    onSubmit: _save,
-                  ),
-                ],
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: canEdit
+                          ? TextField(
+                              key: const Key('rate-field'),
+                              controller: _rate,
+                              textDirection: TextDirection.ltr,
+                              textAlign: TextAlign.center,
+                              style: cairo(15, 800, color: look.ink),
+                              decoration: InputDecoration(
+                                hintText: current,
+                                isDense: true,
+                                filled: true,
+                                fillColor: look.page,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadii.lg,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : _StartAlignedText(
+                              current,
+                              style: context.textExtras.amount,
+                              mono: true,
+                            ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      Currency.egp.symbol,
+                      style: cairo(13, 800, color: look.muted),
+                    ),
+                    if (canEdit) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      GuardedMutation(
+                        buttonKey: const Key('save-rate'),
+                        inputs: _rate.text,
+                        expectedVersion: data.version,
+                        label: AppStrings.save,
+                        glyph: Icons.save_outlined,
+                        confirmText: AppStrings.confirm,
+                        normalizedValue: DecimalString.tryParse(_rate.text)
+                            ?.value,
+                        onSubmit: _save,
+                      ),
+                    ],
+                  ],
+                ),
                 if (_message != null) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(_message!, style: theme.textTheme.bodyMedium),
@@ -1081,11 +1858,17 @@ class _AssignSubmit extends ConsumerStatefulWidget {
     required this.section,
     required this.customerIds,
     required this.online,
+    required this.onCancel,
+    required this.onAssigned,
   });
 
   final AccountSection section;
   final List<String> customerIds;
   final bool online;
+  final VoidCallback onCancel;
+
+  /// Called after a 201: the parent leaves assign mode and clears the ticks.
+  final ValueChanged<String> onAssigned;
 
   @override
   ConsumerState<_AssignSubmit> createState() => _AssignSubmitState();
@@ -1093,6 +1876,13 @@ class _AssignSubmit extends ConsumerStatefulWidget {
 
 class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
   String? _assignee;
+
+  /// Ids and names of the assignees on screen. The first one is chosen by
+  /// default, like the website (`items[0]?.id`).
+  List<(String, String)> _people = const [];
+
+  String? get _chosen =>
+      _assignee ?? (_people.isEmpty ? null : _people.first.$1);
 
   @override
   Widget build(BuildContext context) {
@@ -1106,10 +1896,22 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
       data: (rows) {
         final theme = Theme.of(context);
         final scheme = theme.colorScheme;
+        _people = [
+          for (final row in rows)
+            ('${row['id']}', '${row['displayName'] ?? row['id']}'),
+        ];
+        final chosen = _chosen;
         return Column(
           key: const Key('assignee-field'),
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text(
+              AppStrings.assignSelected(widget.customerIds.length),
+              key: const Key('assign-selected-count'),
+              style: theme.textTheme.titleSmall,
+            ),
+            Text(AppStrings.assignHint, style: theme.textTheme.bodySmall),
+            const SizedBox(height: AppSpacing.sm),
             Text(AppStrings.assignee, style: theme.textTheme.titleSmall),
             if (!widget.online) ...[
               const SizedBox(height: AppSpacing.xs),
@@ -1122,22 +1924,31 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
             if (rows.isEmpty)
               Text(AppStrings.noAssignees, style: theme.textTheme.bodyMedium)
             else
-              for (final row in rows)
+              for (final (id, label) in _people)
                 _AssigneeChoice(
-                  id: '${row['id']}',
-                  label: '${row['displayName'] ?? row['id']}',
-                  selected: _assignee == '${row['id']}',
+                  id: id,
+                  label: label,
+                  selected: chosen == id,
                   onSelected: (id) => setState(() => _assignee = id),
                 ),
             const SizedBox(height: AppSpacing.sm),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: GuardedMutation(
-                buttonKey: const Key('save-assignment'),
-                inputs: '${widget.customerIds.join(",")}|$_assignee',
-                label: AppStrings.assign,
-                onSubmit: _submit,
-              ),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              crossAxisAlignment: WrapCrossAlignment.start,
+              children: [
+                GuardedMutation(
+                  buttonKey: const Key('save-assignment'),
+                  inputs: '${widget.customerIds.join(",")}|$chosen',
+                  label: AppStrings.assign,
+                  onSubmit: _submit,
+                ),
+                TextButton(
+                  key: const Key('assign-cancel'),
+                  onPressed: widget.onCancel,
+                  child: const Text(AppStrings.assignCancel),
+                ),
+              ],
             ),
           ],
         );
@@ -1146,10 +1957,13 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
   }
 
   Future<String?> _submit(MutationMeta meta) async {
-    final assignee = _assignee;
-    if (assignee == null || widget.customerIds.isEmpty) {
-      return AppStrings.chooseAssignee;
-    }
+    final assignee = _chosen;
+    if (assignee == null) return _tell(AppStrings.chooseAssignee);
+    if (widget.customerIds.isEmpty) return _tell(AppStrings.chooseAssignCards);
+    final name = [
+      for (final (id, label) in _people)
+        if (id == assignee) label,
+    ].firstOrNull;
     try {
       final ack = await ref
           .read(apiLayerProvider)
@@ -1160,15 +1974,39 @@ class _AssignSubmitState extends ConsumerState<_AssignSubmit> {
             section: widget.section.path,
             meta: meta,
           );
-      if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
+      // 537f073 answers 201 `{assignmentIds, eventSequences}`; there is no
+      // single `id`, so the count comes from `assignmentIds`.
+      final created = ack.raw['assignmentIds'];
+      final count = created is List
+          ? created.length
+          : widget.customerIds.length;
       ref.invalidate(accountsProvider(widget.section));
+      ref.invalidate(collectionsProvider);
+      if (!mounted) return null;
+      final message = AppStrings.assignDone(count, name ?? '');
+      _tell(message);
+      widget.onAssigned(message);
       return null;
     } catch (error) {
-      return failureText(ref.read(errorHandlerProvider).toFailure(error));
+      final text = failureText(ref.read(errorHandlerProvider).toFailure(error));
+      return _tell(text);
     }
+  }
+
+  /// Shows [message] in a snackbar as well as under the button, so a server
+  /// refusal is never missed. Returns it for the inline error line.
+  String _tell(String message) {
+    final messenger = mounted ? ScaffoldMessenger.maybeOf(context) : null;
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const Key('assign-snackbar'),
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    return message;
   }
 }
 
@@ -1196,12 +2034,7 @@ class _StartAlignedText extends StatelessWidget {
         textDirection: TextDirection.ltr,
         textAlign: TextAlign.end,
         softWrap: true,
-        style: mono
-            ? style.copyWith(
-                fontFamily: 'JetBrainsMono',
-                fontFamilyFallback: const ['Cairo'],
-              )
-            : style,
+        style: mono ? style.copyWith(fontFamily: kAppFont) : style,
       ),
     );
   }

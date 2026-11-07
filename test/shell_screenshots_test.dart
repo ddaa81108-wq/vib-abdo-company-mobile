@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
@@ -77,17 +76,7 @@ void main() {
         expect(find.byKey(const Key('more-sheet')), findsOneWidget);
         await saveShot(tester, 'more-$suffix');
 
-        final layer = await pumpFakeApp(tester, size: Size(width, 900));
-        await tester.runAsync(loadScreenshotFonts);
-        await tester.pump();
-        if (dark) {
-          await tester.tap(find.byKey(LoginScreen.themeKey));
-          await settle(tester);
-        }
-        (layer.client as FakeApiClient).failHomeRemaining = 8;
-        await signIn(tester, username: 'employee.demo', password: 'demo-only');
-        expect(find.byKey(const Key('home-fallback-banner')), findsOneWidget);
-        await saveShot(tester, 'home-fallback-$suffix');
+        // Home is the icon grid only, so there is no fallback banner shot.
       }
     }
   }, timeout: const Timeout(Duration(minutes: 3)));
@@ -226,9 +215,22 @@ int _pngCrc(List<int> bytes) {
 }
 
 Future<void> loadScreenshotFonts() async {
-  await _loadFont('assets/fonts/Cairo-Variable.ttf', 'Cairo');
-  await _loadFont('assets/fonts/JetBrainsMono-Bold.ttf', 'JetBrainsMono');
-  await _loadFont('assets/fonts/JetBrainsMono-ExtraBold.ttf', 'JetBrainsMono');
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Regular.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Medium.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-SemiBold.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Bold.ttf',
+    'IBMPlexSansArabic',
+  );
   final icons = _materialIconsFile();
   if (icons != null) {
     await ui.loadFontFromList(

@@ -3,6 +3,7 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/state/collection_request_journal.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/app.dart';
@@ -14,6 +15,7 @@ import 'package:vib_abdo_company_mobile/notifications/device_token_store.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_providers.dart';
 import 'package:vib_abdo_company_mobile/notifications/shown_notification_store.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
+import 'package:vib_abdo_company_mobile/state/session_providers.dart';
 import 'package:vib_abdo_company_mobile/ui/widgets/environment_badge.dart';
 
 /// Pumps the app with an injected fake [ApiLayer]. The provider does not build one.
@@ -57,6 +59,11 @@ Future<ApiLayer> pumpFakeApp(
         apiLayerProvider.overrideWithValue(layer),
         pushSessionGateProvider.overrideWithValue(pushGate),
         deviceTokenStoreProvider.overrideWithValue(MemoryDeviceTokenStore()),
+        // The receipt journal persists in SharedPreferences on a device;
+        // tests keep it in memory (persistence has its own test).
+        collectionAttemptStoreProvider.overrideWithValue(
+          MemoryCollectionAttemptStore(),
+        ),
         connectivityPortProvider.overrideWithValue(
           connectivity ?? const FixedConnectivity(true),
         ),
@@ -127,3 +134,16 @@ Future<T> _widget<T extends Widget>(WidgetTester tester, Key key) async {
     'login=${find.byKey(const Key('login-screen'), skipOffstage: false).evaluate().length}',
   );
 }
+
+/// Sections the signed-in home summary marks writable (permission service).
+/// The home tiles show names only, so tests read write access from here.
+List<SectionKey> homeWritable(WidgetTester tester) => ProviderScope.containerOf(
+  tester.element(find.byKey(const Key('home-shell'))),
+).read(homeSummaryProvider)!.writableSections;
+
+/// Management actions the home summary allows (permission service). Home no
+/// longer draws them as buttons, so tests read them from here.
+List<ManagementAction> homeActions(WidgetTester tester) =>
+    ProviderScope.containerOf(
+      tester.element(find.byKey(const Key('home-shell'))),
+    ).read(homeSummaryProvider)!.actions;

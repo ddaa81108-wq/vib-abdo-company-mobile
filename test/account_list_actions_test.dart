@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/accounts/account_list_logic.dart';
@@ -97,7 +98,11 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('assign-mode')));
     await tester.tap(find.byKey(const Key('assign-mode')));
     await settle(tester);
-    expect(find.byType(Checkbox), findsNWidgets(8));
+    // Only cards with a positive debt get a checkbox (537 website rule).
+    expect(find.byType(Checkbox), findsNWidgets(3));
+    for (final id in ['b', 'd', 'g']) {
+      expect(find.byKey(ValueKey('assign-select-$id')), findsOneWidget);
+    }
     final systemCard = find
         .ancestor(of: find.text('كارت النظام'), matching: find.byType(Material))
         .first;
@@ -107,37 +112,25 @@ void main() {
     );
   });
 
-  testWidgets('Egyptian deposits send the pinned filter', (tester) async {
+  testWidgets('deposit lists show no filter chip row (Ali, 2026-11-04)', (
+    tester,
+  ) async {
     final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/egyptian-deposits');
-
-    expect(find.byKey(const ValueKey('account-filter-all')), findsOneWidget);
-    expect(find.byKey(const ValueKey('account-filter-today')), findsOneWidget);
-    expect(find.byKey(const ValueKey('account-filter-debts')), findsOneWidget);
+    for (final path in ['/egyptian-deposits', '/libyan-deposits']) {
+      await go(tester, path);
+      for (final id in ['all', 'today', 'debts', 'settled', 'pinned']) {
+        expect(find.byKey(ValueKey('account-filter-$id')), findsNothing);
+      }
+      expect(find.text(AppStrings.pinnedTab), findsNothing);
+      // The list loads unfiltered, and search stays.
+      expect(find.byKey(const Key('account-search')), findsOneWidget);
+    }
     expect(
-      find.byKey(const ValueKey('account-filter-settled')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const ValueKey('account-filter-pinned')), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('account-filter-pendingReview')),
-      findsNothing,
-    );
-    expect(find.text(AppStrings.pinnedTab), findsOneWidget);
-
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('account-filter-pinned')),
-    );
-    await tester.tap(find.byKey(const ValueKey('account-filter-pinned')));
-    await settle(tester);
-
-    expect(
-      fake.accountListQueries.any(
-        (query) =>
-            query.section == 'egyptian-deposits' && query.filter == 'pinned',
-      ),
+      fake.accountListQueries
+          .where((q) => q.section.endsWith('deposits'))
+          .every((q) => q.filter == null),
       isTrue,
     );
   });
@@ -152,7 +145,7 @@ void main() {
     fake.accountNextItems = [
       {'id': 'c_extra', 'name': 'صفحة ثانية', 'balanceUnits': 10, 'version': 1},
     ];
-    await go(tester, '/customers');
+    await go(tester, '/libyan-deposits');
 
     expect(find.text('صفحة ثانية'), findsNothing);
     await tester.ensureVisible(find.text(AppStrings.loadMore));
@@ -160,10 +153,8 @@ void main() {
     await settle(tester);
     expect(find.text('صفحة ثانية'), findsOneWidget);
 
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('account-filter-pinned')),
-    );
-    await tester.tap(find.byKey(const ValueKey('account-filter-pinned')));
+    // No chips now (Ali, 2026-11-04): a search is the query change.
+    await _search(tester, 'عميل');
     await settle(tester);
 
     expect(find.text('صفحة ثانية'), findsNothing);
@@ -180,17 +171,14 @@ void main() {
     fake.accountNextItems = [
       {'id': 'c_late', 'name': 'صفحة متأخرة', 'balanceUnits': 10, 'version': 1},
     ];
-    await go(tester, '/customers');
+    await go(tester, '/libyan-deposits');
     final gate = Completer<void>();
     fake.pauseAccountLists = gate;
 
     await tester.ensureVisible(find.text(AppStrings.loadMore));
     await tester.tap(find.text(AppStrings.loadMore));
     await tester.pump();
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('account-filter-today')),
-    );
-    await tester.tap(find.byKey(const ValueKey('account-filter-today')));
+    await _search(tester, 'عميل');
     await tester.pump();
     gate.complete();
     fake.pauseAccountLists = null;
@@ -206,7 +194,7 @@ void main() {
       final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
       final fake = layer.client as FakeApiClient;
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      await go(tester, '/customers');
+      await go(tester, '/companies');
       expect(find.byKey(const Key('show-all-debts')), findsNothing);
 
       tester.view.physicalSize = const Size(360, 2400);
@@ -220,7 +208,7 @@ void main() {
           'version': 1,
         },
       ];
-      await go(tester, '/customers');
+      await go(tester, '/companies');
       expect(find.byType(ExpansionTile), findsOneWidget);
       await tester.tap(find.text(AppStrings.oldDebtsTitle));
       await settle(tester);
@@ -229,10 +217,12 @@ void main() {
       await tester.enterText(find.byKey(const Key('account-search')), 'عميل');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await settle(tester);
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('account-filter-pinned')),
-      );
-      await tester.tap(find.byKey(const ValueKey('account-filter-pinned')));
+      // Companies have no filter chips (Ali, 2026-11-03); the filter
+      // provider is still the one the list reads.
+      ProviderScope.containerOf(tester.element(find.byKey(HomeShell.shellKey)))
+              .read(accountFilterProvider(AccountSection.companies).notifier)
+              .state =
+          'pinned';
       await settle(tester);
 
       // Ten cards make the phone list taller than the viewport, so opening
@@ -256,7 +246,7 @@ void main() {
           .skip(before)
           .where((query) => query.cursor != null);
       expect(paged, hasLength(1));
-      expect(paged.single.section, 'customers');
+      expect(paged.single.section, 'companies');
       expect(paged.single.filter, 'pinned');
       expect(paged.single.q, 'عميل');
       expect(paged.single.cursor, 'page-2');
@@ -347,4 +337,11 @@ Future<void> settle(WidgetTester tester) {
     EnginePhase.sendSemanticsUpdate,
     const Duration(seconds: 20),
   );
+}
+
+Future<void> _search(WidgetTester tester, String text) async {
+  final field = find.byKey(const Key('account-search'));
+  await tester.ensureVisible(field);
+  await tester.enterText(field, text);
+  await tester.testTextInput.receiveAction(TextInputAction.search);
 }

@@ -45,7 +45,7 @@ void main() {
     },
   );
 
-  test('fake admin: explicit permissions, home, cashStatus from server, versioned decisions', () async {
+  test('fake admin: explicit permissions, home, awaiting cash from server fields', () async {
     final api = ApiLayer.create(
       config: const ApiConfig(
         baseUrl: 'https://fake.invalid',
@@ -77,31 +77,43 @@ void main() {
     );
     expect(home.oldDebts, isNotNull);
 
+    // 537f073 sends no cashStatus: awaiting cash is approved && no
+    // cashReceivedAt, the server's own rule.
     final overview = await api.collections.overview();
     final approved = overview.submissions.firstWhere((s) => s.id == 'sb_2');
-    expect(approved.cashStatus, CashStatus.pending);
-    expect(overview.submissions.first.cashStatus, CashStatus.notApplicable);
+    expect(approved.status, 'approved');
+    expect(approved.cashReceivedAt, isNull);
+    expect(approved.awaitingCash, isTrue);
+    expect(
+      overview.submissions.firstWhere((s) => s.id == 'sb_1').awaitingCash,
+      isFalse,
+    );
+    expect(overview.cashOutstandingUnits?.units, 250);
     final pendingUnlinked =
         overview.unlinkedReceipts.firstWhere((r) => r.id == 'ur_1');
     expect(pendingUnlinked.version, isNull);
-    expect(pendingUnlinked.cashStatus, CashStatus.notApplicable);
-    final rejectedUnlinked =
-        overview.unlinkedReceipts.firstWhere((r) => r.id == 'ur_2');
-    expect(rejectedUnlinked.status, 'rejected');
-    expect(rejectedUnlinked.version, isNull);
-    expect(rejectedUnlinked.cashStatus, CashStatus.pending);
+    expect(pendingUnlinked.awaitingCash, isFalse);
+    expect(overview.unlinkedReceipts.any((r) => r.id == 'ur_2'), isFalse);
 
+    await expectLater(
+      api.collections.markCashReceived('sb_1', MutationMeta()),
+      throwsA(isA<ApiException>().having(
+        (e) => e.code,
+        'code',
+        'SUBMISSION_NOT_APPROVED',
+      )),
+    );
     final ack = await api.collections.markCashReceived(
       'sb_2',
       MutationMeta(),
     );
     expect(ack.version, isNull);
-    expect(ack.raw['cashReceivedAt'], '2026-10-22T22:00:00.000Z');
+    expect(ack.raw['cashReceivedAt'], isNotNull);
     final afterCash = await api.collections.overview();
-    expect(
-      afterCash.submissions.firstWhere((s) => s.id == 'sb_2').cashStatus,
-      CashStatus.received,
-    );
+    final received = afterCash.submissions.firstWhere((s) => s.id == 'sb_2');
+    expect(received.cashReceivedAt, isNotNull);
+    expect(received.awaitingCash, isFalse);
+    expect(afterCash.cashOutstandingUnits?.units, 0);
     await api.session.logout();
   });
 

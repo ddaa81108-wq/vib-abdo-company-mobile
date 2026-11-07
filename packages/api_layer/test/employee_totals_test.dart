@@ -107,25 +107,27 @@ void main() {
       );
       final own = _rowForUser(report, byId, FakeFixtures.demoEmployeeId);
       final other = _rowForUser(report, byId, FakeFixtures.otherEmployeeId);
+      // 537f073 computes these from the batch rows: own sb_2 approved 250,
+      // pending sb_1 + ur_1; other pending sb_9 + ur_9.
       expect(own.employeeName, 'موظف استلام تجريبي');
-      expect(own.employeeId, isNull);
-      expect(own.collectedUnits?.units, 0);
+      expect(own.employeeId, FakeFixtures.demoEmployeeId);
+      expect(own.collectedUnits?.units, 250);
       expect(own.pendingUnits, isNull);
-      expect(own.approvedCount, 0);
-      expect(own.pendingCount, 1);
+      expect(own.approvedCount, 1);
+      expect(own.pendingCount, 2);
       expect(own.cashOutstandingUnits, isNull);
       expect(own.currency, Currency.lyd);
       expect(other.employeeName, 'موظف آخر تجريبي');
-      expect(other.employeeId, isNull);
-      expect(other.collectedUnits?.units, 900);
-      expect(other.approvedCount, 4);
+      expect(other.employeeId, FakeFixtures.otherEmployeeId);
+      expect(other.collectedUnits?.units, 0);
+      expect(other.approvedCount, 0);
       expect(other.pendingCount, 2);
       expect(other.pendingUnits, isNull);
       expect(other.cashOutstandingUnits, isNull);
       expect(other.currency, Currency.lyd);
       expect(report.from, isNull);
       expect(report.to, isNull);
-      expect(report.version, 1);
+      expect(report.version, isNull);
       expect(report.currency, Currency.lyd);
       expect(report.totals.collectedUnits, isNull);
       expect(report.totals.pendingUnits, isNull);
@@ -151,9 +153,10 @@ void main() {
 
       // 🔶 Not provided by this source. Null, not a fabricated 0, so the UI
       // shows '—' rather than a zero amount or an invented id/date.
-      // `userId` on the fixture is the scoping id, not `employeeId`.
+      // 537f073 sends employeeId on each row; it is kept as sent.
+      expect(own.employeeId, FakeFixtures.demoEmployeeId);
+      expect(other.employeeId, FakeFixtures.otherEmployeeId);
       for (final row in [own, other]) {
-        expect(row.employeeId, isNull);
         expect(row.employeeId, isNot(0));
         expect(row.pendingUnits, isNull);
         expect(row.pendingUnits?.units, isNot(0));
@@ -166,10 +169,10 @@ void main() {
       expect(report.to, isNot(0));
       expect(money.formatOrDash(0, own.currency), isNot('—'));
 
-      // A zero the collections row actually sends stays zero. The other
-      // employee's stored collected amount stays that amount.
-      expect(own.collectedUnits?.units, 0);
-      expect(other.collectedUnits?.units, 900);
+      // A zero the collections row actually sends stays zero. The own
+      // collected amount stays the amount the server sent.
+      expect(own.collectedUnits?.units, 250);
+      expect(other.collectedUnits?.units, 0);
       expect(money.formatOrDash(own.collectedUnits, own.currency), isNot('—'));
       expect(
         money.formatOrDash(other.collectedUnits, other.currency),
@@ -290,7 +293,8 @@ Future<Map<String, Map<String, dynamic>>> _collectionsTotalsByUser(
   final rows = <String, Map<String, dynamic>>{};
   for (final raw in data['employeeTotals'] as List) {
     final row = Map<String, dynamic>.from(raw as Map);
-    rows['${row['userId']}'] = row;
+    // 537f073 keys employeeTotals rows by employeeId.
+    rows['${row['employeeId']}'] = row;
   }
   return rows;
 }

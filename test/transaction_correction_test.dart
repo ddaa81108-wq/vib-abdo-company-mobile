@@ -81,7 +81,11 @@ void main() {
 
     expect(find.byKey(const Key('correct-tx_1')), findsNothing);
     expect(find.byKey(const Key('correct-tx_2')), findsNothing);
-    expect(find.text(AppStrings.reversed), findsOneWidget);
+    // Like the website, a cancelled (reversed) row is not drawn at all
+    // (Ali, 2026-11-03). Other statuses stay on screen.
+    expect(find.byKey(const ValueKey('ledger-row-tx_1')), findsNothing);
+    expect(find.byKey(const ValueKey('ledger-row-tx_2')), findsOneWidget);
+    expect(find.text(AppStrings.reversed), findsNothing);
   });
 
   testWidgets('posted lines on every card section can open a correction', (
@@ -93,24 +97,22 @@ void main() {
 
     expect(find.byKey(const Key('correct-tx_1')), findsOneWidget);
     expect(find.byKey(const Key('correct-tx_2')), findsOneWidget);
-    await scrollTo(tester, const Key('load-older'), 'customers');
-    await tester.tap(find.byKey(const Key('load-older')));
+    // The older page loads by itself (Ali, 2026-11-03).
     await settle(tester);
     expect(find.byKey(const Key('correct-tx_old')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('correct-tx_2')));
+    await tapCorrect(tester, 'tx_2');
     await settle(tester);
     expect(find.byKey(const Key('correction-payment-mode')), findsOneWidget);
     expectRtl(tester);
-    Navigator.of(tester.element(find.byKey(const Key('correction-form'))))
-        .pop();
+    await closeCorrection(tester, 'tx_2');
     await settle(tester);
 
     await go(tester, '/companies/c_55');
     expect(find.byKey(const Key('correct-tx_1')), findsOneWidget);
 
     await go(tester, '/libyan-deposits/c_55');
-    await tester.tap(find.byKey(const Key('correct-tx_2')));
+    await tapCorrect(tester, 'tx_2');
     await settle(tester);
     expect(find.byKey(const Key('correction-form')), findsOneWidget);
     expect(find.byKey(const Key('correction-payment-mode')), findsNothing);
@@ -143,7 +145,7 @@ void main() {
     final ledgerBefore = ledgerReads;
     final cardBefore = cardReads;
 
-    await tester.tap(find.byKey(const Key('correct-tx_1')));
+    await tapCorrect(tester, 'tx_1');
     await settle(tester);
     await enterAmount(tester, '100');
     await openConfirm(tester);
@@ -209,7 +211,8 @@ void main() {
     );
     expect(ledgerReads, greaterThan(ledgerBefore));
     expect(cardReads, greaterThan(cardBefore));
-    expect(find.text('tx_1'), findsWidgets);
+    // The corrected line stays in place in the table.
+    expect(find.byKey(const ValueKey('ledger-row-tx_1')), findsOneWidget);
   });
 
   testWidgets('a version conflict refetches the card and resends with it', (
@@ -237,7 +240,7 @@ void main() {
     expect(fake.scriptedGetJson, isEmpty);
     final before = ledgerReads;
 
-    await tester.tap(find.byKey(const Key('correct-tx_1')));
+    await tapCorrect(tester, 'tx_1');
     await settle(tester);
     await openConfirm(tester);
     await confirmSend(tester, fake);
@@ -368,24 +371,25 @@ void main() {
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
+    await tester.ensureVisible(find.byKey(const Key('add-debt')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('add-debt')));
     await settle(tester);
     await tester.enterText(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is TextField &&
-            widget.decoration?.labelText == AppStrings.amount,
+      find.descendant(
+        of: find.byKey(const Key('movement-amount')),
+        matching: find.byType(TextField),
       ),
       '10',
     );
     await tester.enterText(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is TextField &&
-            widget.decoration?.labelText == AppStrings.date,
-      ),
+      find.byKey(const Key('movement-date')),
       'ليس تاريخًا',
     );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('save-movement')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('save-movement')));
     await settle(tester);
 
@@ -482,6 +486,22 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
 
+    // The add row: choose دفع كلي, then its save button.
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('composer-full')));
+    await tester.pump();
+    await tester.pump();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('full-payment')));
     await settle(tester);
     final ledgerBody = jsonDecode(fake.mutationBodies.single) as Map;
@@ -490,7 +510,7 @@ void main() {
     expect(ledgerBody['type'], 'payment');
 
     await scrollTo(tester, const Key('correct-tx_2'), 'customers');
-    await tester.tap(find.byKey(const Key('correct-tx_2')));
+    await tapCorrect(tester, 'tx_2');
     await settle(tester);
     expect(find.byKey(const Key('correction-amount')), findsNothing);
     await tester.enterText(
@@ -538,8 +558,7 @@ void main() {
         ),
       );
       await settle(tester);
-      Navigator.of(tester.element(find.byKey(const Key('correction-form'))))
-          .pop();
+      await closeCorrection(tester, 'tx_1');
       await settle(tester);
 
       await tester.tap(find.byKey(HomeShell.menuKey));
@@ -578,7 +597,7 @@ void main() {
 
 Future<void> openCorrection(WidgetTester tester, String section) async {
   await scrollTo(tester, const Key('correct-tx_1'), section);
-  await tester.tap(find.byKey(const Key('correct-tx_1')));
+  await tapCorrect(tester, 'tx_1');
   await settle(tester);
   expect(find.byKey(const Key('correction-form')), findsOneWidget);
 }
@@ -593,11 +612,35 @@ Future<void> scrollTo(WidgetTester tester, Key key, String section) async {
     200,
     scrollable: scrollable.first,
   );
+  // Bring it fully into view (a taller bottom bar can leave it at the edge).
+  await tester.ensureVisible(find.byKey(key));
+  await settle(tester);
 }
 
 /// Opens the confirm dialog. The save control stays busy, with a spinning
 /// indicator, until the dialog closes, so [pumpAndSettle] would not go idle.
+/// The edit button sits in the last columns of the ledger table, so it
+/// is brought into view before the tap. The form then opens in its row.
+Future<void> tapCorrect(WidgetTester tester, String id) async {
+  final button = find.byKey(Key('correct-$id'));
+  await tester.ensureVisible(button);
+  await settle(tester);
+  await tester.tap(button);
+  await settle(tester);
+}
+
+Future<void> closeCorrection(WidgetTester tester, String id) async {
+  final close = find.byKey(Key('close-inline-edit-$id'));
+  await tester.ensureVisible(close);
+  await settle(tester);
+  await tester.tap(close);
+  await settle(tester);
+  expect(find.byKey(const Key('correction-form')), findsNothing);
+}
+
 Future<void> openConfirm(WidgetTester tester) async {
+  await tester.ensureVisible(find.byKey(const Key('save-correction')));
+  await tester.pump(const Duration(milliseconds: 300));
   await tester.tap(find.byKey(const Key('save-correction')));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));

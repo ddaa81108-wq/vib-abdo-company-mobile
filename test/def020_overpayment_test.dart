@@ -20,6 +20,9 @@ void main() {
       final fake = layer.client as FakeApiClient;
       final postsBefore = fake.mutationPaths.length;
       await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('add-payment')));
       await settle(tester);
       await tester.enterText(
@@ -29,6 +32,10 @@ void main() {
         ),
         '400',
       );
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+      await tester.ensureVisible(find.byKey(const Key('save-movement')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('save-movement')));
       await pumpUntil(tester, find.byKey(const Key('overpayment-warning')));
 

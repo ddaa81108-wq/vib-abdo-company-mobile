@@ -93,7 +93,7 @@ void main() {
             isEmpty,
           );
           expect(_header(current), findsOneWidget);
-          expect(_header('-80 د.ل'), findsNothing);
+          expect(_header('80 د.ل'), findsNothing);
           expect(tester.takeException(), isNull);
         },
       );
@@ -129,10 +129,20 @@ void main() {
       final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
       expect(body['expectedVersion'], 4);
       expect(body['inputValue'], 400);
-      expect(_header('-80 د.ل'), findsOneWidget);
+      // أمانة shows without its minus sign, named by the word (Ali,
+      // 2026-11-03). The figure is still the server's -80.
+      expect(_header('80 د.ل'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('ledger-header-kind')),
+          matching: find.text('أمانة'),
+        ),
+        findsOneWidget,
+      );
       expect(_header('320 د.ل'), findsNothing);
       final shown = tester.widget<MoneyText>(balance);
-      expect(shown.style?.color, positiveInk);
+      // The glossy total card paints its own ink per state (Ali,
+      // 2026-11-03); أمانة is never the debt colour.
       expect(
         shown.style?.color,
         isNot(tester.element(balance).statusColors.debtText),
@@ -163,10 +173,10 @@ void main() {
     });
 
     await tester.tap(find.byKey(const Key('overpayment-continue')));
-    await _pumpUntilHeader(tester, '-50 د.ل');
+    await _pumpUntilHeader(tester, '50 د.ل');
 
-    expect(_header('-50 د.ل'), findsOneWidget);
-    expect(_header('-80 د.ل'), findsNothing);
+    expect(_header('50 د.ل'), findsOneWidget);
+    expect(_header('80 د.ل'), findsNothing);
     expect(_header('320 د.ل'), findsNothing);
     final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
     expect(body['inputValue'], 400);
@@ -174,8 +184,8 @@ void main() {
     fake.scriptedGetJson[_cardPath] = _cardJson(-50);
     gate.complete();
     await settle(tester);
-    expect(_header('-50 د.ل'), findsOneWidget);
-    expect(_header('-80 د.ل'), findsNothing);
+    expect(_header('50 د.ل'), findsOneWidget);
+    expect(_header('80 د.ل'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -208,7 +218,7 @@ void main() {
     );
     expect(_header(shown), findsOneWidget);
     expect(shown, isNot('20 د.ل'));
-    expect(_header('-80 د.ل'), findsNothing);
+    expect(_header('80 د.ل'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -232,7 +242,7 @@ void main() {
 
       expect(_header('—'), findsOneWidget);
       expect(_header('320 د.ل'), findsNothing);
-      expect(_header('-80 د.ل'), findsNothing);
+      expect(_header('80 د.ل'), findsNothing);
 
       fake.scriptedGetJson[_cardPath] = _cardJson(50);
       gate.complete();
@@ -265,7 +275,7 @@ void main() {
 
       expect(_header(MoneyValue.invalidLabel), findsOneWidget);
       expect(_header('320 د.ل'), findsNothing);
-      expect(_header('-80 د.ل'), findsNothing);
+      expect(_header('80 د.ل'), findsNothing);
 
       fake.scriptedGetJson[_cardPath] = _cardJson(50);
       gate.complete();
@@ -289,16 +299,16 @@ void main() {
       fake.pauseGets[_cardPath] = gate;
 
       await tester.tap(find.byKey(const Key('overpayment-continue')));
-      await _pumpUntilHeader(tester, '-80 د.ل');
+      await _pumpUntilHeader(tester, '80 د.ل');
 
-      expect(_header('-80 د.ل'), findsOneWidget);
+      expect(_header('80 د.ل'), findsOneWidget);
       expect(_header('320 د.ل'), findsNothing);
 
       fake.scriptedGetJson[_cardPath] = _cardJson(15);
       gate.complete();
       await settle(tester);
       expect(_header('15 د.ل'), findsOneWidget);
-      expect(_header('-80 د.ل'), findsNothing);
+      expect(_header('80 د.ل'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -308,39 +318,30 @@ void main() {
     (tester) async {
       final layer = await pumpFakeApp(tester, size: const Size(430, 1400));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      final unlinked = await tester.runAsync(
-        () => layer.collections.decideUnlinked(
-          'ur_1',
-          decision: CollectionDecision.approve,
-          meta: MutationMeta(requestId: 'ur-no-customer'),
-        ),
-      );
-      expect(unlinked!.balanceUnits, isNull);
-      expect(unlinked.raw.containsKey('balanceUnits'), isFalse);
-      expect(unlinked.raw['balanceUnits'], isNot(50));
-
-      final mismatch = await tester.runAsync(() async {
-        final assigned = await layer.collections.assign(
-          customerIds: const ['c_eg_08'],
-          assigneeUserId: 'u_12',
-          section: 'egyptian-deposits',
-          meta: MutationMeta(requestId: 'as-eg'),
-        );
-        final assignmentId = (assigned.raw['assignmentIds'] as List).single;
-        final submitted = await layer.collections.submit(
-          '$assignmentId',
-          mode: 'partial',
-          amountUnits: 400,
-          meta: MutationMeta(requestId: 'eg-submit'),
-        );
-        return layer.collections.decide(
-          submitted.id!,
-          CollectionDecision.approve,
-          meta: MutationMeta(requestId: 'eg-approve'),
+      // 537f073 refuses to approve a standalone receipt with no card or
+      // new-card choice, so there is no balance to show at all.
+      await tester.runAsync(() async {
+        await expectLater(
+          layer.collections.decideUnlinked(
+            'ur_1',
+            decision: CollectionDecision.approve,
+            meta: MutationMeta(requestId: 'ur-no-customer'),
+          ),
+          throwsA(
+            isA<BadRequestException>().having(
+              (error) => error.code,
+              'code',
+              'UNLINKED_RECEIPT_LINK_REQUIRED',
+            ),
+          ),
         );
       });
-      expect(mismatch!.balanceUnits, isNull);
-      expect(mismatch.raw.containsKey('balanceUnits'), isFalse);
+
+      // 537f073 only assigns customer and company cards, so an Egyptian
+      // deposit never gets a collection approval. The card write below
+      // still answers without a balance (currency mismatch on the server),
+      // which has to show a dash until the card reloads.
+      const mismatchRaw = <String, dynamic>{'ok': true};
       final stored = await tester.runAsync(
         () => layer.accounts.get(AccountSection.egyptianDeposits, 'c_eg_08'),
       );
@@ -361,7 +362,7 @@ void main() {
         'egyptian-deposits',
         'c_eg_08',
       )] = jsonEncode(
-        mismatch.raw,
+        mismatchRaw,
       );
 
       await tester.tap(find.byKey(const Key('overpayment-continue')));
@@ -437,7 +438,7 @@ void main() {
       await tester.tap(find.byKey(const Key('overpayment-continue')));
       await settle(tester);
 
-      expect(_header('-80 د.ل'), findsOneWidget);
+      expect(_header('80 د.ل'), findsOneWidget);
       expect(_header('320 د.ل'), findsNothing);
       expect(find.byKey(const Key('ledger-reload-failed')), findsOneWidget);
       expect(find.text(AppStrings.ledgerReloadFailed), findsOneWidget);
@@ -471,6 +472,9 @@ void main() {
       final fake = layer.client as FakeApiClient;
       final postsBefore = fake.mutationPaths.length;
       await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('add-payment')));
       await settle(tester);
       await tester.enterText(
@@ -486,7 +490,10 @@ void main() {
         find.ancestor(of: save, matching: find.byType(GuardedMutation)),
       );
       expect(before.inputs, contains('|400|'));
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
       await tester.ensureVisible(save);
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(save);
       for (var i = 0; i < 30; i++) {
         if (find
@@ -515,7 +522,13 @@ void main() {
       expect(draft.expectedVersion, mutation.expectedVersion);
       expect(requestId, isNotEmpty);
 
+      FocusManager.instance.primaryFocus?.unfocus();
+
+      await tester.pump();
+
       await tester.ensureVisible(save);
+
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(save);
       for (var i = 0; i < 30; i++) {
         if (find
@@ -555,6 +568,10 @@ void main() {
       final fake = layer.client as FakeApiClient;
 
       await tester.ensureVisible(find.byKey(const Key('add-payment')));
+
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('add-payment')));
       await settle(tester);
       await tester.enterText(
@@ -577,7 +594,10 @@ void main() {
       );
 
       final save = find.byKey(const Key('save-movement'));
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
       await tester.ensureVisible(save);
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(save);
       await settle(tester);
 
@@ -587,7 +607,13 @@ void main() {
       expect(_header('220 د.ل'), findsOneWidget);
       expect(_header('320 د.ل'), findsNothing);
 
+      FocusManager.instance.primaryFocus?.unfocus();
+
+      await tester.pump();
+
       await tester.ensureVisible(save);
+
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(save);
       for (var i = 0; i < 30; i++) {
         if (find
@@ -631,6 +657,10 @@ void main() {
       final fake = layer.client as FakeApiClient;
 
       await tester.ensureVisible(find.byKey(const Key('add-payment')));
+
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.ensureVisible(find.byKey(const Key('add-payment')));
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const Key('add-payment')));
       await settle(tester);
       await tester.enterText(
@@ -659,7 +689,10 @@ void main() {
       );
       fake.failGetPaths.add(_cardPath);
       final save = find.byKey(const Key('save-movement'));
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
       await tester.ensureVisible(save);
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(save);
       await settle(tester);
 
@@ -746,6 +779,10 @@ String _cardJson(
 
 Future<void> _openPayment(WidgetTester tester, String amount) async {
   await tester.ensureVisible(find.byKey(const Key('add-payment')));
+  await tester.pump(const Duration(milliseconds: 400));
+  await tester.pump();
+  await tester.ensureVisible(find.byKey(const Key('add-payment')));
+  await tester.pump(const Duration(milliseconds: 400));
   await tester.tap(find.byKey(const Key('add-payment')));
   await settle(tester);
   await tester.enterText(
@@ -756,7 +793,11 @@ Future<void> _openPayment(WidgetTester tester, String amount) async {
     amount,
   );
   final save = find.byKey(const Key('save-movement'));
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tester.pump();
   await tester.ensureVisible(save);
+  await tester.pump(const Duration(milliseconds: 400));
+  await tester.pump();
   await tester.tap(save);
   const warning = Key('overpayment-warning');
   for (var i = 0; i < 30; i++) {

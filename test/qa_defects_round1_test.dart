@@ -6,7 +6,6 @@ import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
-import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import 'support/pump_app.dart';
 
@@ -31,7 +30,9 @@ void main() {
 
       expect(find.text('هذا الإجراء للإدارة فقط'), findsNothing);
       expect(find.byKey(const Key('approve-sb_1')), findsNothing);
-      expect(find.text(AppStrings.approved), findsNWidgets(2));
+      // 537f073 history: an approved receipt waits for its cash.
+      expect(find.byKey(const ValueKey('awaiting-cash-sb_1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('awaiting-cash-sb_2')), findsOneWidget);
     },
   );
 
@@ -43,7 +44,22 @@ void main() {
     await go(tester, '/customers/c_55');
 
     expect(_headerAmount('320 د.ل'), findsOneWidget);
+    // The add row: choose دفع كلي, then its save button.
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('composer-full')));
+    await tester.pump();
+    await tester.pump();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('full-payment')));
     await settle(tester);
 
@@ -91,14 +107,16 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
 
-    expect(find.text(AppStrings.approved), findsOneWidget);
+    // 537f073: approved and no cash yet is «ينتظر استلام النقدية».
+    expect(find.byKey(const ValueKey('awaiting-cash-sb_2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('awaiting-cash-sb_1')), findsNothing);
     final approve = find.byKey(const Key('approve-sb_1'));
     await tester.ensureVisible(approve);
     await tester.tap(approve);
     await settle(tester);
 
     expect(find.byKey(const Key('approve-sb_1')), findsNothing);
-    expect(find.text(AppStrings.approved), findsNWidgets(2));
+    expect(find.byKey(const ValueKey('awaiting-cash-sb_1')), findsOneWidget);
   });
 
   testWidgets(
@@ -137,7 +155,8 @@ void main() {
         findsWidgets,
       );
       expect(find.byKey(const Key('approve-sb_1')), findsNothing);
-      expect(find.text(AppStrings.approved), findsNWidgets(2));
+      expect(find.byKey(const ValueKey('awaiting-cash-sb_1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('awaiting-cash-sb_2')), findsOneWidget);
       await settle(tester);
     },
   );
@@ -147,10 +166,27 @@ void main() {
   ) async {
     final layer = await pumpFakeApp(tester, size: const Size(800, 2200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    expect(_debtAmount('320 د.ل'), findsOneWidget);
+    // Home has no debt bulletin now (icon grid only); the server value is
+    // checked below.
+    expect(_debtAmount('320 د.ل'), findsNothing);
 
     await go(tester, '/customers/c_55');
+    // The add row: choose دفع كلي, then its save button.
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(const Key('composer-full')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('composer-full')));
+    await tester.pump();
+    await tester.pump();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
     await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('full-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('full-payment')));
     await settle(tester);
 
@@ -161,7 +197,7 @@ void main() {
     final shown = layer.money.format(card!.balanceUnits!.units!, Currency.lyd);
     expect(card.balanceUnits?.units, 0);
     expect(_debtAmount('320 د.ل'), findsNothing);
-    expect(_debtAmount(shown), findsOneWidget);
+    expect(_debtAmount(shown), findsNothing);
   });
 
   testWidgets('DEF-016 a partial payment shows the stored home balance', (
@@ -171,6 +207,9 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
     await tester.ensureVisible(find.byKey(const Key('add-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(const Key('add-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('add-payment')));
     await settle(tester);
     await tester.enterText(
@@ -180,6 +219,10 @@ void main() {
       ),
       '100',
     );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('save-movement')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('save-movement')));
     await settle(tester);
 
@@ -189,7 +232,7 @@ void main() {
     );
     final shown = layer.money.format(card!.balanceUnits!.units!, Currency.lyd);
     expect(card.balanceUnits?.units, isNot(320));
-    expect(_debtAmount(shown), findsOneWidget);
+    expect(_debtAmount(shown), findsNothing);
     expect(_debtAmount('320 د.ل'), findsNothing);
   });
 
@@ -213,7 +256,7 @@ void main() {
     );
     final shown = layer.money.format(card!.balanceUnits!.units!, Currency.lyd);
     expect(card.balanceUnits?.units, isNot(320));
-    expect(_debtAmount(shown), findsOneWidget);
+    expect(_debtAmount(shown), findsNothing);
     expect(_debtAmount('320 د.ل'), findsNothing);
   });
 }

@@ -54,10 +54,13 @@ void main() {
   ) async {
     await pumpFakeApp(tester, size: const Size(430, 1200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers/c_55');
+    // Customers and companies show the glossy دين/أمانة/صفر total card
+    // instead (Ali, 2026-11-03); the deposit ledgers keep the age gradient.
+    await go(tester, '/libyan-deposits/c_55');
 
     _expectHeaderGradient(tester, AppStatusColors.light.warningDebt);
-    expect(find.text('منذ 4 أيام'), findsWidgets);
+    // The total card shows only the total (Ali, 2026-11-04): no age line.
+    expect(find.text('منذ 4 أيام'), findsNothing);
 
     await _toggleDark(tester);
     _expectHeaderGradient(tester, AppStatusColors.dark.warningDebt);
@@ -82,7 +85,9 @@ void main() {
       ],
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers/c_55');
+    // Customers and companies show the glossy دين/أمانة/صفر total card
+    // instead (Ali, 2026-11-03); the deposit ledgers keep the age gradient.
+    await go(tester, '/libyan-deposits/c_55');
     _expectHeaderGradient(tester, AppStatusColors.light.overdueDebt);
     expect(tester.takeException(), isNull);
   });
@@ -103,7 +108,7 @@ void main() {
       ],
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/companies/c_55');
+    await go(tester, '/libyan-deposits/c_55');
     final ink = tester.widget<Ink>(
       find.descendant(
         of: find.byKey(const Key('ledger-header')),
@@ -142,7 +147,9 @@ void main() {
           );
           await _scrollToTop(tester, const Key('screen-ledger-customers'));
           expectRtl(tester);
-          expect(find.text(AppStrings.customerLedger), findsOneWidget);
+          // Only the owner's name sits above the ledger (Ali, 2026-11-04).
+          expect(find.byKey(const Key('ledger-owner-pill')), findsOneWidget);
+          expect(find.text(AppStrings.customerLedger), findsNothing);
           expect(find.text('posted'), findsNothing);
           await _expectFits(
             tester,
@@ -233,9 +240,16 @@ void main() {
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/libyan-deposits/c_55');
-    expect(find.text(AppStrings.libyanLedger), findsOneWidget);
-    expect(_textOf(tester, const Key('ledger-sequence-tx_1')), AppStrings.dash);
+    // Only the owner's name sits above the ledger (Ali, 2026-11-04).
+    expect(find.byKey(const Key('ledger-owner-pill')), findsOneWidget);
+    expect(find.text(AppStrings.libyanLedger), findsNothing);
+    // م counts the drawn rows 1..n once every page is in (Ali,
+    // 2026-11-03); a row without a server sequence still gets its place.
+    await tester.pump(const Duration(milliseconds: 50));
+    await settle(tester);
+    expect(_textOf(tester, const Key('ledger-sequence-tx_old')), '1');
     expect(_textOf(tester, const Key('ledger-sequence-tx_2')), '2');
+    expect(_textOf(tester, const Key('ledger-sequence-tx_1')), '3');
     expect(
       Directionality.of(
         tester.element(
@@ -317,7 +331,9 @@ void main() {
     );
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/egyptian-deposits/c_55');
-    expect(find.text(AppStrings.egyptianLedger), findsOneWidget);
+    // Only the owner's name sits above the ledger (Ali, 2026-11-04).
+    expect(find.byKey(const Key('ledger-owner-pill')), findsOneWidget);
+    expect(find.text(AppStrings.egyptianLedger), findsNothing);
     expect(find.text(AppStrings.systemCard), findsOneWidget);
     _expectWritesHidden(tester);
   });
@@ -367,7 +383,8 @@ void main() {
     expect(find.text(AppStrings.emptyLedger), findsOneWidget);
     expect(find.byKey(const Key('edit-account-card')), findsOneWidget);
     expect(find.byKey(const Key('add-debt')), findsOneWidget);
-    expect(find.text(AppStrings.statementHidden), findsOneWidget);
+    // Ali, 2026-11-03: no explanatory notes in the footer.
+    expect(find.text(AppStrings.statementHidden), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -393,8 +410,10 @@ void main() {
     await tester.tap(find.text(AppStrings.retry));
     await settle(tester);
     expect(find.byKey(const Key('add-debt')), findsOneWidget);
-    expect(find.byKey(const Key('load-older')), findsOneWidget);
-    expect(find.text(AppStrings.loadOlder), findsOneWidget);
+    // Older pages load by themselves now (Ali, 2026-11-03).
+    await settle(tester);
+    expect(find.byKey(const ValueKey('ledger-row-tx_old')), findsOneWidget);
+    expect(find.byKey(const Key('load-older')), findsNothing);
     expect(gate.calls, greaterThanOrEqualTo(2));
     expect(tester.takeException(), isNull);
   });
@@ -468,22 +487,32 @@ void main() {
     expect(_isStretched(tester, const Key('edit-account-card')), isFalse);
 
     await size(320, 1);
-    expect(_amountIsStacked(tester), isTrue);
+    expect(
+      _amountIsStacked(tester),
+      isFalse,
+    ); // one table row at every width (Ali, 2026-11-03)
     await _reveal(
       tester,
       find.byKey(const Key('edit-account-card')),
       const Key('screen-ledger-customers'),
     );
-    expect(_isStretched(tester, const Key('edit-account-card')), isTrue);
+    // The ledger's edit-card control is a pencil in the top bar now (Ali,
+    // 2026-11-03), so it never stretches; the edit screen below still does.
+    expect(_isStretched(tester, const Key('edit-account-card')), isFalse);
 
     await size(430, 1.3);
-    expect(_amountIsStacked(tester), isTrue);
+    expect(
+      _amountIsStacked(tester),
+      isFalse,
+    ); // one table row at every width (Ali, 2026-11-03)
     await _reveal(
       tester,
       find.byKey(const Key('edit-account-card')),
       const Key('screen-ledger-customers'),
     );
-    expect(_isStretched(tester, const Key('edit-account-card')), isTrue);
+    // The ledger's edit-card control is a pencil in the top bar now (Ali,
+    // 2026-11-03), so it never stretches; the edit screen below still does.
+    expect(_isStretched(tester, const Key('edit-account-card')), isFalse);
 
     await go(tester, '/customers/c_55/edit');
     tester.view.physicalSize = const Size(360, 1600);
@@ -603,7 +632,11 @@ void _expectAligned(WidgetTester tester) {
   final amount1 = tester.getRect(find.byKey(const Key('ledger-amount-tx_1')));
   final amount2 = tester.getRect(find.byKey(const Key('ledger-amount-tx_2')));
   expect((date1.left - date2.left).abs(), lessThan(1.5));
-  expect((amount1.right - amount2.right).abs(), lessThan(1.5));
+  // Table columns: a debt sits under دين مضاف and a payment under مدفوع,
+  // each on its own row (Ali, 2026-11-03).
+  expect((amount1.left - amount2.left).abs(), greaterThan(40));
+  expect(amount1.top, lessThan(date1.bottom));
+  expect(amount2.top, lessThan(date2.bottom));
 }
 
 Future<void> _scrollToTop(WidgetTester tester, Key screen) async {
@@ -696,13 +729,26 @@ Future<void> settle(WidgetTester tester) {
   );
 }
 
-/// Loads Cairo, JetBrains Mono, and Material Icons after the test app is up.
+/// Loads IBM Plex Sans Arabic and Material Icons after the test app is up.
 /// Call from [WidgetTester.runAsync]. flutter_tester does not bundle those
 /// faces, so icons and Arabic otherwise paint as empty squares.
 Future<void> loadScreenshotFonts() async {
-  await _loadFont('assets/fonts/Cairo-Variable.ttf', 'Cairo');
-  await _loadFont('assets/fonts/JetBrainsMono-Bold.ttf', 'JetBrainsMono');
-  await _loadFont('assets/fonts/JetBrainsMono-ExtraBold.ttf', 'JetBrainsMono');
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Regular.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Medium.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-SemiBold.ttf',
+    'IBMPlexSansArabic',
+  );
+  await _loadFont(
+    'assets/fonts/IBMPlexSansArabic-Bold.ttf',
+    'IBMPlexSansArabic',
+  );
   final icons = _materialIconsFile();
   if (icons == null) {
     throw StateError('MaterialIcons-Regular.otf was not found');

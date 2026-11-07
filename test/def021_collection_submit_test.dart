@@ -44,45 +44,70 @@ void main() {
       await tester.tap(find.byKey(const Key('save-unlinked')));
       await settle(tester);
 
-      expect(
-        find.byKey(const Key('submission-sb_posted_1'), skipOffstage: false),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('unlinked-card-ur_posted_1'), skipOffstage: false),
-        findsOneWidget,
-      );
-      expect(find.text('زبون جديد', skipOffstage: false), findsOneWidget);
-
       final overview = await tester.runAsync(
         () => layer.collections.overview(),
       );
-      expect(overview!.submissions.map((row) => row.id).toList(), [
-        'sb_1',
-        'sb_2',
-        'sb_posted_1',
-      ]);
-      expect(overview.unlinkedReceipts.map((row) => row.id).toList(), [
-        'ur_1',
-        'ur_2',
-        'ur_posted_1',
-      ]);
-      expect(overview.submissions.last.amountUnits?.units, 40);
-      expect(overview.unlinkedReceipts.last.amountUnits?.units, 25);
-      expect(overview.unlinkedReceipts.last.customerName, 'زبون جديد');
+      // 537f073 lists submissions newest first; rejected unlinked receipts
+      // are not listed.
+      final posted = overview!.submissions.first;
+      expect(posted.assignmentId, 'as_1');
+      expect(posted.amountUnits?.units, 40);
+      expect(posted.status, 'pending');
+      expect(overview.submissions, hasLength(3));
+      final created = overview.unlinkedReceipts.firstWhere(
+        (row) => row.customerName == 'زبون جديد',
+      );
+      expect(created.amountUnits?.units, 25);
+      expect(overview.unlinkedReceipts.map((row) => row.id), contains('ur_1'));
+      expect(
+        overview.unlinkedReceipts.map((row) => row.id),
+        isNot(contains('ur_2')),
+      );
+
+      expect(
+        find.byKey(Key('submission-${posted.id}'), skipOffstage: false),
+        findsOneWidget,
+      );
+      // Standalone receipts are on «تحصيلاتي».
+      await openReceipts(tester);
+      expect(
+        find.byKey(Key('unlinked-card-${created.id}'), skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(find.text('زبون جديد', skipOffstage: false), findsOneWidget);
+      await openTab(tester, 'cards');
+      // One pending receipt per card: both buttons are off now.
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.byKey(const Key('submit-as_1'), skipOffstage: false),
+            )
+            .onPressed,
+        isNull,
+      );
 
       await go(tester, '/');
       await go(tester, '/collections');
       expect(
-        find.byKey(const Key('submission-sb_posted_1'), skipOffstage: false),
+        find.byKey(Key('submission-${posted.id}'), skipOffstage: false),
         findsOneWidget,
       );
+      await openReceipts(tester);
       expect(
-        find.byKey(const Key('unlinked-card-ur_posted_1'), skipOffstage: false),
+        find.byKey(Key('unlinked-card-${created.id}'), skipOffstage: false),
         findsOneWidget,
       );
     },
   );
+}
+
+Future<void> openReceipts(WidgetTester tester) => openTab(tester, 'receipts');
+
+Future<void> openTab(WidgetTester tester, String tab) async {
+  final chip = find.byKey(Key('collections-tab-$tab'));
+  await tester.ensureVisible(chip);
+  await tester.tap(chip);
+  await settle(tester);
 }
 
 Future<void> settle(WidgetTester tester) async {

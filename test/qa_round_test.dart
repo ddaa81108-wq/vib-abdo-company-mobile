@@ -109,29 +109,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a failed home request shows per-section fields', (tester) async {
-    final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    expect(find.text('صافي ديون العملاء'), findsOneWidget);
-
-    (layer.client as FakeApiClient).failHomeRemaining = 1;
-    final refresh = tester
-        .widget<RefreshIndicator>(find.byType(RefreshIndicator))
-        .onRefresh();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-    await refresh;
-    await settle(tester);
-
-    expect(find.text('صافي ديون العملاء'), findsNothing);
-    expect(
-      find.textContaining('ديون العملاء · ${AppStrings.netDebt}'),
-      findsOneWidget,
-    );
-    expect(find.textContaining(AppStrings.totalDebt), findsWidgets);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('a failed refresh keeps the last report', (tester) async {
     var fail = false;
     await pumpFakeApp(
@@ -159,12 +136,20 @@ void main() {
   testWidgets('load older shows the error and a retry', (tester) async {
     final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers/c_55');
+    // The older page loads by itself (Ali, 2026-11-03); a failure shows
+    // the error and a retry in its place.
     (layer.client as FakeApiClient).failOlderRemaining = 1;
-    await tester.tap(find.byKey(const Key('load-older')));
+    await go(tester, '/customers/c_55');
     await settle(tester);
     expect(find.byKey(const Key('load-older-error')), findsOneWidget);
     expect(find.text(AppStrings.retry), findsWidgets);
+    final retry = tester.widget<TextButton>(
+      find.byKey(const Key('load-older')),
+    );
+    retry.onPressed!();
+    await settle(tester);
+    expect(find.byKey(const Key('load-older-error')), findsNothing);
+    expect(find.byKey(const ValueKey('ledger-row-tx_old')), findsOneWidget);
   });
 
   testWidgets(

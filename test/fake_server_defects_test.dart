@@ -50,8 +50,8 @@ void main() {
       await pumpFakeApp(tester, size: const Size(800, 2400));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
 
+      // Home has no debt bulletin now; the customers list shows the age.
       expect(find.textContaining('مرّ عليه 3 أيام'), findsNothing);
-      expect(find.textContaining('منذ 4 أيام'), findsWidgets);
 
       await go(tester, '/customers');
       expect(find.text('مرّ عليه 3 أيام'), findsNothing);
@@ -72,9 +72,10 @@ void main() {
       await go(tester, '/');
       await go(tester, '/customers/c_55');
       expect(find.byKey(const Key('add-debt')), findsOneWidget);
-      expect(find.byKey(const Key('full-payment')), findsOneWidget);
+      expect(find.byKey(const Key('composer-full')), findsOneWidget);
       expect(find.text('مرّ عليه 3 أيام'), findsNothing);
-      expect(find.text('منذ 4 أيام'), findsWidgets);
+      // The ledger total card shows only the total (Ali, 2026-11-04).
+      expect(find.text('منذ 4 أيام'), findsNothing);
     },
   );
 }

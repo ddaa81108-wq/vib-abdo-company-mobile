@@ -176,7 +176,7 @@ String movementLabel({
     return switch (paymentMode) {
       'full' => AppStrings.fullPayment,
       'partial' => AppStrings.partialPayment,
-      _ => AppStrings.paymentMovement,
+      _ => AppStrings.paymentUnknownMode,
     };
   }
   return AppStrings.debtMovement;
@@ -185,6 +185,14 @@ String movementLabel({
 String calculationLabel(CalculationMode? mode) => switch (mode) {
   CalculationMode.divide => AppStrings.divide,
   CalculationMode.multiply => AppStrings.multiply,
+  _ => AppStrings.direct,
+};
+
+/// The website's marks (LedgerWorkspace-BQxJagtI.js): `÷` (U+00F7) for
+/// divide, `×` (U+00D7) for multiply, «مباشر» stays a word. Labels only.
+String calculationSymbol(CalculationMode? mode) => switch (mode) {
+  CalculationMode.divide => '\u00F7',
+  CalculationMode.multiply => '\u00D7',
   _ => AppStrings.direct,
 };
 

@@ -309,7 +309,9 @@ class LedgerPage {
   final Paged<LedgerEntryDto> page;
   final Currency currency;
 
-  /// Display only. NEVER used to accumulate a running balance (web client does; we don't).
+  /// Display only. Since 2026-11-03 the ledger screen runs the website's
+  /// running balance from it, and shows it only when it ends on the
+  /// server's card balance (features/accounts/ledger_running_balance.dart).
   final MoneyValue? pageOpeningBalanceUnits;
   final AccountCardDto? account;
 

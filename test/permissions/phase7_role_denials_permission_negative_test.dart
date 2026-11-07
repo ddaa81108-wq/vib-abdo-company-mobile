@@ -136,23 +136,17 @@ void main() {
     tags: ['pending-decision'],
   );
 
-  testWidgets(
-    'employee collections overview still includes the caller totals row',
-    (tester) async {
-      // Open question for Ali: must the server omit employeeTotals for an
-      // employee? The fake still returns the caller's own row. 🔶 userId on
-      // that row is how the fake scopes it. Not a Pass that the field is
-      // confirmed.
-      final layer = await pumpFakeApp(tester);
-      await signIn(tester, username: 'employee.demo', password: 'demo-only');
-      final overview = await tester.runAsync(
-        () => layer.collections.overview(),
-      );
-      expect(overview!.employeeTotals, hasLength(1));
-      expect(overview.employeeTotals.single.employeeName, 'موظف استلام تجريبي');
-    },
-    tags: ['pending-decision'],
-  );
+  testWidgets('employee collections overview has no totals board (537f073)', (
+    tester,
+  ) async {
+    // Resolved by the deployed server: 537f073 sends employeeTotals to
+    // admins only, so an employee sees no other employee's figures.
+    final layer = await pumpFakeApp(tester);
+    await signIn(tester, username: 'employee.demo', password: 'demo-only');
+    final overview = await tester.runAsync(() => layer.collections.overview());
+    expect(overview!.employeeTotals, isEmpty);
+    expect(overview.collectedUnits?.units, 250);
+  });
 
   test('a 403 is not retried by the buildAppRoot callback', () async {
     // The closure is the one buildAppRoot installs. It is not reimplemented

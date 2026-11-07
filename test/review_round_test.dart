@@ -59,42 +59,49 @@ void main() {
     expect(light.overdueDebt.end, const Alignment(0.5736, 0.8192));
   });
 
-  testWidgets('offline disables writes and the status line follows connectivity', (
-    tester,
-  ) async {
-    final link = ToggleConnectivity(true);
-    await pumpFakeApp(
-      tester,
-      size: const Size(800, 1600),
-      connectivity: link,
-    );
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/customers');
-    expect(find.byKey(const Key('online-banner')), findsOneWidget);
-    expect(
-      tester.widget<FilledButton>(find.byKey(const Key('add-account'))).onPressed,
-      isNotNull,
-    );
+  testWidgets(
+    'offline disables writes and the status line follows connectivity',
+    (tester) async {
+      final link = ToggleConnectivity(true);
+      await pumpFakeApp(
+        tester,
+        size: const Size(800, 1600),
+        connectivity: link,
+      );
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/customers');
+      expect(find.byKey(const Key('online-banner')), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('add-account')))
+            .onPressed,
+        isNotNull,
+      );
 
-    link.setOnline(false);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-    expect(find.byKey(const Key('offline-banner')), findsOneWidget);
-    expect(find.text(AppStrings.offline), findsWidgets);
-    expect(
-      tester.widget<FilledButton>(find.byKey(const Key('add-account'))).onPressed,
-      isNull,
-    );
+      link.setOnline(false);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byKey(const Key('offline-banner')), findsOneWidget);
+      expect(find.text(AppStrings.offline), findsWidgets);
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('add-account')))
+            .onPressed,
+        isNull,
+      );
 
-    link.setOnline(true);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-    expect(find.byKey(const Key('online-banner')), findsOneWidget);
-    expect(
-      tester.widget<FilledButton>(find.byKey(const Key('add-account'))).onPressed,
-      isNotNull,
-    );
-  });
+      link.setOnline(true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byKey(const Key('online-banner')), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('add-account')))
+            .onPressed,
+        isNotNull,
+      );
+    },
+  );
 }
 
 Future<void> go(WidgetTester tester, String path) async {

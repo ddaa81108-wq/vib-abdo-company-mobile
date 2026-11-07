@@ -18,6 +18,10 @@ void main() {
     expect(_header('320 د.ل'), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const Key('add-payment')));
+
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.byKey(const Key('add-payment')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('add-payment')));
     await settle(tester);
     await tester.enterText(
@@ -39,6 +43,10 @@ void main() {
         MutationMeta(expectedVersion: 4),
       ),
     );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('save-movement')));
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('save-movement')));
     await settle(tester);
 
@@ -47,8 +55,11 @@ void main() {
     expect(_header('319 د.ل'), findsOneWidget);
     expect(_header('320 د.ل'), findsNothing);
 
-    Navigator.of(tester.element(find.byType(Dialog))).pop();
-    await settle(tester);
+    // The add row is inline now; close the sheet only when one is open.
+    if (find.byType(Dialog).evaluate().isNotEmpty) {
+      Navigator.of(tester.element(find.byType(Dialog))).pop();
+      await settle(tester);
+    }
     final stored = await tester.runAsync(
       () => layer.accounts.get(AccountSection.customers, 'c_55'),
     );

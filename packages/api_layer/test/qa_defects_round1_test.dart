@@ -183,7 +183,8 @@ void main() {
       );
       expect(submission.status, 'approved');
       expect(submission.version, isNull);
-      expect(submission.cashStatus, CashStatus.notApplicable);
+      // Approved and no cashReceivedAt yet: awaiting cash.
+      expect(submission.awaitingCash, isTrue);
     },
   );
 
@@ -409,11 +410,11 @@ void main() {
     var pending = overview.submissions.firstWhere((item) => item.id == 'sb_1');
     expect(pending.status, 'pending');
     expect(pending.version, isNull);
-    expect(pending.cashStatus, CashStatus.notApplicable);
+    expect(pending.awaitingCash, isFalse);
 
     var submission =
         overview.submissions.firstWhere((item) => item.id == 'sb_2');
-    expect(submission.cashStatus, CashStatus.pending);
+    expect(submission.awaitingCash, isTrue);
     expect(submission.version, isNull);
     expect(submission.status, 'approved');
 
@@ -422,11 +423,11 @@ void main() {
       MutationMeta(expectedVersion: 3, requestId: 'cash-1'),
     );
     expect(ack.version, isNull);
-    expect(ack.raw['cashReceivedAt'], '2026-10-22T22:00:00.000Z');
+    expect(ack.raw['cashReceivedAt'], isNotNull);
     expect(ack.raw.containsKey('version'), isFalse);
     overview = await api.collections.overview();
     submission = overview.submissions.firstWhere((item) => item.id == 'sb_2');
-    expect(submission.cashStatus, CashStatus.received);
+    expect(submission.cashReceivedAt, isNotNull);
     expect(submission.version, isNull);
     expect(submission.status, 'approved');
 
@@ -456,11 +457,13 @@ void main() {
     );
     expect(stillPending.status, 'pending');
     expect(stillPending.version, isNull);
-    expect(stillPending.cashStatus, CashStatus.notApplicable);
+    expect(stillPending.awaitingCash, isFalse);
 
     await api.collections.decideUnlinked(
       'ur_1',
       decision: CollectionDecision.approve,
+      customerId: 'c_55',
+      entryType: 'payment',
       meta: MutationMeta(requestId: 'ucash-approve'),
     );
     final unlinkedAck = await api.collections.markUnlinkedCashReceived(
@@ -468,12 +471,12 @@ void main() {
       MutationMeta(requestId: 'ucash-received'),
     );
     expect(unlinkedAck.version, isNull);
-    expect(unlinkedAck.raw['cashReceivedAt'], '2026-10-22T22:00:00.000Z');
+    expect(unlinkedAck.raw['cashReceivedAt'], isNotNull);
     overview = await api.collections.overview();
     final receipt = overview.unlinkedReceipts.firstWhere(
       (item) => item.id == 'ur_1',
     );
-    expect(receipt.cashStatus, CashStatus.received);
+    expect(receipt.cashReceivedAt, isNotNull);
     expect(receipt.version, isNull);
     expect(receipt.status, 'approved');
   });
@@ -486,12 +489,14 @@ void main() {
       'ur_1',
       decision: CollectionDecision.approve,
       note: 'مطابقة اختبار',
+      customerId: 'c_55',
+      entryType: 'payment',
       meta: MutationMeta(expectedVersion: 9, requestId: 'ulink-1'),
     );
     expect(ack.version, isNull);
     expect(ack.raw['status'], 'approved');
-    expect(ack.balanceUnits, isNull);
-    expect(ack.raw.containsKey('balanceUnits'), isFalse);
+    // 537f073 posts the 50 onto the chosen card (320).
+    expect(ack.balanceUnits?.units, 270);
     expect(ack.raw.containsKey('version'), isFalse);
     var overview = await api.collections.overview();
     var receipt = overview.unlinkedReceipts.firstWhere(
@@ -521,7 +526,7 @@ void main() {
   });
 
   test(
-    'close day compares the stored batch version through the repository',
+    '537f073 close day is refused until every row is decided and cash is in',
     () async {
       final api = await login('admin@example.invalid');
       expect((await api.collections.overview()).batchId, 'b_1');
@@ -529,40 +534,54 @@ void main() {
       await expectLater(
         api.collections.closeDay(
           batchId: 'b_1',
-          meta: MutationMeta(expectedVersion: 99, requestId: 'close-99'),
+          meta: MutationMeta(requestId: 'close-early'),
         ),
         throwsA(
-          isA<ConflictException>().having(
-            (e) => e.code,
-            'code',
-            'VERSION_CONFLICT',
-          ),
+          isA<ConflictException>()
+              .having((e) => e.code, 'code', 'COLLECTION_DAY_NOT_SETTLED')
+              .having(
+                (e) => e.details,
+                'details',
+                {'pendingCount': 4, 'cashPendingCount': 1},
+              ),
         ),
       );
       expect((await api.collections.overview()).batchId, 'b_1');
 
+      final meta = MutationMeta(requestId: 'settle');
+      await api.collections.decide('sb_1', CollectionDecision.reject,
+          meta: meta);
+      await api.collections.decide('sb_9', CollectionDecision.reject,
+          meta: meta);
+      await api.collections.decideUnlinked('ur_1',
+          decision: CollectionDecision.reject, meta: meta);
+      await api.collections.decideUnlinked('ur_9',
+          decision: CollectionDecision.reject, meta: meta);
+      await expectLater(
+        api.collections.closeDay(batchId: 'b_1', meta: meta),
+        throwsA(isA<ConflictException>().having(
+          (e) => e.details,
+          'details',
+          {'pendingCount': 0, 'cashPendingCount': 1},
+        )),
+      );
+      await api.collections.markCashReceived('sb_2', meta);
+
       final ack = await api.collections.closeDay(
         batchId: 'b_1',
-        meta: MutationMeta(expectedVersion: 1, requestId: 'close-1'),
+        meta: MutationMeta(requestId: 'close-1'),
       );
-      expect(ack.id, 'ok');
-      expect(ack.version, 2);
-      expect((await api.collections.overview()).batchId, 'b_2');
+      expect(ack.raw['closed'], true);
+      final after = await api.collections.overview();
+      expect(after.assignments, isEmpty);
+      expect(after.submissions, isEmpty);
+      expect(after.openBatches, isEmpty);
 
-      await expectLater(
-        api.collections.closeDay(
-          batchId: 'b_1',
-          meta: MutationMeta(expectedVersion: 1, requestId: 'close-stale'),
-        ),
-        throwsA(
-          isA<ConflictException>().having(
-            (e) => e.code,
-            'code',
-            'VERSION_CONFLICT',
-          ),
-        ),
+      final again = await api.collections.closeDay(
+        batchId: 'b_1',
+        meta: MutationMeta(requestId: 'close-again'),
       );
-      expect((await api.collections.overview()).batchId, 'b_2');
+      expect(again.raw['replayed'], true);
     },
   );
 

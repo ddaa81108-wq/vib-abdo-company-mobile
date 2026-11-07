@@ -203,6 +203,9 @@ void main() {
     );
     expect(scroll.scrollDirection, Axis.horizontal);
     expect(scroll.controller!.position.maxScrollExtent, greaterThan(0));
+    // The history table now sits under the new report blocks.
+    await tester.ensureVisible(find.byKey(const Key('report-table-scroll')));
+    await tester.pump();
     final before = scroll.controller!.offset;
     await tester.drag(
       find.byKey(const Key('report-table-scroll')),
@@ -216,6 +219,19 @@ void main() {
     await tester.pump();
     expect(scroll.controller!.offset, isNot(before));
     expect(tester.takeException(), isNull);
+    // Back to the top, where the export button sits.
+    tester
+        .state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byKey(ReportsScreen.screenKey),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        )
+        .position
+        .jumpTo(0);
+    await tester.pump();
 
     final layer = ProviderScope.containerOf(
       tester.element(find.byType(HomeShell)),
@@ -557,10 +573,10 @@ Future<void> reveal(WidgetTester tester, Finder finder, Key screen) {
   return tester.scrollUntilVisible(
     finder,
     400,
-    scrollable: find.descendant(
-      of: find.byKey(screen),
-      matching: find.byType(Scrollable),
-    ),
+    // The page's own scroll (the cash grid has inner scrolls too).
+    scrollable: find
+        .descendant(of: find.byKey(screen), matching: find.byType(Scrollable))
+        .first,
   );
 }
 

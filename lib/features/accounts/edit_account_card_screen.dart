@@ -58,11 +58,16 @@ class EditAccountCardButton extends ConsumerWidget {
   const EditAccountCardButton({
     required this.section,
     required this.card,
+    this.compact = false,
     super.key,
   });
 
   final AccountSection section;
   final AccountCardDto card;
+
+  /// A pencil in the ledger's top bar instead of a text link (Ali,
+  /// 2026-11-03). Same permission and destination.
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -73,6 +78,18 @@ class EditAccountCardButton extends ConsumerWidget {
     );
     if (!allowed) return const SizedBox.shrink();
     final online = ref.watch(onlineProvider);
+    if (compact) {
+      return Tooltip(
+        message: AppStrings.editCard,
+        child: TextButton(
+          key: const Key('edit-account-card'),
+          onPressed: online
+              ? () => context.push('/${section.path}/${card.id}/edit')
+              : null,
+          child: const Icon(Icons.edit_outlined, size: 20),
+        ),
+      );
+    }
     final button = GatedButton(
       buttonKey: const Key('edit-account-card'),
       allowed: true,
