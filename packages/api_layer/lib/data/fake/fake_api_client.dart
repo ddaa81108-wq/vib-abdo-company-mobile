@@ -2962,6 +2962,9 @@ class FakeApiClient implements ApiClient {
         jsonDecode(jsonEncode(result)) as Map<String, dynamic>;
   }
 
+  /// Extra login rows merged into the fixture store on first read (tests).
+  final List<Map<String, dynamic>> extraLoginUsers = [];
+
   List<Map<String, dynamic>>? _loginUserRows;
   List<Map<String, dynamic>>? _accountRequestRows;
 
@@ -2971,10 +2974,12 @@ class FakeApiClient implements ApiClient {
     return user['isOwner'] == true;
   }
 
-  List<Map<String, dynamic>> get _loginUserStore =>
-      _loginUserRows ??= FakeFixtures.loginUsers()
-          .map((row) => Map<String, dynamic>.from(row))
-          .toList();
+  List<Map<String, dynamic>> get _loginUserStore => _loginUserRows ??= [
+        ...FakeFixtures.loginUsers().map(
+          (row) => Map<String, dynamic>.from(row),
+        ),
+        for (final row in extraLoginUsers) Map<String, dynamic>.from(row),
+      ];
 
   List<Map<String, dynamic>> get _accountRequestStore =>
       _accountRequestRows ??= FakeFixtures.accountRequests()
