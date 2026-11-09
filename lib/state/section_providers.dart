@@ -144,6 +144,50 @@ final accountExtraCardsProvider = NotifierProvider.autoDispose
       AccountExtraCards.new,
     );
 
+/// The `zeroReview` object from a 200 review response, until the list refetch
+/// replaces it. It is not a locally invented review, and it is dropped when
+/// the signed-in user changes.
+class ZeroReviewAckState {
+  const ZeroReviewAckState({this.userId, this.reviews = const {}});
+
+  final String? userId;
+  final Map<String, Map<String, dynamic>> reviews;
+}
+
+class ZeroReviewAck extends Notifier<ZeroReviewAckState> {
+  ZeroReviewAck(this.section);
+
+  final AccountSection section;
+
+  @override
+  ZeroReviewAckState build() => const ZeroReviewAckState();
+
+  void remember({
+    required String? userId,
+    required String cardId,
+    required Map<String, dynamic> review,
+  }) {
+    if (userId == null || section.path.isEmpty) return;
+    final kept = state.userId == userId ? state.reviews : const {};
+    state = ZeroReviewAckState(
+      userId: userId,
+      reviews: {...kept, cardId: review},
+    );
+  }
+
+  void forget(String cardId) {
+    if (!state.reviews.containsKey(cardId)) return;
+    final next = Map<String, Map<String, dynamic>>.of(state.reviews)
+      ..remove(cardId);
+    state = ZeroReviewAckState(userId: state.userId, reviews: next);
+  }
+}
+
+final zeroReviewAckProvider = NotifierProvider.autoDispose
+    .family<ZeroReviewAck, ZeroReviewAckState, AccountSection>(
+      ZeroReviewAck.new,
+    );
+
 /// User-scoped reads stop when the session is gone, so a 401 does not start
 /// another request and the previous user's value is not fetched again.
 void watchSignedIn(Ref ref) {

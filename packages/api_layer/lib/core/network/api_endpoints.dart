@@ -36,8 +36,11 @@ class ApiEndpoints {
       '/api/$section/$id/transactions/$tx/cancel';
   static String accountPin(String section, String id) =>
       '/api/$section/$id/pin';
+  static String accountZeroReview(String section, String id) =>
+      '/api/$section/$id/zero-review';
+
   static String customerZeroReview(String id) =>
-      '/api/customers/$id/zero-review';
+      accountZeroReview('customers', id);
   static const egyptianExchangeRate = '/api/egyptian-deposits/exchange-rate';
 
   // Collections (استلامات الديون)

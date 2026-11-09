@@ -37,8 +37,11 @@ abstract interface class AccountsRepository {
   Future<MutationAck> setPinned(
       AccountSection s, String id, bool pinned, MutationMeta meta);
 
-  /// Customers only; admin. Uses `expectedFinancialVersion`.
-  Future<MutationAck> confirmZeroReview(String customerId, MutationMeta meta);
+  /// `POST /api/{section}/{id}/zero-review` with `expectedFinancialVersion`.
+  /// The server ignores `requestId`. Customers are manager-only; the other
+  /// three sections accept that role or the section write code.
+  Future<MutationAck> confirmZeroReview(
+      AccountSection s, String accountId, MutationMeta meta);
 
   Future<ExchangeRateDto> getExchangeRate();
   Future<ExchangeRateDto> updateExchangeRate(
@@ -104,9 +107,8 @@ class RemoteAccountsRepository implements AccountsRepository {
   Future<MutationAck> addTransaction(AccountSection s, String accountId,
       AccountTransactionRequest r, MutationMeta meta) async {
     final path = ApiEndpoints.accountTransactions(s.path, accountId);
-    final data = (await _api.post(path,
-            body: {...meta.toBody(), ...r.toJson()}))
-        .data;
+    final data =
+        (await _api.post(path, body: {...meta.toBody(), ...r.toJson()})).data;
     return runWithMoneyEndpoint(path, () => MutationAck.fromData(data));
   }
 
@@ -141,9 +143,9 @@ class RemoteAccountsRepository implements AccountsRepository {
 
   @override
   Future<MutationAck> confirmZeroReview(
-          String customerId, MutationMeta meta) async =>
+          AccountSection s, String accountId, MutationMeta meta) async =>
       MutationAck.fromData((await _api.post(
-              ApiEndpoints.customerZeroReview(customerId),
+              ApiEndpoints.accountZeroReview(s.path, accountId),
               body: meta.toBody(versionField: 'expectedFinancialVersion')))
           .data);
 

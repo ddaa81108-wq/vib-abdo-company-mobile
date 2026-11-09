@@ -295,7 +295,8 @@ final _forbidden = <_Call>[
     'POST',
     '/api/customers/c_55/zero-review',
     body: _mutation('zero', version: 4),
-    message: adminOnlyMessage,
+    message: 'لا تملك صلاحية مراجعة هذا القسم.',
+    code: 'PERMISSION_DENIED',
   ),
   _Call(
     'PUT',

@@ -49,7 +49,7 @@ List<AccountListFilter> accountListFilters(AccountSection section) {
     const AccountListFilter(id: 'pinned', label: AppStrings.pinnedTab),
     if (section == AccountSection.customers)
       const AccountListFilter(
-        id: 'pendingReview',
+        id: 'pending-review',
         label: AppStrings.zeroTab,
         count: AccountFilterCount.pendingReview,
       ),
@@ -66,44 +66,23 @@ int? accountFilterCount(AccountsSummaryDto summary, AccountFilterCount? kind) {
 
 /// Whether مراجعة التصفير may be shown on this card.
 ///
-/// Customers only, and never on a system-managed card.
-///
-/// When the server sent `allowedActions`, that list is the record decision
-/// through [PermissionService.canOnRecord] and replaces the balance and
-/// `zeroReview` checks. When the list is absent, the control is shown only if
-/// the role may run the proposed `debts.zero_review` action, [canOnRecord]
-/// allows the section write fallback, the server `balanceUnits` is exactly 0,
-/// and [readZeroReview] is pending.
-///
-/// TODO(pending server answer): `debts.zero_review` is a proposed management
-/// code (🔶). [canOnRecord] with no `allowedActions` falls back to section
-/// write, so a role that has only the proposed code and cannot write the
-/// section does not see the control until the server sends `allowedActions`.
-/// `balanceUnits == 0` is the server balance. `ageStatus == 'zero'` alone does
-/// not count, and a missing balance is not treated as zero.
+/// The card must carry `zeroReview.pending == true` and `balanceUnits == 0`.
+/// A missing `zeroReview` (the server before this route, or a system-linked
+/// Egyptian account) shows nothing and does not cause a request. A historical
+/// zero is `pending: false` with `reviewedAt: null` and also shows nothing.
+/// Customers require the admin role. The other three sections require that
+/// role or the section write code. `fullAccess` is not a substitute.
 bool showCustomerZeroReview({
   required PermissionService permissions,
   required AccountSection section,
   required AccountCardDto card,
 }) {
-  if (section != AccountSection.customers || card.systemManaged) return false;
-  if (card.allowedActions != null) {
-    return permissions.canOnRecord(
-      action: zeroReviewRecordAction,
-      allowedActions: card.allowedActions,
-      section: SectionKey.customers,
-    );
-  }
-  if (!permissions.canDo(ManagementAction.customerZeroReview)) return false;
-  if (!permissions.canOnRecord(
-    action: zeroReviewRecordAction,
-    allowedActions: null,
-    section: SectionKey.customers,
-  )) {
-    return false;
-  }
+  if (card.systemManaged) return false;
+  final link = card.systemLinkKey;
+  if (link != null && link.isNotEmpty) return false;
   if (card.balanceUnits?.asInt != 0) return false;
-  return readZeroReview(card.zeroReview) == ZeroReviewRead.pending;
+  if (readZeroReview(card.zeroReview) != ZeroReviewRead.pending) return false;
+  return permissions.canReviewZeroBalance(section.sectionKey);
 }
 
 /// `expectedFinancialVersion` is `zeroReview.financialVersion`, not the card
@@ -113,16 +92,25 @@ int? zeroReviewFinancialVersion(AccountCardDto card) {
   return value is int ? value : null;
 }
 
-/// Display order for customers: server order, then cards whose `zeroReview`
-/// the server has already closed. Pending and unknown rows stay put. This
-/// does not change status and does not run before a successful confirm.
-List<AccountCardDto> customersWithClosedZeroReviewLast(
-  List<AccountCardDto> cards,
-) {
+/// A zero card the server has settled: reviewed, historical, or system-linked.
+/// A nonzero balance stays with the moving cards. A missing `zeroReview` does
+/// not move the row.
+bool settledZeroCard(AccountCardDto card) {
+  if (card.balanceUnits?.asInt != 0) return false;
+  if (card.systemManaged) return true;
+  final link = card.systemLinkKey;
+  if (link != null && link.isNotEmpty) return true;
+  return readZeroReview(card.zeroReview) == ZeroReviewRead.closed;
+}
+
+/// Server order, then settled zero cards. The first copy of an id is kept.
+List<AccountCardDto> settledZeroReviewsLast(List<AccountCardDto> cards) {
   final open = <AccountCardDto>[];
   final closed = <AccountCardDto>[];
+  final seen = <String>{};
   for (final card in cards) {
-    if (readZeroReview(card.zeroReview) == ZeroReviewRead.closed) {
+    if (!seen.add(card.id)) continue;
+    if (settledZeroCard(card)) {
       closed.add(card);
     } else {
       open.add(card);
@@ -130,6 +118,36 @@ List<AccountCardDto> customersWithClosedZeroReviewLast(
   }
   return [...open, ...closed];
 }
+
+/// Display order for every card section. Pending and unknown rows stay put.
+List<AccountCardDto> customersWithClosedZeroReviewLast(
+  List<AccountCardDto> cards,
+) => settledZeroReviewsLast(cards);
+
+/// The same card with the `zeroReview` object from a review response.
+AccountCardDto cardWithServerZeroReview(
+  AccountCardDto card,
+  Map<String, dynamic> review,
+) => AccountCardDto(
+  id: card.id,
+  name: card.name,
+  phone: card.phone,
+  balanceUnits: card.balanceUnits,
+  currency: card.currency,
+  activeAssigneeName: card.activeAssigneeName,
+  lastActivityAt: card.lastActivityAt,
+  pinned: card.pinned,
+  version: card.version,
+  nextSequence: card.nextSequence,
+  debtAgeDays: card.debtAgeDays,
+  ageStatus: card.ageStatus,
+  ageStatusLabel: card.ageStatusLabel,
+  zeroReview: review,
+  allowedActions: card.allowedActions,
+  systemManaged: card.systemManaged,
+  systemLinkKey: card.systemLinkKey,
+  systemKind: card.systemKind,
+);
 
 /// The website rule on 537f073 (`balanceUnits > 0 && !activeAssigneeName`),
 /// plus system-managed cards, which are read-only. The server refuses the

@@ -119,6 +119,20 @@ class FakeFixtures {
         isOwner: false,
       );
     }
+    if (username.startsWith('company.writer')) {
+      return _me(
+        id: 'u_33',
+        username: 'company.writer@example.invalid',
+        name: 'كاتب شركات تجريبي',
+        role: 'employee',
+        permissions: const [
+          'companies.read',
+          'companies.write',
+        ],
+        sectionAccess: null,
+        isOwner: false,
+      );
+    }
     if (username.startsWith('limited.reader')) {
       return _me(
         id: 'u_5',

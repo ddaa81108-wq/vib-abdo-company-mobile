@@ -172,6 +172,25 @@ class PermissionService extends ChangeNotifier {
   /// Management actions: explicit (proposed) code, or full access (flag / admin role flag).
   bool canDo(ManagementAction a) => canRaw(a.proposedCode);
 
+  /// Zero-balance review, as the server implements it.
+  ///
+  /// Customers: the exact admin role only. `debts.write`, `debts.zero_review`,
+  /// and `fullAccess` do not grant it. Companies and both deposit sections:
+  /// that same admin role, or the section write code on the signed-in set.
+  /// `fullAccess` does not stand in for the write code.
+  bool canReviewZeroBalance(SectionKey section) {
+    if (_role == AccountRole.unknown) return false;
+    if (section == SectionKey.customers) return _role == AccountRole.admin;
+    final code = section.write?.code;
+    if (code != 'companies.write' &&
+        code != 'libyan_deposits.write' &&
+        code != 'egyptian_deposits.write') {
+      return false;
+    }
+    if (_role == AccountRole.admin) return true;
+    return _rawCodes.contains(code);
+  }
+
   /// Sections to SHOW (in server menu order). Non-readable sections are hidden, not locked.
   List<SectionKey> get visibleSections =>
       SectionKey.values.where(canRead).toList(growable: false);

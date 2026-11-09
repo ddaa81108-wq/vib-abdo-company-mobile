@@ -89,7 +89,7 @@ void main() {
       );
       expect(
         accountListFilters(AccountSection.customers).map((tab) => tab.id),
-        contains('pendingReview'),
+        contains('pending-review'),
       );
       expect(
         accountFilterCount(
@@ -192,7 +192,7 @@ void main() {
     }
 
     expect(show(admin, _pending()), isTrue);
-    expect(show(writer, _pending()), isTrue);
+    expect(show(writer, _pending()), isFalse);
     expect(show(reader, _pending()), isFalse);
     expect(show(employee, _pending()), isFalse);
     expect(show(admin, _pending(balanceUnits: 320)), isFalse);
@@ -202,9 +202,39 @@ void main() {
     expect(show(admin, _card(id: 'bare', balanceUnits: 0)), isFalse);
     expect(show(admin, _pending(zeroReview: {'status': 'confirmed'})), isFalse);
     expect(show(admin, _pending(zeroReview: {'status': 'maybe'})), isFalse);
+    expect(
+      show(
+        admin,
+        _pending(
+          zeroReview: {
+            'pending': false,
+            'financialVersion': 1,
+            'reviewedAt': null,
+            'reviewedByName': null,
+          },
+        ),
+      ),
+      isFalse,
+    );
     expect(show(admin, _pending(systemManaged: true)), isFalse);
-    expect(show(admin, _pending(), AccountSection.companies), isFalse);
-    expect(show(admin, _pending(), AccountSection.egyptianDeposits), isFalse);
+    expect(show(admin, _pending(), AccountSection.companies), isTrue);
+    expect(show(admin, _pending(), AccountSection.libyanDeposits), isTrue);
+    expect(show(admin, _pending(), AccountSection.egyptianDeposits), isTrue);
+    final companyWriter = PermissionService()
+      ..applyFromServer(const [
+        'companies.read',
+        'companies.write',
+      ], role: 'employee');
+    expect(show(companyWriter, _pending(), AccountSection.companies), isTrue);
+    expect(show(companyWriter, _pending()), isFalse);
+    expect(
+      show(companyWriter, _pending(), AccountSection.libyanDeposits),
+      isFalse,
+    );
+    final flagged = PermissionService()
+      ..applyFromServer(const [], role: 'employee', fullAccess: true);
+    expect(show(flagged, _pending(), AccountSection.companies), isFalse);
+    expect(show(flagged, _pending()), isFalse);
 
     expect(
       show(
@@ -215,12 +245,12 @@ void main() {
           allowedActions: const [zeroReviewRecordAction],
         ),
       ),
-      isTrue,
+      isFalse,
     );
-    expect(show(admin, _pending(allowedActions: const ['pin'])), isFalse);
+    expect(show(admin, _pending(allowedActions: const ['pin'])), isTrue);
     expect(
       show(admin, _pending(allowedActions: const ['debts.zero_review'])),
-      isFalse,
+      isTrue,
     );
     expect(
       show(

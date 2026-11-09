@@ -164,10 +164,16 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
         ),
       ),
       builder: (data) {
-        final loaded = [...data.page.items, ...extra];
-        final cards = section == AccountSection.customers
-            ? customersWithClosedZeroReviewLast(loaded)
-            : loaded;
+        final session = ref.watch(sessionStateProvider);
+        final userId = session is SessionAuthenticated
+            ? session.profile.id
+            : null;
+        final ack = ref.watch(zeroReviewAckProvider(section));
+        final loaded = [
+          for (final card in [...data.page.items, ...extra])
+            _reviewFromServer(card, ack, userId),
+        ];
+        final cards = settledZeroReviewsLast(loaded);
         HistoryWindowTrace.accountWindow = [for (final card in cards) card.id];
         return RefreshIndicator(
           key: const Key('accounts-refresh'),
@@ -201,14 +207,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                 ),
               // Deposits: الإجمالي, النشط, إضافة أمانة on one row, then a
               // full-width search. The Egyptian rate stays under that search.
-              if (section != AccountSection.customers)
-                const Padding(
-                  padding: EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-                  child: Text(
-                    'مراجعة التصفير منشورة لبطاقات العملاء فقط. الشركات والأمانات لا تملك مسار المراجعة في العقد.',
-                    key: Key('zero-review-unavailable'),
-                  ),
-                ),
               if (deposits)
                 _DepositTopRow(
                   summary: data.summary,
@@ -728,19 +726,34 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       if (mounted) setState(() => _reply = message);
       return message;
     }
+    final userId = _signedInId();
     try {
-      await ref
+      final ack = await ref
           .read(apiLayerProvider)
           .accounts
-          .confirmZeroReview(card.id, meta);
-      if (!mounted) return null;
-      setState(() => _reply = 'تمت مراجعة التصفير.');
-      ref.invalidate(accountsProvider(section));
+          .confirmZeroReview(section, card.id, meta);
+      if (!mounted || _signedInId() != userId) return null;
+      final review = ack.raw['zeroReview'];
+      if (review is Map) {
+        ref
+            .read(zeroReviewAckProvider(section).notifier)
+            .remember(
+              userId: userId,
+              cardId: card.id,
+              review: Map<String, dynamic>.from(review),
+            );
+      }
+      try {
+        ref.invalidate(accountsProvider(section));
+        await ref.read(accountsProvider(section).future);
+        if (!mounted || _signedInId() != userId) return null;
+        ref.read(zeroReviewAckProvider(section).notifier).forget(card.id);
+      } catch (error) {
+        if (!mounted || _signedInId() != userId) return null;
+      }
       return null;
     } catch (error) {
-      if (!mounted) {
-        return failureText(ref.read(errorHandlerProvider).toFailure(error));
-      }
+      if (!mounted || _signedInId() != userId) return null;
       final message = failureText(
         ref.read(errorHandlerProvider).toFailure(error),
       );
@@ -748,6 +761,22 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       ref.invalidate(accountsProvider(section));
       return message;
     }
+  }
+
+  String? _signedInId() {
+    final session = ref.read(sessionStateProvider);
+    return session is SessionAuthenticated ? session.profile.id : null;
+  }
+
+  AccountCardDto _reviewFromServer(
+    AccountCardDto card,
+    ZeroReviewAckState ack,
+    String? userId,
+  ) {
+    if (userId == null || ack.userId != userId) return card;
+    final review = ack.reviews[card.id];
+    if (review == null) return card;
+    return cardWithServerZeroReview(card, review);
   }
 
   String _ack(MutationAck ack) {

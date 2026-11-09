@@ -84,14 +84,14 @@ void main() {
     expect(find.byKey(const Key('zero-review')), findsNothing);
     expect(find.byKey(const ValueKey('zero-review-a')), findsOneWidget);
     expect(find.byKey(const ValueKey('zero-review-a2')), findsOneWidget);
-    expect(find.byKey(const ValueKey('zero-review-d')), findsOneWidget);
-    for (final id in ['b', 'c', 'sys', 'e', 'f', 'g']) {
+    expect(find.byKey(const ValueKey('zero-review-e')), findsOneWidget);
+    for (final id in ['b', 'c', 'sys', 'd', 'f', 'g']) {
       expect(find.byKey(ValueKey('zero-review-$id')), findsNothing);
     }
     expect(tester.takeException(), isNull);
 
     await go(tester, '/companies');
-    expect(find.byKey(const ValueKey('zero-review-a')), findsNothing);
+    expect(find.byKey(const ValueKey('zero-review-a')), findsOneWidget);
     expect(find.byKey(const ValueKey('zero-review-d')), findsNothing);
 
     await go(tester, '/customers');
