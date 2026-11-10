@@ -109,15 +109,27 @@ class PurchasesScreen extends ConsumerWidget {
                               ),
                             ),
                           if (entries.isNotEmpty || draft != null)
-                            _PurchaseGrid(
-                              entries: entries,
-                              money: money,
-                              book: book,
-                              openDay: day,
-                              canWrite: canWrite,
-                              canFinalize: canFinalize,
-                              online: online,
-                            ),
+                            MediaQuery.sizeOf(context).width <= 560
+                                ? SliverToBoxAdapter(
+                                    child: _PurchasePhoneCards(
+                                      entries: entries,
+                                      money: money,
+                                      book: book,
+                                      openDay: day,
+                                      canWrite: canWrite,
+                                      canFinalize: canFinalize,
+                                      online: online,
+                                    ),
+                                  )
+                                : _PurchaseGrid(
+                                    entries: entries,
+                                    money: money,
+                                    book: book,
+                                    openDay: day,
+                                    canWrite: canWrite,
+                                    canFinalize: canFinalize,
+                                    online: online,
+                                  ),
                           SliverToBoxAdapter(
                             child: _OlderPurchasesBar(controls: controls),
                           ),
@@ -1412,6 +1424,326 @@ List<_LedgerLine> _ledgerLines(List<PurchaseEntryDto> entries) {
     lines.add(_LedgerEntryLine(entry));
   }
   return lines;
+}
+
+/// Phone purchases, matching the website at 390px: one card per movement.
+class _PurchasePhoneCards extends ConsumerWidget {
+  const _PurchasePhoneCards({
+    required this.entries,
+    required this.money,
+    required this.book,
+    required this.openDay,
+    required this.canWrite,
+    required this.canFinalize,
+    required this.online,
+  });
+
+  final List<PurchaseEntryDto> entries;
+  final MoneyFormatter money;
+  final PurchaseBook book;
+  final PurchaseDayDto? openDay;
+  final bool canWrite;
+  final bool canFinalize;
+  final bool online;
+
+  bool _writable(PurchaseEntryDto entry) {
+    if (!canWrite || entry.dayVersion == null) return false;
+    if (entry.dayStatus == 'draft') {
+      return entry.dayId != null && entry.dayId == openDay?.id;
+    }
+    return entry.dayStatus == 'finalized' && entry.correctionOpen;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lines = _ledgerLines(entries);
+    return Column(
+      key: const Key('purchase-ledger'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final line in lines)
+          switch (line) {
+            _LedgerBreakLine(
+              :final dayId,
+              :final closing,
+              :final nextDate,
+              :final dayNumber,
+              :final dayStatus,
+              :final correctionOpen,
+              :final dayVersion,
+            ) =>
+              _phoneBreak(
+                context,
+                ref,
+                dayId: dayId,
+                closing: closing,
+                nextDate: nextDate,
+                dayNumber: dayNumber,
+                dayStatus: dayStatus,
+                correctionOpen: correctionOpen,
+                dayVersion: dayVersion,
+              ),
+            _LedgerEntryLine(:final entry) => _phoneEntry(context, ref, entry),
+          },
+      ],
+    );
+  }
+
+  Widget _phoneBreak(
+    BuildContext context,
+    WidgetRef ref, {
+    required String dayId,
+    required MoneyValue? closing,
+    required String? nextDate,
+    required int? dayNumber,
+    required String? dayStatus,
+    required bool correctionOpen,
+    required int? dayVersion,
+  }) {
+    return Padding(
+      key: Key('purchase-rollover-$dayId'),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF14532D),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (canFinalize &&
+                    dayStatus == 'finalized' &&
+                    dayVersion != null)
+                  GuardedMutation(
+                    buttonKey: Key('day-correction-$dayId'),
+                    inputs: 'day-correction:$dayId:$correctionOpen:$dayVersion',
+                    expectedVersion: dayVersion,
+                    label: correctionOpen
+                        ? AppStrings.closeDayCorrection
+                        : AppStrings.openDayCorrection,
+                    onVersionConflict: () => ref.invalidate(purchasesProvider),
+                    onSubmit: (meta) async {
+                      await ref
+                          .read(apiLayerProvider)
+                          .purchases
+                          .setDayCorrection(
+                            book,
+                            dayId,
+                            open: !correctionOpen,
+                            meta: meta,
+                          );
+                      ref.invalidate(purchasesProvider);
+                      return null;
+                    },
+                  ),
+                _chip('مُرحّل', const Color(0xFF111111)),
+                const SizedBox(width: 4),
+                _chip(nextDate ?? AppStrings.dash, const Color(0xFF111111)),
+                const SizedBox(width: 4),
+                _chip('يوم #${dayNumber ?? '—'}', const Color(0xFF14532D)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE7E5E4)),
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              alignment: WrapAlignment.spaceBetween,
+              children: [
+                Text(
+                  money.formatOrDash(closing, Currency.lyd),
+                  style: cairo(16, 800, color: const Color(0xFF211600)),
+                ),
+                Text(
+                  'الباقي المرحّل من اليوم السابق',
+                  style: cairo(12, 800, color: const Color(0xFF211600)),
+                ),
+                Text(
+                  _PText.lastRemaining,
+                  style: cairo(11, 700, color: const Color(0xFF78716C)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _phoneEntry(
+    BuildContext context,
+    WidgetRef ref,
+    PurchaseEntryDto entry,
+  ) {
+    final kind = (entry.itemLabel ?? '').trim().isEmpty
+        ? AppStrings.dash
+        : entry.itemLabel!.trim();
+    final egp = money.formatOrDash(entry.egpValueUnits, Currency.egp);
+    final egpNumber = egp.replaceAll('ج.م', '').trim();
+    Color kindColor = const Color(0xFF1E3A8A);
+    if (kind.contains('فودافون')) kindColor = const Color(0xFFE11D48);
+    if (kind.contains('شيك') || kind.contains('ظهر')) {
+      kindColor = const Color(0xFFEA580C);
+    }
+    if (kind.contains('فوري')) kindColor = const Color(0xFF312E81);
+    return Container(
+      key: Key('purchase-entry-${entry.id}'),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBF3),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE7E5E4)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              _field('التسلسل', Text('${entry.sequence ?? ''}')),
+              _field(
+                'النوع',
+                Wrap(
+                  spacing: 4,
+                  children: [
+                    _chip(kind, kindColor),
+                    if ((entry.actorName ?? '').isNotEmpty)
+                      _chip(
+                        'بواسطة ${entry.actorName}',
+                        const Color(0xFF1E3A8A),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              _field(
+                'القيمة ج.م',
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(egpNumber, style: cairo(13, 800)),
+                    const Text('ج.م', style: TextStyle(fontSize: 12)),
+                  ],
+                ),
+              ),
+              _field(
+                'العملية',
+                _chip(
+                  entry.calculationMode == CalculationMode.multiply
+                      ? '×'
+                      : entry.calculationMode == CalculationMode.divide
+                      ? '÷'
+                      : '—',
+                  const Color(0xFF2563EB),
+                ),
+              ),
+              _field(
+                'السعر',
+                Text(
+                  entry.exchangeRate == null
+                      ? AppStrings.dash
+                      : money.formatDecimal(entry.exchangeRate!),
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              _field(
+                'الناتج',
+                Text(money.formatOrDash(entry.resultUnits, Currency.lyd)),
+              ),
+              _field(
+                'المسدد',
+                Text(money.formatOrDash(entry.paidUnits, Currency.lyd)),
+              ),
+              _field(
+                'الباقي',
+                Text(money.formatOrDash(entry.remainingUnits, Currency.lyd)),
+                fill: const Color(0xFFFFF3C4),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              if (_writable(entry))
+                IconButton(
+                  key: Key('edit-${entry.id}'),
+                  onPressed: online
+                      ? () =>
+                            ref.read(_ledgerDraftProvider.notifier).state =
+                                _LedgerDraft(entryId: entry.id)
+                      : null,
+                  icon: const Icon(Icons.edit_outlined),
+                )
+              else
+                const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Icon(Icons.check_circle, color: Color(0xFF15803D)),
+                ),
+              _field(
+                'مستهلك فودافون',
+                Text(
+                  money.formatOrDash(
+                    entry.vodafoneConsumedUnits,
+                    vodafoneCurrency,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _field(String label, Widget value, {Color? fill}) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.all(3),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(
+          color: fill ?? Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE7E5E4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: cairo(9, 700, color: const Color(0xFF78716C))),
+            FittedBox(fit: BoxFit.scaleDown, alignment: AlignmentDirectional.centerStart, child: value),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _chip(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(text, style: cairo(11, 800, color: Colors.white)),
+    );
+  }
 }
 
 class _PurchaseGrid extends ConsumerWidget {

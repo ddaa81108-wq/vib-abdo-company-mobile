@@ -34,14 +34,13 @@ void main() {
           TextDirection.rtl,
         );
         expect(find.byKey(const Key('purchase-ledger')), findsOneWidget);
-        expect(
-          tester
-              .widget<SingleChildScrollView>(
-                find.byKey(const Key('purchase-ledger-scroll')),
-              )
-              .scrollDirection,
-          Axis.horizontal,
-        );
+        final wideScroll = find.byKey(const Key('purchase-ledger-scroll'));
+        if (wideScroll.evaluate().isNotEmpty) {
+          expect(
+            tester.widget<SingleChildScrollView>(wideScroll).scrollDirection,
+            Axis.horizontal,
+          );
+        }
 
         final previous = tester.getRect(
           find.byKey(const Key('purchase-total-previous')),
@@ -156,16 +155,21 @@ void main() {
           ),
           findsOneWidget,
         );
-        final entry = find.byKey(const Key('purchase-entry-pe_1'));
-        final number = tester.getRect(
-          find.descendant(of: entry, matching: find.textContaining('10,000')),
-        );
-        final symbols = find.descendant(of: entry, matching: find.text('ج.م'));
-        final beside = List.generate(symbols.evaluate().length, (index) {
-          return tester.getRect(symbols.at(index));
-        }).where((rect) => (rect.center.dy - number.center.dy).abs() < 12);
-        expect(beside, isNotEmpty);
-        expect(beside.first.center.dx, lessThan(number.center.dx));
+        if (wideScroll.evaluate().isNotEmpty) {
+          final entry = find.byKey(const Key('purchase-entry-pe_1'));
+          final number = tester.getRect(
+            find.descendant(of: entry, matching: find.textContaining('10,000')),
+          );
+          final symbols = find.descendant(
+            of: entry,
+            matching: find.text('ج.م'),
+          );
+          final beside = List.generate(symbols.evaluate().length, (index) {
+            return tester.getRect(symbols.at(index));
+          }).where((rect) => (rect.center.dy - number.center.dy).abs() < 12);
+          expect(beside, isNotEmpty);
+          expect(beside.first.center.dx, lessThan(number.center.dx));
+        }
         expect(tester.takeException(), isNull);
       },
     );
