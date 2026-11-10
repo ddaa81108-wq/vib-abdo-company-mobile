@@ -240,6 +240,7 @@ class SessionManager {
         role: me.user.role,
         sectionAccess: me.user.sectionAccess,
         fullAccess: me.user.fullAccess,
+        isOwner: me.user.isOwner,
       );
       if (!_reloadCurrent(serial, epoch)) return;
       _emit(SessionAuthenticated(me.user));

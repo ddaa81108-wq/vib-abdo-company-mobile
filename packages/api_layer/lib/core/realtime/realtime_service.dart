@@ -37,6 +37,8 @@ class RealtimeTopics {
   static const masraweyaChanged = 'masraweya.changed';
   static const purchasesChanged = 'purchases.changed';
   static const treasuryChanged = 'treasury.changed';
+  static const treasuryReportClosed = 'treasury.report.closed';
+  static const financialSummaryChanged = 'financial.summary.changed';
   static const fullResyncRequired = 'full_resync_required';
 
   static const all = {
@@ -52,6 +54,8 @@ class RealtimeTopics {
     masraweyaChanged,
     purchasesChanged,
     treasuryChanged,
+    treasuryReportClosed,
+    financialSummaryChanged,
   };
 }
 

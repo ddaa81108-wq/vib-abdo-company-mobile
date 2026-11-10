@@ -5,7 +5,8 @@ import 'package:vib_abdo_company_mobile/notifications/notification_channels.dart
 
 void main() {
   test('collections channel id, Arabic name, and badge flag stay stable', () {
-    expect(NotificationChannels.collectionsId, 'vib_collections_alerts');
+    expect(NotificationChannels.collectionsId, 'vib_notices_sound_v1');
+    expect(NotificationChannels.collectionsId, isNot('vib_collections_alerts'));
     expect(NotificationChannels.collectionsName, 'تنبيهات VIB');
     expect(
       NotificationChannels.collectionsDescription,

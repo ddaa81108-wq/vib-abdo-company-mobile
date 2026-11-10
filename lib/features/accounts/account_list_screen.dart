@@ -175,195 +175,241 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
         ];
         final cards = settledZeroReviewsLast(loaded);
         HistoryWindowTrace.accountWindow = [for (final card in cards) card.id];
-        return RefreshIndicator(
-          key: const Key('accounts-refresh'),
-          onRefresh: () async {
-            ref.read(accountExtraCardsProvider(section).notifier).clear();
-            ref.invalidate(accountsProvider(section));
-            await ref.read(accountsProvider(section).future);
-          },
-          child: ListView(
-            key: Key('screen-${section.path}'),
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: pagePadding(width),
-            children: [
-              // Customers and companies: no page title (Ali, 2026-11-02).
-              // Deposits: the toolbar already names the section (Ali, t348).
-              if (!debtLook && !deposits) ...[
-                ScreenTitle(sectionLabel(section.sectionKey)),
-                const SizedBox(height: AppSpacing.md),
-              ],
-              if (_showTicker)
-                _ticker(
-                  home,
-                  money,
-                  width,
-                  cards,
-                  data.page.nextCursor,
-                  HistoryWindow.trimEnabled &&
-                          data.page.items.length > HistoryWindow.eagerLimit
-                      ? HistoryWindow.retainLimit
-                      : null,
-                ),
-              // Deposits: الإجمالي, النشط, إضافة أمانة on one row, then a
-              // full-width search. The Egyptian rate stays under that search.
-              if (deposits)
-                _DepositTopRow(
-                  summary: data.summary,
-                  currency: section.currency,
-                  money: money,
-                  add: addButton,
-                )
-              else
-                _SummaryStrip(
-                  section: section,
-                  summary: data.summary,
-                  currency: section.currency,
-                  money: money,
-                ),
-              const SizedBox(height: AppSpacing.md),
-              // Customers and companies: no filter chips (Ali, 2026-11-02).
-              // Deposits: no filter chips (Ali, 2026-11-04).
-              if (!debtLook && !deposits) ...[
-                _Tabs(section: section, summary: data.summary),
-                const SizedBox(height: AppSpacing.md),
-              ],
-              if (debtLook)
-                _CustomersToolbar(
-                  toolbarKey: Key(
-                    isCustomers ? 'customers-toolbar' : 'companies-toolbar',
-                  ),
-                  add: addButton,
-                  search: searchField,
-                  assign: assignButton,
-                )
-              else ...[
-                searchField,
-                if (section == AccountSection.egyptianDeposits)
-                  const _RateCard(),
-                // Deposits: add sits in the top row.
-                if (!deposits) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  Wrap(
-                    spacing: AppSpacing.md,
-                    runSpacing: AppSpacing.md,
-                    children: [addButton, assignButton],
-                  ),
-                ],
-              ],
-              if (_assigning)
-                _AssignSubmit(
-                  section: section,
-                  customerIds: assignmentTargetIds(_selected, cards),
-                  online: online,
-                  onCancel: () => setState(() {
-                    _assigning = false;
-                    _selected.clear();
-                  }),
-                  onAssigned: (message) => setState(() {
-                    _assigning = false;
-                    _selected.clear();
-                    _reply = message;
-                  }),
-                ),
-              if (_reply != null) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  _reply!,
-                  key: const Key('server-reply'),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
-              const SizedBox(height: AppSpacing.md),
-              if (cards.isEmpty)
-                EmptyPane(message: AppStrings.emptyAccounts)
-              else if (cards.length <= HistoryWindow.eagerLimit)
-                _cardWrap(
-                  cards: cards,
-                  columns: columns,
-                  canWrite: canWrite,
-                  permissions: permissions,
-                )
-              else
-                SizedBox(
-                  height: 560,
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: (notification) =>
-                        _onCardsScroll(notification, data.page.nextCursor),
-                    child: debtLook
-                        ? ListView.builder(
-                            key: const Key('account-cards-list'),
-                            itemCount: (cards.length + 1) ~/ 2,
-                            itemBuilder: (context, row) => Padding(
-                              padding: const EdgeInsetsDirectional.only(
-                                bottom: AppSpacing.md,
-                              ),
-                              child: SizedBox(
-                                height: customerCardHeight(context),
-                                child: Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    for (final i in [row * 2, row * 2 + 1]) ...[
-                                      if (i == row * 2 + 1)
-                                        const SizedBox(width: AppSpacing.md),
-                                      Expanded(
-                                        child: i < cards.length
-                                            ? _accountCard(
-                                                card: cards[i],
-                                                canWrite: canWrite,
-                                                permissions: permissions,
-                                              )
-                                            : const SizedBox.shrink(),
+        return Column(
+          children: [
+            Expanded(
+              child: RefreshIndicator(
+                key: const Key('accounts-refresh'),
+                onRefresh: () async {
+                  ref.read(accountExtraCardsProvider(section).notifier).clear();
+                  ref.invalidate(accountsProvider(section));
+                  await ref.read(accountsProvider(section).future);
+                },
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (notification) =>
+                      _onCardsScroll(notification, data.page.nextCursor),
+                  child: CustomScrollView(
+                    key: Key('screen-${section.path}'),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverPadding(
+                        padding: pagePadding(width)
+                            .copyWith(bottom: pagePadding(width).bottom + 32),
+                        sliver: SliverMainAxisGroup(
+                          slivers: [
+                            SliverToBoxAdapter(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Customers and companies: no page title (Ali, 2026-11-02).
+                                  // Deposits: the toolbar already names the section (Ali, t348).
+                                  if (!debtLook && !deposits) ...[
+                                    ScreenTitle(
+                                      sectionLabel(section.sectionKey),
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                  ],
+                                  if (_showTicker)
+                                    _ticker(
+                                      home,
+                                      money,
+                                      width,
+                                      cards,
+                                      data.page.nextCursor,
+                                      HistoryWindow.trimEnabled &&
+                                              data.page.items.length >
+                                                  HistoryWindow.eagerLimit
+                                          ? HistoryWindow.retainLimit
+                                          : null,
+                                    ),
+                                  // Deposits: الإجمالي, النشط, إضافة أمانة on one row, then a
+                                  // full-width search. The Egyptian rate stays under that search.
+                                  if (deposits)
+                                    _DepositTopRow(
+                                      summary: data.summary,
+                                      currency: section.currency,
+                                      money: money,
+                                      add: addButton,
+                                    )
+                                  else
+                                    _SummaryStrip(
+                                      section: section,
+                                      summary: data.summary,
+                                      currency: section.currency,
+                                      money: money,
+                                    ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  // Customers and companies: no filter chips (Ali, 2026-11-02).
+                                  // Deposits: no filter chips (Ali, 2026-11-04).
+                                  if (!debtLook && !deposits) ...[
+                                    _Tabs(
+                                      section: section,
+                                      summary: data.summary,
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                  ],
+                                  if (debtLook)
+                                    _CustomersToolbar(
+                                      toolbarKey: Key(
+                                        isCustomers
+                                            ? 'customers-toolbar'
+                                            : 'companies-toolbar',
+                                      ),
+                                      add: addButton,
+                                      search: searchField,
+                                      assign: assignButton,
+                                    )
+                                  else ...[
+                                    searchField,
+                                    if (section ==
+                                        AccountSection.egyptianDeposits)
+                                      const _RateCard(),
+                                    // Deposits: add sits in the top row.
+                                    if (!deposits) ...[
+                                      const SizedBox(height: AppSpacing.md),
+                                      Wrap(
+                                        spacing: AppSpacing.md,
+                                        runSpacing: AppSpacing.md,
+                                        children: [addButton, assignButton],
                                       ),
                                     ],
                                   ],
-                                ),
+                                  if (_assigning)
+                                    _AssignSubmit(
+                                      section: section,
+                                      customerIds: assignmentTargetIds(
+                                        _selected,
+                                        cards,
+                                      ),
+                                      online: online,
+                                      onCancel: () => setState(() {
+                                        _assigning = false;
+                                        _selected.clear();
+                                      }),
+                                      onAssigned: (message) => setState(() {
+                                        _assigning = false;
+                                        _selected.clear();
+                                        _reply = message;
+                                      }),
+                                    ),
+                                  if (_reply != null) ...[
+                                    const SizedBox(height: AppSpacing.sm),
+                                    Text(
+                                      _reply!,
+                                      key: const Key('server-reply'),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium,
+                                    ),
+                                  ],
+                                  const SizedBox(height: AppSpacing.md),
+                                ],
                               ),
                             ),
-                          )
-                        : ListView.builder(
-                            key: const Key('account-cards-list'),
-                            itemCount: cards.length,
-                            itemBuilder: (context, index) {
-                              final card = cards[index];
-                              return Padding(
-                                padding: const EdgeInsetsDirectional.only(
-                                  bottom: AppSpacing.md,
+                            if (cards.isEmpty)
+                              const SliverToBoxAdapter(
+                                child: EmptyPane(
+                                  message: AppStrings.emptyAccounts,
                                 ),
-                                child: _accountCard(
-                                  card: card,
+                              )
+                            else if (cards.length <= HistoryWindow.eagerLimit)
+                              SliverToBoxAdapter(
+                                child: _cardWrap(
+                                  cards: cards,
+                                  columns: columns,
                                   canWrite: canWrite,
                                   permissions: permissions,
                                 ),
-                              );
-                            },
-                          ),
+                              )
+                            else if (debtLook)
+                              SliverList(
+                                key: const Key('account-cards-list'),
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, row) => Padding(
+                                    padding: const EdgeInsetsDirectional.only(
+                                      bottom: AppSpacing.md,
+                                    ),
+                                    child: SizedBox(
+                                      height: customerCardHeight(context),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          for (final i in [
+                                            row * 2,
+                                            row * 2 + 1,
+                                          ]) ...[
+                                            if (i == row * 2 + 1)
+                                              const SizedBox(
+                                                width: AppSpacing.md,
+                                              ),
+                                            Expanded(
+                                              child: i < cards.length
+                                                  ? _accountCard(
+                                                      card: cards[i],
+                                                      canWrite: canWrite,
+                                                      permissions: permissions,
+                                                    )
+                                                  : const SizedBox.shrink(),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  childCount: (cards.length + 1) ~/ 2,
+                                ),
+                              )
+                            else
+                              SliverList(
+                                key: const Key('account-cards-list'),
+                                delegate: SliverChildBuilderDelegate((
+                                  context,
+                                  index,
+                                ) {
+                                  final card = cards[index];
+                                  return Padding(
+                                    padding: const EdgeInsetsDirectional.only(
+                                      bottom: AppSpacing.md,
+                                    ),
+                                    child: _accountCard(
+                                      card: card,
+                                      canWrite: canWrite,
+                                      permissions: permissions,
+                                    ),
+                                  );
+                                }, childCount: cards.length),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              if (_moreError != null)
-                Text(
-                  _moreError!,
-                  key: const Key('load-more-accounts-error'),
-                  style: Theme.of(context).textTheme.bodyMedium
-                      ?.copyWith(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+            if (_moreError != null)
+              Text(
+                _moreError!,
+                key: const Key('load-more-accounts-error'),
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: Theme.of(context).colorScheme.error),
+              ),
+            if (_loadMoreCursor(data.page.nextCursor) != null)
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton(
+                  key: const Key('load-more-accounts'),
+                  onPressed: online && !_paging
+                      ? () => _more(
+                          _loadMoreCursor(data.page.nextCursor)!,
+                          retainLimit: _accountRetainLimit(data.page.items),
+                        )
+                      : null,
+                  child: const Text(AppStrings.loadMore),
                 ),
-              if (_loadMoreCursor(data.page.nextCursor) != null)
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: TextButton(
-                    key: const Key('load-more-accounts'),
-                    onPressed: online && !_paging
-                        ? () => _more(
-                            _loadMoreCursor(data.page.nextCursor)!,
-                            retainLimit: _accountRetainLimit(data.page.items),
-                          )
-                        : null,
-                    child: const Text(AppStrings.loadMore),
-                  ),
-                ),
-            ],
-          ),
+              ),
+          ],
         );
       },
     );

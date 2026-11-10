@@ -58,26 +58,34 @@ class MasraweyaScreen extends ConsumerWidget {
         ),
       ),
       child: SectionTheme(
-        child: ListView(
-          key: screenKey,
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
-          padding: pagePadding(MediaQuery.sizeOf(context).width),
-          children: [
-            day.when(
-              skipLoadingOnReload: true,
-              loading: () => const SkeletonBox(height: 120),
-              error: (error, _) => presentFailure(
-                ref.read(errorHandlerProvider).toFailure(error),
-                onRetry: () => ref.invalidate(masraweyaProvider),
+        child: RefreshIndicator(
+          key: const Key('masraweya-refresh'),
+          onRefresh: () async {
+            ref.invalidate(masraweyaProvider);
+            await ref.read(masraweyaProvider.future);
+          },
+          child: ListView(
+            key: screenKey,
+            physics: const AlwaysScrollableScrollPhysics(),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+            padding: pagePadding(MediaQuery.sizeOf(context).width),
+            children: [
+              day.when(
+                skipLoadingOnReload: true,
+                loading: () => const SkeletonBox(height: 120),
+                error: (error, _) => presentFailure(
+                  ref.read(errorHandlerProvider).toFailure(error),
+                  onRetry: () => ref.invalidate(masraweyaProvider),
+                ),
+                data: (data) => _DayView(
+                  data: data,
+                  money: money,
+                  canWrite: canWrite,
+                  online: online,
+                ),
               ),
-              data: (data) => _DayView(
-                data: data,
-                money: money,
-                canWrite: canWrite,
-                online: online,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

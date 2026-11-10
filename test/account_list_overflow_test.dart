@@ -203,4 +203,41 @@ void main() {
       });
     }
   }
+
+  testWidgets('the last card scrolls fully above the bottom bar', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(320, 568), textScale: 2);
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    for (final section in AccountSection.values) {
+      goNow(tester, '/${section.path}');
+      await settle(tester);
+      final screen = find.byKey(Key('screen-${section.path}'));
+      expect(screen, findsOneWidget);
+      final scrollable = find.descendant(
+        of: screen,
+        matching: find.byType(Scrollable),
+      );
+      await tester.fling(scrollable.first, const Offset(0, -8000), 10000);
+      await tester.pumpAndSettle();
+      final cards = find.byWidgetPredicate((widget) {
+        final key = widget.key;
+        return key != null && key.toString().contains('account-card-');
+      });
+      expect(cards, findsWidgets, reason: section.path);
+      var lowest = tester.getRect(cards.at(0));
+      for (var i = 1; i < cards.evaluate().length; i++) {
+        final rect = tester.getRect(cards.at(i));
+        if (rect.bottom > lowest.bottom) lowest = rect;
+      }
+      final barTop = tester.getRect(find.byKey(HomeShell.bottomBarKey)).top;
+      expect(
+        lowest.bottom,
+        lessThanOrEqualTo(barTop + 1),
+        reason: section.path,
+      );
+      expect(lowest.height, greaterThan(40), reason: section.path);
+      _noOverflow(tester, '${section.path} scrolled end');
+    }
+  });
 }

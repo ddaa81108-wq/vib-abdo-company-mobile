@@ -63,49 +63,58 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     final showPayroll = write || payroll || manage;
     final width = MediaQuery.sizeOf(context).width;
 
-    return ListView(
-      key: CollectionsScreen.screenKey,
-      padding: pagePadding(width).copyWith(bottom: AppSpacing.xxl),
-      children: [
-        if (_payroll && showPayroll) ...[
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: OutlinedButton.icon(
-              key: const Key('collections-payroll-back'),
-              onPressed: () => setState(() => _payroll = false),
-              icon: const Icon(Icons.arrow_forward, size: 18),
-              label: const Text(CollectionsText.payrollBack),
+    return RefreshIndicator(
+      key: const Key('collections-refresh'),
+      onRefresh: () async {
+        ref.invalidate(collectionsProvider);
+        ref.invalidate(payrollProvider);
+        await ref.read(collectionsProvider.future);
+      },
+      child: ListView(
+        key: CollectionsScreen.screenKey,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: pagePadding(width).copyWith(bottom: AppSpacing.xxl),
+        children: [
+          if (_payroll && showPayroll) ...[
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: OutlinedButton.icon(
+                key: const Key('collections-payroll-back'),
+                onPressed: () => setState(() => _payroll = false),
+                icon: const Icon(Icons.arrow_forward, size: 18),
+                label: const Text(CollectionsText.payrollBack),
+              ),
             ),
-          ),
-          const CollectionsPayrollBlock(),
-        ] else
-          KeptData<CollectionsOverviewDto>(
-            value: overview,
-            resetKey: 'collections',
-            onRetry: () => ref.invalidate(collectionsProvider),
-            messageOf: (error) =>
-                failureText(ref.read(errorHandlerProvider).toFailure(error)),
-            failureOf: (error) =>
-                ref.read(errorHandlerProvider).toFailure(error),
-            loading: const _CollectionsLoading(),
-            builder: (data) => manage
-                ? _AdminView(
-                    data: data,
-                    money: money,
-                    onPayroll: showPayroll
-                        ? () => setState(() => _payroll = true)
-                        : null,
-                  )
-                : _EmployeeView(
-                    data: data,
-                    money: money,
-                    write: write,
-                    onPayroll: showPayroll
-                        ? () => setState(() => _payroll = true)
-                        : null,
-                  ),
-          ),
-      ],
+            const CollectionsPayrollBlock(),
+          ] else
+            KeptData<CollectionsOverviewDto>(
+              value: overview,
+              resetKey: 'collections',
+              onRetry: () => ref.invalidate(collectionsProvider),
+              messageOf: (error) =>
+                  failureText(ref.read(errorHandlerProvider).toFailure(error)),
+              failureOf: (error) =>
+                  ref.read(errorHandlerProvider).toFailure(error),
+              loading: const _CollectionsLoading(),
+              builder: (data) => manage
+                  ? _AdminView(
+                      data: data,
+                      money: money,
+                      onPayroll: showPayroll
+                          ? () => setState(() => _payroll = true)
+                          : null,
+                    )
+                  : _EmployeeView(
+                      data: data,
+                      money: money,
+                      write: write,
+                      onPayroll: showPayroll
+                          ? () => setState(() => _payroll = true)
+                          : null,
+                    ),
+            ),
+        ],
+      ),
     );
   }
 }

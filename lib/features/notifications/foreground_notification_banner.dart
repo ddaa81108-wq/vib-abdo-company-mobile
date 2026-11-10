@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../notifications/notification_announcer.dart';
 import '../../state/notification_providers.dart';
+import '../../state/section_providers.dart';
 import '../../ui/tokens.dart';
 import 'notification_content.dart';
 import 'notification_open_seam.dart';
@@ -25,8 +29,30 @@ class ForegroundNotificationBanner extends ConsumerStatefulWidget {
 }
 
 class _ForegroundNotificationBannerState
-    extends ConsumerState<ForegroundNotificationBanner> {
+    extends ConsumerState<ForegroundNotificationBanner>
+    with WidgetsBindingObserver {
   AppNotification? _note;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      unawaited(ref.read(notificationAnnouncerProvider).stop());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +60,7 @@ class _ForegroundNotificationBannerState
       final note = next.asData?.value;
       if (note == null) return;
       setState(() => _note = note);
+      unawaited(_announce(note));
     });
     final note = _note;
     final theme = Theme.of(context);
@@ -80,6 +107,21 @@ class _ForegroundNotificationBannerState
             ),
           ),
       ],
+    );
+  }
+
+  Future<void> _announce(AppNotification note) async {
+    Map<String, dynamic> preferences = const {};
+    try {
+      preferences = await ref.read(notificationPrefsProvider.future);
+    } catch (_) {
+      preferences = const {};
+    }
+    if (!mounted) return;
+    await announceNewNotification(
+      note: note,
+      preferences: preferences,
+      announcer: ref.read(notificationAnnouncerProvider),
     );
   }
 

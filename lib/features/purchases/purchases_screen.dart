@@ -47,87 +47,96 @@ class PurchasesScreen extends ConsumerWidget {
     final canFinalize = permissions.canFinalizePurchases;
 
     return SectionTheme(
-      child: ListView(
-        key: screenKey,
-        // One page: build it whole so the totals card at the end is ready
-        // (and readable by tests) without scrolling.
-        scrollCacheExtent: const ScrollCacheExtent.pixels(6000),
-        padding: pagePadding(MediaQuery.sizeOf(context).width),
-        children: [
-          KeptData<PurchasesPage>(
-            value: page,
-            resetKey: book,
-            onRetry: () => ref.invalidate(purchasesProvider),
-            messageOf: (error) =>
-                failureText(ref.read(errorHandlerProvider).toFailure(error)),
-            failureOf: (error) =>
-                ref.read(errorHandlerProvider).toFailure(error),
-            loading: const Column(
-              key: Key('purchases-loading'),
-              children: [
-                SkeletonBox(),
-                SizedBox(height: AppSpacing.md),
-                SkeletonBox(),
-              ],
-            ),
-            builder: (data) {
-              final day = data.day;
-              return _PurchaseHistory(
-                key: ValueKey(book),
-                book: book,
-                first: data.entries,
-                firstCursor: data.nextBefore,
-                online: online,
-                builder: (context, entries, controls) {
-                  final draft = ref.watch(_ledgerDraftProvider);
-                  final empty = day == null && entries.isEmpty && draft == null;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (day != null)
-                        _DayCard(
+      child: RefreshIndicator(
+        key: const Key('purchases-refresh'),
+        onRefresh: () async {
+          ref.invalidate(purchasesProvider);
+          await ref.read(purchasesProvider.future);
+        },
+        child: ListView(
+          key: screenKey,
+          physics: const AlwaysScrollableScrollPhysics(),
+          // One page: build it whole so the totals card at the end is ready
+          // (and readable by tests) without scrolling.
+          scrollCacheExtent: const ScrollCacheExtent.pixels(6000),
+          padding: pagePadding(MediaQuery.sizeOf(context).width),
+          children: [
+            KeptData<PurchasesPage>(
+              value: page,
+              resetKey: book,
+              onRetry: () => ref.invalidate(purchasesProvider),
+              messageOf: (error) =>
+                  failureText(ref.read(errorHandlerProvider).toFailure(error)),
+              failureOf: (error) =>
+                  ref.read(errorHandlerProvider).toFailure(error),
+              loading: const Column(
+                key: Key('purchases-loading'),
+                children: [
+                  SkeletonBox(),
+                  SizedBox(height: AppSpacing.md),
+                  SkeletonBox(),
+                ],
+              ),
+              builder: (data) {
+                final day = data.day;
+                return _PurchaseHistory(
+                  key: ValueKey(book),
+                  book: book,
+                  first: data.entries,
+                  firstCursor: data.nextBefore,
+                  online: online,
+                  builder: (context, entries, controls) {
+                    final draft = ref.watch(_ledgerDraftProvider);
+                    final empty =
+                        day == null && entries.isEmpty && draft == null;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (day != null)
+                          _DayCard(
+                            day: day,
+                            money: money,
+                            canWrite: canWrite,
+                            canFinalize: canFinalize,
+                            online: online,
+                            book: book,
+                          ),
+                        if (empty)
+                          const EmptyPane(
+                            key: Key('purchases-empty'),
+                            message: AppStrings.emptyPurchases,
+                          ),
+                        if (entries.isNotEmpty || draft != null)
+                          _PurchaseGrid(
+                            entries: entries,
+                            money: money,
+                            book: book,
+                            openDay: day,
+                            canWrite: canWrite,
+                            online: online,
+                          ),
+                        _OlderPurchasesBar(controls: controls),
+                        _OpeningCard(
+                          book: book,
                           day: day,
                           money: money,
                           canWrite: canWrite,
-                          canFinalize: canFinalize,
                           online: online,
-                          book: book,
                         ),
-                      if (empty)
-                        const EmptyPane(
-                          key: Key('purchases-empty'),
-                          message: AppStrings.emptyPurchases,
-                        ),
-                      if (entries.isNotEmpty || draft != null)
-                        _PurchaseGrid(
-                          entries: entries,
+                        // registerTotals cover the whole merchant register.
+                        // Later pages are not added into this figure.
+                        _RegisterTotals(
+                          totals: data.registerTotals,
                           money: money,
-                          book: book,
-                          openDay: day,
-                          canWrite: canWrite,
-                          online: online,
                         ),
-                      _OlderPurchasesBar(controls: controls),
-                      _OpeningCard(
-                        book: book,
-                        day: day,
-                        money: money,
-                        canWrite: canWrite,
-                        online: online,
-                      ),
-                      // registerTotals cover the whole merchant register.
-                      // Later pages are not added into this figure.
-                      _RegisterTotals(
-                        totals: data.registerTotals,
-                        money: money,
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
-          ),
-        ],
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

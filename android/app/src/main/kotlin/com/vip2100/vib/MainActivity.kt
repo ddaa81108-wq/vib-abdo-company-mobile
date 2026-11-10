@@ -4,9 +4,15 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
+import android.media.RingtoneManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 import android.os.Bundle
 import android.os.FileObserver
 import android.os.Handler
@@ -23,6 +29,10 @@ class MainActivity : FlutterActivity() {
     private var holdCallback: Runnable? = null
     private var windowAlive = true
     private var intentObserver: FileObserver? = null
+    private var speech: TextToSpeech? = null
+    private var speechReady = false
+    private var pendingSpeech: String? = null
+
     private val captureLock = CaptureLock(
         debuggable = BuildConfig.DEBUG,
         scheduleHold = { token, delayMs ->
@@ -61,6 +71,10 @@ class MainActivity : FlutterActivity() {
         intentObserver?.stopWatching()
         intentObserver = null
         captureLock.disarm()
+        pendingSpeech = null
+        speech?.stop()
+        speech?.shutdown()
+        speech = null
         super.onDestroy()
     }
 
@@ -117,6 +131,15 @@ class MainActivity : FlutterActivity() {
         )
         channel.description = getString(R.string.notification_channel_description)
         channel.setShowBadge(true)
+        val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        channel.setSound(
+            sound,
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build(),
+        )
+        channel.enableVibration(true)
         manager.createNotificationChannel(channel)
     }
 
@@ -158,6 +181,26 @@ class MainActivity : FlutterActivity() {
                     result.success(showPrivateTray(args))
                 } else {
                     result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/notification_speech")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "speak" -> {
+                        val text = call.argument<String>("text") ?: ""
+                        speakNotification(text)
+                        result.success(null)
+                    }
+                    "tone" -> {
+                        playNoticeTone()
+                        result.success(null)
+                    }
+                    "stop" -> {
+                        pendingSpeech = null
+                        speech?.stop()
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
                 }
             }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/connectivity")
@@ -219,7 +262,9 @@ class MainActivity : FlutterActivity() {
             .setPublicVersion(publicVersion)
             .setContentIntent(pending)
             .setAutoCancel(true)
-            .setOnlyAlertOnce(true)
+            .setOnlyAlertOnce(false)
+            .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
         return try {
             manager.notify(tag, id, notification)
@@ -227,5 +272,70 @@ class MainActivity : FlutterActivity() {
         } catch (_: SecurityException) {
             false
         }
+    }
+
+    /// Same shape as the website tone: 760 Hz sine, 200 ms, fast attack.
+    /// The tray uses the device notification sound on [vib_notices_sound_v1].
+    private fun playNoticeTone() {
+        val sampleRate = 44100
+        val count = (sampleRate * 0.2).toInt()
+        val pcm = ShortArray(count)
+        for (i in 0 until count) {
+            val t = i.toDouble() / sampleRate
+            val attack = (t / 0.02).coerceIn(0.0, 1.0)
+            val release = ((0.2 - t) / 0.18).coerceIn(0.0, 1.0)
+            val envelope = kotlin.math.min(attack, release)
+            val sample = kotlin.math.sin(2.0 * Math.PI * 760.0 * t) * envelope * 0.45
+            pcm[i] = (sample * Short.MAX_VALUE).toInt().toShort()
+        }
+        val track = AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setSampleRate(sampleRate)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build(),
+            )
+            .setBufferSizeInBytes(count * 2)
+            .setTransferMode(AudioTrack.MODE_STATIC)
+            .build()
+        track.write(pcm, 0, count)
+        track.setNotificationMarkerPosition(count)
+        track.setPlaybackPositionUpdateListener(object : AudioTrack.OnPlaybackPositionUpdateListener {
+            override fun onMarkerReached(played: AudioTrack) {
+                played.release()
+            }
+            override fun onPeriodicNotification(played: AudioTrack) {}
+        })
+        track.play()
+    }
+
+    private fun speakNotification(text: String) {
+        if (text.isEmpty()) return
+        val engine = speech
+        if (engine == null) {
+            pendingSpeech = text
+            speech = TextToSpeech(this) { status ->
+                speechReady = status == TextToSpeech.SUCCESS
+                if (speechReady) {
+                    speech?.language = Locale("ar")
+                    val queued = pendingSpeech
+                    pendingSpeech = null
+                    if (!queued.isNullOrEmpty()) speakNotification(queued)
+                }
+            }
+            return
+        }
+        if (!speechReady) {
+            pendingSpeech = text
+            return
+        }
+        engine.speak(text, TextToSpeech.QUEUE_ADD, null, "vib-notice")
     }
 }

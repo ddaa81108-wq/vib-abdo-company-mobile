@@ -2,7 +2,7 @@
 
 الأرقام ثابتة. لا يُعاد استخدام رقم أُلغي. التراجع يكون بالتزام `git revert` جديد، لا بمسح التاريخ ولا بإعادة القاعدة.
 
-الفرع المحلي: `cursor/client-hygiene-008-011-5c94`.
+الفرع المحلي: `cursor/live-refresh-notify-5c94`.
 رأس السجل عند كتابته: انظر آخر التزام `VIB-FIX-REG` في `git log`. أرقام 001–007 وهاشاتها لم تتغير.
 
 ## VIB-FIX-001
@@ -126,12 +126,71 @@
 - يعتمد على: يغطي ناتج 008 بعد حذف 009. لا يغيّر سلوك 001–010.
 - التراجع: `git revert 723090010326a0428b0bb964d2cde430943c91d8`. afterward: الوظائف الثلاث السابقة تبقى، ويفقد الفحص الجديد.
 
+## VIB-FIX-012
+
+- الالتزام: `b3777102eb2379785853ae41d2d6275434907a84`
+- العنوان: VIB-FIX-012: Refetch sections when the website changes them.
+- العرض: بيان يُضاف من الموقع لا يظهر في التطبيق حتى يكتب المستخدم في القسم نفسه. الاتجاه العكسي يظهر في الموقع فورًا.
+- السبب: التطبيق أصلًا يستمع إلى `GET /api/events` و`GET /api/event-changes`، لكن الإشارة كانت تُسقط التحصيل والأستاذ والرئيسية فقط. قوائم العملاء والشركات والأمانات والمشتريات والمصراوية والخزينة تبقى في الذاكرة لأنها ليست `autoDispose`. الموقع يعيد قراءة كل قسم حسب موضوعه (`customer.changed` وما يقابله، بما فيه `treasury.report.closed` و`financial.summary.changed`).
+- السلوك: كل موضوع يُسقط قراءة قسمه. `full_resync_required` والعودة من الخلفية يُسقطان الأقسام كلها. فتح مسار فيه رد مخزن يعيد قراءته. السحب للتحديث على المشتريات والمصراوية والتحصيل وسجل الأستاذ. لا استطلاع ضيق جديد، والتوقف في الخلفية كما كان. الإجماليات تبقى من الخادم.
+- الدليل: `test/live_refresh_test.dart`.
+- يعتمد على: لا يغيّر عقد 001–011. يلمس التنسيق فوق 008 في بضع شاشات.
+- التراجع: `git revert b3777102eb2379785853ae41d2d6275434907a84`. afterward: `flutter test test/live_refresh_test.dart --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-013
+
+- الالتزام: `f11bbabd5d1fb32a6d441b8a447e149dfe1b4e2b` ثم `dde8ebfc42af33da585aca0207acbfe2afa540f2` لإبقاء `onDestroy` واحدًا حتى يبني الإصدار.
+- العنوان: VIB-FIX-013: Speak new notifications when النطق is on.
+- العرض: الإشعارات «غير منطوقة». المفتاح في الحساب اسمه «النطق» ويحفظ `speechEnabled`. النص الظاهر كان مفتاح الإجراء مثل `collection.submit` لأن الخادم لا يرسل `title` ولا `body`.
+- السبب: الموقع عند `speechEnabled` ينطق `notificationSentence`، وعند `soundEnabled` يطلق نغمة قصيرة داخل الصفحة. قناة أندرويد `vib_collections_alerts` أصلًا `IMPORTANCE_HIGH` فشريط النظام له صوت. الشريط الداخلي كان صامتًا، والتطبيق لم يكن ينطق. الدليل يرجّح معنى النطق لا نصًا مشوّهًا وحده، والنص الخام أُصلح معه لأنه مصدر الجملة المنطوقة.
+- السلوك: جملة عربية من `actorName` و`action` و`details` كما في الموقع. إذا `speechEnabled` تُنطق بالعربية على الجهاز عبر `app/notification_speech`. إذا `soundEnabled` (الافتراض في الخادم) تُطلق نغمة. الخلفية توقف النطق. لا مسار جديد.
+- الدليل: `test/notification_sentence_test.dart`.
+- يعتمد على: لا يغيّر 012. القراءة من الحقول الموجودة في `GET /api/notifications`.
+- التراجع: `git revert dde8ebfc42af33da585aca0207acbfe2afa540f2` ثم `git revert f11bbabd5d1fb32a6d441b8a447e149dfe1b4e2b`. afterward: `flutter test test/notification_sentence_test.dart --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-014
+
+- الالتزام: `4108e09819282b614493e09504d6b4ad90377893` ثم `4fc1e00f707c67ea78964199d0b0d3df123362ca` لاختبار الشريط وقناة النطق الغائبة.
+- العنوان: VIB-FIX-014: Open the section named on a notification for the owner.
+- العرض: النقر على أي إشعار يفتح «القسم غير مصرح لهذا الحساب» والمدير الأساسي داخل الحساب.
+- السبب: صف `GET /api/notifications` يرسل `sectionKey` و`entityId` ولا يرسل `recipientUserId`. التطبيق كان يقرأ `section` و`relatedRef` فقط، ورفض نقرة الشريط واللافتة إذا غاب المستلم قبل أن يفحص القسم. المدير الأساسي (`isOwner` مع دور `admin`) لم يُعامل كدخول كامل إذا وُجدت قائمة صلاحيات جزئية، بينما الموقع يفتح له كل الأقسام.
+- السلوك: `sectionKey` يفتح القسم، ومع المعرّف يفتح الكارت. غياب المستلم يعني أن الصف لحساب الجلسة. مستلم آخر ما زال يُرفض. `isOwner` مع دور `admin` دخول كامل للأقسام. إنشاء الحسابات يبقى للمدير الأساسي. موظف بلا صلاحية القسم ما زال يُمنع.
+- الدليل: `test/notification_opener_test.dart` و`packages/api_layer/test/permission_service_test.dart`.
+- يعتمد على: يكمّل 013 في نموذج الإشعار. لا يوسّع صلاحيات الموظف.
+- التراجع: `git revert 4fc1e00f707c67ea78964199d0b0d3df123362ca` ثم `git revert 4108e09819282b614493e09504d6b4ad90377893`. afterward: `flutter test test/notification_opener_test.dart test/system_tray_navigation_test.dart packages/api_layer/test/permission_service_test.dart --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-015
+
+- الالتزام: `cd32d2d00bd949e151745f1aa344fffae74a445b`
+- العنوان: VIB-FIX-015: Play a sound for notifications on a new channel.
+- العرض: «غير منطوقة» تعني بلا صوت. القناة `vib_collections_alerts` إن أُنشئت بلا صوت لا تقبل تغيير الأهمية لاحقًا.
+- السبب: الموقع عند `soundEnabled` يطلق نغمة 760 هرتز لـ 200 مللي ثانية عند إشعار جديد، ولا يطلقها عند التحميل الأول. شريط أندرويد يحتاج قناة جديدة بأهمية عالية وصوت الإشعار الافتراضي.
+- السلوك: القناة `vib_notices_sound_v1`، وأهمية عالية، وصوت `TYPE_NOTIFICATION`، واهتزاز. النغمة داخل التطبيق بنفس التردد والمدة عندما `soundEnabled` ليس `false`. `speechEnabled` يبقى للنطق كما في 013. إيقاف الصوت من الحساب يبقى كما هو.
+- الدليل: `test/notifications/notification_channels_test.dart`.
+- يعتمد على: فوق 013. لا مسار جديد.
+- التراجع: `git revert cd32d2d00bd949e151745f1aa344fffae74a445b`. afterward: `flutter test test/notifications/notification_channels_test.dart --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-016
+
+- الالتزام: `33b1c4238feaf09c14cef69b230b59fd885dd9d2` ثم `80620f65499024580f52ce5ec5edf0a484ebd915` لإبقاء القائمة الطويلة كسولة مع وصول آخر كارت.
+- العنوان: VIB-FIX-016: Scroll the last account card fully above the bottom bar.
+- العرض: آخر كروت الديون والأمانات لا تظهر كاملة حتى أسفل الصفحة.
+- السبب: القائمة الطويلة كانت داخل صندوق بارتفاع 560، فيُقص أسفلها تحت الشريط. التمرير الداخلي لا يُظهر الجزء الواقع خارج الشاشة.
+- السلوك: تمرير واحد للصفحة حتى آخر كارت، مع فراغ أسفل 32. علامة مراجعة الصفر وارتفاع كرت الديون بقيا. الأقسام الأربعة: العملاء والشركات والأمانات الليبية والمصرية.
+- الدليل: `test/account_list_overflow_test.dart` باسم `the last card scrolls fully above the bottom bar` على 320×568 ومقياس نص 2.
+- يعتمد على: لا يغيّر 012–015. لا يغيّر بيانات الكارت.
+- التراجع: `git revert 80620f65499024580f52ce5ec5edf0a484ebd915` ثم `git revert 33b1c4238feaf09c14cef69b230b59fd885dd9d2`. afterward: `flutter test test/account_list_overflow_test.dart --name "last card" test/p7_long_history_test.dart test/def027_history_window_test.dart --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
+
+اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
 
 تكرار تقديم التحصيل بعد ضياع الرد، وربط الأمانة المصرية، وتفعيل MFA، وقائمة الجلسات، وإغلاق المصراوية عند 04:00، وقفل الالتقاط. خادم مراجعة الأقسام الأربعة منشور على الإنتاج `https://vip2100.com` منذ 2026-11-09 (مستودع الموقع `64f33ffb3c61db38c78cbe520d90f79a6a3ba7f2`، schema 57).
 
-## فحص المجموعة بعد 011
+## فحص المجموعة بعد 016
 
-`flutter analyze` بلا ملاحظات للتطبيق و`packages/api_layer`، قبل 008 وبعد 011. `flutter test --exclude-tags screenshots --dart-define=USE_FAKE_API=true`: 810 نجحت، 8 تُركت، 0 فشلت، قبل التنسيق وبعده. حزمة `packages/api_layer` بأمر `flutter test --dart-define=USE_FAKE_API=true`: 545 نجحت، 14 تُركت، 0 فشلت، قبل التنسيق وبعده. الثمانية لقطات موقوفة في التطبيق. لم يُعد اختبار أندرويد لأن ملفات Kotlin وقناة `app/screen_security` لم تتغير. 10 نوفمبر 2026. خادم وهمي فقط، لا اتصال حي.
+قبل 012 على `4ecc7cf`: `flutter analyze` بلا ملاحظات. التطبيق `flutter test --exclude-tags screenshots --dart-define=USE_FAKE_API=true`: 810 نجحت، 8 تُركت، 0 فشلت. الحزمة `flutter test --dart-define=USE_FAKE_API=true`: 545 نجحت، 14 تُركت، 0 فشلت.
 
-سلوك 006 و007 يبقى كما هو. هذه الجولة تنسيق وحذف ملفين غير مستخدمين وتوثيق نشر الخادم وفحص تنسيق للقراءة فقط.
+بعد 014: `flutter analyze` بلا ملاحظات. التطبيق 816 نجحت و8 تُركت. الحزمة 545 نجحت و14 تُركت. بعد 016: اختبار آخر الكارت على 320×568 ومقياس 2 نجح للأقسام الأربعة، واختبارات القناة نجحت. المجموعة الكاملة تُعاد في فحص الطلب. 10 نوفمبر 2026. خادم وهمي فقط.
+
+لا تغيير في عقد الخادم. النطق والنغمة على الجهاز. إشارة التغيير من المسارات الموجودة.

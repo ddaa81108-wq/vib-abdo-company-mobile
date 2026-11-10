@@ -147,134 +147,144 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
     final page = ref.watch(ledgerPageProvider(_query));
     final money = ref.watch(apiLayerProvider).money;
     return SectionTheme(
-      child: ListView(
-        key: FinancialLedgerScreen.screenKey,
-        padding: pagePadding(MediaQuery.sizeOf(context).width),
-        children: [
-          Text('سجل الأستاذ', style: cairo(22, 800)),
-          const SizedBox(height: AppSpacing.xs),
-          const Text(
-            'قيود الصفحة كما أرسلها الخادم. إجمالي الصفحة ليس إجمالي المؤسسة.',
-            key: Key('ledger-page-note'),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Card(
-            child: Padding(
-              padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text('تصفية الصفحة', style: cairo(14, 800)),
-                  TextField(
-                    key: const Key('ledger-search'),
-                    controller: _search,
-                    decoration: const InputDecoration(labelText: 'بحث'),
-                    onSubmitted: (_) => setState(_dropOlder),
-                  ),
-                  DropdownButtonFormField<String?>(
-                    key: const Key('ledger-currency'),
-                    initialValue: _currency,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'العملة'),
-                    items: const [
-                      DropdownMenuItem(value: null, child: Text('الكل')),
-                      DropdownMenuItem(value: 'LYD', child: Text('دينار')),
-                      DropdownMenuItem(value: 'EGP', child: Text('جنيه')),
-                    ],
-                    onChanged: (value) => _retarget(
-                      currency: value,
-                      clearCurrency: value == null,
+      child: RefreshIndicator(
+        key: const Key('financial-ledger-refresh'),
+        onRefresh: () async {
+          ref.invalidate(ledgerPageProvider);
+          await ref.read(ledgerPageProvider(_query).future);
+        },
+        child: ListView(
+          key: FinancialLedgerScreen.screenKey,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: pagePadding(MediaQuery.sizeOf(context).width),
+          children: [
+            Text('سجل الأستاذ', style: cairo(22, 800)),
+            const SizedBox(height: AppSpacing.xs),
+            const Text(
+              'قيود الصفحة كما أرسلها الخادم. إجمالي الصفحة ليس إجمالي المؤسسة.',
+              key: Key('ledger-page-note'),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Card(
+              child: Padding(
+                padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('تصفية الصفحة', style: cairo(14, 800)),
+                    TextField(
+                      key: const Key('ledger-search'),
+                      controller: _search,
+                      decoration: const InputDecoration(labelText: 'بحث'),
+                      onSubmitted: (_) => setState(_dropOlder),
                     ),
-                  ),
-                  DropdownButtonFormField<FinancialLedgerSectionKey?>(
-                    key: const Key('ledger-section'),
-                    initialValue: _section,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'القسم'),
-                    items: [
-                      const DropdownMenuItem(
-                        value: null,
-                        child: Text('كل الأقسام'),
+                    DropdownButtonFormField<String?>(
+                      key: const Key('ledger-currency'),
+                      initialValue: _currency,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'العملة'),
+                      items: const [
+                        DropdownMenuItem(value: null, child: Text('الكل')),
+                        DropdownMenuItem(value: 'LYD', child: Text('دينار')),
+                        DropdownMenuItem(value: 'EGP', child: Text('جنيه')),
+                      ],
+                      onChanged: (value) => _retarget(
+                        currency: value,
+                        clearCurrency: value == null,
                       ),
-                      for (final section in FinancialLedgerSectionKey.values)
-                        if (section != FinancialLedgerSectionKey.unknown)
-                          DropdownMenuItem(
-                            value: section,
-                            child: Text(_sectionLabel(section)),
-                          ),
-                    ],
-                    onChanged: (value) =>
-                        _retarget(section: value, clearSection: value == null),
-                  ),
-                ],
+                    ),
+                    DropdownButtonFormField<FinancialLedgerSectionKey?>(
+                      key: const Key('ledger-section'),
+                      initialValue: _section,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'القسم'),
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('كل الأقسام'),
+                        ),
+                        for (final section in FinancialLedgerSectionKey.values)
+                          if (section != FinancialLedgerSectionKey.unknown)
+                            DropdownMenuItem(
+                              value: section,
+                              child: Text(_sectionLabel(section)),
+                            ),
+                      ],
+                      onChanged: (value) => _retarget(
+                        section: value,
+                        clearSection: value == null,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          const ExportPdfButton(),
-          page.when(
-            loading: () => const SkeletonBox(height: 120),
-            error: (error, _) => presentFailure(
-              ref.read(errorHandlerProvider).toFailure(error),
-              onRetry: () => ref.invalidate(ledgerPageProvider(_query)),
-              retryKey: const Key('ledger-retry'),
-            ),
-            data: (data) {
-              final shown = _older ?? data;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(AppStrings.pageTotals, style: cairo(14, 800)),
-                  const SizedBox(height: AppSpacing.sm),
-                  Wrap(
-                    spacing: AppSpacing.sm,
-                    runSpacing: AppSpacing.sm,
-                    children: [
-                      for (final entry in shown.pageTotals.entries)
-                        _TotalFrame(
-                          label: _currencyLabel(entry.key),
-                          child: MoneyText(
-                            _money(money, entry.key, entry.value),
-                            key: Key('ledger-total-${entry.key}'),
+            const SizedBox(height: AppSpacing.sm),
+            const ExportPdfButton(),
+            page.when(
+              loading: () => const SkeletonBox(height: 120),
+              error: (error, _) => presentFailure(
+                ref.read(errorHandlerProvider).toFailure(error),
+                onRetry: () => ref.invalidate(ledgerPageProvider(_query)),
+                retryKey: const Key('ledger-retry'),
+              ),
+              data: (data) {
+                final shown = _older ?? data;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(AppStrings.pageTotals, style: cairo(14, 800)),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      children: [
+                        for (final entry in shown.pageTotals.entries)
+                          _TotalFrame(
+                            label: _currencyLabel(entry.key),
+                            child: MoneyText(
+                              _money(money, entry.key, entry.value),
+                              key: Key('ledger-total-${entry.key}'),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    if (shown.page.items.isEmpty)
+                      const EmptyPane(message: AppStrings.emptyLedger)
+                    else
+                      for (final row in shown.page.items) _LedgerRow(row: row),
+                    if (_olderError != null)
+                      Text(
+                        _olderError!,
+                        key: const Key('ledger-older-error'),
+                        style: cairo(
+                          13,
+                          700,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    if (shown.page.nextCursor != null)
+                      Align(
+                        alignment: AlignmentDirectional.center,
+                        child: OutlinedButton(
+                          key: const Key('ledger-older'),
+                          onPressed: _olderBusy
+                              ? null
+                              : () => _loadOlder(shown.page.nextCursor),
+                          child: Text(
+                            _olderBusy
+                                ? AppStrings.ledgerLoadingOlder
+                                : AppStrings.loadOlder,
                           ),
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  if (shown.page.items.isEmpty)
-                    const EmptyPane(message: AppStrings.emptyLedger)
-                  else
-                    for (final row in shown.page.items) _LedgerRow(row: row),
-                  if (_olderError != null)
-                    Text(
-                      _olderError!,
-                      key: const Key('ledger-older-error'),
-                      style: cairo(
-                        13,
-                        700,
-                        color: Theme.of(context).colorScheme.error,
                       ),
-                    ),
-                  if (shown.page.nextCursor != null)
-                    Align(
-                      alignment: AlignmentDirectional.center,
-                      child: OutlinedButton(
-                        key: const Key('ledger-older'),
-                        onPressed: _olderBusy
-                            ? null
-                            : () => _loadOlder(shown.page.nextCursor),
-                        child: Text(
-                          _olderBusy
-                              ? AppStrings.ledgerLoadingOlder
-                              : AppStrings.loadOlder,
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-        ],
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

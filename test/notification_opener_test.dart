@@ -96,6 +96,32 @@ void main() {
     );
     expect(
       resolveNotificationTarget(
+        const NotificationRelatedRef(type: 'customers', id: ''),
+      )?.location,
+      '/customers',
+    );
+    expect(
+      resolveNotificationTarget(
+        const NotificationRelatedRef(type: 'settings', id: ''),
+      )?.location,
+      '/settings',
+    );
+    final serverRow = AppNotification.fromJson({
+      'id': 4,
+      'action': 'customer.payment',
+      'entityType': 'customer',
+      'entityId': 'c_59',
+      'sectionKey': 'customers',
+      'actorName': 'أحمد',
+      'createdAt': '2026-11-10T00:00:00.000Z',
+    });
+    expect(serverRow.relatedRef?.type, 'customers');
+    expect(
+      resolveNotificationTarget(serverRow.relatedRef)?.location,
+      '/customers/c_59',
+    );
+    expect(
+      resolveNotificationTarget(
         const NotificationRelatedRef(type: 'account', id: 'c_59'),
       ),
       isNull,
@@ -180,7 +206,7 @@ void main() {
         origin: NotificationOpenOrigin.systemTray,
       ),
     );
-    expect(missingRecipient, NotificationOpenResult.forbidden);
+    expect(missingRecipient, NotificationOpenResult.opened);
 
     final noTarget = await finish(
       tester,

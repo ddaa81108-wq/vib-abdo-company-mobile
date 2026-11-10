@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/app.dart';
 import 'package:vib_abdo_company_mobile/features/collections/collections_screen.dart';
-import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notification_open_seam.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notification_opener.dart'
     as gate;
@@ -87,15 +86,19 @@ void main() {
         tester,
         container.read(systemTrayTapHandlerProvider).openPayload('n-tray'),
       );
-      await tester.pump();
-      expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+      await tester.pumpAndSettle(
+        const Duration(milliseconds: 50),
+        EnginePhase.sendSemanticsUpdate,
+        const Duration(seconds: 20),
+      );
+      expect(find.byKey(CollectionsScreen.screenKey), findsOneWidget);
 
       final forbidden = await finish(
         tester,
         container
             .read(notificationOpenSeamProvider)
             .open(
-              notice(id: 'n-tray-2'),
+              notice(id: 'n-tray-2', recipient: 'someone-else'),
               origin: NotificationOpenOrigin.systemTray,
             ),
       );
