@@ -18,246 +18,21 @@ import 'package:vib_abdo_company_mobile/ui/theme.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  testWidgets('opening balance renders RTL in light mode', (tester) async {
+  testWidgets('the opening balance card is not on the purchases page', (
+    tester,
+  ) async {
     await pumpFakeApp(tester, size: const Size(800, 1600));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
-
     expectRtl(tester);
-    expect(themeOf(tester).brightness, Brightness.light);
-    expect(find.byKey(const Key('opening-card')), findsOneWidget);
-    expect(find.text(AppStrings.purchaseOpening), findsWidgets);
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('opening-card')),
-        matching: find.textContaining('2,000 د.ل'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('opening-card')),
-        matching: find.text('80'),
-      ),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('set-opening')), findsOneWidget);
-    expect(find.text(AppStrings.correctionClosed), findsOneWidget);
-    expect(chipColor(tester, '12'), AppStatusColors.light.chipNormalBg);
-    expect(find.byKey(const Key('open-correction-12')), findsNothing);
-    expect(find.byKey(const Key('close-correction-12')), findsNothing);
-
-    await tester.tap(find.byKey(const Key('set-opening')));
-    await settle(tester);
-    expect(
-      textDirectionOf(tester, const Key('opening-debt')),
-      TextDirection.ltr,
-    );
-    expect(find.text(AppStrings.noPreview), findsOneWidget);
+    expect(find.byKey(const Key('opening-card')), findsNothing);
+    expect(find.byKey(const Key('set-opening')), findsNothing);
+    expect(find.text(AppStrings.purchaseOpening), findsNothing);
+    // A draft day is «اليوم الحالي». «التصحيح مغلق» was the old label for a
+    // shut correction session; a carried day now says «مُرحّل».
+    expect(find.text(AppStrings.purchaseToday), findsOneWidget);
+    expect(find.text(AppStrings.correctionClosed), findsNothing);
   });
-
-  testWidgets('opening balance rejects a non-integer and sends nothing', (
-    tester,
-  ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
-    final fake = layer.client as FakeApiClient;
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/purchases');
-    await openOpening(tester);
-
-    await enterField(tester, const Key('opening-debt'), '');
-    await enterField(tester, const Key('opening-vodafone'), '40');
-    await tester.tap(find.byKey(const Key('save-opening')));
-    await tester.pump();
-
-    expect(find.text(AppStrings.integerOnly), findsOneWidget);
-    expect(find.text(AppStrings.openingConfirm), findsNothing);
-    expect(fake.mutationRequestIds, isEmpty);
-
-    await enterField(tester, const Key('opening-debt'), '1.5');
-    await tester.tap(find.byKey(const Key('save-opening')));
-    await tester.pump();
-    expect(find.text(AppStrings.integerOnly), findsOneWidget);
-    expect(fake.mutationRequestIds, isEmpty);
-  });
-
-  testWidgets(
-    'opening submit confirms then sends requestId and expectedVersion',
-    (tester) async {
-      final layer = await pumpFakeApp(tester, size: const Size(800, 1800));
-      final fake = layer.client as FakeApiClient;
-      await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      await go(tester, '/purchases');
-      await openOpening(tester);
-      await enterField(tester, const Key('opening-debt'), '1,500');
-      await enterField(tester, const Key('opening-vodafone'), '٤٠');
-
-      await tester.tap(find.byKey(const Key('save-opening')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text(AppStrings.openingConfirm), findsOneWidget);
-      expect(find.text('1500 · 40'), findsOneWidget);
-
-      await tester.tap(find.text(AppStrings.cancel));
-      await settle(tester);
-      expect(find.text(AppStrings.openingConfirm), findsNothing);
-      expect(fake.mutationRequestIds, isEmpty);
-
-      await tester.tap(find.byKey(const Key('save-opening')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.byKey(const Key('confirm-mutation')));
-      await finishSend(tester);
-
-      final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
-      expect(body['requestId'], isA<String>());
-      expect('${body['requestId']}'.isNotEmpty, isTrue);
-      expect(body['expectedDayVersion'], 3);
-      expect(body['previousDebtUnits'], 1500);
-      expect(body['previousVodafoneUnits'], 40);
-      expect(fake.mutationPaths.last, '/api/purchases/al_bayan/opening');
-      expect(find.text(AppStrings.openingConfirm), findsNothing);
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('opening-card')),
-          matching: find.textContaining('1,500 د.ل'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('opening-card')),
-          matching: find.text('40'),
-        ),
-        findsOneWidget,
-      );
-    },
-  );
-
-  testWidgets('سمسم sends the opening write to the simsim ledger', (
-    tester,
-  ) async {
-    final layer = await pumpFakeApp(tester, size: const Size(800, 1600));
-    final fake = layer.client as FakeApiClient;
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/purchases');
-    await tester.tap(find.text(AppStrings.simsim));
-    await settle(tester);
-    await openOpening(tester);
-    await tester.tap(find.byKey(const Key('save-opening')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.byKey(const Key('confirm-mutation')));
-    await finishSend(tester);
-    final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
-    expect(body['requestId'], isNotEmpty);
-    expect(body['expectedDayVersion'], 3);
-    expect(fake.mutationPaths.last, '/api/purchases/simsim/opening');
-  });
-
-  testWidgets('the open day version is the expectedDayVersion that is sent', (
-    tester,
-  ) async {
-    final layer = await pumpFakeApp(
-      tester,
-      size: const Size(800, 1600),
-      overrides: [
-        purchasesProvider.overrideWith((ref) async {
-          return PurchasesPage.fromData({
-            'day': {
-              'id': '1',
-              'dayNumber': 1,
-              'version': 11,
-              'status': 'draft',
-              'correctionOpen': false,
-              'previousDebtUnits': 7,
-              'previousVodafoneUnits': 8,
-            },
-            'entries': <Object>[],
-          });
-        }),
-      ],
-    );
-    final fake = layer.client as FakeApiClient;
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/purchases');
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('opening-card')),
-        matching: find.textContaining('7 د.ل'),
-      ),
-      findsOneWidget,
-    );
-    await openOpening(tester);
-    await tester.tap(find.byKey(const Key('save-opening')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.byKey(const Key('confirm-mutation')));
-    await finishSend(tester);
-    final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
-    expect(body['expectedDayVersion'], 11);
-    expect(body['previousDebtUnits'], 7);
-    expect(body['previousVodafoneUnits'], 8);
-    expect(body['requestId'], isNotEmpty);
-  });
-
-  testWidgets(
-    'opening conflict shows the Arabic reload message and refetches',
-    (tester) async {
-      var loads = 0;
-      final layer = await pumpFakeApp(
-        tester,
-        size: const Size(800, 1600),
-        overrides: [
-          purchasesProvider.overrideWith((ref) async {
-            loads++;
-            return PurchasesPage.fromData({
-              'day': {
-                'id': '9',
-                'dayNumber': 9,
-                'version': -1,
-                'status': 'draft',
-                'correctionOpen': false,
-                'previousDebtUnits': 10,
-                'previousVodafoneUnits': 2,
-              },
-              'entries': <Object>[],
-            });
-          }),
-        ],
-      );
-      final fake = layer.client as FakeApiClient;
-      await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      await go(tester, '/purchases');
-      final before = loads;
-      await openOpening(tester);
-      await tester.tap(find.byKey(const Key('save-opening')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.byKey(const Key('confirm-mutation')));
-      await settle(tester);
-
-      expect(find.text(AppStrings.versionConflict), findsWidgets);
-      expect(loads, greaterThan(before));
-      final first = fake.mutationRequestIds.single;
-
-      await tester.tap(find.byKey(const Key('save-opening')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.byKey(const Key('confirm-mutation')));
-      await settle(tester);
-      expect(fake.mutationRequestIds, [first, first]);
-
-      await enterField(tester, const Key('opening-debt'), '11');
-      await tester.tap(find.byKey(const Key('save-opening')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.byKey(const Key('confirm-mutation')));
-      await settle(tester);
-      expect(fake.mutationRequestIds, hasLength(3));
-      expect(fake.mutationRequestIds[2], isNot(first));
-    },
-  );
 
   testWidgets(
     'day correction renders open and closed, and confirms the write',
@@ -269,8 +44,8 @@ void main() {
       await go(tester, '/purchases');
 
       expectRtl(tester);
-      expect(find.text(AppStrings.correctionClosed), findsOneWidget);
-      expect(find.text(AppStrings.correctionOpen), findsNothing);
+      expect(find.text(AppStrings.purchaseCarried), findsOneWidget);
+      expect(find.text(AppStrings.purchaseEditing), findsNothing);
       expect(find.byKey(const Key('open-correction-12')), findsOneWidget);
       expect(find.byKey(const Key('close-correction-12')), findsNothing);
       expect(chipColor(tester, '12'), AppStatusColors.light.chipNormalBg);
@@ -282,7 +57,7 @@ void main() {
       await tester.tap(find.text(AppStrings.cancel));
       await tester.pump();
       expect(fake.mutationRequestIds, isEmpty);
-      expect(find.text(AppStrings.correctionClosed), findsOneWidget);
+      expect(find.text(AppStrings.purchaseCarried), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('open-correction-12')));
       await tester.pump();
@@ -301,7 +76,7 @@ void main() {
         fake.mutationPaths.last,
         '/api/purchases/al_bayan/days/12/correction',
       );
-      expect(find.text(AppStrings.correctionOpen), findsWidgets);
+      expect(find.text(AppStrings.purchaseEditing), findsWidgets);
       expect(find.byKey(const Key('close-correction-12')), findsOneWidget);
       expect(find.byKey(const Key('open-correction-12')), findsNothing);
       expect(chipColor(tester, '12'), AppStatusColors.light.chipReviewBg);
@@ -319,7 +94,7 @@ void main() {
       expect(closed.containsKey('expectedDayVersion'), isFalse);
       expect(closed['open'], isFalse);
       expect(closed['requestId'], isNot(opened['requestId']));
-      expect(find.text(AppStrings.correctionClosed), findsOneWidget);
+      expect(find.text(AppStrings.purchaseCarried), findsOneWidget);
       expect(find.byKey(const Key('open-correction-12')), findsOneWidget);
     },
   );
@@ -382,7 +157,7 @@ void main() {
     fake.purchaseFixtureStatus = 'correction';
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
-    expect(find.byKey(const Key('set-opening')), findsOneWidget);
+    expect(find.byKey(const Key('set-opening')), findsNothing);
     expect(find.byKey(const Key('close-correction-12')), findsOneWidget);
 
     layer.permissions.applyFromServer(
@@ -392,8 +167,8 @@ void main() {
     );
     await tester.pump();
     expect(find.byKey(PurchasesScreen.screenKey), findsOneWidget);
-    expect(find.byKey(const Key('opening-card')), findsOneWidget);
-    expect(find.text(AppStrings.correctionOpen), findsWidgets);
+    expect(find.byKey(const Key('opening-card')), findsNothing);
+    expect(find.text(AppStrings.purchaseEditing), findsWidgets);
     expect(find.byKey(const Key('set-opening')), findsNothing);
     expect(find.byKey(const Key('close-correction-12')), findsNothing);
     expect(find.byKey(const Key('open-correction-12')), findsNothing);
@@ -405,13 +180,7 @@ void main() {
       sectionAccess: const {'purchases': 'manage'},
     );
     await tester.pump();
-    expect(find.byKey(const Key('set-opening')), findsOneWidget);
-    expect(
-      tester
-          .widget<FilledButton>(find.byKey(const Key('set-opening')))
-          .onPressed,
-      isNotNull,
-    );
+    expect(find.byKey(const Key('set-opening')), findsNothing);
     expect(find.byKey(const Key('close-correction-12')), findsNothing);
     expect(find.byKey(const Key('finalize-day-12')), findsNothing);
 
@@ -489,31 +258,8 @@ void main() {
       await go(tester, '/purchases');
 
       expect(textScaleOf(tester), scale);
+      expect(find.byKey(const Key('opening-card')), findsNothing);
       expect(tester.takeException(), isNull);
-      final card = find.byKey(const Key('opening-card'));
-      final cardRect = tester.getRect(card);
-      for (final sample in ['2,000', '80']) {
-        final figure = find.descendant(
-          of: card,
-          matching: find.textContaining(sample),
-        );
-        expect(figure, findsOneWidget);
-        final text = tester.widget<Text>(figure);
-        expect(text.maxLines, anyOf(isNull, greaterThan(1)));
-        expect(text.overflow, isNot(TextOverflow.ellipsis));
-        expect(text.overflow, isNot(TextOverflow.fade));
-        // ج.م is its own short run; the digits keep wrapping.
-        if (text.data != 'ج.م') {
-          expect(text.softWrap, isNot(false));
-        }
-        final rect = tester.getRect(figure);
-        expect(rect.left, greaterThanOrEqualTo(cardRect.left - 1));
-        expect(rect.right, lessThanOrEqualTo(cardRect.right + 1));
-        expect(rect.top, greaterThanOrEqualTo(cardRect.top - 1));
-        expect(rect.bottom, lessThanOrEqualTo(cardRect.bottom + 1));
-        expect(rect.width, greaterThan(8));
-        expect(rect.height, greaterThan(8));
-      }
     });
   }
 
@@ -708,12 +454,6 @@ Future<void> enterField(WidgetTester tester, Key key, String value) async {
   await tester.pump();
 }
 
-Future<void> openOpening(WidgetTester tester) async {
-  await show(tester, find.byKey(const Key('set-opening')));
-  await tester.tap(find.byKey(const Key('set-opening')));
-  await settle(tester);
-}
-
 Future<void> show(WidgetTester tester, Finder finder) async {
   await tester.scrollUntilVisible(
     finder,
@@ -854,23 +594,8 @@ Future<void> exercisePhone(
   expect(themeOf(tester).brightness, dark ? Brightness.dark : Brightness.light);
   expect(tester.takeException(), isNull);
 
-  await show(tester, find.byKey(const Key('set-opening')));
-  await tester.tap(find.byKey(const Key('set-opening')));
-  await settle(tester);
-  expect(find.byKey(const Key('save-opening')), findsOneWidget);
+  expect(find.byKey(const Key('opening-card')), findsNothing);
   expect(tester.takeException(), isNull);
-
-  await tester.ensureVisible(find.byKey(const Key('save-opening')));
-  await tester.pump();
-  await tester.tap(find.byKey(const Key('save-opening')));
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 300));
-  expect(find.text(AppStrings.openingConfirm), findsOneWidget);
-  expect(tester.takeException(), isNull);
-  await tester.tap(find.text(AppStrings.cancel));
-  await tester.pump(const Duration(milliseconds: 400));
-  Navigator.of(tester.element(find.byKey(const Key('save-opening')))).pop();
-  await tester.pump(const Duration(milliseconds: 400));
 
   await show(tester, find.byKey(const Key('close-correction-1')));
   final colors = dark ? AppStatusColors.dark : AppStatusColors.light;

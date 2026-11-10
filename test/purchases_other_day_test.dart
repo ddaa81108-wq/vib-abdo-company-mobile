@@ -50,13 +50,13 @@ void main() {
     _scriptPurchases(missing.client as FakeApiClient, _page(day: null));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
-    expect(find.byKey(const Key('opening-card')), findsOneWidget);
+    expect(find.byKey(const Key('opening-card')), findsNothing);
     expect(find.byKey(const Key('set-opening')), findsNothing);
 
     await pumpFakeApp(tester, size: const Size(800, 1400));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
-    expect(find.byKey(const Key('set-opening')), findsOneWidget);
+    expect(find.byKey(const Key('set-opening')), findsNothing);
 
     final finalized = await pumpFakeApp(tester, size: const Size(800, 1400));
     (finalized.client as FakeApiClient).purchaseFixtureStatus = 'finalized';
@@ -69,7 +69,7 @@ void main() {
     (correction.client as FakeApiClient).purchaseFixtureStatus = 'correction';
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
-    expect(find.byKey(const Key('set-opening')), findsOneWidget);
+    expect(find.byKey(const Key('set-opening')), findsNothing);
 
     final unversioned = await pumpFakeApp(tester, size: const Size(800, 1400));
     _scriptPurchases(

@@ -8,6 +8,7 @@ import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
+import '../accounts/website_ledger_tone.dart';
 import '../../ui/presentation.dart';
 import '../../ui/strings.dart';
 import '../../ui/theme.dart';
@@ -53,89 +54,89 @@ class PurchasesScreen extends ConsumerWidget {
           ref.invalidate(purchasesProvider);
           await ref.read(purchasesProvider.future);
         },
-        child: ListView(
-          key: screenKey,
-          physics: const AlwaysScrollableScrollPhysics(),
-          // One page: build it whole so the totals card at the end is ready
-          // (and readable by tests) without scrolling.
-          scrollCacheExtent: const ScrollCacheExtent.pixels(6000),
-          padding: pagePadding(MediaQuery.sizeOf(context).width),
-          children: [
-            KeptData<PurchasesPage>(
-              value: page,
-              resetKey: book,
-              onRetry: () => ref.invalidate(purchasesProvider),
-              messageOf: (error) =>
-                  failureText(ref.read(errorHandlerProvider).toFailure(error)),
-              failureOf: (error) =>
-                  ref.read(errorHandlerProvider).toFailure(error),
-              loading: const Column(
-                key: Key('purchases-loading'),
-                children: [
-                  SkeletonBox(),
-                  SizedBox(height: AppSpacing.md),
-                  SkeletonBox(),
-                ],
-              ),
-              builder: (data) {
-                final day = data.day;
-                return _PurchaseHistory(
-                  key: ValueKey(book),
-                  book: book,
-                  first: data.entries,
-                  firstCursor: data.nextBefore,
-                  online: online,
-                  builder: (context, entries, controls) {
-                    final draft = ref.watch(_ledgerDraftProvider);
-                    final empty =
-                        day == null && entries.isEmpty && draft == null;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (day != null)
-                          _DayCard(
-                            day: day,
-                            money: money,
-                            canWrite: canWrite,
-                            canFinalize: canFinalize,
-                            online: online,
-                            book: book,
+        child: KeptData<PurchasesPage>(
+          expand: true,
+          value: page,
+          resetKey: book,
+          onRetry: () => ref.invalidate(purchasesProvider),
+          messageOf: (error) =>
+              failureText(ref.read(errorHandlerProvider).toFailure(error)),
+          failureOf: (error) => ref.read(errorHandlerProvider).toFailure(error),
+          loading: const Column(
+            key: Key('purchases-loading'),
+            children: [
+              SkeletonBox(),
+              SizedBox(height: AppSpacing.md),
+              SkeletonBox(),
+            ],
+          ),
+          builder: (data) {
+            final day = data.day;
+            return _PurchaseHistory(
+              key: ValueKey(book),
+              book: book,
+              first: data.entries,
+              firstCursor: data.nextBefore,
+              online: online,
+              builder: (context, entries, controls) {
+                final draft = ref.watch(_ledgerDraftProvider);
+                final empty = day == null && entries.isEmpty && draft == null;
+                return CustomScrollView(
+                  key: PurchasesScreen.screenKey,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  scrollCacheExtent: const ScrollCacheExtent.pixels(6000),
+                  slivers: [
+                    SliverPadding(
+                      padding: pagePadding(MediaQuery.sizeOf(context).width),
+                      sliver: SliverMainAxisGroup(
+                        slivers: [
+                          if (day != null)
+                            SliverToBoxAdapter(
+                              child: _DayCard(
+                                day: day,
+                                money: money,
+                                canWrite: canWrite,
+                                canFinalize: canFinalize,
+                                online: online,
+                                book: book,
+                              ),
+                            ),
+                          if (empty)
+                            const SliverToBoxAdapter(
+                              child: EmptyPane(
+                                key: Key('purchases-empty'),
+                                message: AppStrings.emptyPurchases,
+                              ),
+                            ),
+                          if (entries.isNotEmpty || draft != null)
+                            _PurchaseGrid(
+                              entries: entries,
+                              money: money,
+                              book: book,
+                              openDay: day,
+                              canWrite: canWrite,
+                              canFinalize: canFinalize,
+                              online: online,
+                            ),
+                          SliverToBoxAdapter(
+                            child: _OlderPurchasesBar(controls: controls),
                           ),
-                        if (empty)
-                          const EmptyPane(
-                            key: Key('purchases-empty'),
-                            message: AppStrings.emptyPurchases,
+                          // registerTotals cover the whole merchant register.
+                          // Later pages are not added into this figure.
+                          SliverToBoxAdapter(
+                            child: _RegisterTotals(
+                              totals: data.registerTotals,
+                              money: money,
+                            ),
                           ),
-                        if (entries.isNotEmpty || draft != null)
-                          _PurchaseGrid(
-                            entries: entries,
-                            money: money,
-                            book: book,
-                            openDay: day,
-                            canWrite: canWrite,
-                            online: online,
-                          ),
-                        _OlderPurchasesBar(controls: controls),
-                        _OpeningCard(
-                          book: book,
-                          day: day,
-                          money: money,
-                          canWrite: canWrite,
-                          online: online,
-                        ),
-                        // registerTotals cover the whole merchant register.
-                        // Later pages are not added into this figure.
-                        _RegisterTotals(
-                          totals: data.registerTotals,
-                          money: money,
-                        ),
-                      ],
-                    );
-                  },
+                        ],
+                      ),
+                    ),
+                  ],
                 );
               },
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -165,7 +166,6 @@ abstract final class _PText {
   static const remaining = 'الباقي';
 }
 
-Color _red(BuildContext c) => c.statusColors.debtText;
 Color _green(BuildContext c) => c.statusColors.creditText;
 Color _amber(BuildContext c) => Theme.of(c).brightness == Brightness.dark
     ? const Color(0xFFFBBF24)
@@ -415,37 +415,77 @@ class _RegisterTotals extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     String f(MoneyValue? v, Currency c) => money.formatOrDash(v, c);
-    return SectionCard(
+    final remaining = totals?.remainingUnits?.asInt;
+    final remainingGloss = remaining == null || remaining == 0
+        ? websiteLedgerSlate
+        : remaining > 0
+        ? websiteLedgerRed
+        : websiteLedgerGreen;
+    return DecoratedBox(
       key: const Key('purchases-lifetime'),
-      title: _PText.lifetime,
-      child: PairGrid(
-        children: [
-          EdgeSummary(
-            title: _PText.lifeResult,
-            value: f(totals?.resultUnits, Currency.lyd),
-            edge: sectionGold(context),
-          ),
-          EdgeSummary(
-            title: _PText.lifePaid,
-            value: f(totals?.paidUnits, Currency.lyd),
-            edge: _green(context),
-          ),
-          EdgeSummary(
-            title: _PText.lifeRemaining,
-            value: f(totals?.remainingUnits, Currency.lyd),
-            edge: _red(context),
-          ),
-          EdgeSummary(
-            title: _PText.lifeVodafone,
-            value: f(totals?.vodafoneConsumedUnits, vodafoneCurrency),
-            edge: _amber(context),
-          ),
-          EdgeSummary(
-            title: AppStrings.vodafoneRemaining,
-            value: f(totals?.vodafoneRemainingUnits, vodafoneCurrency),
-            edge: _green(context),
-          ),
-        ],
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE7AE12), width: 1.4),
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF141414)
+            : const Color(0xFFFFFBF0),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              _PText.lifetime,
+              textAlign: TextAlign.center,
+              style: cairo(14, 800, color: const Color(0xFFE7AE12)),
+            ),
+            const SizedBox(height: 8),
+            DecoratedBox(
+              decoration: remainingGloss.decoration(BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  children: [
+                    Text(
+                      _PText.lifeRemaining,
+                      style: cairo(12, 700, color: remainingGloss.ink),
+                    ),
+                    Text(
+                      f(totals?.remainingUnits, Currency.lyd),
+                      style: cairo(20, 800, color: remainingGloss.amount),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            PairGrid(
+              children: [
+                EdgeSummary(
+                  title: _PText.lifeResult,
+                  value: f(totals?.resultUnits, Currency.lyd),
+                  edge: sectionGold(context),
+                ),
+                EdgeSummary(
+                  title: _PText.lifePaid,
+                  value: f(totals?.paidUnits, Currency.lyd),
+                  edge: _green(context),
+                ),
+                EdgeSummary(
+                  title: _PText.lifeVodafone,
+                  value: f(totals?.vodafoneConsumedUnits, vodafoneCurrency),
+                  edge: _amber(context),
+                ),
+                EdgeSummary(
+                  title: AppStrings.vodafoneRemaining,
+                  value: f(totals?.vodafoneRemainingUnits, vodafoneCurrency),
+                  edge: _green(context),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -568,7 +608,11 @@ class _DayCard extends ConsumerWidget {
           runSpacing: AppSpacing.xs,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            _CorrectionStatus(day: label, open: correctionOpen),
+            _CorrectionStatus(
+              day: label,
+              status: day.status,
+              open: correctionOpen,
+            ),
             if (canFinalize && day.status == 'finalized' && !correctionOpen)
               GuardedMutation(
                 buttonKey: Key('open-correction-$label'),
@@ -1148,193 +1192,33 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
   }
 }
 
-/// Opening is a write on an open day that has a version. A missing day, a
-/// day with no version, or a finalized day whose correction is closed, does
-/// not offer the button.
-bool _openingWritable(PurchaseDayDto? day) {
-  if (day == null || day.version == null) return false;
-  return day.status == 'draft' || day.correctionOpen;
-}
-
-class _OpeningCard extends StatelessWidget {
-  const _OpeningCard({
-    required this.book,
+class _CorrectionStatus extends StatelessWidget {
+  const _CorrectionStatus({
     required this.day,
-    required this.money,
-    required this.canWrite,
-    required this.online,
+    required this.status,
+    required this.open,
   });
 
-  final PurchaseBook book;
-  final PurchaseDayDto? day;
-  final MoneyFormatter money;
-  final bool canWrite;
-  final bool online;
-
-  @override
-  Widget build(BuildContext context) {
-    return SectionCard(
-      key: const Key('opening-card'),
-      title: AppStrings.purchaseOpening,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          FigureBox(
-            rows: [
-              FigureRow(
-                label: AppStrings.previousDebt,
-                value: money.formatOrDash(day?.previousDebtUnits, Currency.lyd),
-              ),
-              FigureRow(
-                label: AppStrings.previousVodafone,
-                value: money.formatOrDash(
-                  day?.previousVodafoneUnits,
-                  vodafoneCurrency,
-                ),
-                last: true,
-              ),
-            ],
-          ),
-          if (canWrite && _openingWritable(day)) ...[
-            const SizedBox(height: AppSpacing.sm),
-            GatedButton(
-              buttonKey: const Key('set-opening'),
-              allowed: true,
-              online: online,
-              label: AppStrings.purchaseOpening,
-              onPressed: () => showAppForm<void>(
-                context,
-                _OpeningForm(book: book, day: day),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _OpeningForm extends ConsumerStatefulWidget {
-  const _OpeningForm({required this.book, required this.day});
-
-  final PurchaseBook book;
-  final PurchaseDayDto? day;
-
-  @override
-  ConsumerState<_OpeningForm> createState() => _OpeningFormState();
-}
-
-class _OpeningFormState extends ConsumerState<_OpeningForm> {
-  final _debt = TextEditingController();
-  final _vodafone = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    final debt = widget.day?.previousDebtUnits;
-    final vodafone = widget.day?.previousVodafoneUnits;
-    if (debt != null && debt.isValid) _debt.text = '${debt.units}';
-    if (vodafone != null && vodafone.isValid) {
-      _vodafone.text = '${vodafone.units}';
-    }
-    for (final controller in [_debt, _vodafone]) {
-      controller.addListener(_changed);
-    }
-  }
-
-  void _changed() => setState(() {});
-
-  @override
-  void dispose() {
-    for (final controller in [_debt, _vodafone]) {
-      controller.removeListener(_changed);
-      controller.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final debt = parseUnits(_debt.text);
-    final vodafone = parseUnits(_vodafone.text);
-    final valid = debt != null && vodafone != null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          AppStrings.purchaseOpening,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const Text(AppStrings.noPreview),
-        const SizedBox(height: AppSpacing.md),
-        UnitsField(
-          key: const Key('opening-debt'),
-          controller: _debt,
-          label: AppStrings.previousDebt,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        UnitsField(
-          key: const Key('opening-vodafone'),
-          controller: _vodafone,
-          label: AppStrings.previousVodafone,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        GuardedMutation(
-          buttonKey: const Key('save-opening'),
-          inputs: '${_debt.text}|${_vodafone.text}|${widget.day?.version}',
-          expectedVersion: widget.day?.version,
-          label: AppStrings.saveOpening,
-          confirmText: valid ? AppStrings.openingConfirm : null,
-          normalizedValue: valid ? '$debt · $vodafone' : null,
-          onVersionConflict: () => ref.invalidate(purchasesProvider),
-          onSubmit: (meta) => _submit(meta, debt, vodafone),
-        ),
-      ],
-    );
-  }
-
-  Future<String?> _submit(MutationMeta meta, int? debt, int? vodafone) async {
-    if (debt == null || vodafone == null) return AppStrings.integerOnly;
-    final ack = await ref
-        .read(apiLayerProvider)
-        .purchases
-        .setOpening(
-          widget.book,
-          previousDebtUnits: debt,
-          previousVodafoneUnits: vodafone,
-          meta: meta,
-        );
-    if (!mounted) return null;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-    );
-    ref.invalidate(purchasesProvider);
-    // The confirm dialog is the top route. Close this form after it pops.
-    final navigator = Navigator.of(context);
-    final formRoute = ModalRoute.of(context);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (formRoute != null && formRoute.isActive) {
-        navigator.removeRoute(formRoute);
-      }
-    });
-    return null;
-  }
-}
-
-class _CorrectionStatus extends StatelessWidget {
-  const _CorrectionStatus({required this.day, required this.open});
-
   final String day;
+  final String? status;
   final bool open;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.statusColors;
-    final background = open ? colors.chipReviewBg : colors.chipNormalBg;
-    final foreground = open ? colors.chipReviewFg : colors.chipNormalFg;
-    final label = open
-        ? AppStrings.correctionOpen
-        : AppStrings.correctionClosed;
+    final carried = status == 'finalized' && !open;
+    final editing = open;
+    final background = editing ? colors.chipReviewBg : colors.chipNormalBg;
+    final foreground = editing ? colors.chipReviewFg : colors.chipNormalFg;
+    // «التصحيح مغلق» was the app's name for a finalized day whose
+    // correction session is shut. The website says «مُرحّل» for that,
+    // «اليوم الحالي» while the day is still a draft, and «مفتوح للتعديل»
+    // after «تعديل اليوم».
+    final label = editing
+        ? AppStrings.purchaseEditing
+        : carried
+        ? AppStrings.purchaseCarried
+        : AppStrings.purchaseToday;
     return Container(
       key: Key('correction-status-$day'),
       padding: const EdgeInsetsDirectional.symmetric(
@@ -1485,12 +1369,22 @@ class _LedgerBreakLine extends _LedgerLine {
     required this.dayId,
     required this.closing,
     required this.nextDate,
+    required this.dayNumber,
+    required this.closedDate,
+    required this.dayStatus,
+    required this.correctionOpen,
+    required this.dayVersion,
   });
   final String dayId;
   final MoneyValue? closing;
 
   /// `businessDate` of the first row of the following day. Not today's clock.
   final String? nextDate;
+  final int? dayNumber;
+  final String? closedDate;
+  final String? dayStatus;
+  final bool correctionOpen;
+  final int? dayVersion;
 }
 
 /// A visual break before the next day, using that closed day's
@@ -1507,6 +1401,11 @@ List<_LedgerLine> _ledgerLines(List<PurchaseEntryDto> entries) {
           dayId: closed.dayId ?? 'unknown-$i',
           closing: closed.dayClosingDebtUnits,
           nextDate: entry.businessDate,
+          dayNumber: closed.dayNumber,
+          closedDate: closed.businessDate,
+          dayStatus: closed.dayStatus,
+          correctionOpen: closed.correctionOpen,
+          dayVersion: closed.dayVersion,
         ),
       );
     }
@@ -1522,6 +1421,7 @@ class _PurchaseGrid extends ConsumerWidget {
     required this.book,
     required this.openDay,
     required this.canWrite,
+    required this.canFinalize,
     required this.online,
   });
 
@@ -1530,13 +1430,18 @@ class _PurchaseGrid extends ConsumerWidget {
   final PurchaseBook book;
   final PurchaseDayDto? openDay;
   final bool canWrite;
+  final bool canFinalize;
   final bool online;
 
+  /// A draft row on the open day can be edited. A carried day
+  /// («مُرحّل») can be edited only after «تعديل اليوم» sets
+  /// `correctionOpen` on that day, which is the website's rule.
   bool _writable(PurchaseEntryDto entry) {
-    final day = openDay;
-    if (!canWrite || day == null) return false;
-    final editable = day.status == 'draft' || day.correctionOpen;
-    return editable && entry.dayId == day.id && entry.dayVersion != null;
+    if (!canWrite || entry.dayVersion == null) return false;
+    if (entry.dayStatus == 'draft') {
+      return entry.dayId != null && entry.dayId == openDay?.id;
+    }
+    return entry.dayStatus == 'finalized' && entry.correctionOpen;
   }
 
   @override
@@ -1673,7 +1578,16 @@ class _PurchaseGrid extends ConsumerWidget {
 
     for (final line in lines) {
       switch (line) {
-        case _LedgerBreakLine(:final dayId, :final closing, :final nextDate):
+        case _LedgerBreakLine(
+          :final dayId,
+          :final closing,
+          :final nextDate,
+          :final dayNumber,
+          :final closedDate,
+          :final dayStatus,
+          :final correctionOpen,
+          :final dayVersion,
+        ):
           final tableWidth =
               _ledgerCols.fold<double>(0, (sum, col) => sum + col.$2 * scale) +
               actionW;
@@ -1693,36 +1607,98 @@ class _PurchaseGrid extends ConsumerWidget {
                   ),
                 ),
                 child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 12, 8),
+                  padding: const EdgeInsetsDirectional.fromSTEB(12, 10, 12, 10),
                   child: Row(
                     textDirection: TextDirection.rtl,
                     children: [
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            nextDate ?? AppStrings.dash,
-                            style: cairo(16, 800, color: breakInk),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'يوم #${dayNumber ?? '—'}',
+                              style: cairo(13, 800, color: breakInk),
+                            ),
+                            Text(
+                              closedDate ?? AppStrings.dash,
+                              style: cairo(12, 700, color: breakInk),
+                            ),
+                            Text(
+                              nextDate ?? AppStrings.dash,
+                              style: cairo(12, 700, color: breakInk),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF111111),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: sectionButtonGold),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsetsDirectional.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
                           ),
-                          const SizedBox(height: 2),
-                          Row(
+                          child: Column(
                             mainAxisSize: MainAxisSize.min,
-                            textDirection: TextDirection.rtl,
                             children: [
                               Text(
                                 _PText.lastRemaining,
-                                style: cairo(12, 700, color: breakInk),
+                                style: cairo(11, 700, color: sectionButtonGold),
                               ),
-                              const SizedBox(width: 8),
                               MoneyText(
                                 money.formatOrDash(closing, Currency.lyd),
-                                style: figure.copyWith(color: breakInk),
+                                style: figure.copyWith(
+                                  color: const Color(0xFFFFF8CC),
+                                  fontSize: 16,
+                                ),
                               ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
+                      if (canFinalize &&
+                          dayStatus == 'finalized' &&
+                          dayVersion != null) ...[
+                        const SizedBox(width: 8),
+                        GuardedMutation(
+                          buttonKey: Key('day-correction-$dayId'),
+                          inputs:
+                              'day-correction:$dayId:$correctionOpen:$dayVersion',
+                          expectedVersion: dayVersion,
+                          label: correctionOpen
+                              ? AppStrings.closeDayCorrection
+                              : AppStrings.openDayCorrection,
+                          onVersionConflict: () =>
+                              ref.invalidate(purchasesProvider),
+                          onSubmit: (meta) async {
+                            final ack = await ref
+                                .read(apiLayerProvider)
+                                .purchases
+                                .setDayCorrection(
+                                  book,
+                                  dayId,
+                                  open: !correctionOpen,
+                                  meta: meta,
+                                );
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${AppStrings.serverReply} ${ack.id ?? ''}',
+                                  ),
+                                ),
+                              );
+                            }
+                            ref.invalidate(purchasesProvider);
+                            return null;
+                          },
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1825,33 +1801,133 @@ class _PurchaseGrid extends ConsumerWidget {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(
-        AppSpacing.sm,
-        AppSpacing.sm,
-        AppSpacing.sm,
-        AppSpacing.md,
-      ),
-      child: DecoratedBox(
-        key: const Key('purchase-ledger'),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadii.lg),
-          border: Border.all(color: gold, width: 1.4),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadii.lg),
-          child: SingleChildScrollView(
-            key: const Key('purchase-ledger-scroll'),
-            scrollDirection: Axis.horizontal,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: scrollBands,
-            ),
-          ),
-        ),
+    return _LedgerScroller(
+      headerHeight: headerH,
+      gold: gold,
+      header: scrollBands.first,
+      rows: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: scrollBands.skip(1).toList(),
       ),
     );
   }
+}
+
+/// Column titles stay pinned while the page scrolls. The header and the
+/// rows share one horizontal offset.
+class _LedgerScroller extends StatefulWidget {
+  const _LedgerScroller({
+    required this.headerHeight,
+    required this.gold,
+    required this.header,
+    required this.rows,
+  });
+
+  final double headerHeight;
+  final Color gold;
+  final Widget header;
+  final Widget rows;
+
+  @override
+  State<_LedgerScroller> createState() => _LedgerScrollerState();
+}
+
+class _LedgerScrollerState extends State<_LedgerScroller> {
+  final _head = ScrollController();
+  final _body = ScrollController();
+  var _syncing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _body.addListener(() => _copy(_body, _head));
+    _head.addListener(() => _copy(_head, _body));
+  }
+
+  void _copy(ScrollController from, ScrollController to) {
+    if (_syncing || !from.hasClients || !to.hasClients) return;
+    final target = from.offset.clamp(0.0, to.position.maxScrollExtent);
+    if ((to.offset - target).abs() < 0.5) return;
+    _syncing = true;
+    to.jumpTo(target);
+    _syncing = false;
+  }
+
+  @override
+  void dispose() {
+    _head.dispose();
+    _body.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _FixedHead(
+            height: widget.headerHeight,
+            child: DecoratedBox(
+              key: const Key('purchase-ledger'),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                border: Border(
+                  top: BorderSide(color: widget.gold, width: 1.4),
+                  left: BorderSide(color: widget.gold, width: 1.4),
+                  right: BorderSide(color: widget.gold, width: 1.4),
+                ),
+              ),
+              child: SingleChildScrollView(
+                controller: _head,
+                scrollDirection: Axis.horizontal,
+                child: widget.header,
+              ),
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border.all(color: widget.gold, width: 1.4),
+            ),
+            child: SingleChildScrollView(
+              key: const Key('purchase-ledger-scroll'),
+              controller: _body,
+              scrollDirection: Axis.horizontal,
+              child: widget.rows,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FixedHead extends SliverPersistentHeaderDelegate {
+  _FixedHead({required this.height, required this.child});
+
+  final double height;
+  final Widget child;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return SizedBox(height: height, child: child);
+  }
+
+  @override
+  bool shouldRebuild(covariant _FixedHead oldDelegate) =>
+      oldDelegate.height != height || oldDelegate.child != child;
 }
 
 Future<String?> _deleteEntry(
