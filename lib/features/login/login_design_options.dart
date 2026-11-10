@@ -67,45 +67,47 @@ class _SplitGold extends StatelessWidget {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: const Color(0xFF0B1020),
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            Container(
-              height: 180,
-              width: double.infinity,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                  colors: [Color(0xFF1E3A8A), Color(0xFF0B1020)],
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    AppStrings.brandMark,
-                    style: cairo(64, 800, color: const Color(0xFFF5C542)),
-                  ),
-                  Text(
-                    AppStrings.slogan,
-                    style: cairo(14, 600, color: const Color(0xFFE2E8F0)),
-                  ),
-                ],
+      child: Column(
+        children: [
+          Container(
+            height: 200,
+            width: double.infinity,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: [Color(0xFF1E3A8A), Color(0xFF0B1020)],
               ),
             ),
-            Container(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  AppStrings.brandMark,
+                  style: cairo(64, 800, color: const Color(0xFFF5C542)),
+                ),
+                Text(
+                  AppStrings.slogan,
+                  style: cairo(14, 600, color: const Color(0xFFE2E8F0)),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(24),
               decoration: const BoxDecoration(
                 color: Color(0xFFFFFBF0),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
               ),
-              child: const _Fields(),
+              child: const SingleChildScrollView(
+                padding: EdgeInsets.all(24),
+                child: _Fields(),
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
