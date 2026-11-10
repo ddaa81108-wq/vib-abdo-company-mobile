@@ -1593,8 +1593,15 @@ class _AssignmentCard extends ConsumerWidget {
       key: Key('assignment-${assignment.id}'),
       decoration: BoxDecoration(
         gradient: gloss.fill,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: gloss.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x99E7AE12),
+            blurRadius: 0,
+            offset: Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1619,19 +1626,11 @@ class _AssignmentCard extends ConsumerWidget {
                       ),
                     ),
                     if ((assignment.assigneeName ?? '').isNotEmpty)
-                      Container(
-                        margin: const EdgeInsetsDirectional.only(start: 4),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(start: 6),
                         child: Text(
                           assignment.assigneeName!,
-                          style: cairo(9, 800, color: gloss.ink),
+                          style: cairo(10, 600, color: gloss.ink),
                         ),
                       ),
                   ],
@@ -1660,9 +1659,10 @@ class _AssignmentCard extends ConsumerWidget {
                         style: cairo(10, 800, color: gloss.ink),
                       ),
                     ),
-                    if (assignment.cashOutstandingCount > 0)
+                    if (history.isNotEmpty ||
+                        assignment.cashOutstandingCount > 0)
                       Text(
-                        '${assignment.cashOutstandingCount} استلام',
+                        '${history.isNotEmpty ? history.length : assignment.cashOutstandingCount} استلام',
                         style: cairo(10, 800, color: gloss.ink),
                       ),
                   ],
@@ -1676,46 +1676,48 @@ class _AssignmentCard extends ConsumerWidget {
               ],
             ),
           ),
+          const Divider(height: 1, thickness: 1, color: Color(0x66FFFFFF)),
           Material(
             color: Colors.transparent,
             child: Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              initiallyExpanded:
-                  !admin ||
-                  history.any(
-                    (item) => item.status == 'pending' || item.awaitingCash,
-                  ),
-              tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-              childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-              iconColor: gloss.ink,
-              collapsedIconColor: gloss.ink,
-              title: Text(
-                '◂ تفاصيل الاستلامات',
-                textAlign: TextAlign.center,
-                style: cairo(11, 800, color: gloss.ink),
+              data: Theme.of(context)
+                  .copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                initiallyExpanded:
+                    !admin ||
+                    history.any(
+                      (item) => item.status == 'pending' || item.awaitingCash,
+                    ),
+                tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+                childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                iconColor: gloss.ink,
+                collapsedIconColor: gloss.ink,
+                title: Text(
+                  '◂ تفاصيل الاستلامات',
+                  textAlign: TextAlign.center,
+                  style: cairo(11, 800, color: gloss.ink),
+                ),
+                children: [
+                  if (history.isEmpty && admin)
+                    Text(
+                      CollectionsText.noHistory,
+                      style: cairo(11, 600, color: gloss.ink),
+                    ),
+                  for (final item in history)
+                    _SubmissionLine(
+                      submission: item,
+                      title: item.mode == 'full'
+                          ? CollectionsText.fullReceipt
+                          : CollectionsText.partialReceiptN(++partial),
+                      money: money,
+                      gloss: gloss,
+                      admin: admin,
+                    ),
+                  if (!admin)
+                    _EmployeeActions(assignment: assignment, money: money),
+                ],
               ),
-              children: [
-                if (history.isEmpty && admin)
-                  Text(
-                    CollectionsText.noHistory,
-                    style: cairo(11, 600, color: gloss.ink),
-                  ),
-                for (final item in history)
-                  _SubmissionLine(
-                    submission: item,
-                    title: item.mode == 'full'
-                        ? CollectionsText.fullReceipt
-                        : CollectionsText.partialReceiptN(++partial),
-                    money: money,
-                    gloss: gloss,
-                    admin: admin,
-                  ),
-                if (!admin)
-                  _EmployeeActions(assignment: assignment, money: money),
-              ],
             ),
-          ),
           ),
         ],
       ),
