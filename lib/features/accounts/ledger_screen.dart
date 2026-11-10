@@ -23,6 +23,7 @@ import 'company_card_tone.dart';
 import 'customer_card_tone.dart';
 import 'edit_account_card_screen.dart';
 import 'ledger_running_balance.dart';
+import 'website_ledger_tone.dart';
 import 'overpayment_warning.dart';
 import 'transaction_correction_form.dart';
 
@@ -1294,6 +1295,57 @@ class _Header extends StatelessWidget {
     final shownBalance = awaitingServerBalance
         ? ackBalance
         : value.balanceUnits;
+    if (section == AccountSection.libyanDeposits ||
+        section == AccountSection.egyptianDeposits) {
+      final units = shownBalance?.asInt;
+      final gloss = websiteLedgerGloss(section, units);
+      final radius = BorderRadius.circular(AppRadii.card);
+      final text = units == null
+          ? money.formatOrDash(shownBalance, value.currency)
+          : money.format(units.abs(), value.currency);
+      return Material(
+        key: const Key('ledger-header'),
+        type: MaterialType.transparency,
+        child: Ink(
+          decoration: gloss
+              .decoration(radius)
+              .copyWith(boxShadow: gloss.glowShadow),
+          child: GlossSheen(
+            gloss: gloss,
+            radius: radius,
+            child: Padding(
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    depositCardLabel(section, units),
+                    key: const Key('ledger-total-heading'),
+                    textAlign: TextAlign.center,
+                    style: cairo(13, 800, color: gloss.ink),
+                  ),
+                  MoneyText(
+                    text,
+                    key: const Key('ledger-header-balance'),
+                    style: context.textExtras.amountLarge.copyWith(
+                      color: gloss.amount,
+                    ),
+                  ),
+                  if (units == 0)
+                    Text(
+                      'الحساب مسدّد',
+                      key: const Key('ledger-header-kind'),
+                      style: cairo(12, 800, color: gloss.ink),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     final balanceColor = foreground;
     // Customers: the word comes from the sign of the server balance. أمانة
     // shows the figure without its minus sign (Ali, 2026-11-03). Display
@@ -1440,7 +1492,6 @@ class _TotalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final look = context.look;
     final shown = awaitingServerBalance ? ackBalance : card.balanceUnits;
     final Gloss gloss;
     final String? word;
@@ -1448,12 +1499,9 @@ class _TotalCard extends StatelessWidget {
     final bool credit;
     if (section == AccountSection.companies) {
       final kind = companyLedgerKind(shown);
-      gloss = switch (kind) {
-        CompanyLedgerKind.debt => look.glossDebt,
-        CompanyLedgerKind.credit => look.glossCredit,
-        CompanyLedgerKind.zero => look.glossZero,
-        CompanyLedgerKind.unknown => look.glossGrey,
-      };
+      // Customers, companies, and Libyan deposits share the website's gold
+      // total. The word still follows the balance sign.
+      gloss = websiteLedgerGold;
       word = switch (kind) {
         CompanyLedgerKind.debt => AppStrings.customerDebtWord,
         CompanyLedgerKind.credit => AppStrings.customerCreditWord,
@@ -1464,12 +1512,7 @@ class _TotalCard extends StatelessWidget {
       credit = kind == CompanyLedgerKind.credit;
     } else {
       final kind = customerBalanceKind(shown);
-      gloss = switch (kind) {
-        CustomerBalanceKind.debt => look.glossDebt,
-        CustomerBalanceKind.credit => look.glossCredit,
-        CustomerBalanceKind.zero => look.glossZero,
-        CustomerBalanceKind.unknown => look.glossGrey,
-      };
+      gloss = websiteLedgerGold;
       word = switch (kind) {
         CustomerBalanceKind.debt => AppStrings.customerDebtWord,
         CustomerBalanceKind.credit => AppStrings.customerCreditWord,

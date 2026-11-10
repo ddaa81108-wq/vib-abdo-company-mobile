@@ -4,6 +4,7 @@ import 'package:flutter_api_layer/data/fake/fake_large_catalog.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/features/accounts/website_ledger_tone.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/state/theme_controller.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
@@ -180,12 +181,7 @@ void main() {
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/customers/c_55');
       final card = find.byKey(const Key('ledger-header'));
-      final look = tester.element(card).look;
-      final gloss = switch (units) {
-        > 0 => look.glossDebt,
-        < 0 => look.glossCredit,
-        _ => look.glossZero,
-      };
+      const gloss = websiteLedgerGold;
       final ink = tester.widget<Ink>(
         find.descendant(of: card, matching: find.byType(Ink)).first,
       );
