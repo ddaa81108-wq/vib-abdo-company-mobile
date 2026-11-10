@@ -547,165 +547,189 @@ class _DayCard extends ConsumerWidget {
       end: Alignment.bottomCenter,
       colors: [Color(0xFF3F3F46), Color(0xFF18181B), Color(0xFF09090B)],
     );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: const Color(0xFF141414),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _frameGold(context), width: 1.4),
-          ),
-          child: Padding(
-            key: Key('purchase-day-$label'),
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _bookPills(context, ref),
-                if (showAdd || showFinalize) ...[
-                  SizedBox(height: gap),
-                  Row(
-                    textDirection: TextDirection.rtl,
-                    children: [
-                      Expanded(
-                        child: showAdd
-                            ? _goldAdd(
-                                context,
-                                GatedButton(
-                                  buttonKey: ValueKey('add-purchase-$label'),
-                                  allowed: true,
-                                  online: online,
-                                  leading: Icons.add,
-                                  label: _PText.addDeal,
-                                  onPressed: () =>
-                                      ref
-                                              .read(
-                                                _ledgerDraftProvider.notifier,
-                                              )
-                                              .state =
-                                          const _LedgerDraft(),
-                                ),
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                      SizedBox(width: gap),
-                      Expanded(
-                        child: showFinalize
-                            ? _greenFinalize(
-                                context,
-                                GuardedMutation(
-                                  buttonKey: ValueKey('finalize-day-$label'),
-                                  inputs: 'finalize:$label:${day.version}',
-                                  expectedVersion: day.version,
-                                  leading: Icons.check_circle_outline,
-                                  label: AppStrings.finalizeDay,
-                                  confirmText: AppStrings.finalizeConfirm,
-                                  onSubmit: (meta) =>
-                                      _finalize(context, ref, meta),
-                                ),
-                              )
-                            : const SizedBox.shrink(),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF14532D),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE7AE12), width: 1.6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Text(
+                'يوم #$label',
+                style: cairo(13, 800, color: const Color(0xFFF6E7A8)),
+              ),
+            ),
+            SizedBox(height: gap),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F3D24),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _frameGold(context), width: 1.2),
+              ),
+              child: Padding(
+                key: Key('purchase-day-$label'),
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _bookPills(context, ref),
+                    if (showAdd || showFinalize) ...[
+                      SizedBox(height: gap),
+                      Row(
+                        textDirection: TextDirection.rtl,
+                        children: [
+                          Expanded(
+                            child: showAdd
+                                ? _goldAdd(
+                                    context,
+                                    GatedButton(
+                                      buttonKey: ValueKey(
+                                        'add-purchase-$label',
+                                      ),
+                                      allowed: true,
+                                      online: online,
+                                      leading: Icons.add,
+                                      label: _PText.addDeal,
+                                      onPressed: () =>
+                                          ref
+                                                  .read(
+                                                    _ledgerDraftProvider
+                                                        .notifier,
+                                                  )
+                                                  .state =
+                                              const _LedgerDraft(),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                          SizedBox(width: gap),
+                          Expanded(
+                            child: showFinalize
+                                ? _greenFinalize(
+                                    context,
+                                    GuardedMutation(
+                                      buttonKey: ValueKey(
+                                        'finalize-day-$label',
+                                      ),
+                                      inputs: 'finalize:$label:${day.version}',
+                                      expectedVersion: day.version,
+                                      leading: Icons.check_circle_outline,
+                                      label: AppStrings.finalizeDay,
+                                      confirmText: AppStrings.finalizeConfirm,
+                                      onSubmit: (meta) =>
+                                          _finalize(context, ref, meta),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ],
                       ),
                     ],
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: gap),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _CorrectionStatus(
+                  day: label,
+                  status: day.status,
+                  open: correctionOpen,
+                ),
+                if (canFinalize && day.status == 'finalized' && !correctionOpen)
+                  GuardedMutation(
+                    buttonKey: Key('open-correction-$label'),
+                    inputs: 'open-correction:$label:${day.version}',
+                    expectedVersion: day.version,
+                    label: AppStrings.openDayCorrection,
+                    confirmText: AppStrings.openCorrectionConfirm,
+                    onVersionConflict: () => ref.invalidate(purchasesProvider),
+                    onSubmit: (meta) =>
+                        _correct(context, ref, meta, open: true),
                   ),
-                ],
+                if (canFinalize && correctionOpen)
+                  GuardedMutation(
+                    buttonKey: Key('close-correction-$label'),
+                    inputs: 'close-correction:$label:${day.version}',
+                    expectedVersion: day.version,
+                    label: AppStrings.closeDayCorrection,
+                    confirmText: AppStrings.closeCorrectionConfirm,
+                    onVersionConflict: () => ref.invalidate(purchasesProvider),
+                    onSubmit: (meta) =>
+                        _correct(context, ref, meta, open: false),
+                  ),
               ],
             ),
-          ),
-        ),
-        SizedBox(height: gap),
-        Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.xs,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            _CorrectionStatus(
-              day: label,
-              status: day.status,
-              open: correctionOpen,
+            SizedBox(height: gap),
+            _totalPair(
+              gap: gap,
+              height: cardH,
+              right: _TotalTile(
+                tileKey: const Key('purchase-total-previous'),
+                label: _PText.previousValue,
+                value: f(day.previousDebtUnits, Currency.lyd),
+                gradient: coral,
+                ink: white,
+                border: Colors.white.withValues(alpha: 0.45),
+                radius: radius,
+              ),
+              left: _TotalTile(
+                tileKey: const Key('purchase-total-work'),
+                label: _PText.workToday,
+                value: f(day.todayResultUnits, Currency.lyd),
+                gradient: glossBlack,
+                ink: paleGold,
+                border: const Color(0xFFF5C02E),
+                radius: radius,
+              ),
             ),
-            if (canFinalize && day.status == 'finalized' && !correctionOpen)
-              GuardedMutation(
-                buttonKey: Key('open-correction-$label'),
-                inputs: 'open-correction:$label:${day.version}',
-                expectedVersion: day.version,
-                label: AppStrings.openDayCorrection,
-                confirmText: AppStrings.openCorrectionConfirm,
-                onVersionConflict: () => ref.invalidate(purchasesProvider),
-                onSubmit: (meta) => _correct(context, ref, meta, open: true),
+            SizedBox(height: gap),
+            _totalPair(
+              gap: gap,
+              height: cardH,
+              right: _TotalTile(
+                tileKey: const Key('purchase-total-paid'),
+                label: _PText.paidTotal,
+                value: f(day.todayPaidUnits, Currency.lyd),
+                gradient: glossBlack,
+                ink: paleGold,
+                border: const Color(0xFFF5C02E),
+                radius: radius,
               ),
-            if (canFinalize && correctionOpen)
-              GuardedMutation(
-                buttonKey: Key('close-correction-$label'),
-                inputs: 'close-correction:$label:${day.version}',
-                expectedVersion: day.version,
-                label: AppStrings.closeDayCorrection,
-                confirmText: AppStrings.closeCorrectionConfirm,
-                onVersionConflict: () => ref.invalidate(purchasesProvider),
-                onSubmit: (meta) => _correct(context, ref, meta, open: false),
+              left: _TotalTile(
+                tileKey: const Key('purchase-total-debt'),
+                label: AppStrings.totalDebt,
+                value: f(day.totalDebtUnits, Currency.lyd),
+                gradient: coral,
+                ink: white,
+                border: Colors.white.withValues(alpha: 0.45),
+                radius: radius,
               ),
+            ),
+            SizedBox(height: gap),
+            _TotalTile(
+              tileKey: const Key('purchase-vodafone-ours'),
+              label: _PText.vodafoneOurs,
+              value: f(day.vodafoneRemainingUnits, vodafoneCurrency),
+              fill: const Color(0xFFF3F7E8),
+              ink: const Color(0xFF166534),
+              border: const Color(0xFF86EFAC),
+              radius: radius,
+              note: owed ? caption : null,
+              height: cardH + 8,
+            ),
           ],
         ),
-        SizedBox(height: gap),
-        _totalPair(
-          gap: gap,
-          height: cardH,
-          right: _TotalTile(
-            tileKey: const Key('purchase-total-previous'),
-            label: _PText.previousValue,
-            value: f(day.previousDebtUnits, Currency.lyd),
-            gradient: coral,
-            ink: white,
-            border: Colors.white.withValues(alpha: 0.45),
-            radius: radius,
-          ),
-          left: _TotalTile(
-            tileKey: const Key('purchase-total-work'),
-            label: _PText.workToday,
-            value: f(day.todayResultUnits, Currency.lyd),
-            gradient: glossBlack,
-            ink: paleGold,
-            border: const Color(0xFFF5C02E),
-            radius: radius,
-          ),
-        ),
-        SizedBox(height: gap),
-        _totalPair(
-          gap: gap,
-          height: cardH,
-          right: _TotalTile(
-            tileKey: const Key('purchase-total-paid'),
-            label: _PText.paidTotal,
-            value: f(day.todayPaidUnits, Currency.lyd),
-            gradient: glossBlack,
-            ink: paleGold,
-            border: const Color(0xFFF5C02E),
-            radius: radius,
-          ),
-          left: _TotalTile(
-            tileKey: const Key('purchase-total-debt'),
-            label: AppStrings.totalDebt,
-            value: f(day.totalDebtUnits, Currency.lyd),
-            gradient: coral,
-            ink: white,
-            border: Colors.white.withValues(alpha: 0.45),
-            radius: radius,
-          ),
-        ),
-        SizedBox(height: gap),
-        _TotalTile(
-          tileKey: const Key('purchase-vodafone-ours'),
-          label: _PText.vodafoneOurs,
-          value: f(day.vodafoneRemainingUnits, vodafoneCurrency),
-          fill: const Color(0xFFF3F7E8),
-          ink: const Color(0xFF166534),
-          border: const Color(0xFF86EFAC),
-          radius: radius,
-          note: owed ? caption : null,
-          height: cardH + 8,
-        ),
-      ],
+      ),
     );
   }
 
@@ -1564,9 +1588,20 @@ class _PurchasePhoneCards extends ConsumerWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               alignment: WrapAlignment.spaceBetween,
               children: [
-                Text(
-                  money.formatOrDash(closing, Currency.lyd),
-                  style: cairo(16, 800, color: const Color(0xFF211600)),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6E7A8),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFFE7AE12)),
+                  ),
+                  child: Text(
+                    money.formatOrDash(closing, Currency.lyd),
+                    style: cairo(16, 800, color: const Color(0xFF211600)),
+                  ),
                 ),
                 Text(
                   'الباقي المرحّل من اليوم السابق',
@@ -1686,9 +1721,8 @@ class _PurchasePhoneCards extends ConsumerWidget {
                 IconButton(
                   key: Key('edit-${entry.id}'),
                   onPressed: online
-                      ? () =>
-                            ref.read(_ledgerDraftProvider.notifier).state =
-                                _LedgerDraft(entryId: entry.id)
+                      ? () => ref.read(_ledgerDraftProvider.notifier).state =
+                            _LedgerDraft(entryId: entry.id)
                       : null,
                   icon: const Icon(Icons.edit_outlined),
                 )
@@ -1727,7 +1761,11 @@ class _PurchasePhoneCards extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label, style: cairo(9, 700, color: const Color(0xFF78716C))),
-            FittedBox(fit: BoxFit.scaleDown, alignment: AlignmentDirectional.centerStart, child: value),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerStart,
+              child: value,
+            ),
           ],
         ),
       ),
