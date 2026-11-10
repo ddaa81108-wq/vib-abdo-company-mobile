@@ -137,12 +137,36 @@
 - يعتمد على: لا يغيّر عقد 001–011. يلمس التنسيق فوق 008 في بضع شاشات.
 - التراجع: `git revert b3777102eb2379785853ae41d2d6275434907a84`. afterward: `flutter test test/live_refresh_test.dart --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-013
+
+- الالتزام: `f11bbabd5d1fb32a6d441b8a447e149dfe1b4e2b`
+- العنوان: VIB-FIX-013: Speak new notifications when النطق is on.
+- العرض: الإشعارات «غير منطوقة». المفتاح في الحساب اسمه «النطق» ويحفظ `speechEnabled`. النص الظاهر كان مفتاح الإجراء مثل `collection.submit` لأن الخادم لا يرسل `title` ولا `body`.
+- السبب: الموقع عند `speechEnabled` ينطق `notificationSentence`، وعند `soundEnabled` يطلق نغمة قصيرة داخل الصفحة. قناة أندرويد `vib_collections_alerts` أصلًا `IMPORTANCE_HIGH` فشريط النظام له صوت. الشريط الداخلي كان صامتًا، والتطبيق لم يكن ينطق. الدليل يرجّح معنى النطق لا نصًا مشوّهًا وحده، والنص الخام أُصلح معه لأنه مصدر الجملة المنطوقة.
+- السلوك: جملة عربية من `actorName` و`action` و`details` كما في الموقع. إذا `speechEnabled` تُنطق بالعربية على الجهاز عبر `app/notification_speech`. إذا `soundEnabled` (الافتراض في الخادم) تُطلق نغمة. الخلفية توقف النطق. لا مسار جديد.
+- الدليل: `test/notification_sentence_test.dart`.
+- يعتمد على: لا يغيّر 012. القراءة من الحقول الموجودة في `GET /api/notifications`.
+- التراجع: `git revert f11bbabd5d1fb32a6d441b8a447e149dfe1b4e2b`. afterward: `flutter test test/notification_sentence_test.dart --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-014
+
+- الالتزام: `4108e09819282b614493e09504d6b4ad90377893` ثم `4fc1e00f707c67ea78964199d0b0d3df123362ca` لاختبار الشريط وقناة النطق الغائبة.
+- العنوان: VIB-FIX-014: Open the section named on a notification for the owner.
+- العرض: النقر على أي إشعار يفتح «القسم غير مصرح لهذا الحساب» والمدير الأساسي داخل الحساب.
+- السبب: صف `GET /api/notifications` يرسل `sectionKey` و`entityId` ولا يرسل `recipientUserId`. التطبيق كان يقرأ `section` و`relatedRef` فقط، ورفض نقرة الشريط واللافتة إذا غاب المستلم قبل أن يفحص القسم. المدير الأساسي (`isOwner` مع دور `admin`) لم يُعامل كدخول كامل إذا وُجدت قائمة صلاحيات جزئية، بينما الموقع يفتح له كل الأقسام.
+- السلوك: `sectionKey` يفتح القسم، ومع المعرّف يفتح الكارت. غياب المستلم يعني أن الصف لحساب الجلسة. مستلم آخر ما زال يُرفض. `isOwner` مع دور `admin` دخول كامل للأقسام. إنشاء الحسابات يبقى للمدير الأساسي. موظف بلا صلاحية القسم ما زال يُمنع.
+- الدليل: `test/notification_opener_test.dart` و`packages/api_layer/test/permission_service_test.dart`.
+- يعتمد على: يكمّل 013 في نموذج الإشعار. لا يوسّع صلاحيات الموظف.
+- التراجع: `git revert 4fc1e00f707c67ea78964199d0b0d3df123362ca` ثم `git revert 4108e09819282b614493e09504d6b4ad90377893`. afterward: `flutter test test/notification_opener_test.dart test/system_tray_navigation_test.dart packages/api_layer/test/permission_service_test.dart --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 تكرار تقديم التحصيل بعد ضياع الرد، وربط الأمانة المصرية، وتفعيل MFA، وقائمة الجلسات، وإغلاق المصراوية عند 04:00، وقفل الالتقاط. خادم مراجعة الأقسام الأربعة منشور على الإنتاج `https://vip2100.com` منذ 2026-11-09 (مستودع الموقع `64f33ffb3c61db38c78cbe520d90f79a6a3ba7f2`، schema 57).
 
-## فحص المجموعة بعد 011
+## فحص المجموعة بعد 014
 
-`flutter analyze` بلا ملاحظات للتطبيق و`packages/api_layer`، قبل 008 وبعد 011. `flutter test --exclude-tags screenshots --dart-define=USE_FAKE_API=true`: 810 نجحت، 8 تُركت، 0 فشلت، قبل التنسيق وبعده. حزمة `packages/api_layer` بأمر `flutter test --dart-define=USE_FAKE_API=true`: 545 نجحت، 14 تُركت، 0 فشلت، قبل التنسيق وبعده. الثمانية لقطات موقوفة في التطبيق. لم يُعد اختبار أندرويد لأن ملفات Kotlin وقناة `app/screen_security` لم تتغير. 10 نوفمبر 2026. خادم وهمي فقط، لا اتصال حي.
+قبل 012 على `4ecc7cf`: `flutter analyze` بلا ملاحظات. التطبيق `flutter test --exclude-tags screenshots --dart-define=USE_FAKE_API=true`: 810 نجحت، 8 تُركت، 0 فشلت. الحزمة `flutter test --dart-define=USE_FAKE_API=true`: 545 نجحت، 14 تُركت، 0 فشلت.
 
-سلوك 006 و007 يبقى كما هو. هذه الجولة تنسيق وحذف ملفين غير مستخدمين وتوثيق نشر الخادم وفحص تنسيق للقراءة فقط.
+بعد 014: `flutter analyze` بلا ملاحظات للتطبيق وللحزمة. `dart format --output=none --set-exit-if-changed` على `lib` و`test` و`packages/api_layer` يخرج 0. التطبيق: 816 نجحت، 8 تُركت، 0 فشلت. الحزمة: 545 نجحت، 14 تُركت، 0 فشلت. الزيادة ست اختبارات للإشارة وللنطق. 10 نوفمبر 2026. خادم وهمي فقط.
+
+لا تغيير في عقد الخادم. النطق والنغمة على الجهاز. إشارة التغيير من المسارات الموجودة.
