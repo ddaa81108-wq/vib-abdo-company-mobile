@@ -159,14 +159,38 @@
 - يعتمد على: يكمّل 013 في نموذج الإشعار. لا يوسّع صلاحيات الموظف.
 - التراجع: `git revert 4fc1e00f707c67ea78964199d0b0d3df123362ca` ثم `git revert 4108e09819282b614493e09504d6b4ad90377893`. afterward: `flutter test test/notification_opener_test.dart test/system_tray_navigation_test.dart packages/api_layer/test/permission_service_test.dart --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-015
+
+- الالتزام: `cd32d2d00bd949e151745f1aa344fffae74a445b`
+- العنوان: VIB-FIX-015: Play a sound for notifications on a new channel.
+- العرض: «غير منطوقة» تعني بلا صوت. القناة `vib_collections_alerts` إن أُنشئت بلا صوت لا تقبل تغيير الأهمية لاحقًا.
+- السبب: الموقع عند `soundEnabled` يطلق نغمة 760 هرتز لـ 200 مللي ثانية عند إشعار جديد، ولا يطلقها عند التحميل الأول. شريط أندرويد يحتاج قناة جديدة بأهمية عالية وصوت الإشعار الافتراضي.
+- السلوك: القناة `vib_notices_sound_v1`، وأهمية عالية، وصوت `TYPE_NOTIFICATION`، واهتزاز. النغمة داخل التطبيق بنفس التردد والمدة عندما `soundEnabled` ليس `false`. `speechEnabled` يبقى للنطق كما في 013. إيقاف الصوت من الحساب يبقى كما هو.
+- الدليل: `test/notifications/notification_channels_test.dart`.
+- يعتمد على: فوق 013. لا مسار جديد.
+- التراجع: `git revert cd32d2d00bd949e151745f1aa344fffae74a445b`. afterward: `flutter test test/notifications/notification_channels_test.dart --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-016
+
+- الالتزام: `33b1c4238feaf09c14cef69b230b59fd885dd9d2`
+- العنوان: VIB-FIX-016: Scroll the last account card fully above the bottom bar.
+- العرض: آخر كروت الديون والأمانات لا تظهر كاملة حتى أسفل الصفحة.
+- السبب: القائمة الطويلة كانت داخل صندوق بارتفاع 560، فيُقص أسفلها تحت الشريط. التمرير الداخلي لا يُظهر الجزء الواقع خارج الشاشة.
+- السلوك: تمرير واحد للصفحة حتى آخر كارت، مع فراغ أسفل 32. علامة مراجعة الصفر وارتفاع كرت الديون بقيا. الأقسام الأربعة: العملاء والشركات والأمانات الليبية والمصرية.
+- الدليل: `test/account_list_overflow_test.dart` باسم `the last card scrolls fully above the bottom bar` على 320×568 ومقياس نص 2.
+- يعتمد على: لا يغيّر 012–015. لا يغيّر بيانات الكارت.
+- التراجع: `git revert 33b1c4238feaf09c14cef69b230b59fd885dd9d2`. afterward: `flutter test test/account_list_overflow_test.dart --name "last card" --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
+
+اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
 
 تكرار تقديم التحصيل بعد ضياع الرد، وربط الأمانة المصرية، وتفعيل MFA، وقائمة الجلسات، وإغلاق المصراوية عند 04:00، وقفل الالتقاط. خادم مراجعة الأقسام الأربعة منشور على الإنتاج `https://vip2100.com` منذ 2026-11-09 (مستودع الموقع `64f33ffb3c61db38c78cbe520d90f79a6a3ba7f2`، schema 57).
 
-## فحص المجموعة بعد 014
+## فحص المجموعة بعد 016
 
 قبل 012 على `4ecc7cf`: `flutter analyze` بلا ملاحظات. التطبيق `flutter test --exclude-tags screenshots --dart-define=USE_FAKE_API=true`: 810 نجحت، 8 تُركت، 0 فشلت. الحزمة `flutter test --dart-define=USE_FAKE_API=true`: 545 نجحت، 14 تُركت، 0 فشلت.
 
-بعد 014: `flutter analyze` بلا ملاحظات للتطبيق وللحزمة. `dart format --output=none --set-exit-if-changed` على `lib` و`test` و`packages/api_layer` يخرج 0. التطبيق: 816 نجحت، 8 تُركت، 0 فشلت. الحزمة: 545 نجحت، 14 تُركت، 0 فشلت. الزيادة ست اختبارات للإشارة وللنطق. 10 نوفمبر 2026. خادم وهمي فقط.
+بعد 014: `flutter analyze` بلا ملاحظات. التطبيق 816 نجحت و8 تُركت. الحزمة 545 نجحت و14 تُركت. بعد 016: اختبار آخر الكارت على 320×568 ومقياس 2 نجح للأقسام الأربعة، واختبارات القناة نجحت. المجموعة الكاملة تُعاد في فحص الطلب. 10 نوفمبر 2026. خادم وهمي فقط.
 
 لا تغيير في عقد الخادم. النطق والنغمة على الجهاز. إشارة التغيير من المسارات الموجودة.
