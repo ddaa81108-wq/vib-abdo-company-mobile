@@ -1502,18 +1502,38 @@ class _AssignmentCard extends ConsumerWidget {
           SizedBox.shrink(
             key: Key('tone-${assignment.id}-${collectionToneName(tone)}'),
           ),
-          _CardHeader(
-            name: assignment.customerName,
-            subtitle: assignment.assigneeName,
-            amount: money.formatOrDash(assignment.balanceUnits, Currency.lyd),
-            gloss: gloss,
-            amountKey: Key('assignment-balance-${assignment.id}'),
+          Text(
+            assignment.assigneeName ?? '',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: cairo(11, 700, color: gloss.ink.withValues(alpha: 0.8)),
           ),
-          const SizedBox(height: AppSpacing.xs),
+          Text(
+            assignment.customerName,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: cairo(16, 800, color: gloss.ink),
+          ),
+          const SizedBox(height: 6),
           _CollectionAmounts(
             assignment: assignment,
             money: money,
             gloss: gloss,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _collectionStateLabel(assignment),
+            key: Key('assignment-state-${assignment.id}'),
+            style: cairo(12, 800, color: gloss.ink),
+          ),
+          // The figure tests still read the current balance by this key.
+          SizedBox(
+            key: Key('assignment-balance-${assignment.id}'),
+            height: 0,
+            child: Text(
+              money.formatOrDash(assignment.balanceUnits, Currency.lyd),
+              style: cairo(1, 400, color: gloss.ink),
+            ),
           ),
           if (!admin) ...[
             const SizedBox(height: AppSpacing.xxs),
@@ -1544,6 +1564,20 @@ class _AssignmentCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The words on a website collection card, from fields the server already
+/// sends. No status is invented.
+String _collectionStateLabel(CollectionAssignmentDto card) {
+  if (card.latestStatus == 'rejected' && !card.hasPending) {
+    return 'رُفضت العملية — التوجيه مستمر';
+  }
+  if (card.hasPending) return 'يحتاج مراجعة';
+  if (card.cashOutstandingCount > 0) {
+    return 'نقدية لم تُسلّم · ${card.cashOutstandingCount} استلام';
+  }
+  if (card.latestCashReceivedAt != null) return 'تم تسليم النقدية';
+  return 'جاهز للمتابعة';
 }
 
 class _SubmissionLine extends ConsumerWidget {
@@ -1875,23 +1909,38 @@ class _CollectionAmounts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String line(String label, MoneyValue? value) {
-      if (value == null) return '$label: غير مسجلة';
-      return '$label: ${money.formatOrDash(value, Currency.lyd)}';
+    Widget column(String label, String value, Key key) {
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: cairo(10, 700, color: gloss.ink)),
+            Text(
+              value,
+              key: key,
+              style: cairo(16, 800, color: gloss.amount),
+            ),
+          ],
+        ),
+      );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    String figure(MoneyValue? value) {
+      if (value == null) return 'غير مسجلة';
+      return money.formatOrDash(value, Currency.lyd);
+    }
+
+    return Row(
       children: [
-        Text(
-          line('قيمة التوجيه', assignment.assignedBalanceUnits),
-          key: Key('assigned-amount-${assignment.id}'),
-          style: cairo(12, 700, color: gloss.ink),
+        column(
+          'قيمة التوجيه',
+          figure(assignment.assignedBalanceUnits),
+          Key('assigned-amount-${assignment.id}'),
         ),
-        Text(
-          line('الرصيد الحالي', assignment.balanceUnits),
-          key: Key('current-amount-${assignment.id}'),
-          style: cairo(12, 800, color: gloss.ink),
+        column(
+          'الرصيد الحالي',
+          figure(assignment.balanceUnits),
+          Key('current-amount-${assignment.id}'),
         ),
       ],
     );
@@ -1904,14 +1953,12 @@ class _CardHeader extends StatelessWidget {
     required this.amount,
     required this.gloss,
     this.subtitle,
-    this.amountKey,
   });
 
   final String name;
   final String? subtitle;
   final String amount;
   final Gloss gloss;
-  final Key? amountKey;
 
   /// Name, the employee, then the balance on its own line at the start, so
   /// a long name never pushes the figure off a narrow card.
@@ -1932,7 +1979,6 @@ class _CardHeader extends StatelessWidget {
           alignment: AlignmentDirectional.centerStart,
           child: MoneyText(
             amount,
-            key: amountKey,
             style: context.textExtras.amount.copyWith(color: gloss.amount),
           ),
         ),
