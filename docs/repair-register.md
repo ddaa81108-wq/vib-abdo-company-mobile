@@ -181,6 +181,83 @@
 - يعتمد على: لا يغيّر 012–015. لا يغيّر بيانات الكارت.
 - التراجع: `git revert 80620f65499024580f52ce5ec5edf0a484ebd915` ثم `git revert 33b1c4238feaf09c14cef69b230b59fd885dd9d2`. afterward: `flutter test test/account_list_overflow_test.dart --name "last card" test/p7_long_history_test.dart test/def027_history_window_test.dart --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-017
+
+- الالتزام: `cc9fb2054f6780400888fc01f233cabf612e1e4e`
+- العنوان: VIB-FIX-017: Match the four account ledgers to the website totals.
+- العرض: إجمالي السجل في الأقسام الأربعة لم يطابق لون الموقع وعباراته.
+- السبب: الموقع يرسم إجمالي العملاء والشركات والأمانات الليبية ذهبًا، والمصرية أخضر للموجب وأحمر للسالب.
+- السلوك: نفس الكلمات حسب إشارة الرصيد، والمبلغ بالقيمة المطلقة في الأمانات. أعمدة السجل وأزرار التعديل والإلغاء بقيت.
+- الدليل: `test/deposit_website_tone_test.dart` و`test/ledger_table_test.dart`.
+- يعتمد على: لا مسار جديد.
+- التراجع: `git revert cc9fb2054f6780400888fc01f233cabf612e1e4e`. afterward: `flutter test test/deposit_website_tone_test.dart test/ledger_table_test.dart --name "glossy" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-018
+
+- الالتزام: `456cfa7fdcd6f9063eb741e36a18544e302e7a00`
+- العنوان: VIB-FIX-018: Colour deposit cards like the website, by the balance sign.
+- العرض: كروت الأمانات كانت تُلوَّن بعمر الدين لا بإشارة الرصيد.
+- السبب: الموقع يفرّق لون الديون عن الأمانات: الموجب في الأمانة أخضر، والسالب أحمر، والصفر أسود، في الثيمين.
+- السلوك: العبارة «أمانة للعميل» أو «دين على العميل» أو «لصالح المنظومة» أو «دين علينا للعميل» أو «حساب صفر»، والمبلغ مطلقًا. علامة الصفر بقيت.
+- الدليل: `test/deposit_website_tone_test.dart`.
+- يعتمد على: فوق 017 للألوان المشتركة. لا مسار جديد.
+- التراجع: `git revert 456cfa7fdcd6f9063eb741e36a18544e302e7a00`. afterward: `flutter test test/deposit_website_tone_test.dart --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-019
+
+- الالتزام: `3d62fd0167d8b2cfd9b9315b67109b8d5128cd07`
+- العنوان: VIB-FIX-019: Show collection actions in white on the coloured cards.
+- العرض: أزرار كروت الاستلامات للموظف لا تُرى على لون الكرت.
+- السبب: الزر المفرغ كان بلون قريب من الكرت. الموقع يضع الأزرار بيضاء بخط أخضر داكن.
+- السلوك: استلام كلي وجزئي واتصال في صف واحد، واعتماد ورفض بألوان الموقع، مع قيمة التوجيه والرصيد الحالي من الحقل الموجود.
+- الدليل: `test/collections_presentation_test.dart`.
+- يعتمد على: حقل `assignedBalanceUnits` الموجود في رد الخادم. لا مسار جديد.
+- التراجع: `git revert 3d62fd0167d8b2cfd9b9315b67109b8d5128cd07`. afterward: `flutter test test/collections_presentation_test.dart --name "each fake role" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-020
+
+- الالتزام: `293bfd16afb5b8bd29c2724de743f35939964ba7`
+- العنوان: VIB-FIX-020: Make the appearance toggle readable in light and dark.
+- العرض: زر المظهر باهت في الثيمين.
+- السبب: مسار المفتاح كان قريبًا من لون البطاقة، وأيقونة الدخول بلا أرضية.
+- السلوك: المسار كحلي والمؤشر أبيض في النهار، والمسار ذهبي والمؤشر داكن في الليل. باقي الألوان لم تتغير.
+- الدليل: مفتاح `theme-switch` و`login-theme`.
+- يعتمد على: لا مسار جديد.
+- التراجع: `git revert 293bfd16afb5b8bd29c2724de743f35939964ba7`. afterward: `flutter test test/shell_group_test.dart --name "P4" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-021
+
+- الالتزام: `68a7681874ae2b275928eeba3c9022a30b7a45a1`
+- العنوان: VIB-FIX-021: Add four login layouts for review without replacing the live screen.
+- العرض: خيارات شاشة دخول للمراجعة فقط.
+- السبب: الاختيار لم يُحسم، والشاشة الحالية تبقى.
+- السلوك: أربع واجهات في `login_design_options.dart` غير مربوطة بالمسار.
+- الدليل: `test/ali_preview_screenshots_test.dart` باسم `preview login`.
+- يعتمد على: لا يغيّر الدخول.
+- التراجع: `git revert 68a7681874ae2b275928eeba3c9022a30b7a45a1`.
+
+## VIB-FIX-022
+
+- الالتزام: `77c628c778764f4fe2028945f8a48f1d266325e1`
+- العنوان: VIB-FIX-022: Add four home layouts for review without replacing the live screen.
+- العرض: خيارات رئيسية للمراجعة فقط.
+- السبب: الاختيار لم يُحسم، والشبكة الحالية تبقى.
+- السلوك: أربع واجهات في `home_design_options.dart` غير مربوطة بالمسار.
+- الدليل: `test/ali_preview_screenshots_test.dart` باسم `preview login`.
+- يعتمد على: لا يغيّر الرئيسية.
+- التراجع: `git revert 77c628c778764f4fe2028945f8a48f1d266325e1`.
+
+## VIB-FIX-023
+
+- الالتزام: `07ab6c6509a1ca26fc2088be282f391ee465f8b7`
+- العنوان: VIB-FIX-023: Align purchases with the website ledger.
+- العرض: «التصحيح مغلق» لم تكن عبارة الموقع، واليوم المرحّل لا يُعدَّل من القائمة، والرأس يختفي، والرصيد الافتتاحي ظاهر.
+- السبب: الموقع يقول «مُرحّل» ويفتح اليوم بزر «تعديل اليوم» عبر نفس مسار التصحيح، ويثبّت رأس الجدول، ولا يعرض رصيدًا افتتاحيًا دائمًا.
+- السلوك: اليوم المسودة «اليوم الحالي»، والمرحّل «مُرحّل»، والمفتوح «مفتوح للتعديل». رأس الأعمدة يبقى أثناء التمرير. فاصل اليوم يعرض التاريخ وآخر باقي. إجماليات السجل في إطار ذهبي. بطاقة الرصيد الافتتاحي أُزيلت من الصفحة.
+- الدليل: `test/purchases_opening_correction_test.dart` و`test/purchases_ledger_layout_test.dart`.
+- يعتمد على: `PATCH /api/purchases/{book}/days/{id}/correction` الموجود. لا مسار جديد.
+- التراجع: `git revert 07ab6c6509a1ca26fc2088be282f391ee465f8b7`. afterward: `flutter test test/purchases_opening_correction_test.dart test/purchases_ledger_layout_test.dart --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
