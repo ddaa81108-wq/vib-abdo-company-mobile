@@ -2,8 +2,8 @@
 
 الأرقام ثابتة. لا يُعاد استخدام رقم أُلغي. التراجع يكون بالتزام `git revert` جديد، لا بمسح التاريخ ولا بإعادة القاعدة.
 
-الفرع المحلي: `cursor/four-section-zero-review-ff44`.
-رأس السجل عند كتابته: انظر آخر التزام `VIB-FIX-REG` في `git log`. أرقام 001–005 وهاشاتها لم تتغير.
+الفرع المحلي: `cursor/client-hygiene-008-011-5c94`.
+رأس السجل عند كتابته: انظر آخر التزام `VIB-FIX-REG` في `git log`. أرقام 001–007 وهاشاتها لم تتغير.
 
 ## VIB-FIX-001
 
@@ -81,6 +81,17 @@
 - الدليل: `test/section_zero_review_test.dart` و`packages/api_layer/test/section_zero_review_contract_test.dart` و`test/zero_card_confirm_test.dart`. هذه اختبارات الخادم الوهمي المطابق للعقد، وليست اتصالًا بخادم Node.
 - يعتمد على: يضم 006 في تاريخ الفرع. يلمس `fake_api_client.dart` فوق 006 و001–004، فالتراجع الآمن هو 007 ثم 006 ثم الأقدم.
 - التراجع: `git revert 2b6adbdad218594abab187c4624c7b35f43660f5`. afterward: `flutter test test/section_zero_review_test.dart test/zero_card_confirm_test.dart packages/api_layer/test/section_zero_review_contract_test.dart --dart-define=USE_FAKE_API=true --exclude-tags screenshots`.
+
+## VIB-FIX-008
+
+- الالتزام: `c02b56b4d188dea195d5c3e995c0cc47edba875f`
+- العنوان: VIB-FIX-008: Format the app and api_layer with dart format.
+- العرض: `dart format` على Dart 3.13.5 بعد حل الحزم كان يغيّر 21 ملفًا من 278 في `lib` و`test`، و37 ملفًا من 125 في `packages/api_layer`.
+- السبب: تلك الملفات لم تكن على تنسيق المترجم المثبت. لا ملفات مولَّدة في المسارين، ولا قاعدة في المستودع تستثنيها. بلا `flutter pub get` تُقرأ حزمة `api_layer` كأحدث لغة لأن قيدها `>=3.3.0`، فيتغيّر عدد أكبر؛ التنسيق المعتمد هو الذي بعد حل الحزم.
+- السلوك: تنسيق فقط. النصوص والتعليقات كما هي. بعد حذف المسافات والفواصل لا يبقى فرق في الرموز. لا عقد ولا شبكة ولا قاعدة بيانات ولا موقع.
+- الدليل: 58 ملفًا في الالتزام. `dart format --output=none --set-exit-if-changed lib test packages/api_layer/lib packages/api_layer/test` يخرج 0 بعده.
+- يعتمد على: لا يغيّر سلوك 001–007. يعيد تنسيق `fake_fixtures.dart` فوق 007، فإزالة 008 مع الإبقاء على 007 هي `git revert` لهذا الالتزام وحده.
+- التراجع: `git revert c02b56b4d188dea195d5c3e995c0cc47edba875f`. afterward: `dart format --output=none --set-exit-if-changed lib test packages/api_layer/lib packages/api_layer/test`.
 
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
