@@ -258,6 +258,61 @@
 - يعتمد على: `PATCH /api/purchases/{book}/days/{id}/correction` الموجود. لا مسار جديد.
 - التراجع: `git revert 07ab6c6509a1ca26fc2088be282f391ee465f8b7`. afterward: `flutter test test/purchases_opening_correction_test.dart test/purchases_ledger_layout_test.dart --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-024
+
+- الالتزام: `8f86b1cca953a2d34faef3a2e51e12be6f3de013`
+- العنوان: VIB-FIX-024: Rebuild the account ledger table to the website's columns.
+- العرض: 017 غيّر لون الإجمالي فقط، والجدول بقي كما كان.
+- السبب: الموقع جدول أسود الرأس، أقراص للحركة والعملية، والاسم تحت التاريخ، والترقيم يبدأ بـ #.
+- السلوك: عمود بواسطة أُلغي وظهر الاسم تحت التاريخ. ديون أحمر، دفع جزئي أخضر، دفع كلي أسود، ومباشر أسود. الإجمالي الذهبي بقي.
+- الدليل: `test/ledger_table_test.dart` و`test/ledger_presentation_test.dart`.
+- يعتمد على: لا مسار جديد.
+- التراجع: `git revert 8f86b1cca953a2d34faef3a2e51e12be6f3de013`. afterward: `flutter test test/ledger_table_test.dart --name "runs 1" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-025
+
+- الالتزام: `8228d747ed098efab90744d026d1ea638c794c30`
+- العنوان: VIB-FIX-025: Lay collection cards out like the website.
+- العرض: الأزرار صارت ظاهرة والنص مكدّس.
+- السبب: الموقع يضع الاسم ثم عمودين (قيمة التوجيه والرصيد الحالي) ثم حالة الكرت.
+- السلوك: نفس الترتيب، والحالة من الحقول الموجودة: يحتاج مراجعة، نقدية لم تُسلّم، تم تسليم النقدية، جاهز للمتابعة.
+- الدليل: `test/collections_presentation_test.dart`.
+- يعتمد على: لا مسار جديد.
+- التراجع: `git revert 8228d747ed098efab90744d026d1ea638c794c30`. afterward: `flutter test test/collections_presentation_test.dart --name "fake role" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-026
+
+- الالتزام: `46919585b366e16e425c30204feedbf52e5d4a6b`
+- العنوان: VIB-FIX-026: Match the purchases day bar, check mark, and green header.
+- العرض: لقطات 023 لم تُظهر الفرق.
+- السبب: الموقع يفصل اليوم بشريط «الباقي المرحّل من اليوم السابق»، ويضع علامة صح على الصف المرحّل، ورأس الجدول أخضر.
+- السلوك: الشريط ذهبي مع التاريخ وآخر باقي وزر تعديل اليوم. الصف المرحّل عليه علامة صح. الرصيد الافتتاحي ما زال محذوفًا والرأس يبقى ثابتًا.
+- الدليل: `test/purchases_ledger_layout_test.dart`.
+- يعتمد على: لا مسار جديد.
+- التراجع: `git revert 46919585b366e16e425c30204feedbf52e5d4a6b`. afterward: `flutter test test/purchases_ledger_layout_test.dart --name "440" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-027
+
+- الالتزام: `eae40353f6346d8b0e8ecdb505a8157ee488eaa0`
+- العنوان: VIB-FIX-027: Remove the rejected login options and keep the live screen.
+- العرض: خيارات الدخول الأربعة رُفضت.
+- السبب: لا تُستبدل شاشة الدخول.
+- السلوك: حُذف `login_design_options.dart`. شاشة الدخول الحية كما كانت.
+- الدليل: لا مرجع للملف في الشجرة.
+- يعتمد على: يلغي 021 من الواجهة.
+- التراجع: `git revert eae40353f6346d8b0e8ecdb505a8157ee488eaa0`.
+
+## VIB-FIX-028
+
+- الالتزام: `658bceb9cf016c62aaca5d7c03820fdc7b0e346b`
+- العنوان: VIB-FIX-028: Keep home layout 1 and add three more icon styles.
+- العرض: كل تخطيطات الرئيسية رُفضت إلا الأول.
+- السبب: المطلوب تطوير الأيقونات على نفس الشبكة.
+- السلوك: أربعة أساليب: ثنائي اللون، زجاج متدرج، إطار ذهبي، عمق أخضر. الرئيسية الحية لم تتغير.
+- الدليل: `test/ali_preview_screenshots_test.dart`.
+- يعتمد على: لا يربط الأساليب بالمسار.
+- التراجع: `git revert 658bceb9cf016c62aaca5d7c03820fdc7b0e346b`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
