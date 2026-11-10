@@ -172,14 +172,14 @@
 
 ## VIB-FIX-016
 
-- الالتزام: `33b1c4238feaf09c14cef69b230b59fd885dd9d2`
+- الالتزام: `33b1c4238feaf09c14cef69b230b59fd885dd9d2` ثم `80620f65499024580f52ce5ec5edf0a484ebd915` لإبقاء القائمة الطويلة كسولة مع وصول آخر كارت.
 - العنوان: VIB-FIX-016: Scroll the last account card fully above the bottom bar.
 - العرض: آخر كروت الديون والأمانات لا تظهر كاملة حتى أسفل الصفحة.
 - السبب: القائمة الطويلة كانت داخل صندوق بارتفاع 560، فيُقص أسفلها تحت الشريط. التمرير الداخلي لا يُظهر الجزء الواقع خارج الشاشة.
 - السلوك: تمرير واحد للصفحة حتى آخر كارت، مع فراغ أسفل 32. علامة مراجعة الصفر وارتفاع كرت الديون بقيا. الأقسام الأربعة: العملاء والشركات والأمانات الليبية والمصرية.
 - الدليل: `test/account_list_overflow_test.dart` باسم `the last card scrolls fully above the bottom bar` على 320×568 ومقياس نص 2.
 - يعتمد على: لا يغيّر 012–015. لا يغيّر بيانات الكارت.
-- التراجع: `git revert 33b1c4238feaf09c14cef69b230b59fd885dd9d2`. afterward: `flutter test test/account_list_overflow_test.dart --name "last card" --dart-define=USE_FAKE_API=true`.
+- التراجع: `git revert 80620f65499024580f52ce5ec5edf0a484ebd915` ثم `git revert 33b1c4238feaf09c14cef69b230b59fd885dd9d2`. afterward: `flutter test test/account_list_overflow_test.dart --name "last card" test/p7_long_history_test.dart test/def027_history_window_test.dart --dart-define=USE_FAKE_API=true`.
 
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
