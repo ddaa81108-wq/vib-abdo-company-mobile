@@ -227,7 +227,7 @@
 
 ## VIB-FIX-021
 
-- الالتزام: `68a7681874ae2b275928eeba3c9022a30b7a45a1`
+- الالتزام: `68a7681874ae2b275928eeba3c9022a30b7a45a1` ثم `69ac5c901e1bea4945537a6e946285f673c8c98e` لملء لوحة النموذج.
 - العنوان: VIB-FIX-021: Add four login layouts for review without replacing the live screen.
 - العرض: خيارات شاشة دخول للمراجعة فقط.
 - السبب: الاختيار لم يُحسم، والشاشة الحالية تبقى.
