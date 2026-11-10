@@ -129,23 +129,26 @@ void main() {
     expect(calls.every((call) => call.method == 'applyVerifiedRole'), isTrue);
   });
 
-  test('the intent is written before the channel and holds no secret', () async {
-    final intent = MemoryCaptureIntentSink();
-    final capture = gate(intent: intent);
-    await capture.applySession(
-      generation: 3,
-      state: SessionAuthenticated(_person(role: admin)),
-    );
-    expect(intent.generation, 3);
-    expect(intent.role, admin);
-    await capture.secure(generation: 4);
-    expect(intent.generation, 4);
-    expect(intent.role, isNull);
-    final text = captureIntentText(generation: 4);
-    expect(text, isNot(contains('abdo_')));
-    expect(text, isNot(contains('demo-only')));
-    expect(capture, isNotNull);
-  });
+  test(
+    'the intent is written before the channel and holds no secret',
+    () async {
+      final intent = MemoryCaptureIntentSink();
+      final capture = gate(intent: intent);
+      await capture.applySession(
+        generation: 3,
+        state: SessionAuthenticated(_person(role: admin)),
+      );
+      expect(intent.generation, 3);
+      expect(intent.role, admin);
+      await capture.secure(generation: 4);
+      expect(intent.generation, 4);
+      expect(intent.role, isNull);
+      final text = captureIntentText(generation: 4);
+      expect(text, isNot(contains('abdo_')));
+      expect(text, isNot(contains('demo-only')));
+      expect(capture, isNotNull);
+    },
+  );
 }
 
 class ManualTicker implements CaptureTicker {

@@ -111,7 +111,8 @@ void main() {
       final offset = instant.toLocal().timeZoneOffset;
       final wall = instant.add(offset);
       expect(line.date!.timeZoneOffset, offset);
-      expect([line.date!.year, line.date!.month, line.date!.day, line.date!.hour],
+      expect(
+          [line.date!.year, line.date!.month, line.date!.day, line.date!.hour],
           [wall.year, wall.month, wall.day, wall.hour]);
       expect(line.recordedAt!.isUtc, isFalse);
     });
@@ -121,8 +122,8 @@ void main() {
       // (wall clock read as local) maps both to one moment and fails here,
       // even on a UTC machine. A UTC-only parser fails on isUtc.
       final z = LedgerEntryDto.fromJson(_prodLine()).date!;
-      final plus5 = LedgerEntryDto.fromJson(
-              _prodLine()..['transactionDate'] = '2026-10-30T22:00:00.000+05:00')
+      final plus5 = LedgerEntryDto.fromJson(_prodLine()
+            ..['transactionDate'] = '2026-10-30T22:00:00.000+05:00')
           .date!;
       expect(z.isUtc, isFalse);
       expect(plus5.isUtc, isFalse);
@@ -139,7 +140,8 @@ void main() {
         return;
       }
       expect(line.date!.timeZoneOffset, const Duration(hours: 2));
-      expect([line.date!.year, line.date!.month, line.date!.day, line.date!.hour],
+      expect(
+          [line.date!.year, line.date!.month, line.date!.day, line.date!.hour],
           [2026, 10, 31, 0]);
     });
 
@@ -438,8 +440,8 @@ void main() {
         await expectLater(
             RemoteNotificationsRepository(stub).serverUnreadCount(),
             throwsA(same(entry.value)));
-        expect(stub.calls.map((c) => c.path),
-            ['/api/notifications/unread-count']);
+        expect(
+            stub.calls.map((c) => c.path), ['/api/notifications/unread-count']);
       });
 
       test('employee totals rethrows ${entry.key} without collections',
@@ -451,8 +453,7 @@ void main() {
         final permissions = PermissionService()
           ..applyFromServer(const [], role: 'admin');
         final repo = RemoteEmployeeTotalsRepository(stub,
-            permissions: permissions,
-            source: EmployeeTotalsSource.standalone);
+            permissions: permissions, source: EmployeeTotalsSource.standalone);
         await expectLater(repo.fetch(), throwsA(same(entry.value)));
         expect(stub.calls.map((c) => c.path), ['/api/admin/employee-totals']);
       });

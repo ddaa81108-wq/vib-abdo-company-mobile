@@ -16,7 +16,8 @@ class JsonNumberText {
   String toString() => text;
 
   @override
-  bool operator ==(Object other) => other is JsonNumberText && other.text == text;
+  bool operator ==(Object other) =>
+      other is JsonNumberText && other.text == text;
 
   @override
   int get hashCode => text.hashCode;

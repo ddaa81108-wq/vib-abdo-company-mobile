@@ -211,8 +211,7 @@ void main() {
       '10',
     );
     await leaveFocus(tester);
-    final body =
-        jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
+    final body = jsonDecode(fake.mutationBodies.last) as Map<String, dynamic>;
     final entries = body['entries'] as List;
     expect(entries, hasLength(2));
     expect(entries[1], {'valueUnits': 500, 'commissionUnits': 10});

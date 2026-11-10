@@ -101,7 +101,9 @@ void main() {
   });
 
   group('CollectionsOverviewDto counters (server-computed)', () {
-    test('assignedCount is top-level, then metrics; other counters stay in metrics', () {
+    test(
+        'assignedCount is top-level, then metrics; other counters stay in metrics',
+        () {
       final o = CollectionsOverviewDto.fromData(
         _j(
           '{"assignments":[],"submissions":[{"id":"s","status":"pending"}],'

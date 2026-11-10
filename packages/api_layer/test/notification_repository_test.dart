@@ -17,7 +17,8 @@ void main() {
     return api;
   }
 
-  test('mark-read decrements once, replay does not, read-all sets zero', () async {
+  test('mark-read decrements once, replay does not, read-all sets zero',
+      () async {
     final api = await signedIn('other.employee');
     final fake = api.client as FakeApiClient;
 
@@ -63,7 +64,8 @@ void main() {
     expect(await employee.notifications.serverUnreadCount(), 1);
   });
 
-  test('another user is not affected and the employee count starts at one', () async {
+  test('another user is not affected and the employee count starts at one',
+      () async {
     final employee = await signedIn('employee.demo');
     expect(await employee.notifications.fetchUnreadCount(), 1);
     expect(

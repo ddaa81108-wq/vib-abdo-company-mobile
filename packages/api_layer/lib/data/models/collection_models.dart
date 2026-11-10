@@ -340,7 +340,8 @@ class CollectionsCapabilities {
   static const deployed = CollectionsCapabilities();
 
   final bool workspaces; // GET /workspace, GET /mine
-  final bool cancelAssignment; // POST /assignments/{id}/cancel, activeAssignmentId
+  final bool
+      cancelAssignment; // POST /assignments/{id}/cancel, activeAssignmentId
   final bool cancelApproval; // POST .../cancel-approval
   final bool exceptionalClose; // days/close allowOutstandingCash
   final bool receiptCurrency; // currency / currencyMismatch

@@ -29,22 +29,26 @@ class CaptureHarnessScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
-            _button('دخول مدير', () => session.login(
-              username: 'admin.demo',
-              password: 'demo-only',
-            )),
-            _button('دخول موظف', () => session.login(
-              username: 'employee.demo',
-              password: 'demo-only',
-            )),
-            _button('دخول ضيف', () => session.login(
-              username: 'guest',
-              password: 'demo-only',
-            )),
-            _button('دخول تحقق', () => session.login(
-              username: 'mfa.admin',
-              password: 'demo-only',
-            )),
+            _button(
+              'دخول مدير',
+              () =>
+                  session.login(username: 'admin.demo', password: 'demo-only'),
+            ),
+            _button(
+              'دخول موظف',
+              () => session.login(
+                username: 'employee.demo',
+                password: 'demo-only',
+              ),
+            ),
+            _button(
+              'دخول ضيف',
+              () => session.login(username: 'guest', password: 'demo-only'),
+            ),
+            _button(
+              'دخول تحقق',
+              () => session.login(username: 'mfa.admin', password: 'demo-only'),
+            ),
             _button('خروج', session.logout),
             _button(
               'انتهاء الجلسة',
@@ -59,10 +63,7 @@ class CaptureHarnessScreen extends ConsumerWidget {
   Widget _button(String label, Future<void> Function() onPressed) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: FilledButton(
-        onPressed: () => onPressed(),
-        child: Text(label),
-      ),
+      child: FilledButton(onPressed: () => onPressed(), child: Text(label)),
     );
   }
 }

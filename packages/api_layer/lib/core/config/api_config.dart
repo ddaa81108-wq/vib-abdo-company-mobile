@@ -114,13 +114,11 @@ class ApiConfig {
       useFakeApi: useFakeApi,
       apiBase: apiBase,
       enableDebugLogging: debug,
-      authStrategy: bearer
-          ? AuthStrategyKind.bearerToken
-          : AuthStrategyKind.cookieCsrf,
+      authStrategy:
+          bearer ? AuthStrategyKind.bearerToken : AuthStrategyKind.cookieCsrf,
       moneyUnitScale: scale,
-      rateWireFormat: rate == 'string'
-          ? RateWireFormat.string
-          : RateWireFormat.number,
+      rateWireFormat:
+          rate == 'string' ? RateWireFormat.string : RateWireFormat.number,
       employeeTotalsSource: totals == 'collections'
           ? EmployeeTotalsSource.collections
           : EmployeeTotalsSource.standalone,

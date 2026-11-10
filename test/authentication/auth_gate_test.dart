@@ -25,10 +25,7 @@ void main() {
       '/login',
     );
     expect(
-      authRedirect(
-        const SessionOtpRequired(LoginChallenge()),
-        '/settings',
-      ),
+      authRedirect(const SessionOtpRequired(LoginChallenge()), '/settings'),
       '/mfa',
     );
     expect(

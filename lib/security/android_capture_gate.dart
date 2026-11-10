@@ -15,7 +15,9 @@ abstract class CaptureIntentSink {
 
 class FileCaptureIntentSink implements CaptureIntentSink {
   FileCaptureIntentSink([String? path])
-    : _file = File(path ?? '/data/user/0/com.vip2100.vib/files/capture-intent.txt');
+    : _file = File(
+        path ?? '/data/user/0/com.vip2100.vib/files/capture-intent.txt',
+      );
 
   final File _file;
 

@@ -30,7 +30,10 @@ void main() {
         expect(find.byKey(Key(key)), findsOneWidget, reason: key);
       }
       expect(find.byKey(const Key('settings-link-audit')), findsOneWidget);
-      expect(find.byKey(const Key('settings-link-development')), findsOneWidget);
+      expect(
+        find.byKey(const Key('settings-link-development')),
+        findsOneWidget,
+      );
       // Theme switch is local and flips the app theme.
       final before = Theme.of(
         tester.element(find.byKey(SettingsScreen.screenKey)),
@@ -52,21 +55,24 @@ void main() {
   testWidgets('inner ledger and login accounts hold at 360 and text scale 2', (
     tester,
   ) async {
-  tester.platformDispatcher.textScaleFactorTestValue = 2;
-  addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-  await pumpFakeApp(tester, size: const Size(360, 800));
-  await signIn(tester, username: 'admin.demo', password: 'demo-only');
-  await go(tester, '/settings');
-  expect(find.byKey(const Key('ledger-total-LYD')), findsNothing);
-  await go(tester, '/settings/ledger');
-  expect(find.byKey(FinancialLedgerScreen.screenKey), findsOneWidget);
-  expect(find.byKey(const Key('ledger-total-LYD')), findsOneWidget);
-  await go(tester, '/settings/users');
-  expect(find.byKey(const Key('login-account-u_12')), findsOneWidget);
-  await go(tester, '/settings/users/new');
-  expect(find.byKey(const Key('create-account-submit')), findsOneWidget);
-  await go(tester, '/settings/users/u_12');
-  expect(find.byKey(const Key('login-account-save-permissions')), findsOneWidget);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await pumpFakeApp(tester, size: const Size(360, 800));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/settings');
+    expect(find.byKey(const Key('ledger-total-LYD')), findsNothing);
+    await go(tester, '/settings/ledger');
+    expect(find.byKey(FinancialLedgerScreen.screenKey), findsOneWidget);
+    expect(find.byKey(const Key('ledger-total-LYD')), findsOneWidget);
+    await go(tester, '/settings/users');
+    expect(find.byKey(const Key('login-account-u_12')), findsOneWidget);
+    await go(tester, '/settings/users/new');
+    expect(find.byKey(const Key('create-account-submit')), findsOneWidget);
+    await go(tester, '/settings/users/u_12');
+    expect(
+      find.byKey(const Key('login-account-save-permissions')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 }

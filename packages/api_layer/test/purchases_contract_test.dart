@@ -42,8 +42,8 @@ void main() {
       );
       final data = _data(samples, 'GET /api/purchases/al_bayan');
       api.scriptedGetJson['/api/purchases/al_bayan'] = jsonEncode(data);
-      final page = await RemotePurchasesRepository(api)
-          .list(PurchaseBook.alBayan);
+      final page =
+          await RemotePurchasesRepository(api).list(PurchaseBook.alBayan);
       _expectAlBayan(page);
     },
   );

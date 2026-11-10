@@ -325,9 +325,11 @@ void _expectSummaryValueColumn(WidgetTester tester, {required bool dark}) {
     expect(symbol.center.dx, lessThan(number.center.dx));
   }
   final remaining =
-      tester.widget<Container>(
-            find.byKey(const Key('masraweya-value-frame-remaining')),
-          ).decoration!
+      tester
+              .widget<Container>(
+                find.byKey(const Key('masraweya-value-frame-remaining')),
+              )
+              .decoration!
           as BoxDecoration;
   expect(
     remaining.color,

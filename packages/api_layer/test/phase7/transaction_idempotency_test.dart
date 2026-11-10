@@ -117,10 +117,11 @@ void main() {
   });
 }
 
-AccountTransactionRequest _payment() => AccountTransactionRequest.partialPayment(
-  inputValue: 10,
-  date: DateTime.utc(2026, 10, 21),
-);
+AccountTransactionRequest _payment() =>
+    AccountTransactionRequest.partialPayment(
+      inputValue: 10,
+      date: DateTime.utc(2026, 10, 21),
+    );
 
 Future<void> _untilRequestRecorded(FakeApiClient fake, String requestId) async {
   for (var turn = 0; turn < 40; turn++) {
@@ -137,7 +138,9 @@ Future<void> _untilRequestRecorded(FakeApiClient fake, String requestId) async {
 
 Future<int> _partialRows(ApiLayer layer) async {
   final page = await layer.accounts.ledger(AccountSection.customers, 'c_55');
-  return page.page.items.where((item) => item.id.startsWith('tx_partial')).length;
+  return page.page.items
+      .where((item) => item.id.startsWith('tx_partial'))
+      .length;
 }
 
 Future<({ApiLayer layer, FakeApiClient fake})> _open() async {

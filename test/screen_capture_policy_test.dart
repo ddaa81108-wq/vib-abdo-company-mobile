@@ -57,31 +57,34 @@ void main() {
     expect(activity, isNot(contains('clearFlags')));
   });
 
-  test('logout does not wait on the hold, and the hold remains a last resort', () {
-    expect(lock, contains('const val DEFAULT_HOLD_MS = 2000L'));
-    expect(lock, contains('fun onHoldElapsed(token: Long)'));
-    expect(lock, contains('fun onHostPause()'));
-    expect(lock, contains('if (hostPaused) return false'));
-    expect(activity, contains('onHostPause()'));
-    expect(activity, contains('onHostResume()'));
-    expect(intents, contains('capture-intent.txt'));
-    expect(activity, contains('FileObserver'));
-    expect(activity, contains('shouldApply'));
-    expect(intents, contains('fun shouldApply'));
-    expect(gate, contains('captureIntentText'));
-    expect(gate, contains('Duration(milliseconds: 500)'));
-    expect(activity, contains('onCaptureHoldElapsed'));
-    expect(activity, contains('captureLock.disarm()'));
-    expect(activity, contains('captureLock.resetForNewEngine()'));
-  });
+  test(
+    'logout does not wait on the hold, and the hold remains a last resort',
+    () {
+      expect(lock, contains('const val DEFAULT_HOLD_MS = 2000L'));
+      expect(lock, contains('fun onHoldElapsed(token: Long)'));
+      expect(lock, contains('fun onHostPause()'));
+      expect(lock, contains('if (hostPaused) return false'));
+      expect(activity, contains('onHostPause()'));
+      expect(activity, contains('onHostResume()'));
+      expect(intents, contains('capture-intent.txt'));
+      expect(activity, contains('FileObserver'));
+      expect(activity, contains('shouldApply'));
+      expect(intents, contains('fun shouldApply'));
+      expect(gate, contains('captureIntentText'));
+      expect(gate, contains('Duration(milliseconds: 500)'));
+      expect(activity, contains('onCaptureHoldElapsed'));
+      expect(activity, contains('captureLock.disarm()'));
+      expect(activity, contains('captureLock.resetForNewEngine()'));
+    },
+  );
 
   test(
     'the release window starts secure and only a verified role can update it',
     () {
-    expect(activity, contains('secureWindowAtStart()'));
-    expect(activity, contains('CaptureMessages.handle'));
-    expect(messages, contains('const val METHOD = "applyVerifiedRole"'));
-    expect(gate, contains("'applyVerifiedRole'"));
+      expect(activity, contains('secureWindowAtStart()'));
+      expect(activity, contains('CaptureMessages.handle'));
+      expect(messages, contains('const val METHOD = "applyVerifiedRole"'));
+      expect(gate, contains("'applyVerifiedRole'"));
       expect(activity, contains('BuildConfig.DEBUG'));
       expect(activity, contains('null,'));
       expect(activity, contains('0L'));
@@ -93,10 +96,10 @@ void main() {
         activity.indexOf('secureWindowAtStart()', onCreate),
         lessThan(engine),
       );
-    expect(
-      activity.indexOf('secureWindowAtStart()', engine),
-      lessThan(activity.indexOf('CaptureMessages.handle')),
-    );
+      expect(
+        activity.indexOf('secureWindowAtStart()', engine),
+        lessThan(activity.indexOf('CaptureMessages.handle')),
+      );
     },
   );
 }

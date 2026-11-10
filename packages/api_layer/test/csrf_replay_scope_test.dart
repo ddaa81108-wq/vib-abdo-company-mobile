@@ -81,8 +81,7 @@ void main() {
     );
   });
 
-  test(
-      '403 PERMISSION_DENIED with CSRF only in the message is not refreshed',
+  test('403 PERMISSION_DENIED with CSRF only in the message is not refreshed',
       () async {
     await _expectNoReplay(
       status: 403,

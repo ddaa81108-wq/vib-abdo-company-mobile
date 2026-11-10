@@ -13,11 +13,7 @@ void main() {
     testWidgets('settings and MFA hold at 360dp and text scale $scale', (
       tester,
     ) async {
-      await pumpFakeApp(
-        tester,
-        size: const Size(360, 740),
-        textScale: scale,
-      );
+      await pumpFakeApp(tester, size: const Size(360, 740), textScale: scale);
       await signIn(tester, username: 'mfa.admin', password: 'demo-only');
       expect(find.byKey(MfaScreen.screenKey), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -31,10 +27,7 @@ void main() {
       expect(find.byKey(const Key('login-account-create')), findsOneWidget);
       expect(tester.takeException(), isNull, reason: 'users');
       await go(tester, '/settings/users/new');
-      expect(
-        find.byKey(LoginAccountCreateScreen.screenKey),
-        findsOneWidget,
-      );
+      expect(find.byKey(LoginAccountCreateScreen.screenKey), findsOneWidget);
       expect(tester.takeException(), isNull, reason: 'create');
       await go(tester, '/settings/audit');
       expect(find.byKey(SecurityScreen.screenKey), findsOneWidget);

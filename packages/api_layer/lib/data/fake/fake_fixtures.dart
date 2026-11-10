@@ -1540,7 +1540,10 @@ class FakeFixtures {
             'entityId': 'sub-1',
             'correlationId': 'fake-fixture',
             'outcome': 'success',
-            'details': {'subjectName': 'استلام مستقل تجريبي', 'amountUnits': 75},
+            'details': {
+              'subjectName': 'استلام مستقل تجريبي',
+              'amountUnits': 75
+            },
             'actorName': 'موظف استلام تجريبي',
             'actorUsername': 'employee.demo',
             'createdAt': '2026-10-22T22:33:25.792Z',

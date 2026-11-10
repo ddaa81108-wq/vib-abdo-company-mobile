@@ -11,7 +11,9 @@
 final class MoneyValue {
   const MoneyValue.known(this.units) : invalid = false;
 
-  const MoneyValue.invalid() : units = null, invalid = true;
+  const MoneyValue.invalid()
+      : units = null,
+        invalid = true;
 
   /// Shown instead of a figure. Distinct from the dash used for a missing field.
   static const invalidLabel = 'مبلغ غير صالح';

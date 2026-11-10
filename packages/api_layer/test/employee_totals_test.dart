@@ -260,7 +260,8 @@ void main() {
   test('non-integer money marks the field and keeps the row', () {
     final fractional = (PreciseJson.decode(
       '{"employeeId":"u_12","employeeName":"موظف","collectedUnits":1.5,"pendingUnits":4}',
-    ) as Map).cast<String, dynamic>();
+    ) as Map)
+        .cast<String, dynamic>();
     final row = EmployeeTotalsItemDto.fromJson(fractional);
     expect(row.employeeName, 'موظف');
     expect(row.collectedUnits!.isInvalid, isTrue);
