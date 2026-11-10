@@ -102,7 +102,7 @@ void main() {
     await reveal(tester, const Key('submit-as_2'));
     expect(
       tester
-          .widget<OutlinedButton>(find.byKey(const Key('submit-as_2')))
+          .widget<FilledButton>(find.byKey(const Key('submit-as_2')))
           .onPressed,
       isNull,
     );

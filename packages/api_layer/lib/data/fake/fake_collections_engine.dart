@@ -322,6 +322,7 @@ class FakeCollectionsEngine {
         'customerVersion': card.version,
         'assigneeName': employees[a['assigneeUserId']] ?? '',
         'balanceUnits': card.balanceUnits,
+        'assignedBalanceUnits': card.balanceUnits,
         'hasPending': subs.any((s) => s['status'] == 'pending') ? 1 : 0,
         'latestMode': latest?['mode'],
         'latestStatus': latest?['status'],

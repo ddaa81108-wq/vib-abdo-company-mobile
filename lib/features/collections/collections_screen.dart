@@ -1509,6 +1509,12 @@ class _AssignmentCard extends ConsumerWidget {
             gloss: gloss,
             amountKey: Key('assignment-balance-${assignment.id}'),
           ),
+          const SizedBox(height: AppSpacing.xs),
+          _CollectionAmounts(
+            assignment: assignment,
+            money: money,
+            gloss: gloss,
+          ),
           if (!admin) ...[
             const SizedBox(height: AppSpacing.xxs),
             LtrText(
@@ -1591,37 +1597,49 @@ class _SubmissionLine extends ConsumerWidget {
             : null,
         actions: [
           if (decide && pending) ...[
-            GuardedMutation(
-              buttonKey: Key('approve-${submission.id}'),
-              inputs: 'approve:${submission.id}',
-              label: AppStrings.approve,
-              onVersionConflict: () => ref.invalidate(collectionsProvider),
-              onSubmit: (meta) =>
-                  _decide(ref, CollectionDecision.approve, meta),
+            _siteAction(
+              const Color(0xFFFFFFFF),
+              const Color(0xFF147046),
+              GuardedMutation(
+                buttonKey: Key('approve-${submission.id}'),
+                inputs: 'approve:${submission.id}',
+                label: AppStrings.approve,
+                onVersionConflict: () => ref.invalidate(collectionsProvider),
+                onSubmit: (meta) =>
+                    _decide(ref, CollectionDecision.approve, meta),
+              ),
             ),
-            GuardedMutation(
-              buttonKey: Key('reject-${submission.id}'),
-              inputs: 'reject:${submission.id}',
-              label: AppStrings.reject,
-              filled: false,
-              onVersionConflict: () => ref.invalidate(collectionsProvider),
-              onSubmit: (meta) => _decide(ref, CollectionDecision.reject, meta),
+            _siteAction(
+              const Color(0xFF721521),
+              const Color(0xFFFFFFFF),
+              GuardedMutation(
+                buttonKey: Key('reject-${submission.id}'),
+                inputs: 'reject:${submission.id}',
+                label: AppStrings.reject,
+                onVersionConflict: () => ref.invalidate(collectionsProvider),
+                onSubmit: (meta) =>
+                    _decide(ref, CollectionDecision.reject, meta),
+              ),
             ),
           ],
           if (cash && awaiting)
-            GuardedMutation(
-              buttonKey: Key('cash-${submission.id}'),
-              inputs: 'cash:${submission.id}',
-              label: CollectionsText.cashReceived,
-              onVersionConflict: () => ref.invalidate(collectionsProvider),
-              onSubmit: (meta) async {
-                await ref
-                    .read(apiLayerProvider)
-                    .collections
-                    .markCashReceived(submission.id, meta);
-                ref.invalidate(collectionsProvider);
-                return null;
-              },
+            _siteAction(
+              const Color(0xFFFFFFFF),
+              const Color(0xFF145535),
+              GuardedMutation(
+                buttonKey: Key('cash-${submission.id}'),
+                inputs: 'cash:${submission.id}',
+                label: CollectionsText.cashReceived,
+                onVersionConflict: () => ref.invalidate(collectionsProvider),
+                onSubmit: (meta) async {
+                  await ref
+                      .read(apiLayerProvider)
+                      .collections
+                      .markCashReceived(submission.id, meta);
+                  ref.invalidate(collectionsProvider);
+                  return null;
+                },
+              ),
             ),
         ],
       ),
@@ -1693,59 +1711,69 @@ class _EmployeeActions extends ConsumerWidget {
       );
     }
 
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
+    return Row(
       children: [
-        if (blocked)
-          FilledButton(
-            key: Key('full-${assignment.id}'),
-            onPressed: null,
-            child: const Text(CollectionsText.fullReceipt),
-          )
-        else
-          GuardedMutation(
-            buttonKey: Key('full-${assignment.id}'),
-            inputs: 'full:${assignment.id}:$balance',
-            label: CollectionsText.fullReceipt,
-            confirmText: CollectionsText.fullConfirm(
-              money.formatOrDash(assignment.balanceUnits, Currency.lyd),
-            ),
-            onVersionConflict: () => ref.invalidate(collectionsProvider),
-            // 537f073 expects the current debt with a full receipt and
-            // refuses it if the debt changed (FULL_AMOUNT_CHANGED).
-            onSubmit: (_) => _send(context, ref, 'full', balance),
-          ),
-        OutlinedButton(
-          key: Key('submit-${assignment.id}'),
-          onPressed: blocked || !online
-              ? null
-              : () => showAppForm<void>(
-                  context,
-                  PartialReceiptForm(assignment: assignment),
+        Expanded(
+          child: blocked
+              ? _whiteAction(
+                  key: Key('full-${assignment.id}'),
+                  label: CollectionsText.fullReceipt,
+                  onPressed: null,
+                )
+              : _siteAction(
+                  const Color(0xFFFFFFFF),
+                  const Color(0xFF174D43),
+                  GuardedMutation(
+                    buttonKey: Key('full-${assignment.id}'),
+                    inputs: 'full:${assignment.id}:$balance',
+                    label: CollectionsText.fullReceipt,
+                    confirmText: CollectionsText.fullConfirm(
+                      money.formatOrDash(assignment.balanceUnits, Currency.lyd),
+                    ),
+                    onVersionConflict: () =>
+                        ref.invalidate(collectionsProvider),
+                    // 537f073 expects the current debt with a full receipt and
+                    // refuses it if the debt changed (FULL_AMOUNT_CHANGED).
+                    onSubmit: (_) => _send(context, ref, 'full', balance),
+                  ),
                 ),
-          child: const Text(CollectionsText.partialReceipt),
         ),
-        OutlinedButton.icon(
-          key: Key('call-${assignment.id}'),
-          onPressed: inactive || phone == null || phone.isEmpty
-              ? null
-              : () async {
-                  // Opens the dialer (tel:), as the website's link does.
-                  // Without a dialer the number is copied instead.
-                  final dialed = await ref.read(phoneDialerProvider)(phone);
-                  if (dialed) return;
-                  await Clipboard.setData(ClipboardData(text: phone));
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(CollectionsText.phoneCopied),
-                      ),
-                    );
-                  }
-                },
-          icon: const Icon(Icons.phone_outlined, size: 16),
-          label: const Text(CollectionsText.call),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _whiteAction(
+            key: Key('submit-${assignment.id}'),
+            label: CollectionsText.partialReceipt,
+            onPressed: blocked || !online
+                ? null
+                : () => showAppForm<void>(
+                    context,
+                    PartialReceiptForm(assignment: assignment),
+                  ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _whiteAction(
+            key: Key('call-${assignment.id}'),
+            label: CollectionsText.call,
+            icon: Icons.phone_outlined,
+            onPressed: inactive || phone == null || phone.isEmpty
+                ? null
+                : () async {
+                    // Opens the dialer (tel:), as the website's link does.
+                    // Without a dialer the number is copied instead.
+                    final dialed = await ref.read(phoneDialerProvider)(phone);
+                    if (dialed) return;
+                    await Clipboard.setData(ClipboardData(text: phone));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(CollectionsText.phoneCopied),
+                        ),
+                      );
+                    }
+                  },
+          ),
         ),
       ],
     );
@@ -1779,6 +1807,96 @@ class _EmployeeActions extends ConsumerWidget {
 }
 
 // --------------------------------------------------------------- pieces
+
+/// White (or solid) action on a coloured collection card, matching the
+/// website's `.collection-card button` so the label stays readable.
+Widget _siteAction(Color background, Color foreground, Widget child) {
+  return Theme(
+    data: ThemeData(
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: background,
+          foregroundColor: foreground,
+          disabledBackgroundColor: background.withValues(alpha: 0.55),
+          disabledForegroundColor: foreground.withValues(alpha: 0.7),
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          textStyle: cairo(11, 800),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+    ),
+    child: child,
+  );
+}
+
+Widget _whiteAction({
+  required Key key,
+  required String label,
+  required VoidCallback? onPressed,
+  IconData? icon,
+}) {
+  return FilledButton(
+    key: key,
+    style: FilledButton.styleFrom(
+      backgroundColor: const Color(0xFFFFFFFF),
+      foregroundColor: const Color(0xFF174D43),
+      disabledBackgroundColor: const Color(0xFFE7E5E4),
+      disabledForegroundColor: const Color(0xFF174D43).withValues(alpha: 0.45),
+      minimumSize: const Size(0, 44),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      textStyle: cairo(11, 800),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    ),
+    onPressed: onPressed,
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[Icon(icon, size: 14), const SizedBox(width: 3)],
+          Text(label),
+        ],
+      ),
+    ),
+  );
+}
+
+class _CollectionAmounts extends StatelessWidget {
+  const _CollectionAmounts({
+    required this.assignment,
+    required this.money,
+    required this.gloss,
+  });
+
+  final CollectionAssignmentDto assignment;
+  final MoneyFormatter money;
+  final Gloss gloss;
+
+  @override
+  Widget build(BuildContext context) {
+    String line(String label, MoneyValue? value) {
+      if (value == null) return '$label: غير مسجلة';
+      return '$label: ${money.formatOrDash(value, Currency.lyd)}';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          line('قيمة التوجيه', assignment.assignedBalanceUnits),
+          key: Key('assigned-amount-${assignment.id}'),
+          style: cairo(12, 700, color: gloss.ink),
+        ),
+        Text(
+          line('الرصيد الحالي', assignment.balanceUnits),
+          key: Key('current-amount-${assignment.id}'),
+          style: cairo(12, 800, color: gloss.ink),
+        ),
+      ],
+    );
+  }
+}
 
 class _CardHeader extends StatelessWidget {
   const _CardHeader({

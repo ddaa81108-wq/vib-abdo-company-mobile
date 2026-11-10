@@ -11,6 +11,7 @@ class CollectionAssignmentDto {
       this.section,
       this.phone,
       this.balanceUnits,
+      this.assignedBalanceUnits,
       this.assigneeName,
       this.assigneeUserId,
       this.status,
@@ -33,6 +34,10 @@ class CollectionAssignmentDto {
       section; // customers | companies | libyan-deposits | egyptian-deposits
   final String? phone;
   final MoneyValue? balanceUnits;
+
+  /// Value the assignment was given (`assignedBalanceUnits`). Null when the
+  /// server omits it; the card then shows «غير مسجلة» for that line.
+  final MoneyValue? assignedBalanceUnits;
   final String? assigneeName;
   final String? assigneeUserId;
   final String? status;
@@ -63,6 +68,11 @@ class CollectionAssignmentDto {
         balanceUnits: unitsOrNull(
           j['balanceUnits'],
           fieldPath: 'balanceUnits',
+          rowId: strOrNull(j['id']),
+        ),
+        assignedBalanceUnits: unitsOrNull(
+          j['assignedBalanceUnits'],
+          fieldPath: 'assignedBalanceUnits',
           rowId: strOrNull(j['id']),
         ),
         assigneeName: strOrNull(j['assigneeName']),
