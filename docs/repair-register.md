@@ -434,6 +434,50 @@
 - يعتمد على: 038. لا تغيير في الخادم.
 - التراجع: `git revert 299852337c46a38db69474e3b04ccb5ec9b21369`. afterward: `flutter test test/collections_cancel_approval_test.dart --exclude-tags screenshots --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-040
+
+- الالتزام: `5cc1253e751432e9a85aa38041e763f655cb2f1f`
+- العنوان: VIB-FIX-040: Put the ledger save mark inside the draft row.
+- العرض: علامة حفظ المسودة كانت خارج الجدول في هامش أيسر.
+- السبب: الموقع يضع ✓ خضراء في عمود التعديل و✕ حمراء في عمود الإلغاء على صف الإدخال نفسه.
+- السلوك: الصف المحفوظ قلم أخضر وإلغاء أحمر. صف المسودة ✓ باهتة حتى تصلح القيمة ثم ✓ خضراء، وبجانبها مسح الحقول. الشريط أسود: كبسولة الاسم، تعديل البيانات في الوسط، وإغلاق. الإجمالي الذهبي يذكر التالي إن أرسله الخادم.
+- الدليل: `test/ledger_table_test.dart` و`test/deposits_ledger_tick_test.dart`.
+- يعتمد على: 032. لا مسار جديد.
+- التراجع: `git revert 5cc1253e751432e9a85aa38041e763f655cb2f1f`. afterward: `flutter test test/ledger_table_test.dart --name "opens on" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-041
+
+- الالتزام: `613fbb9b880c8c44e0b525b1b6e68381c3b93ee7`
+- العنوان: VIB-FIX-041: Give deposit cards a gold rim and two per row.
+- العرض: كروت الأمانات كانت بلا إطار ذهبي واضح، وعمود واحد على الهاتف.
+- السبب: الموقع يعرض كروتا في الصف، بإطار ذهبي، واللون من إشارة الرصيد.
+- السلوك: أخضر لأمانة للعميل، أحمر لدين على العميل، أسود لحساب صفر. الإطار ذهبي. عمودان حين يضيق العرض. التصفية كما هي: الذكية واليوم والديون والمسدد والمثبت.
+- الدليل: `test/deposit_website_tone_test.dart`.
+- يعتمد على: 018. لا مسار جديد.
+- التراجع: `git revert 613fbb9b880c8c44e0b525b1b6e68381c3b93ee7`. afterward: `flutter test test/deposit_website_tone_test.dart --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-042
+
+- الالتزام: `84ebd12d55a900cd1c12a28432983e8e59576151`
+- العنوان: VIB-FIX-042: Show purchases as a ledger table on every width.
+- العرض: الهاتف كان يعرض حركات المشتريات كروتًا.
+- السبب: المطلوب جدول كجدول التطبيق على الفرع الرئيسي، مع إبقاء لوحة اليوم وفاصل الباقي.
+- السلوك: الجدول الأفقي على كل العرض. لوحة اليوم الخضراء، وتعديل اليوم، والرأس اللاصق، وصف الباقي المرحّل، وبلا رصيد افتتاحي.
+- الدليل: `test/purchases_ledger_layout_test.dart`.
+- يعتمد على: 034. لا مسار جديد.
+- التراجع: `git revert 84ebd12d55a900cd1c12a28432983e8e59576151`. afterward: `flutter test test/purchases_ledger_layout_test.dart --name "440" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-043
+
+- الالتزام: `8e00286745837d416c83c3bbce97d0ab6473780f`
+- العنوان: VIB-FIX-043: Remove login signup and add four preview designs.
+- العرض: بوابة الدخول كانت تعرض طلب حساب، ولا توجد معاينات جديدة.
+- السبب: الإدارة تنشئ الحسابات. المطلوب أربع شاشات معاينة فقط لا تستبدل الدخول الحي.
+- السلوك: زر طلب الحساب أزيل من البوابة. مسار معلومات الطلب بقي لمن يفتحه مباشرة. أربع معاينات: زجاج على تدرج، شعار منقسم، كريمي ذهبي، أسود بخطوط ذهبية. بلا إنشاء حساب في أي منها.
+- الدليل: `test/screens_ui_test.dart`.
+- يعتمد على: 027. إنشاء الحسابات من الإعدادات كما هو.
+- التراجع: `git revert 8e00286745837d416c83c3bbce97d0ab6473780f`. afterward: `flutter test test/screens_ui_test.dart --name "login is RTL" --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
