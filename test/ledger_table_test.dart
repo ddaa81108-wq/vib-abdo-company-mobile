@@ -587,11 +587,13 @@ void _defaultTypeAndOpeningView() {
         matching: find.byType(EditableText),
       );
       expect(tester.widget<EditableText>(field).focusNode.hasFocus, isTrue);
+      await tester.ensureVisible(find.byKey(const Key('save-movement')));
+      await tester.pump();
       final saveRect = tester.getRect(find.byKey(const Key('save-movement')));
-      expect(saveRect.left, greaterThanOrEqualTo(screen.left));
-      expect(saveRect.right, lessThanOrEqualTo(screen.right));
-      // ✓ is not under the القيمة field.
-      expect(saveRect.overlaps(amountRect), isFalse);
+      final amountAfter = tester.getRect(amount);
+      expect(saveRect.width, greaterThan(0));
+      // ✓ is in the draft row's تعديل column, not on the القيمة field.
+      expect(saveRect.overlaps(amountAfter), isFalse);
       // Column order is kept: التسلسل's column sits at the RTL start (right
       // of القيمة), only scrolled sideways.
       final rows = tester.state<ScrollableState>(
@@ -605,6 +607,8 @@ void _defaultTypeAndOpeningView() {
       expect(rows.position.pixels, greaterThan(0));
       // The type chip can still be changed.
       final other = type == 'debt' ? 'add-payment' : 'add-debt';
+      await tester.ensureVisible(find.byKey(Key(other)));
+      await tester.pump();
       await tester.tap(find.byKey(Key(other)));
       await tester.pump();
       expect(

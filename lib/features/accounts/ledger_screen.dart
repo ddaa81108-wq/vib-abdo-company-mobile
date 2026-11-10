@@ -302,42 +302,51 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                   section == AccountSection.companies;
               // Top: the owner's name in a pill, then small round buttons
               // (jump, تعديل البيانات, ×). Nothing else above the table.
-              final bar = Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 10, 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _OwnerPill(
-                        name: loadedCard.name,
-                        section: _ledgerTitle(section),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    EditAccountCardButton(
-                      section: section,
-                      card: loadedCard,
-                      compact: true,
-                    ),
-                    const SizedBox(width: 6),
-                    IconButton(
-                      key: const Key('ledger-close'),
-                      tooltip: AppStrings.back,
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFF211600),
-                        foregroundColor: const Color(0xFFF6E7A8),
-                        side: const BorderSide(
-                          color: Color(0xFFE7AE12),
-                          width: 1.4,
+              final bar = DecoratedBox(
+                decoration: const BoxDecoration(color: Color(0xFF111111)),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 10, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: _OwnerPill(
+                            name: loadedCard.name,
+                            section: _ledgerTitle(section),
+                          ),
                         ),
-                        minimumSize: const Size(36, 36),
-                        fixedSize: const Size(36, 36),
                       ),
-                      onPressed: () => context.canPop()
-                          ? context.pop()
-                          : context.go('/${section.path}'),
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                    ),
-                  ],
+                      EditAccountCardButton(
+                        section: section,
+                        card: loadedCard,
+                        compact: true,
+                      ),
+                      Expanded(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: IconButton(
+                            key: const Key('ledger-close'),
+                            tooltip: AppStrings.back,
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFF211600),
+                              foregroundColor: const Color(0xFFF6E7A8),
+                              side: const BorderSide(
+                                color: Color(0xFFE7AE12),
+                                width: 1.4,
+                              ),
+                              minimumSize: const Size(36, 36),
+                              fixedSize: const Size(36, 36),
+                            ),
+                            onPressed: () => context.canPop()
+                                ? context.pop()
+                                : context.go('/${section.path}'),
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
               final jumps = Align(
@@ -580,7 +589,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                   width: columns.width,
                   viewport: viewport,
                   columns: columns,
-                  leadingGutter: composer != null,
+                  leadingGutter: false,
                 ),
               ),
             Expanded(
@@ -976,6 +985,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
             expectedVersion: watchedCard.asData?.value.version,
             label: AppStrings.save,
             glyph: Icons.check_rounded,
+            reportErrorInline: false,
             onSubmit: widget.onFull!,
           )
         : GuardedMutation(
@@ -986,6 +996,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
             expectedVersion: watchedCard.asData?.value.version,
             label: AppStrings.save,
             glyph: Icons.check_rounded,
+            reportErrorInline: false,
             onVersionConflict: () {
               ref.invalidate(ledgerProvider((widget.section, widget.id)));
               ref.invalidate(accountCardProvider((widget.section, widget.id)));
@@ -994,9 +1005,10 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
             },
             onSubmit: _submit,
           );
-    // Published to the left gutter. Same button, same request.
+    final ready = full || parseUnits(_amount.text) != null;
+    // The ✓ lives in this row's تعديل column. Pale until the amount is valid.
     final saveCell = Padding(
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(2),
       child: SectionTheme(
         child: Builder(
           builder: (context) {
@@ -1005,18 +1017,20 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
               data: theme.copyWith(
                 filledButtonTheme: FilledButtonThemeData(
                   style: theme.filledButtonTheme.style?.copyWith(
-                    minimumSize: const WidgetStatePropertyAll(Size(40, 40)),
-                    fixedSize: const WidgetStatePropertyAll(Size(40, 40)),
+                    minimumSize: const WidgetStatePropertyAll(Size(32, 32)),
+                    fixedSize: const WidgetStatePropertyAll(Size(32, 32)),
                     padding: const WidgetStatePropertyAll(EdgeInsets.zero),
                     shape: const WidgetStatePropertyAll(CircleBorder()),
-                    backgroundColor: const WidgetStatePropertyAll(
-                      Color(0xFF15803D),
+                    backgroundColor: WidgetStatePropertyAll(
+                      ready ? const Color(0xFF15803D) : const Color(0xFFBBF7D0),
                     ),
-                    foregroundColor: const WidgetStatePropertyAll(Colors.white),
+                    foregroundColor: WidgetStatePropertyAll(
+                      ready ? Colors.white : const Color(0xFF166534),
+                    ),
                   ),
                 ),
               ),
-              child: save,
+              child: FittedBox(fit: BoxFit.scaleDown, child: save),
             );
           },
         ),
@@ -1067,9 +1081,31 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
                       _Cell(_LedgerColumns.paid, dash),
                       if (columns.showBalance)
                         _Cell(_LedgerColumns.balance, dash),
+                      _Cell(_LedgerColumns.edit, saveCell),
                       _Cell(
-                        _LedgerColumns.edit + _LedgerColumns.cancel,
-                        dash,
+                        _LedgerColumns.cancel,
+                        IconButton(
+                          key: const Key('clear-movement'),
+                          tooltip: AppStrings.cancel,
+                          style: IconButton.styleFrom(
+                            backgroundColor: const Color(0xFFE11D48),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(32, 32),
+                            fixedSize: const Size(32, 32),
+                            padding: EdgeInsets.zero,
+                          ),
+                          onPressed: full
+                              ? null
+                              : () {
+                                  _amount.clear();
+                                  _note.clear();
+                                  _factor.clear();
+                                  setState(
+                                    () => _mode = CalculationMode.direct,
+                                  );
+                                },
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                        ),
                         divider: false,
                       ),
                     ],
@@ -1118,32 +1154,16 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
     final tableWidth = widget.tableWidth > widget.scrollPort
         ? widget.tableWidth
         : widget.scrollPort;
-    return Row(
-      textDirection: TextDirection.ltr,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: _LedgerColumns.tickGutter,
-          height: MediaQuery.textScalerOf(context).scale(_composerHeight),
-          child: OverflowBox(
-            alignment: Alignment.topCenter,
-            maxWidth: _LedgerColumns.tickGutter,
-            maxHeight: 420,
-            child: saveCell,
-          ),
+    return SizedBox(
+      width: widget.scrollPort,
+      child: SingleChildScrollView(
+        controller: scroll,
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: tableWidth,
+          child: _InlineViewport(width: widget.scrollPort, child: fields),
         ),
-        SizedBox(
-          width: widget.scrollPort,
-          child: SingleChildScrollView(
-            controller: scroll,
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: tableWidth,
-              child: _InlineViewport(width: widget.scrollPort, child: fields),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -1636,6 +1656,13 @@ class _TotalCard extends StatelessWidget {
                     ],
                   ],
                 ),
+                if (card.nextSequence != null)
+                  Text(
+                    units == 0
+                        ? 'الحساب مسدّد'
+                        : 'التالي #${card.nextSequence}',
+                    style: cairo(11, 700, color: gloss.ink),
+                  ),
                 if (reloadError != null)
                   Semantics(
                     container: true,
@@ -1836,10 +1863,7 @@ class _LedgerTable extends StatelessWidget {
     final radius = attachedTop
         ? BorderRadius.vertical(bottom: corner)
         : BorderRadius.all(corner);
-    final gutter = composer != null;
-    final scrollPort = gutter
-        ? math.max(0.0, viewport - _LedgerColumns.tickGutter)
-        : viewport;
+    final scrollPort = viewport;
     final tableWidth = width > scrollPort ? width : scrollPort;
     final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
@@ -1861,34 +1885,23 @@ class _LedgerTable extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              textDirection: TextDirection.ltr,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (gutter)
-                  const SizedBox(
-                    key: Key('composer-save-pin'),
-                    width: _LedgerColumns.tickGutter,
-                  ),
-                SizedBox(
-                  width: scrollPort,
-                  child: SingleChildScrollView(
-                    key: const Key('ledger-columns-scroll'),
-                    controller: controller,
-                    scrollDirection: Axis.horizontal,
-                    child: SizedBox(
-                      width: tableWidth,
-                      child: _InlineViewport(
-                        width: scrollPort,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: children,
-                        ),
-                      ),
+            SizedBox(
+              width: scrollPort,
+              child: SingleChildScrollView(
+                key: const Key('ledger-columns-scroll'),
+                controller: controller,
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: tableWidth,
+                  child: _InlineViewport(
+                    width: scrollPort,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: children,
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
             ?composer,
             if (width > scrollPort)
@@ -2328,7 +2341,7 @@ class _EntryTile extends ConsumerWidget {
     final odd = (ordinal ?? entry.sequence ?? 0).isOdd;
     final zebra = Theme.of(context).brightness == Brightness.dark
         ? const Color(0xFF1C1917)
-        : (odd ? const Color(0xFFFFFBF3) : const Color(0xFFF3E6C4));
+        : (odd ? const Color(0xFFFFFBF3) : Colors.white);
     return Column(
       key: Key('ledger-entry-${entry.id}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2592,7 +2605,7 @@ class _InlineComposerState extends State<_InlineComposer> {
       columns: widget.columns,
       fieldsScroll: widget.fieldsScroll,
       tableWidth: widget.tableWidth,
-      scrollPort: math.max(0, widget.viewport - _LedgerColumns.tickGutter),
+      scrollPort: math.max(0, widget.viewport),
       typeCell: chips,
       onFull: widget.onFull,
       onSaved: (posted) {
@@ -2780,9 +2793,7 @@ class _OwnerPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       label: '$section: $name',
-      child: SizedBox(
-        width: double.infinity,
-        child: DecoratedBox(
+      child: DecoratedBox(
         key: const Key('ledger-owner-pill'),
         decoration: BoxDecoration(
           color: const Color(0xFF111111),
@@ -2808,7 +2819,6 @@ class _OwnerPill extends StatelessWidget {
               ),
             ],
           ),
-        ),
         ),
       ),
     );

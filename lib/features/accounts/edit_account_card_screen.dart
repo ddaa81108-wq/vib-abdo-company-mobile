@@ -84,16 +84,23 @@ class EditAccountCardButton extends ConsumerWidget {
         style: TextButton.styleFrom(
           backgroundColor: const Color(0xFF211600),
           foregroundColor: const Color(0xFFF6E7A8),
-          side: const BorderSide(color: Color(0xFFE7AE12), width: 1.4),
-          minimumSize: const Size(36, 36),
-          fixedSize: const Size(36, 36),
-          padding: EdgeInsets.zero,
-          shape: const CircleBorder(),
+          side: const BorderSide(color: Color(0xFFE7AE12), width: 1.2),
+          minimumSize: const Size(0, 36),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          shape: const StadiumBorder(),
+          textStyle: cairo(12, 800),
         ),
         onPressed: online
             ? () => context.push('/${section.path}/${card.id}/edit')
             : null,
-        child: const Icon(Icons.edit_outlined, size: 18),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.edit_outlined, size: 16),
+            SizedBox(width: 4),
+            Text('تعديل البيانات'),
+          ],
+        ),
       );
     }
     final button = GatedButton(
