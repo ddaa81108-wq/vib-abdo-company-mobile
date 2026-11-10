@@ -65,6 +65,18 @@ void main() {
   test(
       'admin with empty lists (real server today) -> role flag grants everything',
       () {
+    final owner = PermissionService()
+      ..applyFromServer(
+        const ['collections.read'],
+        role: 'admin',
+        isOwner: true,
+      );
+    expect(owner.canRead(SectionKey.treasury), isTrue);
+    expect(owner.fullAccess, isTrue);
+    final limitedAdmin = PermissionService()
+      ..applyFromServer(const ['collections.read'], role: 'admin');
+    expect(limitedAdmin.canRead(SectionKey.treasury), isFalse);
+
     final p = PermissionService()..applyFromServer(const [], role: 'admin');
     expect(p.role, AccountRole.admin);
     expect(p.fullAccess, isTrue);

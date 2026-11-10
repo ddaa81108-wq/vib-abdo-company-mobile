@@ -68,9 +68,8 @@ class NotificationOpener {
     }
 
     final userId = session.profile.id;
-    if (!_belongsToUser(n, userId, origin)) {
-      // A different recipient is not this user's row. Every other result,
-      // including a missing recipient on a tray tap, is marked read.
+    if (!_belongsToUser(n, userId)) {
+      // A named recipient who is not this user is not this row.
       if (!_foreignRecipient(n, userId)) {
         await _markRead(n.notificationId);
       }
@@ -86,7 +85,18 @@ class NotificationOpener {
     }
 
     final permissions = _ref.read(apiLayerProvider).permissions;
-    if (!permissions.canRead(target.section)) {
+    final owner = session.profile.isOwner;
+    if (target.section == null) {
+      final settings =
+          permissions.canDo(ManagementAction.settingsManage) ||
+          permissions.canViewFinancialLedger ||
+          owner;
+      if (!settings) {
+        await _markRead(n.notificationId);
+        _go(forbiddenLocation);
+        return NotificationOpenResult.forbidden;
+      }
+    } else if (!owner && !permissions.canRead(target.section!)) {
       await _markRead(n.notificationId);
       _go(forbiddenLocation);
       return NotificationOpenResult.forbidden;
@@ -135,16 +145,12 @@ class NotificationOpener {
     router.go(location);
   }
 
-  bool _belongsToUser(
-    AppNotification notification,
-    String userId,
-    NotificationOpenOrigin origin,
-  ) {
-    final owner = notification.recipientUserId;
-    if (origin == NotificationOpenOrigin.list) {
-      return owner == null || owner.isEmpty || owner == userId;
-    }
-    return owner != null && owner.isNotEmpty && owner == userId;
+  bool _belongsToUser(AppNotification notification, String userId) {
+    // GET /api/notifications is already filtered to the signed-in user and
+    // does not send recipientUserId. A named other recipient is refused.
+    final owner = notification.recipientUserId?.trim();
+    if (owner == null || owner.isEmpty) return true;
+    return owner == userId;
   }
 
   /// True only when the server named a recipient and it is not [userId].
@@ -168,7 +174,9 @@ class NotificationTarget {
   });
 
   final String location;
-  final SectionKey section;
+
+  /// Null is the settings screen, which is not a [SectionKey].
+  final SectionKey? section;
   final AccountSection? account;
   final String? accountId;
 }
@@ -181,7 +189,10 @@ NotificationTarget? resolveNotificationTarget(NotificationRelatedRef? ref) {
   if (ref == null) return null;
   final type = ref.type.trim().toLowerCase();
   final id = ref.id.trim();
-  if (type.isEmpty || id.isEmpty) return null;
+  if (type.isEmpty) return null;
+  if (type == 'settings') {
+    return const NotificationTarget._(location: '/settings', section: null);
+  }
   switch (type) {
     case 'collection':
     case 'collections':
@@ -203,7 +214,7 @@ NotificationTarget? resolveNotificationTarget(NotificationRelatedRef? ref) {
     return NotificationTarget._(location: '/collections', section: section);
   }
   final account = _accountFor(section);
-  if (account == null) {
+  if (account == null || id.isEmpty) {
     return NotificationTarget._(location: '/${section.key}', section: section);
   }
   return NotificationTarget._(

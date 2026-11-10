@@ -69,6 +69,7 @@ class PermissionService extends ChangeNotifier {
     Map<String, String>? sectionAccess,
     bool? fullAccess,
     String? version,
+    bool isOwner = false,
   }) {
     _version = version;
     _role = role == adminRoleValue
@@ -92,6 +93,12 @@ class PermissionService extends ChangeNotifier {
     } else {
       _setLists(rawCodes, access,
           full: false, present: present); // (2) explicit lists / employee
+    }
+    // The primary manager is an admin the website lets into every section.
+    // Other accounts keep the granted-section rules. Account creation stays
+    // behind isOwner in the screen, not behind this flag alone.
+    if (isOwner && _role == AccountRole.admin) {
+      _fullAccess = true;
     }
     notifyListeners();
   }

@@ -368,10 +368,10 @@ NotificationRelatedRef? _relatedRef(Map<String, dynamic> json) {
   }
   final flat = _pair(json, 'relatedRefType', 'relatedRefId');
   if (flat != null) return flat;
-  final section = _text(json['section']);
+  final section = _text(json['section']) ?? _text(json['sectionKey']);
   final entity = _text(json['entityId'] ?? json['aggregateId']);
-  if (section == null || entity == null) return null;
-  return NotificationRelatedRef(type: section, id: entity);
+  if (section == null) return null;
+  return NotificationRelatedRef(type: section, id: entity ?? '');
 }
 
 NotificationRelatedRef? _pair(

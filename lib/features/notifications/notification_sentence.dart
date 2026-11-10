@@ -66,7 +66,10 @@ String spokenNotificationText(String text) {
 }
 
 String _actor(AppNotification note) {
-  final role = note.actorRole == 'admin' ? 'الإداري' : 'الموظف';
+  final role = switch (note.actorRole) {
+    'admin' => 'الإداري',
+    _ => 'الموظف',
+  };
   return '$role ${note.actorName.trim()}';
 }
 
