@@ -137,9 +137,9 @@ class LoginAccountsScreen extends ConsumerWidget {
                                     style: cairo(
                                       12,
                                       600,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
                                     ),
                                   ),
                                   const SizedBox(height: AppSpacing.xs),
@@ -437,99 +437,97 @@ class _LoginAccountCreateScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-            Text('إنشاء حساب دخول', style: cairo(18, 800)),
-            const Text(
-              'يظهر للمدير الأساسي فقط. الحساب الجديد لا يصبح مديرًا أساسيًا.',
-            ),
-            TextField(
-              key: const Key('create-username'),
-              controller: _username,
-              decoration: const InputDecoration(labelText: 'اسم الدخول'),
-            ),
-            TextField(
-              key: const Key('create-display-name'),
-              controller: _name,
-              decoration: const InputDecoration(labelText: 'الاسم الظاهر'),
-            ),
-            DropdownButtonFormField<String>(
-              key: const Key('create-role'),
-              initialValue: _role,
-              decoration: const InputDecoration(labelText: 'الدور'),
-              items: const [
-                DropdownMenuItem(value: 'employee', child: Text('موظف')),
-                DropdownMenuItem(value: 'admin', child: Text('إدارة')),
-              ],
-              onChanged: (value) => setState(() => _role = value ?? 'employee'),
-            ),
-            TextField(
-              key: const Key('create-email'),
-              controller: _email,
-              decoration: InputDecoration(
-                labelText: _role == 'admin'
-                    ? 'البريد (مطلوب للإدارة)'
-                    : 'البريد',
-              ),
-            ),
-            TextField(
-              key: const Key('create-password'),
-              controller: _password,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'كلمة مرور مؤقتة'),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text('صلاحيات عامة', style: cairo(14, 800)),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final code in page.assignablePermissions)
-                  FilterChip(
-                    key: Key('create-permission-$code'),
-                    label: Text(permissionLabel(code)),
-                    selected: _permissions.contains(code),
-                    onSelected: (value) => setState(() {
-                      if (value) {
-                        _permissions.add(code);
-                      } else {
-                        _permissions.remove(code);
-                      }
-                    }),
+                  Text('إنشاء حساب دخول', style: cairo(18, 800)),
+                  const Text(
+                    'يظهر للمدير الأساسي فقط. الحساب الجديد لا يصبح مديرًا أساسيًا.',
                   ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text('صلاحيات الأقسام', style: cairo(14, 800)),
-            for (final entry in loginAccountSections.entries)
-              Card(
-                key: Key('create-access-${entry.key}'),
-                margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.all(AppSpacing.sm),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  TextField(
+                    key: const Key('create-username'),
+                    controller: _username,
+                    decoration: const InputDecoration(labelText: 'اسم الدخول'),
+                  ),
+                  TextField(
+                    key: const Key('create-display-name'),
+                    controller: _name,
+                    decoration: const InputDecoration(
+                      labelText: 'الاسم الظاهر',
+                    ),
+                  ),
+                  DropdownButtonFormField<String>(
+                    key: const Key('create-role'),
+                    initialValue: _role,
+                    decoration: const InputDecoration(labelText: 'الدور'),
+                    items: const [
+                      DropdownMenuItem(value: 'employee', child: Text('موظف')),
+                      DropdownMenuItem(value: 'admin', child: Text('إدارة')),
+                    ],
+                    onChanged: (value) =>
+                        setState(() => _role = value ?? 'employee'),
+                  ),
+                  TextField(
+                    key: const Key('create-email'),
+                    controller: _email,
+                    decoration: InputDecoration(
+                      labelText: _role == 'admin'
+                          ? 'البريد (مطلوب للإدارة)'
+                          : 'البريد',
+                    ),
+                  ),
+                  TextField(
+                    key: const Key('create-password'),
+                    controller: _password,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'كلمة مرور مؤقتة',
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text('صلاحيات عامة', style: cairo(14, 800)),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
                     children: [
-                      Text(entry.value, style: cairo(13, 800)),
-                      Wrap(
-                        spacing: 6,
-                        children: [
-                          for (final choice in const [
-                            ('none', 'لا شيء'),
-                            ('read', 'قراءة'),
-                            ('manage', 'إدارة'),
-                          ])
-                            ChoiceChip(
-                              label: Text(choice.$2),
-                              selected: _access[entry.key] == choice.$1,
-                              onSelected: (_) => setState(
-                                () => _access[entry.key] = choice.$1,
-                              ),
-                            ),
-                        ],
-                      ),
+                      for (final code in page.assignablePermissions)
+                        FilterChip(
+                          key: Key('create-permission-$code'),
+                          label: Text(permissionLabel(code)),
+                          selected: _permissions.contains(code),
+                          onSelected: (value) => setState(() {
+                            if (value) {
+                              _permissions.add(code);
+                            } else {
+                              _permissions.remove(code);
+                            }
+                          }),
+                        ),
                     ],
                   ),
-                ),
-              ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text('أقسام العمل', style: cairo(14, 800)),
+                  const Text(
+                    'القسم إما ممنوع أو دخول كامل: قراءة وإضافة وكتابة وتعديل ذلك القسم. لا خيار وصول محدود.',
+                  ),
+                  for (final entry in loginAccountSections.entries)
+                    _SectionGrant(
+                      cardKey: Key('create-access-${entry.key}'),
+                      denyKey: Key('create-deny-${entry.key}'),
+                      grantKey: Key('create-grant-${entry.key}'),
+                      title: entry.value,
+                      value: _access[entry.key] ?? 'none',
+                      note: entry.key == 'reports'
+                          ? 'لا مسار كتابة للتقارير في العقد. الدخول الكامل يرسل reports.read ولا يفتح تعديلًا.'
+                          : null,
+                      enabled: !_saving,
+                      onChanged: (level) => setState(() {
+                        _access[entry.key] = level;
+                        _applySectionCodes(
+                          _permissions,
+                          entry.key,
+                          level,
+                          page.assignablePermissions,
+                        );
+                      }),
+                    ),
                 ],
               ),
             ),
@@ -605,13 +603,20 @@ class _LoginAccountCreateScreenState
       _error = null;
     });
     try {
+      final assignable =
+          ref.read(loginAccountsProvider).asData?.value.assignablePermissions ??
+          const <String>[];
       await ref.read(apiLayerProvider).directory.createLoginAccount({
         'username': _username.text.trim(),
         'displayName': _name.text.trim(),
         'role': _role,
         'email': _email.text.trim(),
         'password': _password.text,
-        'permissions': _permissions.toList(),
+        'permissions': _codesForSave(
+          _permissions,
+          _access,
+          assignable,
+        ).toList(),
         for (final entry in _access.entries) '${entry.key}Access': entry.value,
       });
       _password.clear();
@@ -684,80 +689,65 @@ class _PermissionEditorState extends State<_PermissionEditor> {
           child: ListView(
             padding: pagePadding(MediaQuery.sizeOf(context).width),
             children: [
-        _AccountHeading(account: widget.account),
-        Text('صلاحيات عامة', style: cairo(16, 800)),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          'المحدد الآن ظاهر بلون مختلف. الحفظ يرسل هذه القائمة ومستوى كل قسم.',
-          style: cairo(12, 600, color: scheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (final code in widget.assignable)
-              FilterChip(
-                key: Key('edit-permission-$code'),
-                label: Text(permissionLabel(code)),
-                selected: _permissions.contains(code),
-                onSelected: widget.saving
-                    ? null
-                    : (value) => setState(() {
-                        if (value) {
-                          _permissions.add(code);
-                        } else {
-                          _permissions.remove(code);
-                        }
-                      }),
+              _AccountHeading(account: widget.account),
+              Text('صلاحيات عامة', style: cairo(16, 800)),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'المحدد الآن ظاهر بلون مختلف. الحفظ يرسل هذه القائمة ومستوى كل قسم.',
+                style: cairo(12, 600, color: scheme.onSurfaceVariant),
               ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Text('صلاحيات الأقسام', style: cairo(16, 800)),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          'لا شيء أو قراءة أو إدارة، كما يعرّفها الخادم.',
-          style: cairo(12, 600, color: scheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        for (final entry in loginAccountSections.entries)
-          Card(
-            key: Key('edit-access-${entry.key}'),
-            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.all(AppSpacing.sm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
                 children: [
-                  Text(entry.value, style: cairo(14, 800)),
-                  Text(
-                    'المحدد: ${_accessLabel(_access[entry.key])}',
-                    style: cairo(12, 600, color: scheme.onSurfaceVariant),
-                  ),
-                  Wrap(
-                    spacing: 6,
-                    children: [
-                      for (final choice in const [
-                        ('none', 'لا شيء'),
-                        ('read', 'قراءة'),
-                        ('manage', 'إدارة'),
-                      ])
-                        ChoiceChip(
-                          label: Text(choice.$2),
-                          selected: _access[entry.key] == choice.$1,
-                          onSelected: widget.saving
-                              ? null
-                              : (_) => setState(
-                                  () => _access[entry.key] = choice.$1,
-                                ),
-                        ),
-                    ],
-                  ),
+                  for (final code in widget.assignable)
+                    FilterChip(
+                      key: Key('edit-permission-$code'),
+                      label: Text(permissionLabel(code)),
+                      selected: _permissions.contains(code),
+                      onSelected: widget.saving
+                          ? null
+                          : (value) => setState(() {
+                              if (value) {
+                                _permissions.add(code);
+                              } else {
+                                _permissions.remove(code);
+                              }
+                            }),
+                    ),
                 ],
               ),
-            ),
-          ),
+              const SizedBox(height: AppSpacing.md),
+              Text('أقسام العمل', style: cairo(16, 800)),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'ممنوع أو دخول كامل لهذا القسم. الحفظ يرسل manage مع صلاحيات القراءة والكتابة المنشورة.',
+                style: cairo(12, 600, color: scheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              for (final entry in loginAccountSections.entries)
+                _SectionGrant(
+                  cardKey: Key('edit-access-${entry.key}'),
+                  denyKey: Key('edit-deny-${entry.key}'),
+                  grantKey: Key('edit-grant-${entry.key}'),
+                  legacyKey: Key('edit-legacy-${entry.key}'),
+                  title: entry.value,
+                  value: _access[entry.key] ?? 'none',
+                  note: entry.key == 'reports'
+                      ? 'لا مسار كتابة للتقارير في العقد. الدخول الكامل يرسل reports.read ولا يفتح تعديلًا.'
+                      : null,
+                  enabled: !widget.saving,
+                  onChanged: (level) => setState(() {
+                    _access[entry.key] = level;
+                    _applySectionCodes(
+                      _permissions,
+                      entry.key,
+                      level,
+                      widget.assignable,
+                    );
+                  }),
+                ),
             ],
           ),
         ),
@@ -795,7 +785,11 @@ class _PermissionEditorState extends State<_PermissionEditor> {
                         onPressed: widget.saving
                             ? null
                             : () => widget.onSave({
-                                'permissions': _permissions.toList(),
+                                'permissions': _codesForSave(
+                                  _permissions,
+                                  _access,
+                                  widget.assignable,
+                                ).toList(),
                                 for (final entry in _access.entries)
                                   '${entry.key}Access': entry.value,
                               }),
@@ -852,11 +846,120 @@ class _AccountHeading extends StatelessWidget {
   }
 }
 
+/// Codes the published contract uses for one section grant.
+/// `manage` plus these codes is full read/add/write/edit for that section.
+/// Reports have no write code. Purchases finalize stays outside this group.
+const sectionCapabilityCodes = <String, List<String>>{
+  'customerDebts': ['debts.read', 'debts.write'],
+  'companyDebts': ['companies.read', 'companies.write'],
+  'libyanDeposits': ['libyan_deposits.read', 'libyan_deposits.write'],
+  'egyptianDeposits': ['egyptian_deposits.read', 'egyptian_deposits.write'],
+  'masraweya': ['masraweya.read', 'masraweya.write'],
+  'purchases': ['purchases.read', 'purchases.write'],
+  'treasury': ['treasury.read', 'treasury.write'],
+  'reports': ['reports.read'],
+};
+
 String _knownAccess(String? raw) =>
     raw == 'read' || raw == 'manage' || raw == 'none' ? raw! : 'none';
 
-String _accessLabel(String? raw) => switch (raw) {
-  'read' => 'قراءة',
-  'manage' => 'إدارة',
-  _ => 'لا شيء',
-};
+void _applySectionCodes(
+  Set<String> permissions,
+  String key,
+  String level,
+  List<String> assignable,
+) {
+  final group = [
+    for (final code in sectionCapabilityCodes[key] ?? const <String>[])
+      if (assignable.contains(code)) code,
+  ];
+  if (level == 'manage') {
+    permissions.addAll(group);
+  } else if (level == 'none') {
+    permissions.removeAll(group);
+  }
+}
+
+Set<String> _codesForSave(
+  Set<String> permissions,
+  Map<String, String> access,
+  List<String> assignable,
+) {
+  final codes = {...permissions};
+  for (final entry in access.entries) {
+    _applySectionCodes(codes, entry.key, entry.value, assignable);
+  }
+  return codes;
+}
+
+class _SectionGrant extends StatelessWidget {
+  const _SectionGrant({
+    required this.title,
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+    this.note,
+    this.cardKey,
+    this.denyKey,
+    this.grantKey,
+    this.legacyKey,
+  });
+
+  final String title;
+  final String value;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+  final String? note;
+  final Key? cardKey;
+  final Key? denyKey;
+  final Key? grantKey;
+  final Key? legacyKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final legacy = value == 'read';
+    return Card(
+      key: cardKey,
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.all(AppSpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: cairo(14, 800)),
+            if (note != null)
+              Text(
+                note!,
+                style: cairo(12, 600, color: scheme.onSurfaceVariant),
+              ),
+            if (legacy)
+              Text(
+                'محفوظ سابقاً بحالة ليست دخولاً كاملاً. لن يتغير إلا إذا اخترت الدخول الكامل أو المنع ثم حفظت.',
+                key: legacyKey,
+                style: cairo(12, 700, color: scheme.error),
+              ),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                ChoiceChip(
+                  key: denyKey,
+                  label: const Text('ممنوع'),
+                  selected: value == 'none',
+                  onSelected: enabled ? (_) => onChanged('none') : null,
+                ),
+                ChoiceChip(
+                  key: grantKey,
+                  label: const Text('دخول كامل'),
+                  selected: value == 'manage',
+                  onSelected: enabled ? (_) => onChanged('manage') : null,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

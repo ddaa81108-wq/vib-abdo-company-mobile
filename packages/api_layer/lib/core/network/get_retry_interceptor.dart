@@ -16,8 +16,8 @@ class GetRetryInterceptor extends Interceptor {
     this.baseDelay = const Duration(milliseconds: 400),
     Random? random,
     Future<void> Function(Duration delay)? delay,
-  }) : _random = random ?? Random(),
-       _delay = delay ?? _systemDelay;
+  })  : _random = random ?? Random(),
+        _delay = delay ?? _systemDelay;
 
   final int maxRetries;
   final Duration baseDelay;

@@ -301,7 +301,11 @@ final _cases = <(String, Future<void> Function(Phase7Harness))>[
         ).jsonBody?.containsKey('pinned'),
         isFalse,
       );
-      await h.layer.accounts.confirmZeroReview('c1', meta);
+      await h.layer.accounts.confirmZeroReview(
+        AccountSection.customers,
+        'c1',
+        meta,
+      );
       final zero = expectCall(h, 'POST', ApiEndpoints.customerZeroReview('c1'));
       expect(zero.jsonBody?['requestId'], 'req-contract');
       expect(zero.jsonBody?['expectedFinancialVersion'], 4);

@@ -34,10 +34,7 @@ void main() {
     await saveShot(tester, 'splash-error-light-360');
 
     const emptyStates = <String, (String, Key)>{
-      '/settings/employees': (
-        'settings-employees',
-        Key('login-account-u_1'),
-      ),
+      '/settings/employees': ('settings-employees', Key('login-account-u_1')),
       '/settings/audit': ('settings-audit', Key('security-current-session')),
       '/settings/operations': (
         'settings-operations',

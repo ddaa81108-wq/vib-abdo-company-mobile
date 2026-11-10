@@ -53,7 +53,8 @@ void main() {
     expect(clock.delays, [const Duration(milliseconds: 400)]);
   });
 
-  test('P7-20 HEAD is retried and a 503 Retry-After of 2s replaces backoff', () async {
+  test('P7-20 HEAD is retried and a 503 Retry-After of 2s replaces backoff',
+      () async {
     final clock = _Clock();
     final adapter = _Script(status: 503, failures: 1, retryAfter: '2');
     final dio = _dio(adapter, clock);
@@ -67,7 +68,8 @@ void main() {
     final clock = _Clock();
     final adapter = _Script(status: 503, failures: 1, retryAfter: '6');
     final client = _client(adapter, clock);
-    await expectLater(client.get('/api/health'), throwsA(isA<ServerException>()));
+    await expectLater(
+        client.get('/api/health'), throwsA(isA<ServerException>()));
     expect(adapter.methods, ['GET']);
     expect(clock.delays, isEmpty);
   });
@@ -100,7 +102,8 @@ void main() {
       final clock = _Clock();
       final adapter = _Script(status: status, failures: 3);
       final client = _client(adapter, clock);
-      await expectLater(client.get('/api/health'), throwsA(isA<ApiException>()));
+      await expectLater(
+          client.get('/api/health'), throwsA(isA<ApiException>()));
       expect(adapter.methods, ['GET'], reason: 'status $status');
       expect(clock.delays, isEmpty, reason: 'status $status');
     }
@@ -111,7 +114,8 @@ void main() {
     final adapter = _Script(status: 502, failures: 3);
     final client = _client(adapter, clock);
     await expectLater(
-      client.get('/api/health', options: const ApiRequestOptions(noRetry: true)),
+      client.get('/api/health',
+          options: const ApiRequestOptions(noRetry: true)),
       throwsA(isA<ServerException>()),
     );
     expect(adapter.methods, ['GET']);
@@ -119,7 +123,8 @@ void main() {
   });
 }
 
-DioApiClient _client(_Script adapter, _Clock clock) => DioApiClient(_dio(adapter, clock));
+DioApiClient _client(_Script adapter, _Clock clock) =>
+    DioApiClient(_dio(adapter, clock));
 
 Dio _dio(_Script adapter, _Clock clock) {
   final dio = Dio(
@@ -194,9 +199,8 @@ class _Script implements HttpClientAdapter {
         jsonEncode({
           'ok': false,
           'error': {
-            'code': status == 401 || status == 419
-                ? 'PAGE_EXPIRED'
-                : 'UPSTREAM',
+            'code':
+                status == 401 || status == 419 ? 'PAGE_EXPIRED' : 'UPSTREAM',
             'message': 'x',
             'correlationId': 'c',
           },
@@ -214,7 +218,9 @@ class _Script implements HttpClientAdapter {
         'data': {'status': 'ok'},
       }),
       200,
-      headers: {Headers.contentTypeHeader: ['application/json']},
+      headers: {
+        Headers.contentTypeHeader: ['application/json']
+      },
     );
   }
 

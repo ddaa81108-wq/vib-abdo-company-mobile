@@ -69,7 +69,8 @@ void main() {
         expect(loggedOut.statusCode, 401);
         _noLeak(loggedOut, const ['موظف آخر تجريبي']);
 
-        await layer.session.login(username: 'admin.demo', password: 'demo-only');
+        await layer.session
+            .login(username: 'admin.demo', password: 'demo-only');
         final missing = await _capture(
           layer.client.get('${ApiEndpoints.users}/missing-user'),
         );

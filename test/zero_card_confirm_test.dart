@@ -16,11 +16,14 @@ void main() {
     final cards = [
       _card('a', 'أول', 320, null),
       _card('z', 'صفر', 0, const {'pending': false}),
+      _card('n', 'صار دينًا', 40, const {'pending': false}),
       _card('b', 'ثان', 10, const {'status': 'pending'}),
       _card('c', 'مغلق', 0, const {'status': 'confirmed'}),
+      _card('z', 'مكرر', 0, const {'pending': false}),
     ];
     expect(customersWithClosedZeroReviewLast(cards).map((card) => card.id), [
       'a',
+      'n',
       'b',
       'z',
       'c',
@@ -119,10 +122,7 @@ void main() {
         'balanceUnits': 0,
         'currency': 'LYD',
         'version': 4,
-        'zeroReview': {
-          'pending': true,
-          'financialVersion': 9,
-        },
+        'zeroReview': {'pending': true, 'financialVersion': 9},
       },
     ));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
@@ -209,12 +209,30 @@ void main() {
     );
   });
 
-  testWidgets('companies do not pretend to review a zero card', (tester) async {
-    await pumpFakeApp(tester, size: const Size(440, 900));
+  testWidgets('a company card without zeroReview does not offer a check', (
+    tester,
+  ) async {
+    final layer = await pumpFakeApp(tester, size: const Size(440, 900));
+    (layer.client as FakeApiClient).appendedAccountCards.add((
+      section: 'companies',
+      card: {
+        'id': 'co_old',
+        'name': 'شركة بلا حقل',
+        'balanceUnits': 0,
+        'currency': 'LYD',
+        'version': 2,
+      },
+    ));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/companies');
-    expect(find.byKey(const Key('zero-review-unavailable')), findsOneWidget);
-    expect(find.byKey(const ValueKey('zero-review-co_1')), findsNothing);
+    expect(find.byKey(const Key('zero-review-unavailable')), findsNothing);
+    expect(find.byKey(const ValueKey('zero-review-co_old')), findsNothing);
+    expect(
+      (layer.client as FakeApiClient).mutationPaths.where(
+        (path) => path.contains('zero-review'),
+      ),
+      isEmpty,
+    );
   });
 
   testWidgets('an employee does not get the zero-review check', (tester) async {
@@ -302,10 +320,12 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('account-card-c_zero')),
       400,
-      scrollable: find.descendant(
-        of: find.byKey(const Key('screen-customers')),
-        matching: find.byType(Scrollable),
-      ).first,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('screen-customers')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
     await tester.pump();
     await saveShot(tester, 'zero-card-after-confirm');

@@ -61,7 +61,9 @@ void main() {
     );
   });
 
-  test('relatedRef accepts an object, a JSON string, flat push keys, or section', () {
+  test(
+      'relatedRef accepts an object, a JSON string, flat push keys, or section',
+      () {
     expect(
       AppNotification.fromJson({
         'id': '1',

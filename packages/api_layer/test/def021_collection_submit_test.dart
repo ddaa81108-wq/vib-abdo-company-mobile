@@ -60,8 +60,8 @@ void main() {
     final overview = await api.collections.overview();
     expect(overview.submissions.first.id, submission.id);
     expect(overview.submissions, hasLength(3));
-    final created = overview.unlinkedReceipts
-        .singleWhere((row) => row.id == receipt.id);
+    final created =
+        overview.unlinkedReceipts.singleWhere((row) => row.id == receipt.id);
     expect(created.customerName, 'زبون جديد');
     expect(created.amountUnits?.units, 25);
     expect(created.status, 'pending');

@@ -26,8 +26,8 @@ class RemoteMasraweyaRepository implements MasraweyaRepository {
   Future<MasraweyaDayDto> saveDay(
       SaveMasraweyaDayRequest r, MutationMeta meta) async {
     const path = ApiEndpoints.masraweyaDay;
-    final data = (await _api.put(path, body: {...meta.toBody(), ...r.toJson()}))
-        .data;
+    final data =
+        (await _api.put(path, body: {...meta.toBody(), ...r.toJson()})).data;
     return runWithMoneyEndpoint(path, () => MasraweyaDayDto.fromData(data));
   }
 }

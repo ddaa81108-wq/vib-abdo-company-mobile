@@ -92,11 +92,11 @@ class CompanyApp extends ConsumerWidget {
 Widget _services(Widget? page) {
   return CaptureResume(
     child: NotificationPermissionRegistration(
-    child: NotificationTransportHost(
-      child: ForegroundNotificationBanner(
-        child: RealtimeLifecycle(child: page ?? const SizedBox.shrink()),
+      child: NotificationTransportHost(
+        child: ForegroundNotificationBanner(
+          child: RealtimeLifecycle(child: page ?? const SizedBox.shrink()),
+        ),
       ),
-    ),
     ),
   );
 }

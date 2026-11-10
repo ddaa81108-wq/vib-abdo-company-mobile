@@ -45,7 +45,9 @@ void main() {
     },
   );
 
-  test('fake admin: explicit permissions, home, awaiting cash from server fields', () async {
+  test(
+      'fake admin: explicit permissions, home, awaiting cash from server fields',
+      () async {
     final api = ApiLayer.create(
       config: const ApiConfig(
         baseUrl: 'https://fake.invalid',

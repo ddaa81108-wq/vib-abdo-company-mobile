@@ -62,6 +62,7 @@ Workflow name: `CI` (`.github/workflows/ci.yml`).
 | `analyze-test-apk` | `Analyze, test, and debug APK` | Analyze, full tests, debug APK with `USE_FAKE_API=true`, then `tool/staging_negative_tests/run.sh --dry-run`. |
 | `permissions-negative` | `Negative permission tests` | Convention check, tagged tests for the app and the package, fail on zero tests, then the same dry-run. |
 | `release-no-fake-api` | `Release build rejects fake API` | Compile probe plus a release APK that must exist and scan clean. Described below. When `GOOGLE_SERVICES_JSON_BASE64` is set, that job decodes it before the successful release APK. See [NOTIFICATIONS.md](NOTIFICATIONS.md). |
+| `format` | `Format check` | Read-only `dart format --output=none --set-exit-if-changed` for `lib`, `test`, and `packages/api_layer`. Resolves packages first, then does not deploy, sign, read secrets, or change the jobs above. |
 
 Android notification permission on emulators is a separate workflow, `Android notification emulator` (`.github/workflows/android-notifications-emulator.yml`). It is not part of this required check. See [NOTIFICATIONS.md](NOTIFICATIONS.md).
 

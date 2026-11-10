@@ -525,8 +525,7 @@ Future<FakeApiClient> _admin() async {
   return api;
 }
 
-String _customersJson(_Kind kind) =>
-    '''
+String _customersJson(_Kind kind) => '''
 {
   "items": [
     {"id":"c_frac","name":"اسم سري","balanceUnits":10.005,"currency":"LYD"},
@@ -543,8 +542,7 @@ String _customersJson(_Kind kind) =>
 String _cardJson(_Kind kind) =>
     '{"id":"c_55","name":"اسم سري","balanceUnits":${kind.json},"currency":"LYD","version":4}';
 
-String _treasuryJson(_Kind kind) =>
-    '''
+String _treasuryJson(_Kind kind) => '''
 {
   "version": 7,
   "totals": {
@@ -559,8 +557,7 @@ String _treasuryJson(_Kind kind) =>
 }
 ''';
 
-String _purchasesJson(_Kind kind) =>
-    '''
+String _purchasesJson(_Kind kind) => '''
 {
   "merchant": {"key": "al_bayan", "name": "البيان"},
   "day": {

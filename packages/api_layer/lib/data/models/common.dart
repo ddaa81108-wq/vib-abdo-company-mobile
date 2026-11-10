@@ -132,10 +132,14 @@ class MutationAck {
     this.id,
     this.version,
     this.balanceUnits,
+    this.replayed = false,
     this.raw = const {},
   });
   final String? id;
   final int? version;
+
+  /// `data.replayed` on a repeated zero-review of the same financial version.
+  final bool replayed;
 
   /// Server balance after the write. Null when the body omitted it.
   final MoneyValue? balanceUnits;
@@ -167,6 +171,7 @@ class MutationAck {
         fieldPath: 'balanceUnits',
         rowId: id,
       ),
+      replayed: d['replayed'] == true,
       raw: d,
     );
   }

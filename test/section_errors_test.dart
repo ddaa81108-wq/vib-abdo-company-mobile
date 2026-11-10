@@ -166,11 +166,14 @@ void main() {
         ledgerPageProvider.overrideWith((ref, query) async {
           gate.calls++;
           if (gate.failing) throw const NetworkException();
-          return ref.read(apiLayerProvider).reports.financialLedger(
-            sectionKey: query.section,
-            currency: query.currency,
-            q: query.q.isEmpty ? null : query.q,
-          );
+          return ref
+              .read(apiLayerProvider)
+              .reports
+              .financialLedger(
+                sectionKey: query.section,
+                currency: query.currency,
+                q: query.q.isEmpty ? null : query.q,
+              );
         }),
       ],
     );

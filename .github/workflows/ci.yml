@@ -299,3 +299,41 @@ jobs:
             echo
             echo "Built \`app-release.apk\` with \`USE_FAKE_API=false\`. Demo profile strings were absent. The APK was not uploaded."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  format:
+    name: Format check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Flutter 3.47.7
+        uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: stable
+          flutter-version: "3.47.7"
+          cache: true
+          pub-cache: true
+
+      - name: Verify Flutter and Dart versions
+        run: |
+          flutter --version
+          flutter --version | grep -q 'Flutter 3.47.7'
+          dart --version
+          dart --version | grep -q '3.13.5'
+
+      # dart format picks the style from the package language version in
+      # package_config.json. api_layer stays on sdk >=3.3.0, so this resolve
+      # is required for the check to match a local format after pub get.
+      # The step only reads source. It does not deploy, sign, or use secrets.
+      - name: Resolve packages
+        run: |
+          flutter pub get
+          flutter pub get --directory packages/api_layer
+
+      - name: Check dart format
+        run: |
+          dart format --output=none --set-exit-if-changed \
+            lib test \
+            packages/api_layer/lib packages/api_layer/test

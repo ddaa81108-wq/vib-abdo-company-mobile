@@ -20,11 +20,11 @@ const String releaseFakeApiRejectedMessage =
 /// Debug, profile, and `flutter test` leave `dart.vm.product` unset.
 class ReleaseFakeApiGuard {
   const ReleaseFakeApiGuard()
-    : assert(
-        !const bool.fromEnvironment('dart.vm.product') ||
-            !kUseFakeApiFromEnvironment,
-        releaseFakeApiRejectedMessage,
-      );
+      : assert(
+          !const bool.fromEnvironment('dart.vm.product') ||
+              !kUseFakeApiFromEnvironment,
+          releaseFakeApiRejectedMessage,
+        );
 }
 
 /// Referenced from `main` and from tests so the const assert stays reachable.

@@ -115,7 +115,8 @@ void main() {
           const MoneyFormatter().formatOrDash(unitsOrNull(null), Currency.lyd),
           '—');
     });
-    test('string / fractional / exponent / double => invalid field, not a number',
+    test(
+        'string / fractional / exponent / double => invalid field, not a number',
         () {
       final logs = <String>[];
       SafeLog.sink = (message, {wrapWidth}) {

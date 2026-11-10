@@ -91,9 +91,9 @@ Future<void> _login(FakeApiClient api, String username) {
 }
 
 List<String> _ids(ApiResponse response) => [
-  for (final item in (response.data as Map)['items'] as List)
-    '${(item as Map)['id']}',
-];
+      for (final item in (response.data as Map)['items'] as List)
+        '${(item as Map)['id']}',
+    ];
 
 Matcher _status<T extends ApiException>(int status) =>
     isA<T>().having((error) => error.statusCode, 'statusCode', status);

@@ -12,19 +12,11 @@ import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'support/pump_app.dart';
 
 void main() {
-  for (final (scale, dark) in const [
-    (1.0, false),
-    (1.3, false),
-    (1.0, true),
-  ]) {
+  for (final (scale, dark) in const [(1.0, false), (1.3, false), (1.0, true)]) {
     testWidgets(
       'purchase totals and ledger fit 440x956 scale $scale dark $dark',
       (tester) async {
-        await pumpFakeApp(
-          tester,
-          size: const Size(440, 956),
-          textScale: scale,
-        );
+        await pumpFakeApp(tester, size: const Size(440, 956), textScale: scale);
         await signIn(tester, username: 'admin.demo', password: 'demo-only');
         await go(tester, '/purchases');
         if (dark) {
@@ -111,17 +103,16 @@ void main() {
           ),
           findsOneWidget,
         );
-        final booksTop = tester.getRect(find.byKey(const Key('purchase-books'))).top;
+        final booksTop = tester
+            .getRect(find.byKey(const Key('purchase-books')))
+            .top;
         final vodafoneBottom = tester
             .getRect(find.byKey(const Key('purchase-vodafone-ours')))
             .bottom;
         final textScale = MediaQuery.textScalerOf(
           tester.element(find.byKey(PurchasesScreen.screenKey)),
         ).scale(1);
-        expect(
-          vodafoneBottom - booksTop,
-          lessThan(textScale <= 1 ? 400 : 480),
-        );
+        expect(vodafoneBottom - booksTop, lessThan(textScale <= 1 ? 400 : 480));
         expect(previous.height, lessThan(80));
         final previousLabel = tester.getRect(
           find.descendant(
@@ -133,7 +124,9 @@ void main() {
           (previousLabel.center.dx - previous.center.dx).abs(),
           lessThan(16),
         );
-        final addSize = tester.getSize(find.byKey(const Key('add-purchase-12')));
+        final addSize = tester.getSize(
+          find.byKey(const Key('add-purchase-12')),
+        );
         final finalizeSize = tester.getSize(
           find.byKey(const Key('finalize-day-12')),
         );
@@ -279,72 +272,72 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('writing stays in the ledger and the focused cell stays visible', (
-    tester,
-  ) async {
-    await pumpFakeApp(tester, size: const Size(440, 956));
-    await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    await go(tester, '/purchases');
-    await tester.tap(find.byKey(const Key('add-purchase-12')));
-    await settle(tester);
+  testWidgets(
+    'writing stays in the ledger and the focused cell stays visible',
+    (tester) async {
+      await pumpFakeApp(tester, size: const Size(440, 956));
+      await signIn(tester, username: 'admin.demo', password: 'demo-only');
+      await go(tester, '/purchases');
+      await tester.tap(find.byKey(const Key('add-purchase-12')));
+      await settle(tester);
 
-    expect(find.byKey(const Key('purchase-inline-row')), findsOneWidget);
-    expect(find.byKey(const Key('purchase-ledger')), findsOneWidget);
-    expect(find.byType(Dialog), findsNothing);
-    expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byKey(const Key('purchase-inline-row')), findsOneWidget);
+      expect(find.byKey(const Key('purchase-ledger')), findsOneWidget);
+      expect(find.byType(Dialog), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
 
-    final value = find.descendant(
-      of: find.byKey(const Key('purchase-field-value')),
-      matching: find.byType(EditableText),
-    );
-    expect(
-      tester.widget<EditableText>(value).focusNode.hasFocus,
-      isTrue,
-    );
-
-    final gridLine = tester
-        .widget<DecoratedBox>(
-          find.byKey(const Key('purchase-grid-cell-pe_old')),
-        )
-        .decoration as BoxDecoration;
-    final side = (gridLine.border! as Border).top;
-    expect(side.width, 1);
-    expect((gridLine.border! as Border).left.width, 1);
-    expect((gridLine.border! as Border).right.width, 1);
-    expect((gridLine.border! as Border).bottom.width, 1);
-
-    Future<void> next() async {
-      await tester.testTextInput.receiveAction(TextInputAction.next);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 220));
-    }
-
-    bool inside(Finder field) {
-      final item = tester.getRect(field);
-      final port = tester.getRect(
-        find.byKey(const Key('purchase-ledger-scroll')),
+      final value = find.descendant(
+        of: find.byKey(const Key('purchase-field-value')),
+        matching: find.byType(EditableText),
       );
-      return item.left >= port.left - 8 && item.right <= port.right + 8;
-    }
+      expect(tester.widget<EditableText>(value).focusNode.hasFocus, isTrue);
 
-    expect(inside(find.byKey(const Key('purchase-field-value'))), isTrue);
-    await next();
-    final rate = find.descendant(
-      of: find.byKey(const Key('purchase-field-rate')),
-      matching: find.byType(EditableText),
-    );
-    expect(tester.widget<EditableText>(rate).focusNode.hasFocus, isTrue);
-    expect(inside(find.byKey(const Key('purchase-field-rate'))), isTrue);
-    await next();
-    await next();
-    final vodafone = find.descendant(
-      of: find.byKey(const Key('purchase-field-vodafone')),
-      matching: find.byType(EditableText),
-    );
-    expect(tester.widget<EditableText>(vodafone).focusNode.hasFocus, isTrue);
-    expect(inside(find.byKey(const Key('purchase-field-vodafone'))), isTrue);
-    expect(tester.takeException(), isNull);
-  });
+      final gridLine =
+          tester
+                  .widget<DecoratedBox>(
+                    find.byKey(const Key('purchase-grid-cell-pe_old')),
+                  )
+                  .decoration
+              as BoxDecoration;
+      final side = (gridLine.border! as Border).top;
+      expect(side.width, 1);
+      expect((gridLine.border! as Border).left.width, 1);
+      expect((gridLine.border! as Border).right.width, 1);
+      expect((gridLine.border! as Border).bottom.width, 1);
+
+      Future<void> next() async {
+        await tester.testTextInput.receiveAction(TextInputAction.next);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 220));
+      }
+
+      bool inside(Finder field) {
+        final item = tester.getRect(field);
+        final port = tester.getRect(
+          find.byKey(const Key('purchase-ledger-scroll')),
+        );
+        return item.left >= port.left - 8 && item.right <= port.right + 8;
+      }
+
+      expect(inside(find.byKey(const Key('purchase-field-value'))), isTrue);
+      await next();
+      final rate = find.descendant(
+        of: find.byKey(const Key('purchase-field-rate')),
+        matching: find.byType(EditableText),
+      );
+      expect(tester.widget<EditableText>(rate).focusNode.hasFocus, isTrue);
+      expect(inside(find.byKey(const Key('purchase-field-rate'))), isTrue);
+      await next();
+      await next();
+      final vodafone = find.descendant(
+        of: find.byKey(const Key('purchase-field-vodafone')),
+        matching: find.byType(EditableText),
+      );
+      expect(tester.widget<EditableText>(vodafone).focusNode.hasFocus, isTrue);
+      expect(inside(find.byKey(const Key('purchase-field-vodafone'))), isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Future<void> go(WidgetTester tester, String path) async {

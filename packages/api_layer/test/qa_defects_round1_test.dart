@@ -540,19 +540,19 @@ void main() {
           isA<ConflictException>()
               .having((e) => e.code, 'code', 'COLLECTION_DAY_NOT_SETTLED')
               .having(
-                (e) => e.details,
-                'details',
-                {'pendingCount': 4, 'cashPendingCount': 1},
-              ),
+            (e) => e.details,
+            'details',
+            {'pendingCount': 4, 'cashPendingCount': 1},
+          ),
         ),
       );
       expect((await api.collections.overview()).batchId, 'b_1');
 
       final meta = MutationMeta(requestId: 'settle');
-      await api.collections.decide('sb_1', CollectionDecision.reject,
-          meta: meta);
-      await api.collections.decide('sb_9', CollectionDecision.reject,
-          meta: meta);
+      await api.collections
+          .decide('sb_1', CollectionDecision.reject, meta: meta);
+      await api.collections
+          .decide('sb_9', CollectionDecision.reject, meta: meta);
       await api.collections.decideUnlinked('ur_1',
           decision: CollectionDecision.reject, meta: meta);
       await api.collections.decideUnlinked('ur_9',

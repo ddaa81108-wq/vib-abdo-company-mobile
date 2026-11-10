@@ -350,7 +350,7 @@ abstract final class FakeLargeCatalog {
       'debts' => card['balanceUnits'] != 0,
       'settled' => card['balanceUnits'] == 0,
       'pinned' => card['pinned'] == true,
-      'pendingReview' => index % 23 == 0,
+      'pendingReview' || 'pending-review' => index % 23 == 0,
       _ => true,
     };
   }

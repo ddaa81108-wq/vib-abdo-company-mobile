@@ -119,6 +119,20 @@ class FakeFixtures {
         isOwner: false,
       );
     }
+    if (username.startsWith('company.writer')) {
+      return _me(
+        id: 'u_33',
+        username: 'company.writer@example.invalid',
+        name: 'كاتب شركات تجريبي',
+        role: 'employee',
+        permissions: const [
+          'companies.read',
+          'companies.write',
+        ],
+        sectionAccess: null,
+        isOwner: false,
+      );
+    }
     if (username.startsWith('limited.reader')) {
       return _me(
         id: 'u_5',
@@ -1526,7 +1540,10 @@ class FakeFixtures {
             'entityId': 'sub-1',
             'correlationId': 'fake-fixture',
             'outcome': 'success',
-            'details': {'subjectName': 'استلام مستقل تجريبي', 'amountUnits': 75},
+            'details': {
+              'subjectName': 'استلام مستقل تجريبي',
+              'amountUnits': 75
+            },
             'actorName': 'موظف استلام تجريبي',
             'actorUsername': 'employee.demo',
             'createdAt': '2026-10-22T22:33:25.792Z',

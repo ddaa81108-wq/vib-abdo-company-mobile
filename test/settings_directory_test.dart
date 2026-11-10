@@ -182,7 +182,10 @@ void main() {
       expect(find.textContaining('10,000'), findsNothing);
 
       await go(tester, '/settings/users/u_12');
-      expect(find.byKey(const Key('screen-login-account-edit')), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen-login-account-edit')),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const Key('edit-access-customerDebts'), skipOffstage: false),
         findsOneWidget,
@@ -194,23 +197,19 @@ void main() {
       await tester.ensureVisible(find.byKey(const Key('login-account-cancel')));
       await tester.tap(find.byKey(const Key('login-account-cancel')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('screen-settings-employees')), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen-settings-employees')),
+        findsOneWidget,
+      );
       expect(
         fake.mutationPaths.where((path) => path.contains('/api/users')),
         isEmpty,
       );
 
       await go(tester, '/settings/users/u_12');
-      final readChip = find.descendant(
-        of: find.byKey(
-          const Key('edit-access-customerDebts'),
-          skipOffstage: false,
-        ),
-        matching: find.text('قراءة'),
-        skipOffstage: false,
-      );
+      final grant = find.byKey(const Key('edit-grant-customerDebts'));
       await tester.scrollUntilVisible(
-        readChip,
+        grant,
         400,
         scrollable: find
             .descendant(
@@ -219,7 +218,7 @@ void main() {
             )
             .first,
       );
-      await tester.tap(readChip);
+      await tester.tap(grant);
       await tester.pumpAndSettle();
       await tester.ensureVisible(
         find.byKey(const Key('login-account-save-permissions')),
@@ -227,9 +226,15 @@ void main() {
       await tester.tap(find.byKey(const Key('login-account-save-permissions')));
       await tester.pumpAndSettle();
       final body = fake.mutationBodies.join('\n');
-      expect(body, contains('"customerDebtsAccess":"read"'));
+      expect(body, contains('"customerDebtsAccess":"manage"'));
+      expect(body, contains('"debts.read"'));
+      expect(body, contains('"debts.write"'));
+      expect(body, isNot(contains('"purchases.finalize"')));
       expect(body, contains('"collections.read"'));
-      expect(find.byKey(const Key('screen-settings-employees')), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen-settings-employees')),
+        findsOneWidget,
+      );
     },
   );
 
@@ -293,11 +298,7 @@ void main() {
   test('an audit cursor is the integer before token, not a session list', () {
     final page = AuditPage.fromData(const {
       'items': [
-        {
-          'id': 3,
-          'action': 'collection.submit',
-          'outcome': 'success',
-        },
+        {'id': 3, 'action': 'collection.submit', 'outcome': 'success'},
       ],
       'nextBefore': 14,
     });
@@ -309,7 +310,10 @@ void main() {
 
   test('approving a public request does not open a session', () async {
     final admin = ApiLayer.create(
-      config: const ApiConfig(baseUrl: 'https://fake.invalid', useFakeApi: true),
+      config: const ApiConfig(
+        baseUrl: 'https://fake.invalid',
+        useFakeApi: true,
+      ),
     );
     addTearDown(admin.dispose);
     await admin.session.login(username: 'created.admin', password: 'demo-only');
@@ -326,7 +330,10 @@ void main() {
     );
 
     final stranger = ApiLayer.create(
-      config: const ApiConfig(baseUrl: 'https://fake.invalid', useFakeApi: true),
+      config: const ApiConfig(
+        baseUrl: 'https://fake.invalid',
+        useFakeApi: true,
+      ),
     );
     addTearDown(stranger.dispose);
     await stranger.session.restore();
@@ -341,17 +348,17 @@ void main() {
     final layer = await pumpFakeApp(tester, size: const Size(440, 1400));
     (layer.client as FakeApiClient).scriptedGetJson['/api/audit-log'] =
         jsonEncode({
-      'items': [
-        {
-          'id': 20,
-          'action': 'collection.approve',
-          'outcome': 'success',
-          'actorName': 'مدير تجريبي',
-          'createdAt': '2026-10-22T22:00:00.000Z',
-        },
-      ],
-      'nextBefore': 15,
-    });
+          'items': [
+            {
+              'id': 20,
+              'action': 'collection.approve',
+              'outcome': 'success',
+              'actorName': 'مدير تجريبي',
+              'createdAt': '2026-10-22T22:00:00.000Z',
+            },
+          ],
+          'nextBefore': 15,
+        });
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/settings/audit');
     expect(find.byKey(const Key('audit-event-20')), findsOneWidget);

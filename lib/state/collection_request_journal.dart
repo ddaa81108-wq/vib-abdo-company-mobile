@@ -90,10 +90,7 @@ class PrefsCollectionAttemptStore implements CollectionAttemptStore {
       if (raw == null) return _memory;
       final decoded = jsonDecode(raw);
       if (decoded is! List) return const [];
-      return [
-        for (final item in decoded)
-          ?CollectionAttempt.fromJson(item),
-      ];
+      return [for (final item in decoded) ?CollectionAttempt.fromJson(item)];
     } catch (_) {
       return _memory;
     }
@@ -145,8 +142,7 @@ bool isFinalCollectionAnswer(Object error) => switch (error) {
   _ => true,
 };
 
-class CollectionRequestJournal
-    extends AsyncNotifier<List<CollectionAttempt>> {
+class CollectionRequestJournal extends AsyncNotifier<List<CollectionAttempt>> {
   @override
   Future<List<CollectionAttempt>> build() =>
       ref.read(collectionAttemptStoreProvider).load();

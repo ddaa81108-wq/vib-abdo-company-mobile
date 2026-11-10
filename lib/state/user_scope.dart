@@ -19,6 +19,7 @@ void invalidateUserScope(WidgetRef ref) {
   ref.invalidate(homeDashboardProvider);
   ref.invalidate(accountsProvider);
   ref.invalidate(accountExtraCardsProvider);
+  ref.invalidate(zeroReviewAckProvider);
   ref.invalidate(accountQueryProvider);
   ref.invalidate(accountFilterProvider);
   ref.invalidate(accountNameSuggestionsProvider);

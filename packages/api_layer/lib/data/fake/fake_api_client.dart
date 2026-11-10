@@ -168,6 +168,15 @@ class FakeApiClient implements ApiClient {
   /// GET /api/collections calls, including a refetch after a conflict (tests).
   int collectionOverviewReads = 0;
 
+  /// The next account-list GET fails this many times. The first page of a
+  /// test can load before the counter is set, so a review refetch can fail
+  /// on its own.
+  int failAccountListRemaining = 0;
+
+  /// Successful first-time zero reviews. A replay of the same version does
+  /// not increment this.
+  int zeroReviewCommits = 0;
+
   /// Omit `unreadCount` from the notifications page (tests).
   bool omitUnreadCount = false;
 
@@ -540,6 +549,14 @@ class FakeApiClient implements ApiClient {
     if (!_access.canDo(action)) _fail(403, 'FORBIDDEN', _adminOnly);
   }
 
+  /// Customers: admin role only. The other three sections: that role or the
+  /// section write code. `fullAccess` is not enough for an employee.
+  void _requireZeroReview(SectionKey section) {
+    if (!_access.canReviewZeroBalance(section)) {
+      _fail(403, 'PERMISSION_DENIED', 'لا تملك صلاحية مراجعة هذا القسم.');
+    }
+  }
+
   void _requireFullAccess() {
     if (!_access.fullAccess) _fail(403, 'FORBIDDEN', _adminOnly);
   }
@@ -673,7 +690,7 @@ class FakeApiClient implements ApiClient {
       return;
     }
     if (seg.length > 2 && seg[2] == 'zero-review') {
-      _requireAction(ManagementAction.customerZeroReview);
+      _requireZeroReview(section);
       return;
     }
     _requireWrite(section);
@@ -1639,6 +1656,10 @@ class FakeApiClient implements ApiClient {
         accountListQueries.add(
           AccountListQuery(section: head, filter: filter, q: q, cursor: cursor),
         );
+        if (failAccountListRemaining > 0) {
+          failAccountListRemaining--;
+          _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر تحديث القائمة.');
+        }
         if (cursor != null &&
             cursor.isNotEmpty &&
             failNextAccountPageRemaining > 0) {
@@ -1692,11 +1713,13 @@ class FakeApiClient implements ApiClient {
       _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
     }
     if (seg.length > 2 && seg[2] == 'zero-review') {
-      _requireAction(ManagementAction.customerZeroReview);
+      _requireZeroReview(section);
     } else {
       _requireWrite(section);
     }
-    _rejectSystemManagedWrite(head, seg);
+    if (seg.length < 3 || seg[2] != 'zero-review') {
+      _rejectSystemManagedWrite(head, seg);
+    }
     if (seg.length > 1 &&
         seg[1] != 'suggestions' &&
         seg[1] != 'exchange-rate') {
@@ -2255,38 +2278,72 @@ class FakeApiClient implements ApiClient {
     });
   }
 
-  /// POST /customers/{id}/zero-review. Stores the documented closed review
-  /// (`pending: false`) so the next list read is the server status. Does not
-  /// change the balance.
+  /// POST /{section}/{id}/zero-review. The balance, card version, and
+  /// financial version stay as they were. A second confirm of the same
+  /// version returns `replayed` and does not write again.
   ApiResponse _applyZeroReview(String section, String accountId, Map b) {
-    if (section != 'customers') {
-      _fail(404, 'NOT_FOUND', 'المسار غير موجود في الخادم التجريبي');
+    const sections = {
+      'customers',
+      'companies',
+      'libyan-deposits',
+      'egyptian-deposits',
+    };
+    if (!sections.contains(section)) {
+      _fail(404, 'NOT_FOUND', 'المسار غير موجود.');
     }
     final card = _cardView(section, accountId);
-    if (!b.containsKey('expectedFinancialVersion')) {
-      _fail(400, 'INVALID_REVIEW_VERSION', 'الإصدار المالي مطلوب.');
+    if (card['systemManaged'] == true || card['systemLinkKey'] != null) {
+      _fail(404, 'NOT_FOUND', 'الحساب غير موجود.');
+    }
+    final expected = b['expectedFinancialVersion'];
+    if (expected is! int || expected < 0) {
+      _fail(
+        400,
+        'INVALID_REVIEW_VERSION',
+        'نسخة المراجعة غير صالحة. حدّث الكارت ثم أعد المحاولة.',
+      );
     }
     final review = card['zeroReview'];
     final financial = review is Map && review['financialVersion'] is int
         ? review['financialVersion'] as int
         : null;
-    if (financial != null && b['expectedFinancialVersion'] != financial) {
+    final balance = card['balanceUnits'];
+    if (balance is! int ||
+        balance != 0 ||
+        financial == null ||
+        financial != expected) {
       _fail(
         409,
         'ZERO_REVIEW_CHANGED',
-        'تغيرت الحالة المالية؛ حدّث بيانات الكارت.',
+        'تغيّر الكارت بعد عرضه. راجع آخر حركة قبل تأكيد المراجعة.',
       );
     }
-    if (financial == null) {
-      _requireVersion(b['expectedFinancialVersion'], card['version']);
+    final reviewedAt = review['reviewedAt'];
+    if (review['pending'] == false && reviewedAt != null) {
+      return _ok({
+        'zeroReview': {
+          'pending': false,
+          'financialVersion': financial,
+          'reviewedAt': reviewedAt,
+          'reviewedByName': review['reviewedByName'],
+        },
+        'replayed': true,
+      });
     }
-    final version = card['version'] is int ? card['version'] as int : 0;
+    if (review['pending'] != true) {
+      _fail(
+        409,
+        'ZERO_REVIEW_NOT_PENDING',
+        'هذا الكارت لا ينتظر مراجعة تصفير.',
+      );
+    }
     final closed = {
       'pending': false,
-      'financialVersion': version,
-      'reviewedAt': '2026-10-22T22:00:00.000Z',
+      'financialVersion': financial,
+      'reviewedAt': '2026-11-09T00:40:00.000Z',
       'reviewedByName': _displayName() ?? 'مدير تجريبي',
     };
+    zeroReviewCommits++;
     _cardState['$section|$accountId'] = {
       ...?_cardState['$section|$accountId'],
       'zeroReview': closed,
@@ -2962,6 +3019,9 @@ class FakeApiClient implements ApiClient {
         jsonDecode(jsonEncode(result)) as Map<String, dynamic>;
   }
 
+  /// Extra login rows merged into the fixture store on first read (tests).
+  final List<Map<String, dynamic>> extraLoginUsers = [];
+
   List<Map<String, dynamic>>? _loginUserRows;
   List<Map<String, dynamic>>? _accountRequestRows;
 
@@ -2971,10 +3031,12 @@ class FakeApiClient implements ApiClient {
     return user['isOwner'] == true;
   }
 
-  List<Map<String, dynamic>> get _loginUserStore =>
-      _loginUserRows ??= FakeFixtures.loginUsers()
-          .map((row) => Map<String, dynamic>.from(row))
-          .toList();
+  List<Map<String, dynamic>> get _loginUserStore => _loginUserRows ??= [
+        ...FakeFixtures.loginUsers().map(
+          (row) => Map<String, dynamic>.from(row),
+        ),
+        for (final row in extraLoginUsers) Map<String, dynamic>.from(row),
+      ];
 
   List<Map<String, dynamic>> get _accountRequestStore =>
       _accountRequestRows ??= FakeFixtures.accountRequests()

@@ -269,8 +269,8 @@ void main() {
     () {
       final seen = <String>{};
       for (final section in sections) {
-        final items = (FakeFixtures.accountsFor(section)['items'] as List)
-            .cast<Map>();
+        final items =
+            (FakeFixtures.accountsFor(section)['items'] as List).cast<Map>();
         expect(items, hasLength(10), reason: section);
         for (final card in items) {
           final days = card['debtAgeDays'];

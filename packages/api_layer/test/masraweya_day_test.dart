@@ -187,7 +187,8 @@ void main() {
     expect(current.version, 2);
   });
 
-  test('finalUnits fills remaining and entries have no row total on the wire', () {
+  test('finalUnits fills remaining and entries have no row total on the wire',
+      () {
     final parsed = MasraweyaDayDto.fromData({
       'businessDate': '2026-10-22',
       'today': '2026-10-22',

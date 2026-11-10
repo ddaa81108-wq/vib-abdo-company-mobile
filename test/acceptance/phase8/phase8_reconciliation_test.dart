@@ -112,14 +112,8 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(
-        _inside(const Key('screen-treasury'), '95,000'),
-        findsOneWidget,
-      );
-      expect(
-        _inside(const Key('screen-treasury'), 'ج.م'),
-        findsWidgets,
-      );
+      expect(_inside(const Key('screen-treasury'), '95,000'), findsOneWidget);
+      expect(_inside(const Key('screen-treasury'), 'ج.م'), findsWidgets);
       expect(_fmt(money, treasury.netUnits, Currency.lyd), '51,000 د.ل');
       expect(
         _fmt(money, treasury.egyptianSourceUnits, Currency.egp),
@@ -468,8 +462,12 @@ Future<void> _expectSummary(
 ) async {
   await go(tester, '/${section.path}');
   final page = await _flushed(tester, () => layer.accounts.list(section));
-  final total = _visibleMoney(_fmt(money, page.summary.totalDebtUnits, currency));
-  final net = _visibleMoney(_fmt(money, page.summary.netBalanceUnits, currency));
+  final total = _visibleMoney(
+    _fmt(money, page.summary.totalDebtUnits, currency),
+  );
+  final net = _visibleMoney(
+    _fmt(money, page.summary.netBalanceUnits, currency),
+  );
   expect(_inside(screen, total), findsWidgets);
   expect(_inside(screen, net), findsWidgets);
   if (currency == Currency.egp) {

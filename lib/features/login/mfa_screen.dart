@@ -60,7 +60,9 @@ class _MfaScreenState extends ConsumerState<MfaScreen> {
                     alignment: AlignmentDirectional.centerEnd,
                     child: IconButton(
                       key: const Key('mfa-theme'),
-                      tooltip: dark ? AppStrings.themeLight : AppStrings.themeDark,
+                      tooltip: dark
+                          ? AppStrings.themeLight
+                          : AppStrings.themeDark,
                       onPressed: () =>
                           ref.read(themeModeProvider.notifier).toggle(),
                       icon: Icon(

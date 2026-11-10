@@ -223,11 +223,11 @@ class _HeaderBand extends StatelessWidget {
       horizontal: AppSpacing.md,
       vertical: AppSpacing.sm,
     ),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(AppRadii.md),
-        border: Border.all(color: sectionGold(context).withValues(alpha: 0.45)),
-      ),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      border: Border.all(color: sectionGold(context).withValues(alpha: 0.45)),
+    ),
     child: child,
   );
 }
@@ -340,10 +340,7 @@ class _GroupLabel extends StatelessWidget {
         top: AppSpacing.md,
         bottom: AppSpacing.xs,
       ),
-      child: Text(
-        text,
-        style: cairo(13, 800, color: sectionGold(context)),
-      ),
+      child: Text(text, style: cairo(13, 800, color: sectionGold(context))),
     );
   }
 }

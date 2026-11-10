@@ -33,10 +33,16 @@ void main() {
         await saveShot(tester, 'login-accounts-$theme-440');
         await saveShot(tester, 'accounts-list-$theme');
         await go(tester, '/settings/users/new');
-        expect(find.byKey(const Key('screen-login-account-create')), findsOneWidget);
+        expect(
+          find.byKey(const Key('screen-login-account-create')),
+          findsOneWidget,
+        );
         await saveShot(tester, 'login-account-create-$theme-440');
         await go(tester, '/settings/users/u_12');
-        expect(find.byKey(const Key('screen-login-account-edit')), findsOneWidget);
+        expect(
+          find.byKey(const Key('screen-login-account-edit')),
+          findsOneWidget,
+        );
         await saveShot(tester, 'login-account-edit-$theme-440');
         await saveShot(tester, 'account-edit-permissions-$theme');
         await go(tester, '/settings/ledger');
@@ -61,25 +67,21 @@ void main() {
     tags: ['screenshots'],
   );
 
-  testWidgets(
-    'mfa challenge and security notes at 440x956',
-    (tester) async {
-      await pumpFakeApp(tester, size: const Size(440, 956));
-      await tester.runAsync(loadScreenshotFonts);
-      await signIn(tester, username: 'mfa.admin', password: 'demo-only');
-      for (final dark in [false, true]) {
-        final theme = dark ? 'dark' : 'light';
-        expect(find.byKey(MfaScreen.screenKey), findsOneWidget);
-        expect(find.byKey(MfaScreen.codeKey), findsOneWidget);
-        if (dark) {
-          await tester.tap(find.byKey(const Key('mfa-theme')));
-          await tester.pumpAndSettle();
-        }
-        await saveShot(tester, 'mfa-challenge-$theme-440');
+  testWidgets('mfa challenge and security notes at 440x956', (tester) async {
+    await pumpFakeApp(tester, size: const Size(440, 956));
+    await tester.runAsync(loadScreenshotFonts);
+    await signIn(tester, username: 'mfa.admin', password: 'demo-only');
+    for (final dark in [false, true]) {
+      final theme = dark ? 'dark' : 'light';
+      expect(find.byKey(MfaScreen.screenKey), findsOneWidget);
+      expect(find.byKey(MfaScreen.codeKey), findsOneWidget);
+      if (dark) {
+        await tester.tap(find.byKey(const Key('mfa-theme')));
+        await tester.pumpAndSettle();
       }
-    },
-    tags: ['screenshots'],
-  );
+      await saveShot(tester, 'mfa-challenge-$theme-440');
+    }
+  }, tags: ['screenshots']);
 }
 
 Future<void> go(WidgetTester tester, String path) async {
