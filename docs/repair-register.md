@@ -346,6 +346,61 @@
 - يعتمد على: لا مسار جديد.
 - التراجع: `git revert 02c64c1e559869fafcd318f171bb87c974ad8f80`. afterward: `flutter test test/purchases_ledger_layout_test.dart --name "440" --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-032
+
+- الالتزام: `0e53fd1a159386dd1903af5512b7f6e4b4f3d750`
+- العنوان: VIB-FIX-032: Widen the ledger name capsule and gold-rim the draft pills.
+- العرض: اسم الحساب كان حبة صغيرة في الشريط، وأزرار المسودة لم تكن كبسولات سوداء مذهبة.
+- السبب: لقطة الهاتف 23 تضع الاسم في كبسولة سوداء عريضة بإطار ذهبي تملأ الشريط، وبجانبها دائرتا القلم والإغلاق.
+- السلوك: الكبسولة تأخذ عرض الشريط المتبقي. عناوين الأعمدة حبات سوداء. إطار الصفحة تدرج كريمي إلى ذهبي. أزرار ÷ و × ومباشر سوداء بإطار ذهبي.
+- الدليل: `test/ledger_presentation_test.dart`.
+- يعتمد على: 029. لا مسار جديد.
+- التراجع: `git revert 0e53fd1a159386dd1903af5512b7f6e4b4f3d750`. afterward: `flutter test test/ledger_presentation_test.dart --name "missing sequence" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-033
+
+- الالتزام: `c9beb17b74c28fd940921fdbccd2357aa7b90209`
+- العنوان: VIB-FIX-033: Match the phone collection card spacing and gold edge.
+- العرض: اسم الموظف كان حبة، وعدد الاستلامات والخط فوق التفاصيل غير ظاهرين.
+- السبب: لقطة 20 تضع الموظف نصًا صغيرًا يسار الاسم، و«1 استلام»، وخطًا رفيعًا فوق شريط التفاصيل، وحافة ذهبية أسفل الكرت.
+- السلوك: عمود واحد بعرض الشاشة تحت 560. الموظف نص عادي. العدد من طول السجل أو الاستلامات المعلقة. ظل ذهبي أسفل الكرت.
+- الدليل: `test/collections_presentation_test.dart`.
+- يعتمد على: 030. لا مسار جديد.
+- التراجع: `git revert c9beb17b74c28fd940921fdbccd2357aa7b90209`. afterward: `flutter test test/collections_presentation_test.dart --name "fake role" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-034
+
+- الالتزام: `bf48709353fda28bee95089b9ffede2df1082313`
+- العنوان: VIB-FIX-034: Put the purchase day controls in one green gold panel.
+- العرض: أزرار اليوم والإجماليات كانت متفرقة عن شريط «يوم #».
+- السبب: لقطتا 24 و25 تجمعان المبدل والأزرار والإجماليات في لوحة خضراء واحدة بإطار ذهبي وشريط يوم.
+- السلوك: اللوحة الخضراء تضم «يوم #» والكتب والإضافة والإنهاء والمربعات الأربعة وفودافون. صف الباقي المرحّل أبيض وحبة المبلغ ذهبية. كروت الحركة كريمية بحقول دائرية.
+- الدليل: `test/purchases_ledger_layout_test.dart`.
+- يعتمد على: 031. لا مسار جديد.
+- التراجع: `git revert bf48709353fda28bee95089b9ffede2df1082313`. afterward: `flutter test test/purchases_ledger_layout_test.dart --name "440" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-035
+
+- الالتزام: `668dba21e0a011c8e5c2e969755e235318f18692`
+- العنوان: VIB-FIX-035: Draw four distinct home icon sets on the kept grid.
+- العرض: الأنماط الأربعة كانت أيقونة المادة نفسها داخل دائرة معاد تلوينها.
+- السبب: المطلوب أربع مجموعات مرسومة: ذهبي على كحلي، زجاج متدرج، عمق، ومربعات بتدرج.
+- السلوك: الشبكة عمودان كما هي. كل نمط يرسم مسار القسم بقلمه. الشاشة الحية لم تتبدل. لقطات فاتحة وداكنة لكل نمط.
+- الدليل: `test/ali_preview_screenshots_test.dart`.
+- يعتمد على: 028 استُبدل رسمه. الدخول الحي كما هو.
+- التراجع: `git revert 668dba21e0a011c8e5c2e969755e235318f18692`. afterward: `flutter test test/ali_preview_screenshots_test.dart --name "icon styles" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-036
+
+- الالتزام: `8cd2509218fb505254956a7d04d85bd76c843ab0`
+- العنوان: VIB-FIX-036: Give collection cards a solid gold bottom edge.
+- العرض: ظل الكرت الذهبي كان رفيعًا ويكاد يختفي تحت الكرت التالي.
+- السبب: لقطة 20 تضع حافة ذهبية واضحة أسفل الكرت، وعدد الاستلامات في صف الحالة.
+- السلوك: شريط ذهبي 5 نقاط داخل الحافة السفلية وظل ذهبي تحته. شريط التفاصيل أقصر. العدد يظهر عندما يوجد استلام.
+- الدليل: `test/collections_presentation_test.dart`.
+- يعتمد على: 033. لا مسار جديد.
+- التراجع: `git revert 8cd2509218fb505254956a7d04d85bd76c843ab0`. afterward: `flutter test test/collections_presentation_test.dart --name "fake role" --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
