@@ -93,6 +93,17 @@
 - يعتمد على: لا يغيّر سلوك 001–007. يعيد تنسيق `fake_fixtures.dart` فوق 007، فإزالة 008 مع الإبقاء على 007 هي `git revert` لهذا الالتزام وحده.
 - التراجع: `git revert c02b56b4d188dea195d5c3e995c0cc47edba875f`. afterward: `dart format --output=none --set-exit-if-changed lib test packages/api_layer/lib packages/api_layer/test`.
 
+## VIB-FIX-009
+
+- الالتزام: `8c315941c5bc69df908edcb97debe3a082c56f5a`
+- العنوان: VIB-FIX-009: Remove two unused client files.
+- العرض: `lib/features/settings/admin_placeholder_screen.dart` و`packages/api_layer/lib/core/security/screen_security.dart` لا يستوردهما أحد.
+- السبب: لا استيراد ولا تصدير من `api_layer.dart` ولا مسار ولا اختبار ولا انعكاس. مسارات الإعدادات تعرض `LoginAccountsScreen` و`SecurityScreen` و`DevelopmentScreen`. قناة `app/screen_security` في `AndroidCaptureGate` و`MainActivity.kt` مسار التقاط حي، وليست ملف الحزمة.
+- السلوك: حُذف الملفان فقط. القناة وملفات Kotlin وسلوك الالتقاط بقيت. ذكر الاسم في سجلات القبول القديمة بقي لأنه لا يستورد الملفين.
+- الدليل: بحث المستودع عن الاسمين في Dart وKotlin. لا اختبار يعتمد عليهما.
+- يعتمد على: لا يعتمد على 001–008. 008 لم يُعد تنسيق هذين الملفين.
+- التراجع: `git revert 8c315941c5bc69df908edcb97debe3a082c56f5a`. afterward: `flutter analyze` ثم `flutter test --exclude-tags screenshots --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 تكرار تقديم التحصيل بعد ضياع الرد، وربط الأمانة المصرية، وتفعيل MFA، وقائمة الجلسات، وإغلاق المصراوية عند 04:00، وقفل الالتقاط. خادم مراجعة الأقسام الأربعة منشور على الإنتاج `https://vip2100.com` منذ 2026-11-09 (مستودع الموقع `64f33ffb3c61db38c78cbe520d90f79a6a3ba7f2`، schema 57).
