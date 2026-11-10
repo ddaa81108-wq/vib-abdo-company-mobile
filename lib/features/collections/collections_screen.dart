@@ -1812,6 +1812,13 @@ class _SubmissionLine extends ConsumerWidget {
         admin && permissions.canDo(ManagementAction.collectionsCashReceived);
     final pending = submission.status == 'pending';
     final awaiting = submission.awaitingCash;
+    final transactionId = (submission.approvedTransactionId ?? '').trim();
+    final cancel =
+        admin &&
+        permissions.isAdminRole &&
+        awaiting &&
+        transactionId.isNotEmpty &&
+        !submission.currencyMismatch;
     final received = submission.cashReceivedAt != null;
     final formatted = money.formatOrDash(submission.amountUnits, Currency.lyd);
     final name = (submission.customerName ?? '').trim().isEmpty
@@ -1875,6 +1882,18 @@ class _SubmissionLine extends ConsumerWidget {
               ref.invalidate(collectionsProvider);
               return null;
             },
+          ),
+        ),
+      if (cash && awaiting && cancel) const SizedBox(width: 6),
+      if (cancel)
+        pill(
+          const Color(0xFFFBE8E7),
+          const Color(0xFF8F2831),
+          const Color(0xFFDFB3B7),
+          FilledButton(
+            key: Key('cancel-approval-${submission.id}'),
+            onPressed: () => _cancelApproval(context, ref, transactionId),
+            child: const Text(CollectionsText.cancelApproval),
           ),
         ),
     ];
@@ -1993,6 +2012,42 @@ class _SubmissionLine extends ConsumerWidget {
         .decide(submission.id, decision, meta: meta);
     ref.invalidate(collectionsProvider);
     return null;
+  }
+
+  Future<void> _cancelApproval(
+    BuildContext context,
+    WidgetRef ref,
+    String transactionId,
+  ) async {
+    final reason = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => _CancelApprovalDialog(
+        name: (submission.customerName ?? '').trim().isEmpty
+            ? assignment.customerName
+            : submission.customerName!.trim(),
+        amount: money.formatOrDash(submission.amountUnits, Currency.lyd),
+      ),
+    );
+    if (reason == null || !context.mounted) return;
+    final meta = MutationMeta();
+    try {
+      await ref
+          .read(apiLayerProvider)
+          .collections
+          .cancelApproval(
+            submission.id,
+            reason: reason,
+            expectedTransactionId: transactionId,
+            meta: meta,
+          );
+      ref.invalidate(collectionsProvider);
+    } catch (error) {
+      if (!context.mounted) return;
+      final failure = ref.read(errorHandlerProvider).toFailure(error);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(failureText(failure))));
+    }
   }
 }
 
@@ -2383,6 +2438,70 @@ Widget _neutralPill(String text, {Key? key}) {
       child: Text(text, style: cairo(10, 700, color: const Color(0xFF44403C))),
     ),
   );
+}
+
+/// The website's cancel dialog: reason of 5–500 characters, then the POST.
+class _CancelApprovalDialog extends StatefulWidget {
+  const _CancelApprovalDialog({required this.name, required this.amount});
+
+  final String name;
+  final String amount;
+
+  @override
+  State<_CancelApprovalDialog> createState() => _CancelApprovalDialogState();
+}
+
+class _CancelApprovalDialogState extends State<_CancelApprovalDialog> {
+  final _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = _reason.text.trim().length >= 5;
+    return AlertDialog(
+      title: const Text(CollectionsText.cancelApprovalTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('${widget.name} — ${widget.amount}'),
+          const SizedBox(height: 8),
+          const Text(CollectionsText.cancelApprovalBody),
+          const SizedBox(height: 8),
+          TextField(
+            key: const Key('cancel-approval-reason'),
+            controller: _reason,
+            autofocus: true,
+            maxLength: 500,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: CollectionsText.cancelApprovalReason,
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(AppStrings.back),
+        ),
+        FilledButton(
+          key: const Key('confirm-cancel-approval'),
+          onPressed: ready
+              ? () => Navigator.pop(context, _reason.text.trim())
+              : null,
+          child: const Text(CollectionsText.cancelApprovalConfirm),
+        ),
+      ],
+    );
+  }
 }
 
 /// `2026/11/10، 3:43 م` from the receipt's own timestamp.

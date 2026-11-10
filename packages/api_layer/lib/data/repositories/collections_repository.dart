@@ -36,6 +36,24 @@ abstract interface class CollectionsRepository {
   /// [meta] is not sent.
   Future<MutationAck> markCashReceived(String submissionId, MutationMeta meta);
 
+  /// `POST /api/collections/submissions/{id}/cancel-approval`.
+  ///
+  /// Body is `requestId`, `reason` (5–500), and `expectedTransactionId`
+  /// (`approvedTransactionId` on the workspace receipt). Admin role only.
+  Future<MutationAck> cancelApproval(
+    String submissionId, {
+    required String reason,
+    required String expectedTransactionId,
+    required MutationMeta meta,
+  });
+
+  /// `GET /api/collections/workspace`. Admin role only. The card history
+  /// on the website reads `approvedTransactionId` from these items.
+  Future<({List<Json> items, bool hasMore})> workspaceReceipts({
+    required String batchId,
+    int page = 1,
+  });
+
   Future<MutationAck> createUnlinkedReceipt(
       {required String customerName,
       required int amountUnits,
@@ -140,6 +158,36 @@ class RemoteCollectionsRepository implements CollectionsRepository {
   Future<MutationAck> markCashReceived(
           String submissionId, MutationMeta meta) =>
       _postEmpty(ApiEndpoints.collectionSubmissionCashReceived(submissionId));
+
+  @override
+  Future<MutationAck> cancelApproval(
+    String submissionId, {
+    required String reason,
+    required String expectedTransactionId,
+    required MutationMeta meta,
+  }) =>
+      _post(ApiEndpoints.collectionSubmissionCancelApproval(submissionId), {
+        'requestId': meta.requestId,
+        'reason': reason,
+        'expectedTransactionId': expectedTransactionId,
+      });
+
+  @override
+  Future<({List<Json> items, bool hasMore})> workspaceReceipts({
+    required String batchId,
+    int page = 1,
+  }) async {
+    final data = asJson((await _api.get(
+      ApiEndpoints.collectionWorkspace,
+      query: {
+        'batchId': batchId,
+        'state': 'all',
+        'page': '$page',
+      },
+    ))
+        .data);
+    return (items: asJsonList(data['items']), hasMore: data['hasMore'] == true);
+  }
 
   @override
   Future<MutationAck> createUnlinkedReceipt(

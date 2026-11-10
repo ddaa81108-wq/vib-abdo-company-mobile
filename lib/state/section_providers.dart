@@ -258,8 +258,61 @@ final purchasesProvider = FutureProvider<PurchasesPage>((ref) async {
 
 final collectionsProvider = FutureProvider<CollectionsOverviewDto>((ref) async {
   watchSignedIn(ref);
-  return ref.read(apiLayerProvider).collections.overview();
+  final layer = ref.read(apiLayerProvider);
+  final overview = await layer.collections.overview();
+  if (!layer.permissions.canDo(ManagementAction.collectionsDecide)) {
+    return overview;
+  }
+  try {
+    return await _withApprovalTransactions(layer, overview);
+  } on ApiException {
+    return overview;
+  }
 });
+
+/// The website card history reads `approvedTransactionId` from
+/// `GET /api/collections/workspace`. The overview submission rows omit it.
+Future<CollectionsOverviewDto> _withApprovalTransactions(
+  ApiLayer layer,
+  CollectionsOverviewDto overview,
+) async {
+  final byId = <String, Json>{};
+  for (final batch in overview.openBatches) {
+    if (batch.id.isEmpty) continue;
+    var page = 1;
+    while (page <= 8) {
+      final workspace = await layer.collections.workspaceReceipts(
+        batchId: batch.id,
+        page: page,
+      );
+      for (final item in workspace.items) {
+        final id = strOrNull(item['id']);
+        if (id != null) byId[id] = item;
+      }
+      if (!workspace.hasMore) break;
+      page++;
+    }
+  }
+  if (byId.isEmpty) return overview;
+  return overview.withSubmissions([
+    for (final row in overview.submissions)
+      _submissionWithWorkspace(row, byId[row.id]),
+  ]);
+}
+
+CollectionSubmissionDto _submissionWithWorkspace(
+  CollectionSubmissionDto row,
+  Json? workspace,
+) {
+  if (workspace == null) return row;
+  return CollectionSubmissionDto.fromJson({
+    ...row.raw,
+    if (workspace['approvedTransactionId'] != null)
+      'approvedTransactionId': workspace['approvedTransactionId'],
+    if (workspace.containsKey('currencyMismatch'))
+      'currencyMismatch': workspace['currencyMismatch'],
+  });
+}
 
 final payrollProvider = FutureProvider<PayrollDto>((ref) async {
   watchSignedIn(ref);

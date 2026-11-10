@@ -90,6 +90,7 @@ class FakeCollectionsEngine {
   final List<Map<String, dynamic>> _batches = [];
   final List<Map<String, dynamic>> _payroll = [];
   final List<Map<String, dynamic>> _payrollEntries = [];
+  final Map<String, Map<String, dynamic>> _cancelReplays = {};
   var _clock = 0;
   var _ids = 0;
 
@@ -136,7 +137,7 @@ class FakeCollectionsEngine {
     assign('as_9', 'c_58', otherEmployeeId, '2026-10-18T06:40:00.000Z');
     void submit(String id, String assignmentId, String customerId,
         String collector, String mode, int amount, String status, String at,
-        {String? decidedAt}) {
+        {String? decidedAt, String? approvedTransactionId}) {
       _submissions.add({
         'id': id,
         'assignmentId': assignmentId,
@@ -151,12 +152,14 @@ class FakeCollectionsEngine {
         'decidedAt': decidedAt,
         'decisionNote': '',
         'cashReceivedAt': null,
+        'approvedTransactionId': approvedTransactionId,
       });
     }
 
     submit('sb_2', 'as_2', 'c_56', demoEmployeeId, 'partial', 250, 'approved',
         '2026-10-18T07:30:00.000Z',
-        decidedAt: '2026-10-18T07:40:00.000Z');
+        decidedAt: '2026-10-18T07:40:00.000Z',
+        approvedTransactionId: 'tx-sb_2');
     submit('sb_1', 'as_2', 'c_56', demoEmployeeId, 'partial', 100, 'pending',
         '2026-10-18T10:00:00.000Z');
     submit('sb_9', 'as_9', 'c_58', otherEmployeeId, 'partial', 900, 'pending',
@@ -633,6 +636,110 @@ class FakeCollectionsEngine {
       'transactionId': 'tx-$id',
       'balanceUnits': balance,
       'eventSequences': [3]
+    };
+  }
+
+  /// `POST /api/collections/submissions/{id}/cancel-approval`.
+  ///
+  /// Admin only. Body: `requestId`, `reason` (5–500), `expectedTransactionId`.
+  Map<String, dynamic> cancelApproval(
+      FakeCollectionsCaller caller, String id, Map body) {
+    if (!caller.seesEverything) _forbidden('collections.review');
+    final requestId = _requestId(body['requestId']);
+    final reason = body['reason'] is String ? '${body['reason']}'.trim() : '';
+    if (reason.length < 5 || reason.length > 500) {
+      _fail(400, 'CANCELLATION_REASON_REQUIRED',
+          'اكتب سبب إلغاء الاعتماد من 5 إلى 500 حرف.');
+    }
+    final expected = body['expectedTransactionId'];
+    final scope = 'collections:linked:$id:cancel-approval';
+    final fingerprint = '$reason|$expected';
+    final stored = _cancelReplays['${caller.id}|$scope|$requestId'];
+    if (stored != null) {
+      if (stored['fingerprint'] != fingerprint) {
+        _fail(409, 'REQUEST_ID_REUSED',
+            'استُخدم معرّف الطلب من قبل لمحتوى مختلف.');
+      }
+      return {
+        ...(stored['body'] as Map).cast<String, dynamic>(),
+        'replayed': true,
+        'eventSequences': <int>[],
+      };
+    }
+    final s = _submissions.firstWhere((x) => x['id'] == id,
+        orElse: () => _notFound('submission'));
+    if (s['cashReceivedAt'] != null) {
+      _fail(409, 'COLLECTION_CASH_ALREADY_RECEIVED',
+          'تم استلام نقدية هذه العملية؛ لا يمكن إلغاء اعتمادها بهذا الإجراء.');
+    }
+    if (s['approvedTransactionId'] == null ||
+        s['approvedTransactionId'] != expected) {
+      _fail(409, 'COLLECTION_APPROVAL_CHANGED',
+          'تغيّر الاستلام أو لم يُعتمد بعد. حدّث البيانات وراجع العملية.');
+    }
+    if (s['status'] == 'rejected') {
+      return {
+        'id': id,
+        'cancelled': true,
+        'replayed': true,
+        'eventSequences': <int>[],
+      };
+    }
+    if (s['status'] != 'approved') {
+      _fail(409, 'SUBMISSION_NOT_APPROVED',
+          'لا يمكن إلغاء اعتماد عملية غير معتمدة.');
+    }
+    final a = _assignments.firstWhere((x) => x['id'] == s['assignmentId']);
+    final amount = s['amountUnits'];
+    if (amount is int) {
+      _cards.post('${a['section']}', '${a['customerId']}', amount);
+    }
+    s
+      ..['status'] = 'rejected'
+      ..['decisionNote'] = reason;
+    final result = {
+      'id': id,
+      'cancelled': true,
+      'eventSequences': [1],
+    };
+    _cancelReplays['${caller.id}|$scope|$requestId'] = {
+      'fingerprint': fingerprint,
+      'body': result,
+    };
+    return result;
+  }
+
+  /// `GET /api/collections/workspace`. Items carry `approvedTransactionId`.
+  Map<String, dynamic> workspace(Map<String, dynamic>? query) {
+    final batchId = '${query?['batchId'] ?? ''}';
+    final state = '${query?['state'] ?? 'review'}';
+    final page = int.tryParse('${query?['page'] ?? '1'}') ?? 1;
+    final items = <Map<String, dynamic>>[
+      for (final s in _submissions)
+        if ((batchId.isEmpty || s['batchId'] == batchId) &&
+            (state == 'all' ||
+                (state == 'review' && s['status'] == 'pending') ||
+                (state == 'cash' &&
+                    s['status'] == 'approved' &&
+                    s['cashReceivedAt'] == null)))
+          {
+            'id': s['id'],
+            'kind': 'linked',
+            'status': s['status'],
+            'cashReceivedAt': s['cashReceivedAt'],
+            'approvedTransactionId': s['approvedTransactionId'],
+            'currencyMismatch': 0,
+            'assignmentId': s['assignmentId'],
+          },
+    ];
+    return {
+      'summary': const {},
+      'employees': const [],
+      'items': items,
+      'totalItems': items.length,
+      'page': page,
+      'hasMore': false,
+      'limit': 60,
     };
   }
 

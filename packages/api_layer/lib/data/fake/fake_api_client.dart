@@ -1783,6 +1783,12 @@ class FakeApiClient implements ApiClient {
       _requireAction(ManagementAction.collectionsAssign);
       return _engine(collectionsEngine.assignees);
     }
+    if (method == 'GET' && seg.length == 2 && seg[1] == 'workspace') {
+      if (_access.role != AccountRole.admin) {
+        _fail(403, 'PERMISSION_DENIED', 'ليست لديك صلاحية لهذه العملية.');
+      }
+      return _engine(() => collectionsEngine.workspace(query));
+    }
     if (method == 'GET' && seg.length > 1 && seg[1] == 'link-candidates') {
       _requireAction(ManagementAction.collectionsDecide);
       return _engine(
@@ -1800,7 +1806,7 @@ class FakeApiClient implements ApiClient {
     }
     if (method == 'GET') {
       _requireRead(SectionKey.collections);
-      // 537f073 has no /workspace or /mine route.
+      // `/mine` is not used. `/workspace` is handled above.
       _fail(404, 'ROUTE_NOT_FOUND', 'المسار المطلوب غير موجود.');
     }
     if (method == 'PUT' && _isSalaryPath(seg)) {
@@ -1818,6 +1824,13 @@ class FakeApiClient implements ApiClient {
         seg[1] == 'submissions' &&
         seg[3] == 'cash-received') {
       return _engine(() => engine.cashReceived(seg[2]));
+    }
+    if (seg.length == 4 &&
+        seg[1] == 'submissions' &&
+        seg[3] == 'cancel-approval') {
+      return _engine(
+        () => engine.cancelApproval(_collectionsCaller, seg[2], b),
+      );
     }
     if (seg.length == 4 &&
         seg[1] == 'unlinked-receipts' &&
@@ -1946,6 +1959,12 @@ class FakeApiClient implements ApiClient {
     }
     if (last == 'cash-received') {
       _requireAction(ManagementAction.collectionsCashReceived);
+      return;
+    }
+    if (last == 'cancel-approval') {
+      if (_access.role != AccountRole.admin) {
+        _fail(403, 'PERMISSION_DENIED', 'ليست لديك صلاحية لهذه العملية.');
+      }
       return;
     }
     if (seg.length > 2 && seg[1] == 'days' && last == 'close') {

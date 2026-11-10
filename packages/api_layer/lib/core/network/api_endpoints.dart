@@ -53,6 +53,9 @@ class ApiEndpoints {
       '/api/collections/submissions/$id/decision';
   static String collectionSubmissionCashReceived(String id) =>
       '/api/collections/submissions/$id/cash-received';
+  static String collectionSubmissionCancelApproval(String id) =>
+      '/api/collections/submissions/$id/cancel-approval';
+  static const collectionWorkspace = '/api/collections/workspace';
   static const collectionUnlinkedReceipts =
       '/api/collections/unlinked-receipts';
   static const collectionLinkCandidates = '/api/collections/link-candidates';

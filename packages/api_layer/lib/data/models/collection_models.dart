@@ -138,6 +138,8 @@ class CollectionSubmissionDto {
       this.businessDate,
       this.decidedAt,
       this.decisionNote,
+      this.approvedTransactionId,
+      this.currencyMismatch = false,
       this.raw = const {}});
   final String id;
   final String mode; // full | partial
@@ -167,6 +169,13 @@ class CollectionSubmissionDto {
   final String? businessDate;
   final DateTime? decidedAt;
   final String? decisionNote;
+
+  /// `approved_transaction_id` on the workspace receipt. Absent on
+  /// `GET /api/collections` submission rows.
+  final String? approvedTransactionId;
+
+  /// Workspace `currencyMismatch` (0/1). Linked receipts are 0.
+  final bool currencyMismatch;
   final Json raw;
 
   /// «ينتظر استلام النقدية»: approved and no `cashReceivedAt`. This is the
@@ -198,6 +207,8 @@ class CollectionSubmissionDto {
         businessDate: strOrNull(j['businessDate']),
         decidedAt: dateOrNull(j['decidedAt']),
         decisionNote: strOrNull(j['decisionNote']),
+        approvedTransactionId: strOrNull(j['approvedTransactionId']),
+        currencyMismatch: serverFlag(j['currencyMismatch']),
         raw: j,
       );
 }
@@ -477,6 +488,28 @@ class CollectionsOverviewDto {
           .map(OutstandingCashDto.fromJson)
           .toList(growable: false),
       raw: d,
+    );
+  }
+
+  CollectionsOverviewDto withSubmissions(
+    List<CollectionSubmissionDto> submissions,
+  ) {
+    return CollectionsOverviewDto(
+      assignments: assignments,
+      submissions: submissions,
+      unlinkedReceipts: unlinkedReceipts,
+      employeeTotals: employeeTotals,
+      collectedUnits: collectedUnits,
+      dayTotalUnits: dayTotalUnits,
+      assignedCount: assignedCount,
+      pendingCount: pendingCount,
+      unlinkedPendingCount: unlinkedPendingCount,
+      cashOutstandingUnits: cashOutstandingUnits,
+      executedCount: executedCount,
+      batchId: batchId,
+      openBatches: openBatches,
+      outstandingCash: outstandingCash,
+      raw: raw,
     );
   }
 }

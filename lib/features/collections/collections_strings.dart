@@ -41,6 +41,12 @@ abstract final class CollectionsText {
   static const awaitingCash = 'ينتظر استلام النقدية';
   static const cashReceived = 'تم استلام النقدية';
   static const confirmCash = 'تأكيد استلام النقدية';
+  static const cancelApproval = 'إلغاء الاعتماد';
+  static const cancelApprovalTitle = 'إلغاء اعتماد الاستلام';
+  static const cancelApprovalBody =
+      'سيُلغى أثر هذه العملية فقط ويُعاد حساب رصيد العميل. تبقى بقية الدفعات كما هي، ويُحفظ سبب الإلغاء في السجل.';
+  static const cancelApprovalReason = 'سبب إلغاء الاعتماد';
+  static const cancelApprovalConfirm = 'إلغاء الاعتماد وتصحيح الرصيد';
 
   static const closeBatch = 'إغلاق ومسح الدفعة';
   static const closeConfirm =
