@@ -40,6 +40,7 @@ abstract final class CollectionsText {
   static const awaitingApproval = 'ينتظر الاعتماد';
   static const awaitingCash = 'ينتظر استلام النقدية';
   static const cashReceived = 'تم استلام النقدية';
+  static const confirmCash = 'تأكيد استلام النقدية';
 
   static const closeBatch = 'إغلاق ومسح الدفعة';
   static const closeConfirm =

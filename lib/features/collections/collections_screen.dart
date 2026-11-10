@@ -1562,7 +1562,6 @@ class _AssignmentCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tone = collectionCardTone(assignment);
     final gloss = collectionToneGloss(context, tone);
-    var partial = 0;
     final balanceText = money.formatOrDash(
       assignment.balanceUnits,
       Currency.lyd,
@@ -1628,11 +1627,15 @@ class _AssignmentCard extends ConsumerWidget {
                         ),
                       ),
                       if ((assignment.assigneeName ?? '').isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsetsDirectional.only(start: 6),
-                          child: Text(
-                            assignment.assigneeName!,
-                            style: cairo(10, 600, color: gloss.ink),
+                        Flexible(
+                          child: Padding(
+                            padding: const EdgeInsetsDirectional.only(start: 6),
+                            child: Text(
+                              assignment.assigneeName!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: cairo(10, 600, color: gloss.ink),
+                            ),
                           ),
                         ),
                     ],
@@ -1684,28 +1687,13 @@ class _AssignmentCard extends ConsumerWidget {
               child: Theme(
                 data: Theme.of(context)
                     .copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
+                child: _ReceiptFold(
                   initiallyExpanded:
                       !admin ||
                       history.any(
                         (item) => item.status == 'pending' || item.awaitingCash,
                       ),
-                  minTileHeight: 34,
-                  visualDensity: VisualDensity.compact,
-                  tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-                  childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                  iconColor: gloss.ink,
-                  collapsedIconColor: gloss.ink,
-                  title: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.chevron_left, size: 18, color: gloss.ink),
-                      Text(
-                        'تفاصيل الاستلامات',
-                        style: cairo(11, 800, color: gloss.ink),
-                      ),
-                    ],
-                  ),
+                  ink: gloss.ink,
                   children: [
                     if (history.isEmpty && admin)
                       Text(
@@ -1714,12 +1702,9 @@ class _AssignmentCard extends ConsumerWidget {
                       ),
                     for (final item in history)
                       _SubmissionLine(
+                        assignment: assignment,
                         submission: item,
-                        title: item.mode == 'full'
-                            ? CollectionsText.fullReceipt
-                            : CollectionsText.partialReceiptN(++partial),
                         money: money,
-                        gloss: gloss,
                         admin: admin,
                       ),
                     if (!admin)
@@ -1751,19 +1736,71 @@ String _collectionStateLabel(CollectionAssignmentDto card) {
   return 'جاهز للمتابعة';
 }
 
+/// «تفاصيل الاستلامات»: ◂ while closed, ▾ while open, on the right of the words.
+class _ReceiptFold extends StatefulWidget {
+  const _ReceiptFold({
+    required this.initiallyExpanded,
+    required this.ink,
+    required this.children,
+  });
+
+  final bool initiallyExpanded;
+  final Color ink;
+  final List<Widget> children;
+
+  @override
+  State<_ReceiptFold> createState() => _ReceiptFoldState();
+}
+
+class _ReceiptFoldState extends State<_ReceiptFold> {
+  late bool _open = widget.initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      initiallyExpanded: widget.initiallyExpanded,
+      onExpansionChanged: (open) => setState(() => _open = open),
+      showTrailingIcon: false,
+      minTileHeight: 34,
+      visualDensity: VisualDensity.compact,
+      tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+      childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _open ? Icons.keyboard_arrow_down : Icons.chevron_left,
+            size: 18,
+            color: widget.ink,
+            textDirection: TextDirection.ltr,
+          ),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'تفاصيل الاستلامات',
+                style: cairo(11, 800, color: widget.ink),
+              ),
+            ),
+          ),
+        ],
+      ),
+      children: widget.children,
+    );
+  }
+}
+
 class _SubmissionLine extends ConsumerWidget {
   const _SubmissionLine({
+    required this.assignment,
     required this.submission,
-    required this.title,
     required this.money,
-    required this.gloss,
     required this.admin,
   });
 
+  final CollectionAssignmentDto assignment;
   final CollectionSubmissionDto submission;
-  final String title;
   final MoneyFormatter money;
-  final Gloss gloss;
   final bool admin;
 
   @override
@@ -1775,78 +1812,172 @@ class _SubmissionLine extends ConsumerWidget {
         admin && permissions.canDo(ManagementAction.collectionsCashReceived);
     final pending = submission.status == 'pending';
     final awaiting = submission.awaitingCash;
+    final received = submission.cashReceivedAt != null;
+    final formatted = money.formatOrDash(submission.amountUnits, Currency.lyd);
+    final name = (submission.customerName ?? '').trim().isEmpty
+        ? assignment.customerName
+        : submission.customerName!.trim();
+    final who = (submission.submittedByName ?? '').trim();
+    final kind = submission.mode == 'full'
+        ? CollectionsText.fullReceipt
+        : CollectionsText.partialReceipt;
+    final stamp = _receiptStamp(submission.createdAt);
+    const ink = Color(0xFF211600);
+    const muted = Color(0xFF78716C);
+    Widget pill(Color fill, Color ink, Color edge, Widget child) {
+      return _pillAction(fill, ink, edge, child);
+    }
+
+    final actions = <Widget>[
+      if (decide && pending) ...[
+        pill(
+          const Color(0xFFE4F3E9),
+          const Color(0xFF145535),
+          const Color(0xFFABCAB7),
+          GuardedMutation(
+            buttonKey: Key('approve-${submission.id}'),
+            inputs: 'approve:${submission.id}',
+            label: AppStrings.approve,
+            onVersionConflict: () => ref.invalidate(collectionsProvider),
+            onSubmit: (meta) => _decide(ref, CollectionDecision.approve, meta),
+          ),
+        ),
+        const SizedBox(width: 6),
+        pill(
+          const Color(0xFFFBE8E7),
+          const Color(0xFF8F2831),
+          const Color(0xFFDFB3B7),
+          GuardedMutation(
+            buttonKey: Key('reject-${submission.id}'),
+            inputs: 'reject:${submission.id}',
+            label: AppStrings.reject,
+            onVersionConflict: () => ref.invalidate(collectionsProvider),
+            onSubmit: (meta) => _decide(ref, CollectionDecision.reject, meta),
+          ),
+        ),
+      ],
+      if (cash && awaiting)
+        pill(
+          const Color(0xFFE4F3E9),
+          const Color(0xFF145535),
+          const Color(0xFFABCAB7),
+          GuardedMutation(
+            buttonKey: Key('cash-${submission.id}'),
+            inputs: 'cash:${submission.id}',
+            label: CollectionsText.confirmCash,
+            reportErrorInline: false,
+            onVersionConflict: () => ref.invalidate(collectionsProvider),
+            onSubmit: (meta) async {
+              await ref
+                  .read(apiLayerProvider)
+                  .collections
+                  .markCashReceived(submission.id, meta);
+              ref.invalidate(collectionsProvider);
+              return null;
+            },
+          ),
+        ),
+    ];
     return Padding(
       key: Key('submission-${submission.id}'),
-      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-      child: _HistoryLine(
-        gloss: gloss,
-        title: title,
-        amount: money.formatOrDash(submission.amountUnits, Currency.lyd),
-        status: pending
-            ? _Badge(text: CollectionsText.awaitingApproval, gloss: gloss)
-            : awaiting
-            ? _AwaitingCash(
-                id: submission.id,
-                gloss: gloss,
-                // Employee wording from the website's employee section.
-                text: admin
-                    ? CollectionsText.awaitingCash
-                    : CollectionsText.waitingCashFromAdmin,
-              )
-            : submission.cashReceivedAt != null
-            ? _Badge(
-                key: Key('cash-done-${submission.id}'),
-                text: CollectionsText.cashReceived,
-                gloss: gloss,
-              )
-            : null,
-        actions: [
-          if (decide && pending) ...[
-            _siteAction(
-              const Color(0xFFFFFFFF),
-              const Color(0xFF147046),
-              GuardedMutation(
-                buttonKey: Key('approve-${submission.id}'),
-                inputs: 'approve:${submission.id}',
-                label: AppStrings.approve,
-                onVersionConflict: () => ref.invalidate(collectionsProvider),
-                onSubmit: (meta) =>
-                    _decide(ref, CollectionDecision.approve, meta),
+      padding: const EdgeInsetsDirectional.only(bottom: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE7E5E4)),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const ColoredBox(
+                color: Color(0xFFE7AE12),
+                child: SizedBox(height: 3, width: double.infinity),
               ),
-            ),
-            _siteAction(
-              const Color(0xFF721521),
-              const Color(0xFFFFFFFF),
-              GuardedMutation(
-                buttonKey: Key('reject-${submission.id}'),
-                inputs: 'reject:${submission.id}',
-                label: AppStrings.reject,
-                onVersionConflict: () => ref.invalidate(collectionsProvider),
-                onSubmit: (meta) =>
-                    _decide(ref, CollectionDecision.reject, meta),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: cairo(13, 800, color: ink),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _lydFigure(formatted),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      who.isEmpty ? kind : '$who · $kind',
+                      style: cairo(10, 600, color: muted),
+                    ),
+                    if (stamp.isNotEmpty)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Text(
+                            stamp,
+                            style: cairo(10, 600, color: muted),
+                          ),
+                        ),
+                      ),
+                    if (awaiting)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: _AwaitingCash(
+                          id: submission.id,
+                          text: admin
+                              ? CollectionsText.awaitingCash
+                              : CollectionsText.waitingCashFromAdmin,
+                        ),
+                      ),
+                    if (actions.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: actions,
+                          ),
+                        ),
+                      ),
+                    ] else if (received || submission.status == 'rejected')
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: _neutralPill(
+                          submission.status == 'rejected'
+                              ? CollectionsText.rejected
+                              : CollectionsText.cashReceived,
+                          key: received
+                              ? Key('cash-done-${submission.id}')
+                              : null,
+                        ),
+                      )
+                    else if (pending)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: _neutralPill(CollectionsText.awaitingApproval),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
-          if (cash && awaiting)
-            _siteAction(
-              const Color(0xFFFFFFFF),
-              const Color(0xFF145535),
-              GuardedMutation(
-                buttonKey: Key('cash-${submission.id}'),
-                inputs: 'cash:${submission.id}',
-                label: CollectionsText.cashReceived,
-                onVersionConflict: () => ref.invalidate(collectionsProvider),
-                onSubmit: (meta) async {
-                  await ref
-                      .read(apiLayerProvider)
-                      .collections
-                      .markCashReceived(submission.id, meta);
-                  ref.invalidate(collectionsProvider);
-                  return null;
-                },
-              ),
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -2114,7 +2245,6 @@ class _HistoryLine extends StatelessWidget {
     this.amount,
     this.trailing,
     this.status,
-    this.actions = const [],
   });
 
   final Gloss gloss;
@@ -2122,7 +2252,6 @@ class _HistoryLine extends StatelessWidget {
   final String? amount;
   final String? trailing;
   final Widget? status;
-  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
@@ -2156,15 +2285,6 @@ class _HistoryLine extends StatelessWidget {
                 ?status,
               ],
             ),
-            if (actions.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xs),
-              _ActionSurface(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: actions,
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -2175,23 +2295,107 @@ class _HistoryLine extends StatelessWidget {
 class _AwaitingCash extends StatelessWidget {
   const _AwaitingCash({
     required this.id,
-    required this.gloss,
+    this.gloss,
     this.text = CollectionsText.awaitingCash,
   });
 
   final String id;
-  final Gloss gloss;
+  final Gloss? gloss;
   final String text;
 
   @override
   Widget build(BuildContext context) {
+    if (gloss == null) {
+      return Padding(
+        key: ValueKey('awaiting-cash-$id'),
+        padding: EdgeInsets.zero,
+        child: Text(
+          text,
+          style: cairo(10, 600, color: const Color(0xFF78716C)),
+        ),
+      );
+    }
     return _Badge(
       key: ValueKey('awaiting-cash-$id'),
       text: text,
-      gloss: gloss,
+      gloss: gloss!,
       strong: true,
     );
   }
+}
+
+/// Amount with a smaller «د.ل», kept LTR so the unit stays on the number.
+Widget _lydFigure(String formatted) {
+  final cut = formatted.lastIndexOf(' ');
+  final number = cut < 0 ? formatted : formatted.substring(0, cut);
+  final unit = cut < 0 ? '' : formatted.substring(cut);
+  return Directionality(
+    textDirection: TextDirection.ltr,
+    child: Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: number,
+            style: cairo(16, 800, color: const Color(0xFF211600)),
+          ),
+          TextSpan(
+            text: unit,
+            style: cairo(10, 700, color: const Color(0xFF211600)),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Light fill, dark label, stadium shape. The action itself is unchanged.
+Widget _pillAction(Color fill, Color ink, Color edge, Widget child) {
+  return Theme(
+    data: ThemeData(
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: fill,
+          foregroundColor: ink,
+          disabledBackgroundColor: fill.withValues(alpha: 0.55),
+          disabledForegroundColor: ink.withValues(alpha: 0.7),
+          minimumSize: const Size(0, 34),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          textStyle: cairo(11, 800),
+          shape: const StadiumBorder(),
+          side: BorderSide(color: edge),
+        ),
+      ),
+    ),
+    child: child,
+  );
+}
+
+Widget _neutralPill(String text, {Key? key}) {
+  return DecoratedBox(
+    key: key,
+    decoration: BoxDecoration(
+      color: const Color(0xFFF4F4F5),
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(color: const Color(0xFFE7E5E4)),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      child: Text(text, style: cairo(10, 700, color: const Color(0xFF44403C))),
+    ),
+  );
+}
+
+/// `2026/11/10، 3:43 م` from the receipt's own timestamp.
+String _receiptStamp(DateTime? at) {
+  if (at == null) return '';
+  final local = at.toLocal();
+  final month = local.month.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  final hour = local.hour;
+  final clock = hour % 12 == 0 ? 12 : hour % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final mark = hour < 12 ? 'ص' : 'م';
+  return '${local.year}/$month/$day، $clock:$minute $mark';
 }
 
 class _Badge extends StatelessWidget {
@@ -2222,30 +2426,6 @@ class _Badge extends StatelessWidget {
           text,
           style: cairo(11, strong ? 800 : 600, color: gloss.ink),
         ),
-      ),
-    );
-  }
-}
-
-/// Buttons sit on the page surface, not on the coloured card, so they keep
-/// the theme's contrast on every card tone.
-class _ActionSurface extends StatelessWidget {
-  const _ActionSurface({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final look = context.look;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: look.card,
-        borderRadius: BorderRadius.circular(AppRadii.md),
-        border: Border.all(color: look.cardBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.sm),
-        child: child,
       ),
     );
   }
