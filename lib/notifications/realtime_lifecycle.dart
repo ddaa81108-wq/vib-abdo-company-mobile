@@ -6,8 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_providers.dart';
 import '../error_handling/error_handler.dart';
+import '../state/live_refresh.dart';
 import '../state/notification_providers.dart';
-import '../state/section_providers.dart';
 import '../state/session_providers.dart';
 import 'notification_signal_bridge.dart';
 
@@ -30,6 +30,7 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
   StreamSubscription<PushMessage>? _pushes;
   NotificationSignalBridge? _bridge;
   var _running = false;
+  var _sawBackground = false;
 
   @override
   void initState() {
@@ -49,7 +50,18 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) => _sync();
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _sawBackground = true;
+    }
+    _sync();
+    if (state == AppLifecycleState.resumed && _sawBackground) {
+      _sawBackground = false;
+      refreshAllLiveSections(ref);
+    }
+  }
 
   void _sync() {
     final session = ref.read(sessionStateProvider);
@@ -76,14 +88,16 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
         },
       );
       _signals = layer.realtime.signals.listen((signal) {
-        // Signal only. Counts and cards are whatever the next fetch returns.
-        // A notification-related refresh refetches the list. It does not
-        // ingest the event payload.
-        ref.invalidate(unreadCountProvider);
-        ref.invalidate(homeDashboardProvider);
-        ref.invalidate(collectionsProvider);
-        ref.invalidate(payrollProvider);
-        ref.invalidate(ledgerProvider);
+        // Signal only. The topic chooses which cached reads to drop.
+        // The payload is never applied. The notification bridge refetches
+        // the list and does not ingest the event.
+        applyLiveSignal(
+          ref,
+          RealtimeSignalView(
+            topic: signal.topic,
+            fullResync: signal.fullResync,
+          ),
+        );
         _bridge?.onSignal(signal);
       });
       _pushes = layer.push.messages.listen((_) {
