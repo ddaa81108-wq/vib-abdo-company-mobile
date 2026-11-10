@@ -2,12 +2,15 @@ import 'package:flutter_api_layer/api_layer.dart';
 
 import '../../ui/presentation.dart';
 import '../../ui/strings.dart';
+import 'notification_sentence.dart';
 
 /// Headline for a list row and the foreground banner.
 ///
 /// [AppNotification.employeeName] is included only when the server sent one,
 /// so the separator is never left hanging.
 String notificationHeadline(AppNotification note) {
+  final sentence = notificationSentence(note);
+  if (sentence != null) return sentence;
   final parts = [
     notificationSystemName(note),
     notificationOperationLabel(note),

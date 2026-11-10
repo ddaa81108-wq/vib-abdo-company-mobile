@@ -37,7 +37,7 @@ class NotificationDto {
         action: str(j['action'] ?? j['type']),
         title: strOrNull(j['title']),
         body: strOrNull(j['body']),
-        section: strOrNull(j['section']),
+        section: strOrNull(j['section'] ?? j['sectionKey']),
         entityId: strOrNull(j['entityId'] ?? j['aggregateId']),
         readAt: dateOrNull(j['readAt']),
         createdAt: dateOrNull(j['createdAt']),
@@ -145,6 +145,9 @@ class AppNotification {
     required this.recipientUserId,
     this.title,
     this.body,
+    this.actorName = '',
+    this.actorRole,
+    this.details = const {},
   });
 
   final String notificationId;
@@ -165,6 +168,13 @@ class AppNotification {
   final String? title;
   final String? body;
 
+  /// `actorName` / `actorRole` / `details` from `GET /api/notifications`.
+  /// Empty when the row is a push stub. The website builds the spoken
+  /// sentence from these; it does not send `title` or `body`.
+  final String actorName;
+  final String? actorRole;
+  final Map<String, dynamic> details;
+
   bool get isRead => readAt != null;
 
   factory AppNotification.fromJson(Map<String, dynamic> json) {
@@ -181,6 +191,9 @@ class AppNotification {
       recipientUserId: _text(json['recipientUserId']),
       title: _text(json['title']),
       body: _text(json['body']),
+      actorName: _text(json['actorName']) ?? '',
+      actorRole: _text(json['actorRole']),
+      details: _details(json['details']),
     );
   }
 
@@ -262,6 +275,9 @@ class AppNotification {
       recipientUserId: incoming.recipientUserId ?? recipientUserId,
       title: incoming.title ?? title,
       body: incoming.body ?? body,
+      actorName: incoming.actorName.isNotEmpty ? incoming.actorName : actorName,
+      actorRole: incoming.actorRole ?? actorRole,
+      details: incoming.details.isNotEmpty ? incoming.details : details,
     );
   }
 
@@ -277,6 +293,9 @@ class AppNotification {
         recipientUserId: recipientUserId,
         title: title,
         body: body,
+        actorName: actorName,
+        actorRole: actorRole,
+        details: details,
       );
 }
 
@@ -317,6 +336,11 @@ String _operationRaw(Map<String, dynamic> json) {
     if (text != null) return text;
   }
   return '';
+}
+
+Map<String, dynamic> _details(Object? value) {
+  if (value is! Map) return const {};
+  return Map<String, dynamic>.from(value);
 }
 
 String? _text(Object? value) {

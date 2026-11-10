@@ -4,9 +4,13 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 import android.os.Bundle
 import android.os.FileObserver
 import android.os.Handler
@@ -23,6 +27,10 @@ class MainActivity : FlutterActivity() {
     private var holdCallback: Runnable? = null
     private var windowAlive = true
     private var intentObserver: FileObserver? = null
+    private var speech: TextToSpeech? = null
+    private var speechReady = false
+    private var pendingSpeech: String? = null
+
     private val captureLock = CaptureLock(
         debuggable = BuildConfig.DEBUG,
         scheduleHold = { token, delayMs ->
@@ -160,6 +168,26 @@ class MainActivity : FlutterActivity() {
                     result.notImplemented()
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/notification_speech")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "speak" -> {
+                        val text = call.argument<String>("text") ?: ""
+                        speakNotification(text)
+                        result.success(null)
+                    }
+                    "tone" -> {
+                        playNoticeTone()
+                        result.success(null)
+                    }
+                    "stop" -> {
+                        pendingSpeech = null
+                        speech?.stop()
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/connectivity")
             .setMethodCallHandler { call, result ->
                 if (call.method == "isOnline") {
@@ -220,6 +248,7 @@ class MainActivity : FlutterActivity() {
             .setContentIntent(pending)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
         return try {
             manager.notify(tag, id, notification)
@@ -227,5 +256,43 @@ class MainActivity : FlutterActivity() {
         } catch (_: SecurityException) {
             false
         }
+    }
+
+    /// In-app tone. The system tray uses the high-importance channel sound.
+    /// Speech is the account «النطق» preference, spoken on the device.
+    private fun playNoticeTone() {
+        val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+        tone.startTone(ToneGenerator.TONE_PROP_BEEP, 180)
+        mainHandler.postDelayed({ tone.release() }, 400)
+    }
+
+    private fun speakNotification(text: String) {
+        if (text.isEmpty()) return
+        val engine = speech
+        if (engine == null) {
+            pendingSpeech = text
+            speech = TextToSpeech(this) { status ->
+                speechReady = status == TextToSpeech.SUCCESS
+                if (speechReady) {
+                    speech?.language = Locale("ar")
+                    val queued = pendingSpeech
+                    pendingSpeech = null
+                    if (!queued.isNullOrEmpty()) speakNotification(queued)
+                }
+            }
+            return
+        }
+        if (!speechReady) {
+            pendingSpeech = text
+            return
+        }
+        engine.speak(text, TextToSpeech.QUEUE_ADD, null, "vib-notice")
+    }
+
+    override fun onDestroy() {
+        speech?.stop()
+        speech?.shutdown()
+        speech = null
+        super.onDestroy()
     }
 }

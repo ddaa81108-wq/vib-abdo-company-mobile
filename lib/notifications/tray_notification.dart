@@ -1,5 +1,6 @@
 import 'package:flutter_api_layer/api_layer.dart';
 
+import '../features/notifications/notification_sentence.dart';
 import 'notification_channels.dart';
 import 'push_payload.dart';
 
@@ -64,9 +65,11 @@ int stableAndroidNotificationId(String notificationId) {
 /// tokens on the row are not copied. [employeeName] is the only personal
 /// field, and only in the private body.
 TrayNotification trayForServer(AppNotification notification) {
+  final sentence = notificationSentence(notification);
   final label = operationLabel(notification.operationType);
   final name = notification.employeeName?.trim();
-  final body = (name == null || name.isEmpty) ? label : '$label · $name';
+  final body =
+      sentence ?? ((name == null || name.isEmpty) ? label : '$label · $name');
   final system = _systemName(notification.systemName);
   return TrayNotification(
     androidId: stableAndroidNotificationId(notification.notificationId),
