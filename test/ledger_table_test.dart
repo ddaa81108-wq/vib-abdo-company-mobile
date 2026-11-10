@@ -395,8 +395,8 @@ void main() {
         .data!;
     // The older page loaded by itself; the cancelled tx_1 is not drawn
     // and leaves no gap in the numbers.
-    expect(mark('tx_old'), '1');
-    expect(mark('tx_2'), '2');
+    expect(mark('tx_old'), '#1');
+    expect(mark('tx_2'), '#2');
     expect(find.byKey(const Key('ledger-sequence-tx_1')), findsNothing);
     expect(find.byKey(const Key('load-older')), findsNothing);
     await tester.pump(const Duration(seconds: 1));

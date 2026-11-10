@@ -1003,7 +1003,6 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
                     children: [
                       const _Cell(_LedgerColumns.seq, SizedBox.shrink()),
                       _Cell(_LedgerColumns.when, date),
-                      _Cell(_LedgerColumns.by, dash),
                       _Cell(
                         _LedgerColumns.type,
                         widget.typeCell == null
@@ -1710,8 +1709,10 @@ class _LedgerColumns {
   final AccountSection section;
 
   static const seq = 56.0;
-  static const when = 112.0;
-  static const by = 76.0;
+  static const when = 128.0;
+
+  /// The website has no بواسطة column. The name sits under the date.
+  static const by = 0.0;
   static const type = 150.0;
   static const note = 100.0;
   static const value = 84.0;
@@ -2121,7 +2122,7 @@ class _EntryTile extends ConsumerWidget {
       color: muted,
       decoration: strike,
     );
-    final sequence = ordinal == null ? AppStrings.dash : '$ordinal';
+    final sequence = ordinal == null ? AppStrings.dash : '#$ordinal';
     final date = entry.date;
     final isPayment = entry.type == 'payment';
     final amountColor = _movementAmountColor(
@@ -2191,14 +2192,15 @@ class _EntryTile extends ConsumerWidget {
               ),
             ),
             if (date != null) LtrText(_clock(date), style: small),
+            if ((entry.createdByName ?? '').trim().isNotEmpty)
+              Text(
+                '${AppStrings.byActor} ${entry.createdByName}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: cairo(9.5, 700, color: const Color(0xFF78716C)),
+              ),
           ],
         ),
-      ),
-      _Cell(
-        _LedgerColumns.by,
-        entry.createdByName == null
-            ? dash
-            : _ByChip(entry.createdByName!, reversed: reversed),
       ),
       _Cell(
         _LedgerColumns.type,
@@ -2238,7 +2240,7 @@ class _EntryTile extends ConsumerWidget {
       _Cell(_LedgerColumns.value, _Fit(_InputFigure(entry.inputValue, number))),
       _Cell(
         _LedgerColumns.operation,
-        _Fit(CalculationMark(entry.calculationMode, style: body)),
+        _Fit(_OperationPill(entry.calculationMode, reversed: reversed)),
       ),
       _Cell(
         _LedgerColumns.rate,
@@ -2268,8 +2270,8 @@ class _EntryTile extends ConsumerWidget {
     // Zebra by the row number, so every page stripes the same way.
     final odd = (ordinal ?? entry.sequence ?? 0).isOdd;
     final zebra = Theme.of(context).brightness == Brightness.dark
-        ? Colors.white.withValues(alpha: 0.025)
-        : const Color(0xFF0F172A).withValues(alpha: 0.025);
+        ? const Color(0xFF1C1917)
+        : (odd ? const Color(0xFFFFFBF3) : const Color(0xFFF3E6C4));
     return Column(
       key: Key('ledger-entry-${entry.id}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2358,20 +2360,13 @@ _ChipKind _chipKind(AccountSection section, LedgerEntryDto entry) {
 
 /// Solid glossy chip colours, white text, in both themes (the mockup).
 LinearGradient _chipFill(BuildContext context, _ChipKind kind) {
-  final look = context.look;
-  final dark = Theme.of(context).brightness == Brightness.dark;
-  final status = context.statusColors;
-  Color lift(Color c) => Color.lerp(c, Colors.white, 0.18)!;
+  assert(context.mounted);
+  // The website pills stay the same in both themes: ديون red, دفع جزئي
+  // green, دفع كلي black. Deposit إيداع uses green and سحب uses red.
   final colors = switch (kind) {
-    _ChipKind.full => [look.glossZero.top, look.glossZero.bottom],
-    _ChipKind.debt =>
-      dark
-          ? [look.glossDebt.top, look.glossDebt.bottom]
-          : [lift(status.debtText), status.debtText],
-    _ChipKind.partial =>
-      dark
-          ? [look.glossCredit.top, look.glossCredit.bottom]
-          : [lift(status.creditText), status.creditText],
+    _ChipKind.full => [const Color(0xFF3F3F46), const Color(0xFF18181B)],
+    _ChipKind.debt => [const Color(0xFFF43F5E), const Color(0xFFBE123C)],
+    _ChipKind.partial => [const Color(0xFF22C55E), const Color(0xFF15803D)],
   };
   return LinearGradient(
     begin: Alignment.topCenter,
@@ -2480,8 +2475,8 @@ class _InlineComposerState extends State<_InlineComposer> {
       return FilledButton(
         key: key,
         style: FilledButton.styleFrom(
-          backgroundColor: selected ? fill.colors.last : look.card,
-          foregroundColor: selected ? Colors.white : look.ink,
+          backgroundColor: fill.colors.last,
+          foregroundColor: Colors.white,
           side: BorderSide(
             color: selected ? fill.colors.first : look.cardBorder,
           ),
@@ -2611,8 +2606,7 @@ class _LedgerColumnHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final look = context.look;
-    final style = cairo(11, 700, color: look.muted);
+    final style = cairo(11, 800, color: const Color(0xFFF6E7A8));
     Widget head(double width, String text, {bool divider = true}) => _Cell(
       width,
       Text(text, style: style, textAlign: TextAlign.center),
@@ -2621,10 +2615,9 @@ class _LedgerColumnHeader extends StatelessWidget {
     return DecoratedBox(
       key: const Key('ledger-column-header'),
       decoration: BoxDecoration(
-        color: look.strip,
-        border: Border(
-          bottom: BorderSide(color: _gridLine(context), width: 1.5),
-        ),
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE7AE12), width: 1.2),
       ),
       child: IntrinsicHeight(
         child: Row(
@@ -2632,7 +2625,6 @@ class _LedgerColumnHeader extends StatelessWidget {
           children: [
             head(_LedgerColumns.seq, AppStrings.ledgerColSeq),
             head(_LedgerColumns.when, AppStrings.ledgerColWhen),
-            head(_LedgerColumns.by, AppStrings.ledgerColBy),
             head(_LedgerColumns.type, AppStrings.ledgerColType),
             head(_LedgerColumns.note, AppStrings.ledgerColNote),
             head(_LedgerColumns.value, AppStrings.ledgerColValue),
@@ -2778,35 +2770,33 @@ class _RoundAction extends StatelessWidget {
   }
 }
 
-/// بواسطة: who recorded the row, as a small outlined chip.
-class _ByChip extends StatelessWidget {
-  const _ByChip(this.name, {required this.reversed});
+/// Website operation pill: مباشر / × / ÷ on black.
+class _OperationPill extends StatelessWidget {
+  const _OperationPill(this.mode, {required this.reversed});
 
-  final String name;
+  final CalculationMode? mode;
   final bool reversed;
 
   @override
   Widget build(BuildContext context) {
-    final look = context.look;
+    final label = switch (mode) {
+      CalculationMode.multiply => '×',
+      CalculationMode.divide => '÷',
+      _ => 'مباشر',
+    };
     return DecoratedBox(
       decoration: BoxDecoration(
+        color: const Color(0xFF17191F),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: look.accent.withValues(alpha: 0.5)),
-        color: look.accent.withValues(alpha: 0.08),
       ),
       child: Padding(
-        padding: const EdgeInsetsDirectional.symmetric(
-          horizontal: 6,
-          vertical: 2,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Text(
-          name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          label,
           style: cairo(
-            10.5,
-            700,
-            color: look.ink,
+            11,
+            800,
+            color: Colors.white,
           ).copyWith(decoration: reversed ? TextDecoration.lineThrough : null),
         ),
       ),

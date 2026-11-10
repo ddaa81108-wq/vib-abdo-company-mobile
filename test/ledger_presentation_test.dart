@@ -247,9 +247,9 @@ void main() {
     // 2026-11-03); a row without a server sequence still gets its place.
     await tester.pump(const Duration(milliseconds: 50));
     await settle(tester);
-    expect(_textOf(tester, const Key('ledger-sequence-tx_old')), '1');
-    expect(_textOf(tester, const Key('ledger-sequence-tx_2')), '2');
-    expect(_textOf(tester, const Key('ledger-sequence-tx_1')), '3');
+    expect(_textOf(tester, const Key('ledger-sequence-tx_old')), '#1');
+    expect(_textOf(tester, const Key('ledger-sequence-tx_2')), '#2');
+    expect(_textOf(tester, const Key('ledger-sequence-tx_1')), '#3');
     expect(
       Directionality.of(
         tester.element(
