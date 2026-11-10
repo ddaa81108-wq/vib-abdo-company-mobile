@@ -139,14 +139,14 @@
 
 ## VIB-FIX-013
 
-- الالتزام: `f11bbabd5d1fb32a6d441b8a447e149dfe1b4e2b`
+- الالتزام: `f11bbabd5d1fb32a6d441b8a447e149dfe1b4e2b` ثم `dde8ebfc42af33da585aca0207acbfe2afa540f2` لإبقاء `onDestroy` واحدًا حتى يبني الإصدار.
 - العنوان: VIB-FIX-013: Speak new notifications when النطق is on.
 - العرض: الإشعارات «غير منطوقة». المفتاح في الحساب اسمه «النطق» ويحفظ `speechEnabled`. النص الظاهر كان مفتاح الإجراء مثل `collection.submit` لأن الخادم لا يرسل `title` ولا `body`.
 - السبب: الموقع عند `speechEnabled` ينطق `notificationSentence`، وعند `soundEnabled` يطلق نغمة قصيرة داخل الصفحة. قناة أندرويد `vib_collections_alerts` أصلًا `IMPORTANCE_HIGH` فشريط النظام له صوت. الشريط الداخلي كان صامتًا، والتطبيق لم يكن ينطق. الدليل يرجّح معنى النطق لا نصًا مشوّهًا وحده، والنص الخام أُصلح معه لأنه مصدر الجملة المنطوقة.
 - السلوك: جملة عربية من `actorName` و`action` و`details` كما في الموقع. إذا `speechEnabled` تُنطق بالعربية على الجهاز عبر `app/notification_speech`. إذا `soundEnabled` (الافتراض في الخادم) تُطلق نغمة. الخلفية توقف النطق. لا مسار جديد.
 - الدليل: `test/notification_sentence_test.dart`.
 - يعتمد على: لا يغيّر 012. القراءة من الحقول الموجودة في `GET /api/notifications`.
-- التراجع: `git revert f11bbabd5d1fb32a6d441b8a447e149dfe1b4e2b`. afterward: `flutter test test/notification_sentence_test.dart --dart-define=USE_FAKE_API=true`.
+- التراجع: `git revert dde8ebfc42af33da585aca0207acbfe2afa540f2` ثم `git revert f11bbabd5d1fb32a6d441b8a447e149dfe1b4e2b`. afterward: `flutter test test/notification_sentence_test.dart --dart-define=USE_FAKE_API=true`.
 
 ## VIB-FIX-014
 
