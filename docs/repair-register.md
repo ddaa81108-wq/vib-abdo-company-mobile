@@ -423,6 +423,17 @@
 - يعتمد على: 037. لا مسار جديد.
 - التراجع: `git revert bcfdfa2b41a5d57fbcba66676fe5100a2f7e76e9`. afterward: `flutter test test/collections_presentation_test.dart --name "fake role" --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-039
+
+- الالتزام: `299852337c46a38db69474e3b04ccb5ec9b21369`
+- العنوان: VIB-FIX-039: Add cancel-approval beside the cash receipt pill.
+- العرض: خطوة النقدية كانت تعرض تأكيد استلام النقدية وحدها.
+- السبب: الموقع يضع بجانبها «إلغاء الاعتماد». المسار المؤكد `POST /api/collections/submissions/{id}/cancel-approval`، والجسم `requestId` و`reason` من 5 إلى 500 و`expectedTransactionId`. الخادم يقبله من `role === 'admin'` فقط. معرّف الحركة يأتي من `GET /api/collections/workspace` لأن صفوف `GET /api/collections` لا تختاره.
+- السلوك: الحبة الحمراء للإداري عندما يكون الاستلام معتمدًا وبلا نقدية ومعه `approvedTransactionId` وبلا تعارض عملة. الحوار يطلب السبب ثم يرسل. الرد يُعاد جلبه كما أرسله الخادم. الموظف لا يراها.
+- الدليل: `packages/api_layer/test/collection_cancel_approval_test.dart` و`test/collections_cancel_approval_test.dart`.
+- يعتمد على: 038. لا تغيير في الخادم.
+- التراجع: `git revert 299852337c46a38db69474e3b04ccb5ec9b21369`. afterward: `flutter test test/collections_cancel_approval_test.dart --exclude-tags screenshots --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
