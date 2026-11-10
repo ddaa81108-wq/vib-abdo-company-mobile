@@ -1456,8 +1456,7 @@ class _PurchaseGrid extends ConsumerWidget {
     final breakH = _ledgerBreakH * scale;
     final actionW = _ledgerActionWidth * scale;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final headerFill = const Color(0xFF111111);
-    final breakFill = dark ? const Color(0xFF3F3F46) : const Color(0xFFE7E5E4);
+    final headerFill = const Color(0xFF14532D);
     final breakInk = dark ? const Color(0xFFE7E5E4) : const Color(0xFF44403C);
     final figure = context.textExtras.amount.copyWith(
       fontSize: 13,
@@ -1600,10 +1599,10 @@ class _PurchaseGrid extends ConsumerWidget {
                 maxWidth: tableWidth,
               ),
               child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: breakFill,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF6E7A8),
                   border: Border.symmetric(
-                    horizontal: BorderSide(color: _gridLine(context), width: 1),
+                    horizontal: BorderSide(color: Color(0xFFE7AE12), width: 2),
                   ),
                 ),
                 child: Padding(
@@ -1617,8 +1616,20 @@ class _PurchaseGrid extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
+                              'الباقي المرحّل من اليوم السابق',
+                              style: cairo(
+                                12,
+                                800,
+                                color: const Color(0xFF211600),
+                              ),
+                            ),
+                            Text(
                               'يوم #${dayNumber ?? '—'}',
-                              style: cairo(13, 800, color: breakInk),
+                              style: cairo(
+                                13,
+                                800,
+                                color: const Color(0xFF211600),
+                              ),
                             ),
                             Text(
                               closedDate ?? AppStrings.dash,
@@ -1780,6 +1791,12 @@ class _PurchaseGrid extends ConsumerWidget {
                                   ),
                                 ],
                               ),
+                            )
+                          : entry.dayStatus == 'finalized'
+                          ? const Icon(
+                              Icons.check_circle,
+                              color: Color(0xFF15803D),
+                              size: 22,
                             )
                           : null,
                     ),
