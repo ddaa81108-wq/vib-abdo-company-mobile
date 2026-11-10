@@ -87,15 +87,19 @@ void main() {
         tester,
         container.read(systemTrayTapHandlerProvider).openPayload('n-tray'),
       );
-      await tester.pump();
-      expect(find.byKey(ForbiddenScreen.screenKey), findsOneWidget);
+      await tester.pumpAndSettle(
+        const Duration(milliseconds: 50),
+        EnginePhase.sendSemanticsUpdate,
+        const Duration(seconds: 20),
+      );
+      expect(find.byKey(CollectionsScreen.screenKey), findsOneWidget);
 
       final forbidden = await finish(
         tester,
         container
             .read(notificationOpenSeamProvider)
             .open(
-              notice(id: 'n-tray-2'),
+              notice(id: 'n-tray-2', recipient: 'someone-else'),
               origin: NotificationOpenOrigin.systemTray,
             ),
       );

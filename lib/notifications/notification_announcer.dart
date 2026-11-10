@@ -44,18 +44,21 @@ class MethodChannelNotificationAnnouncer implements NotificationAnnouncer {
   static const channel = MethodChannel('app/notification_speech');
 
   @override
-  Future<void> speak(String text) async {
-    await channel.invokeMethod<void>('speak', {'text': text, 'lang': 'ar'});
-  }
+  Future<void> speak(String text) =>
+      _invoke('speak', {'text': text, 'lang': 'ar'});
 
   @override
-  Future<void> tone() async {
-    await channel.invokeMethod<void>('tone');
-  }
+  Future<void> tone() => _invoke('tone');
 
   @override
-  Future<void> stop() async {
-    await channel.invokeMethod<void>('stop');
+  Future<void> stop() => _invoke('stop');
+
+  Future<void> _invoke(String method, [Object? arguments]) async {
+    try {
+      await channel.invokeMethod<void>(method, arguments);
+    } on MissingPluginException {
+      // Widget tests and non-Android hosts have no engine for this channel.
+    }
   }
 }
 
