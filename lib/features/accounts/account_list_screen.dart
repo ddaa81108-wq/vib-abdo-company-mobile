@@ -81,7 +81,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     // phone (Ali, 2026-11-02; companies 2026-11-03). Each keeps its own data.
     final isCustomers = section == AccountSection.customers;
     final debtLook = isDebtLookSection(section);
-    final columns = debtLook && gridColumns < 2 ? 2 : gridColumns;
+    final columns = gridColumns < 2 ? 2 : gridColumns;
 
     final Widget searchField = TextField(
       key: const Key('account-search'),
@@ -1354,7 +1354,12 @@ class _AccountCard extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: gloss.fill,
             borderRadius: radius,
-            border: Border.all(color: tone.border),
+            border: Border.all(
+              color: isDebtLookSection(section)
+                  ? tone.border
+                  : const Color(0xFFE7AE12),
+              width: isDebtLookSection(section) ? 1 : 1.6,
+            ),
           ),
           child: InkWell(
             onTap: onOpen,
