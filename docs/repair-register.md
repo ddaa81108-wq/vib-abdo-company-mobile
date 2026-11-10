@@ -401,6 +401,17 @@
 - يعتمد على: 033. لا مسار جديد.
 - التراجع: `git revert 8cd2509218fb505254956a7d04d85bd76c843ab0`. afterward: `flutter test test/collections_presentation_test.dart --name "fake role" --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-037
+
+- الالتزام: `fb4fd1b6d608aeedd2050e6a133ae2d8befe0676`
+- العنوان: VIB-FIX-037: Draw the collection details mark with a chevron icon.
+- العرض: شريط «تفاصيل الاستلامات» كان يرسم مربع حرف ناقص قبل الكلمات.
+- السبب: خط Cairo لا يحتوي الرمز ◂، فظهرت خانة بديلة.
+- السلوك: السهم أيقونة Material بجانب النص. الكلمات كما هي.
+- الدليل: `test/collections_presentation_test.dart`.
+- يعتمد على: 036. لا مسار جديد.
+- التراجع: `git revert fb4fd1b6d608aeedd2050e6a133ae2d8befe0676`. afterward: `flutter test test/collections_presentation_test.dart --name "fake role" --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
