@@ -1696,10 +1696,15 @@ class _AssignmentCard extends ConsumerWidget {
                   childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                   iconColor: gloss.ink,
                   collapsedIconColor: gloss.ink,
-                  title: Text(
-                    '◂ تفاصيل الاستلامات',
-                    textAlign: TextAlign.center,
-                    style: cairo(11, 800, color: gloss.ink),
+                  title: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.chevron_left, size: 18, color: gloss.ink),
+                      Text(
+                        'تفاصيل الاستلامات',
+                        style: cairo(11, 800, color: gloss.ink),
+                      ),
+                    ],
                   ),
                   children: [
                     if (history.isEmpty && admin)
