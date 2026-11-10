@@ -257,6 +257,11 @@ class _AdminViewState extends ConsumerState<_AdminView> {
         _ActionBar(
           key: const Key('collections-action-bar'),
           oneRow: true,
+          tones: [
+            if (widget.onPayroll != null) const Color(0xFF178447),
+            if (close) const Color(0xFFB52835),
+            const Color(0xFF178447),
+          ],
           children: [
             if (widget.onPayroll != null)
               _BarButton(
@@ -493,6 +498,29 @@ class _EmployeeTotals extends StatelessWidget {
   }
 }
 
+/// Two compact cards on a phone, three when the row is wide.
+Widget _assignmentGrid(List<Widget> cards) {
+  if (cards.isEmpty) return const SizedBox.shrink();
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final cols = constraints.maxWidth < 560
+          ? 1
+          : constraints.maxWidth >= 720
+          ? 3
+          : 2;
+      const gap = 8.0;
+      final width = (constraints.maxWidth - gap * (cols - 1)) / cols;
+      return Wrap(
+        spacing: gap,
+        runSpacing: gap,
+        children: [
+          for (final card in cards) SizedBox(width: width, child: card),
+        ],
+      );
+    },
+  );
+}
+
 String _adminTabLabel(AdminTab tab) => switch (tab) {
   AdminTab.all => CollectionsText.tabAll,
   AdminTab.review => CollectionsText.tabReview,
@@ -526,13 +554,15 @@ class _AdminList extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final assignment in rows.assignments)
-          _AssignmentCard(
-            assignment: assignment,
-            history: collectionCardHistory(data, assignment.id),
-            money: money,
-            admin: true,
-          ),
+        _assignmentGrid([
+          for (final assignment in rows.assignments)
+            _AssignmentCard(
+              assignment: assignment,
+              history: collectionCardHistory(data, assignment.id),
+              money: money,
+              admin: true,
+            ),
+        ]),
         for (final receipt in rows.unlinked)
           _AdminUnlinkedCard(receipt: receipt, money: money),
         for (final item in rows.outstanding)
@@ -850,13 +880,15 @@ class _EmployeeViewState extends ConsumerState<_EmployeeView> {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (final assignment in rows.assignments)
-                      _AssignmentCard(
-                        assignment: assignment,
-                        history: collectionCardHistory(data, assignment.id),
-                        money: money,
-                        admin: false,
-                      ),
+                    _assignmentGrid([
+                      for (final assignment in rows.assignments)
+                        _AssignmentCard(
+                          assignment: assignment,
+                          history: collectionCardHistory(data, assignment.id),
+                          money: money,
+                          admin: false,
+                        ),
+                    ]),
                     for (final submission in rows.submissions)
                       _ReceiptRow(submission: submission, money: money),
                     for (final receipt in rows.unlinked)
@@ -980,13 +1012,33 @@ class _LabeledField extends StatelessWidget {
 /// The glossy bar of pill buttons (the website's green bar, in the app's
 /// hero gloss). Buttons inside take the bar's colours.
 class _ActionBar extends StatelessWidget {
-  const _ActionBar({required this.children, this.oneRow = false, super.key});
+  const _ActionBar({
+    required this.children,
+    this.oneRow = false,
+    this.tones,
+    super.key,
+  });
 
   final List<Widget> children;
   final bool oneRow;
 
+  /// When set, each button is a solid colour instead of the hero bar.
+  final List<Color>? tones;
+
   @override
   Widget build(BuildContext context) {
+    final tones = this.tones;
+    if (tones != null && tones.length == children.length) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(child: _solidButton(context, tones[i], children[i])),
+          ],
+        ],
+      );
+    }
     final look = context.look;
     final gloss = look.glossHero;
     final radius = BorderRadius.circular(AppRadii.xl);
@@ -1067,6 +1119,28 @@ class _ActionBar extends StatelessWidget {
       ),
     );
   }
+}
+
+Widget _solidButton(BuildContext context, Color background, Widget child) {
+  final style = ButtonStyle(
+    minimumSize: const WidgetStatePropertyAll(Size(0, 40)),
+    backgroundColor: WidgetStatePropertyAll(background),
+    foregroundColor: const WidgetStatePropertyAll(Colors.white),
+    iconColor: const WidgetStatePropertyAll(Colors.white),
+    side: const WidgetStatePropertyAll(BorderSide.none),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+    textStyle: WidgetStatePropertyAll(cairo(11, 800)),
+    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 6)),
+  );
+  return Theme(
+    data: Theme.of(context).copyWith(
+      outlinedButtonTheme: OutlinedButtonThemeData(style: style),
+      filledButtonTheme: FilledButtonThemeData(style: style),
+    ),
+    child: child,
+  );
 }
 
 class _BarButton extends StatelessWidget {
@@ -1167,11 +1241,14 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final look = context.look;
-    final radius = BorderRadius.circular(AppRadii.xl);
+    final radius = BorderRadius.circular(12);
     final figure = context.textExtras.amount.copyWith(color: look.ink);
+    final tile = Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFF1A2230)
+        : const Color(0xFFFFFFFF);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: look.card,
+        color: tile,
         borderRadius: radius,
         border: Border.all(color: look.cardBorder),
         boxShadow: look.glass
@@ -1188,7 +1265,7 @@ class _SummaryCard extends StatelessWidget {
         borderRadius: radius,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            border: BorderDirectional(start: BorderSide(color: edge, width: 5)),
+            border: BorderDirectional(start: BorderSide(color: edge, width: 6)),
           ),
           child: Padding(
             padding: const EdgeInsetsDirectional.all(AppSpacing.xs),
@@ -1240,9 +1317,8 @@ class _TabChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final look = context.look;
-    final gloss = look.glossHero;
     final radius = BorderRadius.circular(AppRadii.xl);
-    final ink = selected ? look.onHero : look.ink;
+    final ink = selected ? const Color(0xFF211600) : look.ink;
     final body = Padding(
       padding: const EdgeInsetsDirectional.symmetric(
         horizontal: 4,
@@ -1294,17 +1370,11 @@ class _TabChip extends StatelessWidget {
           borderRadius: radius,
           child: selected
               ? DecoratedBox(
-                  decoration: gloss
-                      .decoration(radius)
-                      .copyWith(boxShadow: gloss.glowShadow),
-                  child: ClipRRect(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE7AE12),
                     borderRadius: radius,
-                    child: GlossSheen(
-                      gloss: gloss,
-                      radius: radius,
-                      child: body,
-                    ),
                   ),
+                  child: body,
                 )
               : DecoratedBox(
                   decoration: BoxDecoration(
@@ -1493,73 +1563,160 @@ class _AssignmentCard extends ConsumerWidget {
     final tone = collectionCardTone(assignment);
     final gloss = collectionToneGloss(context, tone);
     var partial = 0;
-    return GlossCard(
+    final balanceText = money.formatOrDash(
+      assignment.balanceUnits,
+      Currency.lyd,
+    );
+    final assignedText = assignment.assignedBalanceUnits == null
+        ? 'غير مسجلة'
+        : money.formatOrDash(assignment.assignedBalanceUnits, Currency.lyd);
+    Widget pair(String label, String value, {Key? key}) {
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: cairo(9, 700, color: gloss.ink.withValues(alpha: 0.8)),
+            ),
+            Text(
+              value,
+              key: key,
+              style: cairo(14, 800, color: gloss.amount),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return DecoratedBox(
       key: Key('assignment-${assignment.id}'),
-      gloss: gloss,
+      decoration: BoxDecoration(
+        gradient: gloss.fill,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: gloss.border),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox.shrink(
             key: Key('tone-${assignment.id}-${collectionToneName(tone)}'),
           ),
-          Text(
-            assignment.assigneeName ?? '',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: cairo(11, 700, color: gloss.ink.withValues(alpha: 0.8)),
-          ),
-          Text(
-            assignment.customerName,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: cairo(16, 800, color: gloss.ink),
-          ),
-          const SizedBox(height: 6),
-          _CollectionAmounts(
-            assignment: assignment,
-            money: money,
-            gloss: gloss,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _collectionStateLabel(assignment),
-            key: Key('assignment-state-${assignment.id}'),
-            style: cairo(12, 800, color: gloss.ink),
-          ),
-          // The figure tests still read the current balance by this key.
-          SizedBox(
-            key: Key('assignment-balance-${assignment.id}'),
-            height: 0,
-            child: Text(
-              money.formatOrDash(assignment.balanceUnits, Currency.lyd),
-              style: cairo(1, 400, color: gloss.ink),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        assignment.customerName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: cairo(13, 800, color: gloss.ink),
+                      ),
+                    ),
+                    if ((assignment.assigneeName ?? '').isNotEmpty)
+                      Container(
+                        margin: const EdgeInsetsDirectional.only(start: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          assignment.assigneeName!,
+                          style: cairo(9, 800, color: gloss.ink),
+                        ),
+                      ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    pair(
+                      'قيمة التوجيه',
+                      assignedText,
+                      key: Key('assigned-amount-${assignment.id}'),
+                    ),
+                    pair(
+                      'الرصيد الحالي',
+                      balanceText,
+                      key: Key('assignment-balance-${assignment.id}'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _collectionStateLabel(assignment),
+                        key: Key('assignment-state-${assignment.id}'),
+                        style: cairo(10, 800, color: gloss.ink),
+                      ),
+                    ),
+                    if (assignment.cashOutstandingCount > 0)
+                      Text(
+                        '${assignment.cashOutstandingCount} استلام',
+                        style: cairo(10, 800, color: gloss.ink),
+                      ),
+                  ],
+                ),
+                if (!admin)
+                  LtrText(
+                    assignment.phone ?? CollectionsText.noPhone,
+                    key: Key('phone-${assignment.id}'),
+                    style: cairo(10, 600, color: gloss.ink),
+                  ),
+              ],
             ),
           ),
-          if (!admin) ...[
-            const SizedBox(height: AppSpacing.xxs),
-            LtrText(
-              assignment.phone ?? CollectionsText.noPhone,
-              key: Key('phone-${assignment.id}'),
-              style: cairo(12, 600, color: gloss.ink),
+          Material(
+            color: Colors.transparent,
+            child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              initiallyExpanded:
+                  !admin ||
+                  history.any(
+                    (item) => item.status == 'pending' || item.awaitingCash,
+                  ),
+              tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+              childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              iconColor: gloss.ink,
+              collapsedIconColor: gloss.ink,
+              title: Text(
+                '◂ تفاصيل الاستلامات',
+                textAlign: TextAlign.center,
+                style: cairo(11, 800, color: gloss.ink),
+              ),
+              children: [
+                if (history.isEmpty && admin)
+                  Text(
+                    CollectionsText.noHistory,
+                    style: cairo(11, 600, color: gloss.ink),
+                  ),
+                for (final item in history)
+                  _SubmissionLine(
+                    submission: item,
+                    title: item.mode == 'full'
+                        ? CollectionsText.fullReceipt
+                        : CollectionsText.partialReceiptN(++partial),
+                    money: money,
+                    gloss: gloss,
+                    admin: admin,
+                  ),
+                if (!admin)
+                  _EmployeeActions(assignment: assignment, money: money),
+              ],
             ),
-          ],
-          const SizedBox(height: AppSpacing.sm),
-          if (history.isEmpty && admin)
-            Text(
-              CollectionsText.noHistory,
-              style: cairo(12, 500, color: gloss.ink),
-            ),
-          for (final item in history)
-            _SubmissionLine(
-              submission: item,
-              title: item.mode == 'full'
-                  ? CollectionsText.fullReceipt
-                  : CollectionsText.partialReceiptN(++partial),
-              money: money,
-              gloss: gloss,
-              admin: admin,
-            ),
-          if (!admin) _EmployeeActions(assignment: assignment, money: money),
+          ),
+          ),
         ],
       ),
     );
@@ -1573,9 +1730,7 @@ String _collectionStateLabel(CollectionAssignmentDto card) {
     return 'رُفضت العملية — التوجيه مستمر';
   }
   if (card.hasPending) return 'يحتاج مراجعة';
-  if (card.cashOutstandingCount > 0) {
-    return 'نقدية لم تُسلّم · ${card.cashOutstandingCount} استلام';
-  }
+  if (card.cashOutstandingCount > 0) return 'نقدية لم تُسلّم';
   if (card.latestCashReceivedAt != null) return 'تم تسليم النقدية';
   return 'جاهز للمتابعة';
 }
@@ -1894,57 +2049,6 @@ Widget _whiteAction({
       ),
     ),
   );
-}
-
-class _CollectionAmounts extends StatelessWidget {
-  const _CollectionAmounts({
-    required this.assignment,
-    required this.money,
-    required this.gloss,
-  });
-
-  final CollectionAssignmentDto assignment;
-  final MoneyFormatter money;
-  final Gloss gloss;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget column(String label, String value, Key key) {
-      return Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: cairo(10, 700, color: gloss.ink)),
-            Text(
-              value,
-              key: key,
-              style: cairo(16, 800, color: gloss.amount),
-            ),
-          ],
-        ),
-      );
-    }
-
-    String figure(MoneyValue? value) {
-      if (value == null) return 'غير مسجلة';
-      return money.formatOrDash(value, Currency.lyd);
-    }
-
-    return Row(
-      children: [
-        column(
-          'قيمة التوجيه',
-          figure(assignment.assignedBalanceUnits),
-          Key('assigned-amount-${assignment.id}'),
-        ),
-        column(
-          'الرصيد الحالي',
-          figure(assignment.balanceUnits),
-          Key('current-amount-${assignment.id}'),
-        ),
-      ],
-    );
-  }
 }
 
 class _CardHeader extends StatelessWidget {
