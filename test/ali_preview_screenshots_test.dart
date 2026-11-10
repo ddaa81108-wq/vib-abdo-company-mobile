@@ -64,10 +64,29 @@ void main() {
         await go(tester, path);
         await tester.pump(const Duration(milliseconds: 200));
         await saveShot(tester, 'live-${path.substring(1)}-$theme');
+        if (!dark && path == '/collections') {
+          await tester.ensureVisible(find.text('1 استلام'));
+          await tester.pumpAndSettle();
+          await saveShot(tester, 'live-collections-count-light');
+        }
+        if (!dark && path == '/purchases') {
+          await tester.ensureVisible(
+            find.byKey(const Key('purchase-rollover-11')),
+          );
+          await tester.pumpAndSettle();
+          await saveShot(tester, 'live-purchases-carry-light');
+        }
       }
       await go(tester, '/customers/c_55');
       await tester.pump(const Duration(milliseconds: 200));
       await saveShot(tester, 'live-ledger-customers-$theme');
+      if (!dark) {
+        await tester.ensureVisible(
+          find.byKey(const Key('movement-mode-direct')),
+        );
+        await tester.pumpAndSettle();
+        await saveShot(tester, 'live-ledger-draft-pills-light');
+      }
       for (final section in [
         'libyan-deposits',
         'egyptian-deposits',

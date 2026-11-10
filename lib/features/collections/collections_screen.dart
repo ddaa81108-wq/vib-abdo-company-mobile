@@ -1597,129 +1597,138 @@ class _AssignmentCard extends ConsumerWidget {
         border: Border.all(color: gloss.border),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x99E7AE12),
+            color: Color(0xE6E7AE12),
             blurRadius: 0,
-            offset: Offset(0, 3),
+            offset: Offset(0, 5),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox.shrink(
-            key: Key('tone-${assignment.id}-${collectionToneName(tone)}'),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        assignment.customerName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: cairo(13, 800, color: gloss.ink),
-                      ),
-                    ),
-                    if ((assignment.assigneeName ?? '').isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(start: 6),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(13),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox.shrink(
+              key: Key('tone-${assignment.id}-${collectionToneName(tone)}'),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
                         child: Text(
-                          assignment.assigneeName!,
-                          style: cairo(10, 600, color: gloss.ink),
+                          assignment.customerName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: cairo(13, 800, color: gloss.ink),
                         ),
                       ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    pair(
-                      'قيمة التوجيه',
-                      assignedText,
-                      key: Key('assigned-amount-${assignment.id}'),
-                    ),
-                    pair(
-                      'الرصيد الحالي',
-                      balanceText,
-                      key: Key('assignment-balance-${assignment.id}'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _collectionStateLabel(assignment),
-                        key: Key('assignment-state-${assignment.id}'),
-                        style: cairo(10, 800, color: gloss.ink),
-                      ),
-                    ),
-                    if (history.isNotEmpty ||
-                        assignment.cashOutstandingCount > 0)
-                      Text(
-                        '${history.isNotEmpty ? history.length : assignment.cashOutstandingCount} استلام',
-                        style: cairo(10, 800, color: gloss.ink),
-                      ),
-                  ],
-                ),
-                if (!admin)
-                  LtrText(
-                    assignment.phone ?? CollectionsText.noPhone,
-                    key: Key('phone-${assignment.id}'),
-                    style: cairo(10, 600, color: gloss.ink),
+                      if ((assignment.assigneeName ?? '').isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsetsDirectional.only(start: 6),
+                          child: Text(
+                            assignment.assigneeName!,
+                            style: cairo(10, 600, color: gloss.ink),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
-            ),
-          ),
-          const Divider(height: 1, thickness: 1, color: Color(0x66FFFFFF)),
-          Material(
-            color: Colors.transparent,
-            child: Theme(
-              data: Theme.of(context)
-                  .copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                initiallyExpanded:
-                    !admin ||
-                    history.any(
-                      (item) => item.status == 'pending' || item.awaitingCash,
-                    ),
-                tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-                childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                iconColor: gloss.ink,
-                collapsedIconColor: gloss.ink,
-                title: Text(
-                  '◂ تفاصيل الاستلامات',
-                  textAlign: TextAlign.center,
-                  style: cairo(11, 800, color: gloss.ink),
-                ),
-                children: [
-                  if (history.isEmpty && admin)
-                    Text(
-                      CollectionsText.noHistory,
-                      style: cairo(11, 600, color: gloss.ink),
-                    ),
-                  for (final item in history)
-                    _SubmissionLine(
-                      submission: item,
-                      title: item.mode == 'full'
-                          ? CollectionsText.fullReceipt
-                          : CollectionsText.partialReceiptN(++partial),
-                      money: money,
-                      gloss: gloss,
-                      admin: admin,
-                    ),
+                  Row(
+                    children: [
+                      pair(
+                        'قيمة التوجيه',
+                        assignedText,
+                        key: Key('assigned-amount-${assignment.id}'),
+                      ),
+                      pair(
+                        'الرصيد الحالي',
+                        balanceText,
+                        key: Key('assignment-balance-${assignment.id}'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _collectionStateLabel(assignment),
+                          key: Key('assignment-state-${assignment.id}'),
+                          style: cairo(10, 800, color: gloss.ink),
+                        ),
+                      ),
+                      if (history.isNotEmpty ||
+                          assignment.cashOutstandingCount > 0)
+                        Text(
+                          '${history.isNotEmpty ? history.length : assignment.cashOutstandingCount} استلام',
+                          style: cairo(10, 800, color: gloss.ink),
+                        ),
+                    ],
+                  ),
                   if (!admin)
-                    _EmployeeActions(assignment: assignment, money: money),
+                    LtrText(
+                      assignment.phone ?? CollectionsText.noPhone,
+                      key: Key('phone-${assignment.id}'),
+                      style: cairo(10, 600, color: gloss.ink),
+                    ),
                 ],
               ),
             ),
-          ),
-        ],
+            const Divider(height: 1, thickness: 1, color: Color(0x66FFFFFF)),
+            Material(
+              color: Colors.transparent,
+              child: Theme(
+                data: Theme.of(context)
+                    .copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  initiallyExpanded:
+                      !admin ||
+                      history.any(
+                        (item) => item.status == 'pending' || item.awaitingCash,
+                      ),
+                  minTileHeight: 34,
+                  visualDensity: VisualDensity.compact,
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+                  childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                  iconColor: gloss.ink,
+                  collapsedIconColor: gloss.ink,
+                  title: Text(
+                    '◂ تفاصيل الاستلامات',
+                    textAlign: TextAlign.center,
+                    style: cairo(11, 800, color: gloss.ink),
+                  ),
+                  children: [
+                    if (history.isEmpty && admin)
+                      Text(
+                        CollectionsText.noHistory,
+                        style: cairo(11, 600, color: gloss.ink),
+                      ),
+                    for (final item in history)
+                      _SubmissionLine(
+                        submission: item,
+                        title: item.mode == 'full'
+                            ? CollectionsText.fullReceipt
+                            : CollectionsText.partialReceiptN(++partial),
+                        money: money,
+                        gloss: gloss,
+                        admin: admin,
+                      ),
+                    if (!admin)
+                      _EmployeeActions(assignment: assignment, money: money),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(
+              height: 5,
+              child: ColoredBox(color: Color(0xFFE7AE12)),
+            ),
+          ],
+        ),
       ),
     );
   }
