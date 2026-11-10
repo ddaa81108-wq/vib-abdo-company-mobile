@@ -79,13 +79,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       tooltip: dark
                           ? AppStrings.themeLight
                           : AppStrings.themeDark,
+                      style: IconButton.styleFrom(
+                        backgroundColor: dark
+                            ? const Color(0xFFF5C542)
+                            : const Color(0xFF1E3A8A),
+                        foregroundColor: dark
+                            ? const Color(0xFF0B1020)
+                            : const Color(0xFFFFFFFF),
+                      ),
                       onPressed: () =>
                           ref.read(themeModeProvider.notifier).toggle(),
-                      icon: Icon(
-                        dark
-                            ? Icons.light_mode_outlined
-                            : Icons.dark_mode_outlined,
-                      ),
+                      icon: Icon(dark ? Icons.light_mode : Icons.dark_mode),
                     ),
                   ),
                   Text(

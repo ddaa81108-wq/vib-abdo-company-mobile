@@ -63,13 +63,36 @@ class AccountScreen extends ConsumerWidget {
         const SizedBox(height: AppSpacing.md),
         Card(
           clipBehavior: Clip.antiAlias,
-          child: SwitchListTile(
-            key: const Key('theme-switch'),
-            title: const Text(AppStrings.appearance),
-            subtitle: Text(dark ? AppStrings.themeDark : AppStrings.themeLight),
-            value: dark,
-            onChanged: (value) =>
-                ref.read(themeModeProvider.notifier).setDark(value),
+          child: SwitchTheme(
+            data: SwitchThemeData(
+              thumbColor: WidgetStateProperty.resolveWith((states) {
+                return states.contains(WidgetState.selected)
+                    ? const Color(0xFF0B1020)
+                    : const Color(0xFFFFFFFF);
+              }),
+              trackColor: WidgetStateProperty.resolveWith((states) {
+                return states.contains(WidgetState.selected)
+                    ? const Color(0xFFF5C542)
+                    : const Color(0xFF1E3A8A);
+              }),
+              trackOutlineColor: const WidgetStatePropertyAll(
+                Color(0xFFF5C542),
+              ),
+            ),
+            child: SwitchListTile(
+              key: const Key('theme-switch'),
+              secondary: Icon(
+                dark ? Icons.dark_mode : Icons.light_mode,
+                color: dark ? const Color(0xFFF5C542) : const Color(0xFF1E3A8A),
+              ),
+              title: const Text(AppStrings.appearance),
+              subtitle: Text(
+                dark ? AppStrings.themeDark : AppStrings.themeLight,
+              ),
+              value: dark,
+              onChanged: (value) =>
+                  ref.read(themeModeProvider.notifier).setDark(value),
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.md),

@@ -331,10 +331,23 @@ class StyledDrawer extends StatelessWidget {
               padding: const EdgeInsetsDirectional.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  Icon(
-                    dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                    color: p.ink,
-                    size: 20,
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: dark
+                          ? const Color(0xFFF5C542)
+                          : const Color(0xFF1E3A8A),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(
+                        dark ? Icons.light_mode : Icons.dark_mode,
+                        color: dark
+                            ? const Color(0xFF0B1020)
+                            : const Color(0xFFFFFFFF),
+                        size: 18,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

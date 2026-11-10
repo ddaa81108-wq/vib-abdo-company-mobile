@@ -499,11 +499,16 @@ class _Rail extends ConsumerWidget {
           ),
           IconButton(
             tooltip: dark ? AppStrings.themeLight : AppStrings.themeDark,
-            onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
-            icon: Icon(
-              dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              color: palette.shine,
+            style: IconButton.styleFrom(
+              backgroundColor: dark
+                  ? const Color(0xFFF5C542)
+                  : const Color(0xFF1E3A8A),
+              foregroundColor: dark
+                  ? const Color(0xFF0B1020)
+                  : const Color(0xFFFFFFFF),
             ),
+            onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
+            icon: Icon(dark ? Icons.light_mode : Icons.dark_mode),
           ),
         ],
       ),
@@ -534,12 +539,22 @@ class _NavList extends ConsumerWidget {
     final palette = context.sidebarPalette;
     final colors = context.appColors;
     final themeTile = SoftTile(
-      leading: Icon(
-        dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+      leading: DecoratedBox(
+        decoration: BoxDecoration(
+          color: dark ? const Color(0xFFF5C542) : const Color(0xFF1E3A8A),
+          shape: BoxShape.circle,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(
+            dark ? Icons.light_mode : Icons.dark_mode,
+            size: 18,
+            color: dark ? const Color(0xFF0B1020) : const Color(0xFFFFFFFF),
+          ),
+        ),
       ),
       title: dark ? AppStrings.themeLight : AppStrings.themeDark,
       titleColor: palette.shine,
-      iconColor: palette.shine,
       onTap: () => ref.read(themeModeProvider.notifier).toggle(),
     );
     return Material(
