@@ -84,6 +84,7 @@ class EditAccountCardButton extends ConsumerWidget {
         style: TextButton.styleFrom(
           backgroundColor: const Color(0xFF211600),
           foregroundColor: const Color(0xFFF6E7A8),
+          side: const BorderSide(color: Color(0xFFE7AE12), width: 1.4),
           minimumSize: const Size(36, 36),
           fixedSize: const Size(36, 36),
           padding: EdgeInsets.zero,

@@ -268,9 +268,13 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
         padding: const EdgeInsets.all(6),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: const Color(0xFFF7F1E4),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE7AE12), width: 2),
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFFFF8EC), Color(0xFFF6E2A8)],
+            ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xFFE7AE12), width: 2.4),
           ),
           child: KeptData<AccountCardDto>(
             value: card,
@@ -302,31 +306,31 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                 padding: const EdgeInsets.fromLTRB(8, 8, 10, 4),
                 child: Row(
                   children: [
-                    Flexible(
-                      child: Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: _OwnerPill(
-                          name: loadedCard.name,
-                          section: _ledgerTitle(section),
-                        ),
-                      ),
-                    ),
                     Expanded(
-                      child: Center(
-                        child: EditAccountCardButton(
-                          section: section,
-                          card: loadedCard,
-                          compact: true,
-                        ),
+                      child: _OwnerPill(
+                        name: loadedCard.name,
+                        section: _ledgerTitle(section),
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    EditAccountCardButton(
+                      section: section,
+                      card: loadedCard,
+                      compact: true,
+                    ),
+                    const SizedBox(width: 6),
                     IconButton(
                       key: const Key('ledger-close'),
                       tooltip: AppStrings.back,
                       style: IconButton.styleFrom(
                         backgroundColor: const Color(0xFF211600),
                         foregroundColor: const Color(0xFFF6E7A8),
+                        side: const BorderSide(
+                          color: Color(0xFFE7AE12),
+                          width: 1.4,
+                        ),
                         minimumSize: const Size(36, 36),
+                        fixedSize: const Size(36, 36),
                       ),
                       onPressed: () => context.canPop()
                           ? context.pop()
@@ -933,15 +937,34 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
           CalculationMode.divide,
           CalculationMode.multiply,
         ])
-          ChoiceChip(
+          GestureDetector(
             key: Key('movement-mode-${mode.name}'),
-            label: CalculationMark(mode),
-            selected: _mode == mode,
-            showCheckmark: false,
-            visualDensity: VisualDensity.compact,
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-            onSelected: full ? null : (_) => setState(() => _mode = mode),
+            onTap: full ? null : () => setState(() => _mode = mode),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF17191F),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: _mode == mode
+                      ? const Color(0xFFF6E7A8)
+                      : const Color(0xFFE7AE12),
+                  width: _mode == mode ? 1.6 : 1,
+                ),
+              ),
+              child: Text(
+                switch (mode) {
+                  CalculationMode.multiply => '×',
+                  CalculationMode.divide => '÷',
+                  CalculationMode.direct => 'مباشر',
+                },
+                style: cairo(
+                  11,
+                  800,
+                  color: _mode == mode ? const Color(0xFFF6E7A8) : Colors.white,
+                ),
+              ),
+            ),
           ),
       ],
     );
@@ -2757,20 +2780,22 @@ class _OwnerPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       label: '$section: $name',
-      child: DecoratedBox(
+      child: SizedBox(
+        width: double.infinity,
+        child: DecoratedBox(
         key: const Key('ledger-owner-pill'),
         decoration: BoxDecoration(
           color: const Color(0xFF111111),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: const Color(0xFFE7AE12)),
+          border: Border.all(color: const Color(0xFFE7AE12), width: 1.4),
         ),
         child: Padding(
           padding: const EdgeInsetsDirectional.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xxs,
+            horizontal: AppSpacing.md,
+            vertical: 8,
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.max,
             children: [
               Flexible(
                 child: Text(
@@ -2783,6 +2808,7 @@ class _OwnerPill extends StatelessWidget {
               ),
             ],
           ),
+        ),
         ),
       ),
     );
