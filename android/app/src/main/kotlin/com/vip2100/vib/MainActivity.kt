@@ -4,8 +4,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
-import android.media.AudioManager
-import android.media.ToneGenerator
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
+import android.media.RingtoneManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
@@ -129,6 +131,15 @@ class MainActivity : FlutterActivity() {
         )
         channel.description = getString(R.string.notification_channel_description)
         channel.setShowBadge(true)
+        val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        channel.setSound(
+            sound,
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build(),
+        )
+        channel.enableVibration(true)
         manager.createNotificationChannel(channel)
     }
 
@@ -251,7 +262,8 @@ class MainActivity : FlutterActivity() {
             .setPublicVersion(publicVersion)
             .setContentIntent(pending)
             .setAutoCancel(true)
-            .setOnlyAlertOnce(true)
+            .setOnlyAlertOnce(false)
+            .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
         return try {
@@ -262,12 +274,46 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /// In-app tone. The system tray uses the high-importance channel sound.
-    /// Speech is the account «النطق» preference, spoken on the device.
+    /// Same shape as the website tone: 760 Hz sine, 200 ms, fast attack.
+    /// The tray uses the device notification sound on [vib_notices_sound_v1].
     private fun playNoticeTone() {
-        val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
-        tone.startTone(ToneGenerator.TONE_PROP_BEEP, 180)
-        mainHandler.postDelayed({ tone.release() }, 400)
+        val sampleRate = 44100
+        val count = (sampleRate * 0.2).toInt()
+        val pcm = ShortArray(count)
+        for (i in 0 until count) {
+            val t = i.toDouble() / sampleRate
+            val attack = (t / 0.02).coerceIn(0.0, 1.0)
+            val release = ((0.2 - t) / 0.18).coerceIn(0.0, 1.0)
+            val envelope = kotlin.math.min(attack, release)
+            val sample = kotlin.math.sin(2.0 * Math.PI * 760.0 * t) * envelope * 0.45
+            pcm[i] = (sample * Short.MAX_VALUE).toInt().toShort()
+        }
+        val track = AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setSampleRate(sampleRate)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build(),
+            )
+            .setBufferSizeInBytes(count * 2)
+            .setTransferMode(AudioTrack.MODE_STATIC)
+            .build()
+        track.write(pcm, 0, count)
+        track.setNotificationMarkerPosition(count)
+        track.setPlaybackPositionUpdateListener(object : AudioTrack.OnPlaybackPositionUpdateListener {
+            override fun onMarkerReached(played: AudioTrack) {
+                played.release()
+            }
+            override fun onPeriodicNotification(played: AudioTrack) {}
+        })
+        track.play()
     }
 
     private fun speakNotification(text: String) {

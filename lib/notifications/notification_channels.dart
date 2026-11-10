@@ -6,8 +6,10 @@
 /// Channel ids are part of the device install. Renaming one creates a second
 /// channel and leaves the old one in system settings.
 abstract final class NotificationChannels {
-  /// General and collections alerts. Manifest FCM meta-data uses this id.
-  static const collectionsId = 'vib_collections_alerts';
+  /// Audible alerts. A new id, because Android will not raise the importance
+  /// or add a sound to a channel the device already created.
+  /// The old id `vib_collections_alerts` stays on the device and is unused.
+  static const collectionsId = 'vib_notices_sound_v1';
 
   /// Arabic label. Includes the manifest display name `VIB`.
   static const collectionsName = 'تنبيهات VIB';

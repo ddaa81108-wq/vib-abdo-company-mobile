@@ -42,7 +42,7 @@
             android:resource="@drawable/ic_stat_notification" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="vib_collections_alerts" />
+            android:value="vib_notices_sound_v1" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
