@@ -412,6 +412,17 @@
 - يعتمد على: 036. لا مسار جديد.
 - التراجع: `git revert fb4fd1b6d608aeedd2050e6a133ae2d8befe0676`. afterward: `flutter test test/collections_presentation_test.dart --name "fake role" --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-038
+
+- الالتزام: `bcfdfa2b41a5d57fbcba66676fe5100a2f7e76e9`
+- العنوان: VIB-FIX-038: Rebuild the expanded collection receipt as a white card.
+- العرض: الاستلام المفتوح كان صندوقًا مذهبًا داخله لوحة بيضاء للأزرار.
+- السبب: لقطة الهاتف تجعل كل استلام كرتًا أبيض بحافة ذهبية: الاسم والمبلغ، ثم الموظف ونوع الاستلام، ثم التاريخ، ثم حبات الإجراء.
+- السلوك: الاعتماد والرفض حبتان فاتحتان. تأكيد استلام النقدية الحبة الخضراء الموصولة بـ `markCashReceived`. بعد التسليم حبة محايدة «تم استلام النقدية». شريط التفاصيل يضع ▾ عند الفتح و◂ عند الإغلاق يمين النص. إلغاء الاعتماد غير ظاهر: مساره `POST .../cancel-approval` ليس في العميل و`CollectionsCapabilities.cancelApproval` مغلق.
+- الدليل: `test/collections_presentation_test.dart`.
+- يعتمد على: 037. لا مسار جديد.
+- التراجع: `git revert bcfdfa2b41a5d57fbcba66676fe5100a2f7e76e9`. afterward: `flutter test test/collections_presentation_test.dart --name "fake role" --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
