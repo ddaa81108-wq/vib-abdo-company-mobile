@@ -313,6 +313,39 @@
 - يعتمد على: لا يربط الأساليب بالمسار.
 - التراجع: `git revert 658bceb9cf016c62aaca5d7c03820fdc7b0e346b`.
 
+## VIB-FIX-029
+
+- الالتزام: `0eb59f4be86347b7d624a514ff3d4d56885c7953`
+- العنوان: VIB-FIX-029: Give the ledger the website's full-screen gold frame.
+- العرض: جدول 024 كان داخل شريط التطبيق والصفحة الفاتحة.
+- السبب: لقطة الهاتف إطار ذهبي، اسم في كبسولة سوداء، وقلم وإغلاق دائريان، وصفوف كريمية.
+- السلوك: شريط التطبيق والشريط السفلي يختفيان على سجل الكرت. الرؤوس أقراص سوداء. بواسطة قرص أسود تحت التاريخ. التعديل أخضر والإلغاء أحمر.
+- الدليل: `test/ledger_presentation_test.dart`.
+- يعتمد على: لا مسار جديد. التعديل والإلغاء والإغلاق هي الأزرار الموجودة.
+- التراجع: `git revert 0eb59f4be86347b7d624a514ff3d4d56885c7953`. afterward: `flutter test test/ledger_presentation_test.dart --name "missing sequence" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-030
+
+- الالتزام: `ba618b43614e0fba4b899fd8e19cc7a5b825dbb6`
+- العنوان: VIB-FIX-030: Match the phone collections cards, tabs, and action colours.
+- العرض: الكروت كانت كتلًا عريضة والنص غير مرتب.
+- السبب: لقطة الهاتف كرت بعرض الشاشة: الاسم، عمودا المبلغ، الحالة، وشريط تفاصيل الاستلامات.
+- السلوك: أزرار المرتبات والإغلاق والكشف أخضر وأحمر وأخضر. التبويب الذهبي. التفاصيل تتسع وتظهر أزرار الاعتماد والنقد داخلها.
+- الدليل: `test/collections_presentation_test.dart`.
+- يعتمد على: لا مسار جديد.
+- التراجع: `git revert ba618b43614e0fba4b899fd8e19cc7a5b825dbb6`. afterward: `flutter test test/collections_presentation_test.dart --name "fake role" --dart-define=USE_FAKE_API=true`.
+
+## VIB-FIX-031
+
+- الالتزام: `02c64c1e559869fafcd318f171bb87c974ad8f80`
+- العنوان: VIB-FIX-031: Show purchases on a phone as website cards, not a wide table.
+- العرض: الجدول الأفقي لا يشبه صفحة المشتريات على عرض الهاتف.
+- السبب: الموقع يعرض كل حركة كرت حقول، والباقي بخلفية ذهبية، وفاصل اليوم شريطًا أخضر.
+- السلوك: تحت 560 نقطة تصبح الحركات كروتًا. الرأس الأخضر للجدول العريض يبقى على الشاشات الأوسع. لا رصيد افتتاحي. إجماليات السجل تبقى.
+- الدليل: `test/purchases_ledger_layout_test.dart`.
+- يعتمد على: لا مسار جديد.
+- التراجع: `git revert 02c64c1e559869fafcd318f171bb87c974ad8f80`. afterward: `flutter test test/purchases_ledger_layout_test.dart --name "440" --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
