@@ -7,6 +7,7 @@ import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/features/collections/collections_screen.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
+import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/features/login/signup_info_screen.dart';
 import 'package:vib_abdo_company_mobile/notifications/unread_badge.dart';
 import 'package:vib_abdo_company_mobile/state/notification_providers.dart';
@@ -185,7 +186,8 @@ void main() {
 
   testWidgets('signup uses the back arrow', (tester) async {
     await pumpFakeApp(tester);
-    await tester.tap(find.byKey(const Key('signup-link')));
+    final context = tester.element(find.byKey(LoginScreen.screenKey));
+    GoRouter.of(context).go('/signup-info');
     await settle(tester);
     final icon = tester.widget<Icon>(
       find.descendant(

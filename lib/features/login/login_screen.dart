@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-
 import '../../authentication/auth_gate.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/auth_providers.dart';
@@ -210,11 +208,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  TextButton(
-                    key: LoginScreen.signupKey,
-                    onPressed: () => context.push('/signup-info'),
-                    child: const Text(AppStrings.createEmployee),
-                  ),
                   Text(
                     AppStrings.noLanguage,
                     textAlign: TextAlign.center,
