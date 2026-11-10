@@ -69,6 +69,10 @@ class MainActivity : FlutterActivity() {
         intentObserver?.stopWatching()
         intentObserver = null
         captureLock.disarm()
+        pendingSpeech = null
+        speech?.stop()
+        speech?.shutdown()
+        speech = null
         super.onDestroy()
     }
 
@@ -287,12 +291,5 @@ class MainActivity : FlutterActivity() {
             return
         }
         engine.speak(text, TextToSpeech.QUEUE_ADD, null, "vib-notice")
-    }
-
-    override fun onDestroy() {
-        speech?.stop()
-        speech?.shutdown()
-        speech = null
-        super.onDestroy()
     }
 }
