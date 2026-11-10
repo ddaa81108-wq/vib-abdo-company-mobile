@@ -79,15 +79,20 @@ class EditAccountCardButton extends ConsumerWidget {
     if (!allowed) return const SizedBox.shrink();
     final online = ref.watch(onlineProvider);
     if (compact) {
-      return Tooltip(
-        message: AppStrings.editCard,
-        child: TextButton(
-          key: const Key('edit-account-card'),
-          onPressed: online
-              ? () => context.push('/${section.path}/${card.id}/edit')
-              : null,
-          child: const Icon(Icons.edit_outlined, size: 20),
+      return TextButton(
+        key: const Key('edit-account-card'),
+        style: TextButton.styleFrom(
+          backgroundColor: const Color(0xFF211600),
+          foregroundColor: const Color(0xFFF6E7A8),
+          minimumSize: const Size(36, 36),
+          fixedSize: const Size(36, 36),
+          padding: EdgeInsets.zero,
+          shape: const CircleBorder(),
         ),
+        onPressed: online
+            ? () => context.push('/${section.path}/${card.id}/edit')
+            : null,
+        child: const Icon(Icons.edit_outlined, size: 18),
       );
     }
     final button = GatedButton(

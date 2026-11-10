@@ -131,6 +131,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final selected = _selectedIndex(items, widget.location);
     final showIdentityHere = phone;
 
+    if (_isCardLedger(widget.location)) {
+      // The account ledger is its own full-screen frame (website shots
+      // 03, 05, 06, 08, 10). The shell bar, date strip and bottom nav
+      // stay off that screen.
+      return Scaffold(
+        key: HomeShell.shellKey,
+        backgroundColor: const Color(0xFF140E06),
+        body: widget.child,
+      );
+    }
+
     return Scaffold(
       key: HomeShell.shellKey,
       drawer: phone
@@ -349,6 +360,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       );
     }
     return const SizedBox.shrink();
+  }
+
+  /// `/customers/c_55` is a card ledger. The list and the edit screen are not.
+  bool _isCardLedger(String location) {
+    final parts = location.split('/').where((part) => part.isNotEmpty).toList();
+    if (parts.length != 2) return false;
+    return const {
+      'customers',
+      'companies',
+      'libyan-deposits',
+      'egyptian-deposits',
+    }.contains(parts.first);
   }
 
   String _title(String location) {
