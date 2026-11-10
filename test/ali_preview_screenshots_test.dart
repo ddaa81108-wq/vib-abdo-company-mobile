@@ -20,20 +20,25 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
-    for (final option in [1, 2, 3, 4]) {
-      await tester.pumpWidget(
-        MaterialApp(
-          debugShowCheckedModeBanner: false,
-          theme: buildAppTheme(),
-          builder: (context, child) =>
-              Directionality(textDirection: TextDirection.rtl, child: child!),
-          home: Scaffold(
-            body: SizedBox.expand(child: HomeDesignOption(option: option)),
+    for (final dark in [false, true]) {
+      for (final option in [1, 2, 3, 4]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: buildAppTheme(dark ? Brightness.dark : Brightness.light),
+            builder: (context, child) =>
+                Directionality(textDirection: TextDirection.rtl, child: child!),
+            home: Scaffold(
+              body: SizedBox.expand(child: HomeDesignOption(option: option)),
+            ),
           ),
-        ),
-      );
-      await tester.pump();
-      await saveShot(tester, 'home-icon-style-$option');
+        );
+        await tester.pump();
+        await saveShot(
+          tester,
+          'home-icon-style-$option-${dark ? 'dark' : 'light'}',
+        );
+      }
     }
   }, tags: const ['screenshots']);
 
