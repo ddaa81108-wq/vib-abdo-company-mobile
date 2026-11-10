@@ -1,31 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_api_layer/api_layer.dart';
 
 import '../../ui/section_labels.dart';
 import '../../ui/theme.dart';
 
-import 'package:flutter_api_layer/api_layer.dart';
-
-/// Review-only home layouts. The live dashboard stays [HomeDashboard].
+/// Review-only icon styles on the one home layout Ali kept (option 1).
+/// The live dashboard is unchanged.
 class HomeDesignOption extends StatelessWidget {
   const HomeDesignOption({required this.option, super.key});
 
+  /// 1 duotone, 2 gradient glass, 3 outlined premium, 4 filled depth.
   final int option;
-
-  static const _sections = SectionKey.values;
-
-  @override
-  Widget build(BuildContext context) {
-    return switch (option) {
-      1 => const _CircleGrid(),
-      2 => const _HeroRows(),
-      3 => const _CompactList(),
-      _ => const _Bento(),
-    };
-  }
-}
-
-class _CircleGrid extends StatelessWidget {
-  const _CircleGrid();
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +22,7 @@ class _CircleGrid extends StatelessWidget {
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
         children: [
-          for (final section in HomeDesignOption._sections)
+          for (final section in SectionKey.values)
             DecoratedBox(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -47,19 +32,7 @@ class _CircleGrid extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  DecoratedBox(
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF1E3A8A),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Icon(
-                        _icon(section),
-                        color: const Color(0xFFF5C542),
-                      ),
-                    ),
-                  ),
+                  _IconStyle(option: option, icon: _icon(section)),
                   const SizedBox(height: 8),
                   Text(
                     sectionLabel(section),
@@ -75,172 +48,94 @@ class _CircleGrid extends StatelessWidget {
   }
 }
 
-class _HeroRows extends StatelessWidget {
-  const _HeroRows();
+class _IconStyle extends StatelessWidget {
+  const _IconStyle({required this.option, required this.icon});
+
+  final int option;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xFF0B1020),
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1E3A8A), Color(0xFF4C1D95)],
-              ),
-            ),
-            child: Text('الأقسام', style: cairo(20, 800, color: Colors.white)),
-          ),
-          const SizedBox(height: 12),
-          for (final section in HomeDesignOption._sections)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF131A2C),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: ListTile(
-                  leading: Icon(_icon(section), color: const Color(0xFFF5C542)),
-                  title: Text(
-                    sectionLabel(section),
-                    style: cairo(14, 700, color: Colors.white),
-                  ),
-                  trailing: const Icon(
-                    Icons.chevron_left,
-                    color: Color(0xFF94A3B8),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
+    return switch (option) {
+      2 => _glass(icon),
+      3 => _outlined(icon),
+      4 => _depth(icon),
+      _ => _duotone(icon),
+    };
   }
 }
 
-class _CompactList extends StatelessWidget {
-  const _CompactList();
+Widget _duotone(IconData icon) => DecoratedBox(
+  decoration: const BoxDecoration(
+    color: Color(0xFF1E3A8A),
+    shape: BoxShape.circle,
+  ),
+  child: SizedBox(
+    width: 52,
+    height: 52,
+    child: Icon(icon, color: const Color(0xFFF5C542)),
+  ),
+);
 
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xFFFFFBF0),
-      child: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          for (final section in HomeDesignOption._sections)
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE7AE12)),
-              ),
-              child: Row(
-                children: [
-                  Icon(_icon(section), color: const Color(0xFF1E3A8A)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      sectionLabel(section),
-                      style: cairo(14, 800, color: const Color(0xFF211600)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
+Widget _glass(IconData icon) => DecoratedBox(
+  decoration: BoxDecoration(
+    shape: BoxShape.circle,
+    gradient: const LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xCCFFFFFF), Color(0x66DBEAFE)],
+    ),
+    border: Border.all(color: const Color(0xFF93C5FD), width: 1.4),
+    boxShadow: const [
+      BoxShadow(color: Color(0x332563EB), blurRadius: 12, offset: Offset(0, 4)),
+    ],
+  ),
+  child: SizedBox(
+    width: 52,
+    height: 52,
+    child: Icon(icon, color: const Color(0xFF1D4ED8)),
+  ),
+);
 
-class _Bento extends StatelessWidget {
-  const _Bento();
+Widget _outlined(IconData icon) => DecoratedBox(
+  decoration: BoxDecoration(
+    shape: BoxShape.circle,
+    border: Border.all(color: const Color(0xFFE7AE12), width: 1.6),
+  ),
+  child: SizedBox(
+    width: 52,
+    height: 52,
+    child: Icon(icon, color: const Color(0xFF1E3A8A)),
+  ),
+);
 
-  @override
-  Widget build(BuildContext context) {
-    final sections = HomeDesignOption._sections;
-    return ColoredBox(
-      color: const Color(0xFFF1F5F9),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Expanded(flex: 2, child: _tile(sections.first, tall: true)),
-            const SizedBox(height: 8),
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(child: _tile(sections[1])),
-                  const SizedBox(width: 8),
-                  Expanded(child: _tile(sections[2])),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 3,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  for (final section in sections.skip(3)) _tile(section),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _tile(SectionKey section, {bool tall = false}) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: tall ? const Color(0xFF1E3A8A) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              _icon(section),
-              color: tall ? const Color(0xFFF5C542) : const Color(0xFF1E3A8A),
-            ),
-            const Spacer(),
-            Text(
-              sectionLabel(section),
-              style: cairo(
-                tall ? 16 : 11,
-                800,
-                color: tall ? Colors.white : const Color(0xFF0F172A),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+Widget _depth(IconData icon) => DecoratedBox(
+  decoration: const BoxDecoration(
+    shape: BoxShape.circle,
+    gradient: LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Color(0xFF166534), Color(0xFF052E16)],
+    ),
+    boxShadow: [
+      BoxShadow(color: Color(0x66052E16), blurRadius: 0, offset: Offset(0, 4)),
+    ],
+  ),
+  child: SizedBox(
+    width: 52,
+    height: 52,
+    child: Icon(icon, color: Colors.white),
+  ),
+);
 
 IconData _icon(SectionKey section) => switch (section) {
-  SectionKey.customers => Icons.person_outline,
-  SectionKey.collections => Icons.payments_outlined,
-  SectionKey.companies => Icons.apartment_outlined,
-  SectionKey.libyanDeposits => Icons.account_balance_wallet_outlined,
-  SectionKey.egyptianDeposits => Icons.currency_exchange,
-  SectionKey.masraweya => Icons.menu_book_outlined,
-  SectionKey.purchases => Icons.shopping_bag_outlined,
-  SectionKey.treasury => Icons.account_balance_outlined,
-  SectionKey.reports => Icons.insights_outlined,
+  SectionKey.customers => Icons.person_rounded,
+  SectionKey.collections => Icons.payments_rounded,
+  SectionKey.companies => Icons.apartment_rounded,
+  SectionKey.libyanDeposits => Icons.account_balance_wallet_rounded,
+  SectionKey.egyptianDeposits => Icons.currency_exchange_rounded,
+  SectionKey.masraweya => Icons.menu_book_rounded,
+  SectionKey.purchases => Icons.shopping_bag_rounded,
+  SectionKey.treasury => Icons.account_balance_rounded,
+  SectionKey.reports => Icons.insights_rounded,
 };

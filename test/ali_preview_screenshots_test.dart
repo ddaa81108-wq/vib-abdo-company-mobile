@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_design_options.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
-import 'package:vib_abdo_company_mobile/features/login/login_design_options.dart';
 import 'package:vib_abdo_company_mobile/ui/theme.dart';
 
 import 'shell_screenshots_test.dart' show loadScreenshotFonts, saveShot;
@@ -16,24 +15,12 @@ Future<void> go(WidgetTester tester, String path) async {
 }
 
 void main() {
-  testWidgets('preview login and home options', (tester) async {
+  testWidgets('preview home icon styles on layout 1', (tester) async {
     await tester.runAsync(loadScreenshotFonts);
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
     for (final option in [1, 2, 3, 4]) {
-      await tester.pumpWidget(
-        MaterialApp(
-          debugShowCheckedModeBanner: false,
-          theme: buildAppTheme(),
-          builder: (context, child) =>
-              Directionality(textDirection: TextDirection.rtl, child: child!),
-          home: Scaffold(
-            body: SizedBox.expand(child: LoginDesignOption(option: option)),
-          ),
-        ),
-      );
-      tester.view.physicalSize = const Size(390, 844);
-      tester.view.devicePixelRatio = 1;
-      await tester.pump();
-      await saveShot(tester, 'login-option-$option');
       await tester.pumpWidget(
         MaterialApp(
           debugShowCheckedModeBanner: false,
@@ -46,9 +33,8 @@ void main() {
         ),
       );
       await tester.pump();
-      await saveShot(tester, 'home-option-$option');
+      await saveShot(tester, 'home-icon-style-$option');
     }
-    addTearDown(tester.view.resetPhysicalSize);
   }, tags: const ['screenshots']);
 
   testWidgets('preview live sections light and dark', (tester) async {
@@ -77,7 +63,11 @@ void main() {
       await go(tester, '/customers/c_55');
       await tester.pump(const Duration(milliseconds: 200));
       await saveShot(tester, 'live-ledger-customers-$theme');
-      for (final section in ['libyan-deposits', 'egyptian-deposits', 'companies']) {
+      for (final section in [
+        'libyan-deposits',
+        'egyptian-deposits',
+        'companies',
+      ]) {
         await go(tester, '/$section');
         await tester.pump(const Duration(milliseconds: 200));
         final card = find.byWidgetPredicate(
@@ -99,5 +89,31 @@ void main() {
     await go(tester, '/collections');
     await tester.pump(const Duration(milliseconds: 300));
     await saveShot(tester, 'live-collections-employee');
+
+    await pumpFakeApp(tester, size: const Size(1280, 900));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/customers/c_55');
+    await tester.pump(const Duration(milliseconds: 300));
+    await saveShot(tester, 'wide-ledger-customers');
+    await go(tester, '/libyan-deposits');
+    await tester.pump(const Duration(milliseconds: 200));
+    final card = find.byWidgetPredicate(
+      (widget) =>
+          widget.key is ValueKey<String> &&
+          '${(widget.key as ValueKey<String>).value}'.startsWith(
+            'account-card-',
+          ),
+    );
+    if (card.evaluate().isNotEmpty) {
+      await tester.tap(card.first);
+      await tester.pumpAndSettle();
+      await saveShot(tester, 'wide-ledger-libyan');
+    }
+    await go(tester, '/purchases');
+    await tester.pump(const Duration(milliseconds: 300));
+    await saveShot(tester, 'wide-purchases');
+    await go(tester, '/collections');
+    await tester.pump(const Duration(milliseconds: 200));
+    await saveShot(tester, 'wide-collections');
   }, tags: const ['screenshots']);
 }
