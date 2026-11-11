@@ -511,6 +511,17 @@
 - يعتمد على: 045. لا مسار جديد.
 - التراجع: `git revert 3c7b8eda7b49d4efed440047c7d5b370dd2e062f`. afterward: `flutter test test/live_login_046_test.dart --exclude-tags screenshots --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-047
+
+- الالتزام: `2eba44de5970760d934e0bd17a78cdbc61f64404`
+- العنوان: VIB-FIX-047: Use home icon set 1 on the live home grid.
+- العرض: علي اختار مجموعة الأيقونات 1 على تخطيط الرئيسية 1.
+- السبب: المجموعة كانت معاينة فقط، والشبكة الحية ما زالت أيقونات المادة.
+- السلوك: كل قسم على الرئيسية يرسم العلامة الكحلية بإطار ذهبي من المجموعة 1، بما فيها الإعدادات. بلا رقم معاينة. المسارات والصلاحيات كما هي. الفاتح والداكن يبقيان تخطيط الشبكة نفسه.
+- الدليل: `test/live_home_047_test.dart`.
+- يعتمد على: 035 و022. لا مسار جديد.
+- التراجع: `git revert 2eba44de5970760d934e0bd17a78cdbc61f64404`. afterward: `flutter test test/live_home_047_test.dart --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
