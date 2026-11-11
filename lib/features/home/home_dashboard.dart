@@ -12,6 +12,7 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import 'home_design_options.dart';
 import 'home_shell.dart';
 
 /// Readable debt sections in first-seen order. Each one gets its own control.
@@ -48,20 +49,6 @@ int homeTileColumns(double width, double textScale) {
   if (width <= AppBreakpoints.tablet) return 3;
   return 4;
 }
-
-/// Filled icon for a home tile. Presentation only; the drawer keeps
-/// [sectionIcon].
-IconData homeTileIcon(SectionKey section) => switch (section) {
-  SectionKey.customers => Icons.person,
-  SectionKey.collections => Icons.payments,
-  SectionKey.companies => Icons.apartment,
-  SectionKey.libyanDeposits => Icons.account_balance_wallet,
-  SectionKey.egyptianDeposits => Icons.currency_exchange,
-  SectionKey.masraweya => Icons.menu_book,
-  SectionKey.purchases => Icons.shopping_bag,
-  SectionKey.treasury => Icons.account_balance,
-  SectionKey.reports => Icons.insights,
-};
 
 /// Glossy tile finish per section, as in concepts 1 and 3: blue, violet,
 /// green. Presentation only.
@@ -107,7 +94,7 @@ class HomeDashboard extends ConsumerWidget {
         HomeTile(
           tileKey: HomeShell.sectionKey(section),
           labelKey: Key('home-tile-label-${section.key}'),
-          icon: homeTileIcon(section),
+          mark: HomeIconMark(section: section, size: 56),
           gloss: homeTileGloss(section, context.look),
           label: sectionLabel(section),
           path: sectionPath(section),
@@ -116,7 +103,7 @@ class HomeDashboard extends ConsumerWidget {
         HomeTile(
           tileKey: settingsTileKey,
           labelKey: const Key('home-tile-label-settings'),
-          icon: Icons.settings,
+          mark: HomeIconMark.settings(size: 56),
           gloss: homeTileGloss(null, context.look),
           label: AppStrings.settings,
           path: '/settings',
@@ -187,7 +174,7 @@ class HomeTile extends StatelessWidget {
   const HomeTile({
     required this.tileKey,
     required this.labelKey,
-    required this.icon,
+    required this.mark,
     required this.gloss,
     required this.label,
     required this.path,
@@ -196,14 +183,13 @@ class HomeTile extends StatelessWidget {
 
   final Key tileKey;
   final Key labelKey;
-  final IconData icon;
+  final Widget mark;
   final Gloss gloss;
   final String label;
   final String path;
 
   @override
   Widget build(BuildContext context) {
-    final look = context.look;
     final radius = BorderRadius.circular(AppRadii.xxl);
     return Semantics(
       button: true,
@@ -236,17 +222,7 @@ class HomeTile extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: look.glass
-                                ? Colors.white.withValues(alpha: 0.16)
-                                : gloss.amount.withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(AppRadii.xl),
-                          ),
-                          child: Icon(icon, size: 30, color: gloss.amount),
-                        ),
+                        mark,
                         const SizedBox(height: AppSpacing.md),
                         Text(
                           label,

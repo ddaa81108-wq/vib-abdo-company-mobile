@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 
@@ -57,6 +59,69 @@ class HomeDesignOption extends StatelessWidget {
   }
 }
 
+/// Set 1 from the icon review: gold stroke on a navy tile. No preview number.
+class HomeIconMark extends StatelessWidget {
+  const HomeIconMark({super.key, required this.section, this.size = 72})
+    : settings = false;
+
+  const HomeIconMark.settings({super.key, this.size = 72})
+    : section = null,
+      settings = true;
+
+  final SectionKey? section;
+  final bool settings;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final glyph = CustomPaint(
+      size: Size(size * 0.58, size * 0.58),
+      painter: settings
+          ? const _SettingsGlyphPainter()
+          : _GlyphPainter(section: section!, light: false),
+    );
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFF14213D),
+        borderRadius: BorderRadius.circular(size * 0.25),
+        border: Border.all(color: const Color(0xFFE7AE12), width: 1.4),
+      ),
+      child: glyph,
+    );
+  }
+}
+
+class _SettingsGlyphPainter extends CustomPainter {
+  const _SettingsGlyphPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFF6E7A8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round;
+    final c = Offset(size.width / 2, size.height / 2);
+    canvas.drawCircle(c, size.width * 0.18, paint);
+    for (var i = 0; i < 4; i++) {
+      final angle = i * 1.5708;
+      final inner = size.width * 0.28;
+      final outer = size.width * 0.42;
+      canvas.drawLine(
+        c + Offset(inner * math.cos(angle), inner * math.sin(angle)),
+        c + Offset(outer * math.cos(angle), outer * math.sin(angle)),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class _Mark extends StatelessWidget {
   const _Mark({required this.option, required this.section});
 
@@ -76,22 +141,8 @@ class _Mark extends StatelessWidget {
       2 => _glass(glyph),
       3 => _depth(glyph),
       4 => _ios(glyph),
-      _ => _duotone(glyph),
+      _ => HomeIconMark(section: section),
     };
-  }
-
-  Widget _duotone(Widget glyph) {
-    return Container(
-      width: 72,
-      height: 72,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: const Color(0xFF14213D),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE7AE12), width: 1.4),
-      ),
-      child: glyph,
-    );
   }
 
   Widget _glass(Widget glyph) {
