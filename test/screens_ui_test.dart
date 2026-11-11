@@ -31,7 +31,7 @@ void main() {
     await pumpFakeApp(tester);
     expectRtl(tester);
     expect(find.byKey(LoginScreen.screenKey), findsOneWidget);
-    expect(find.text(AppStrings.slogan), findsOneWidget);
+    expect(find.text('أهلًا بك'), findsOneWidget);
     expect(find.textContaining('Google'), findsNothing);
     expect(find.byKey(const Key('signup-link')), findsNothing);
     expect(find.text(AppStrings.createEmployee), findsNothing);

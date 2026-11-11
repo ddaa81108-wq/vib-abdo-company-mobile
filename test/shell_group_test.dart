@@ -722,7 +722,7 @@ Future<void> _openGroup(
   }
   expect(find.byKey(LoginScreen.screenKey), findsOneWidget);
   expectRtl(tester);
-  expect(find.text(AppStrings.slogan), findsOneWidget);
+  expect(find.text('أهلًا بك'), findsOneWidget);
   expect(find.byKey(LoginScreen.submitKey), findsOneWidget);
   expect(find.text(AppStrings.signIn), findsWidgets);
 

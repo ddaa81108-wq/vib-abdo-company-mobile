@@ -347,7 +347,9 @@ class _WaveCard extends StatelessWidget {
       decoration: const BoxDecoration(color: Color(0xFF07111C)),
       child: Stack(
         children: [
-          const Positioned.fill(child: CustomPaint(painter: _Waves())),
+          const Positioned.fill(
+            child: CustomPaint(painter: LoginWavePainter()),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
             child: Column(
@@ -376,11 +378,15 @@ class _WaveCard extends StatelessWidget {
                   ),
                   child: Stack(
                     children: [
-                      const Positioned(top: 10, right: 10, child: _Corner()),
+                      const Positioned(
+                        top: 10,
+                        right: 10,
+                        child: LoginGoldCorner(),
+                      ),
                       const Positioned(
                         bottom: 10,
                         left: 10,
-                        child: _Corner(flip: true),
+                        child: LoginGoldCorner(flip: true),
                       ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
@@ -688,8 +694,8 @@ class _NumberBadge extends StatelessWidget {
   }
 }
 
-class _Corner extends StatelessWidget {
-  const _Corner({this.flip = false});
+class LoginGoldCorner extends StatelessWidget {
+  const LoginGoldCorner({super.key, this.flip = false});
 
   final bool flip;
 
@@ -770,8 +776,8 @@ class _Diamonds extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _Waves extends CustomPainter {
-  const _Waves();
+class LoginWavePainter extends CustomPainter {
+  const LoginWavePainter();
 
   @override
   void paint(Canvas canvas, Size size) {
