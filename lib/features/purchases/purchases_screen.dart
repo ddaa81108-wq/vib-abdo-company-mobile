@@ -110,14 +110,14 @@ class PurchasesScreen extends ConsumerWidget {
                             ),
                           if (entries.isNotEmpty || draft != null)
                             _PurchaseGrid(
-                                    entries: entries,
-                                    money: money,
-                                    book: book,
-                                    openDay: day,
-                                    canWrite: canWrite,
-                                    canFinalize: canFinalize,
-                                    online: online,
-                                  ),
+                              entries: entries,
+                              money: money,
+                              book: book,
+                              openDay: day,
+                              canWrite: canWrite,
+                              canFinalize: canFinalize,
+                              online: online,
+                            ),
                           SliverToBoxAdapter(
                             child: _OlderPurchasesBar(controls: controls),
                           ),

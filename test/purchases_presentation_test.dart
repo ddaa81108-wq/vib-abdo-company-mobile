@@ -62,10 +62,7 @@ void main() {
         expect(find.byKey(const Key('purchase-books')), findsOneWidget);
         expect(find.byKey(const Key('purchase-day-12')), findsOneWidget);
         expect(find.byKey(const ValueKey('add-purchase-12')), findsOneWidget);
-        expect(
-          find.byKey(const ValueKey('finalize-day-12')),
-          findsOneWidget,
-        );
+        expect(find.byKey(const ValueKey('finalize-day-12')), findsOneWidget);
         await tester.scrollUntilVisible(
           find.byKey(const Key('purchase-entry-pe_1')),
           200,

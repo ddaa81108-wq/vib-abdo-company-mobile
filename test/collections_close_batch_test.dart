@@ -98,9 +98,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a server refusal stays in the dialog in Arabic', (
-    tester,
-  ) async {
+  testWidgets('a server refusal stays in the dialog in Arabic', (tester) async {
     final layer = await pumpFakeApp(tester, size: const Size(390, 844));
     final fake = layer.client as FakeApiClient;
     await signIn(tester, username: 'admin.demo', password: 'demo-only');

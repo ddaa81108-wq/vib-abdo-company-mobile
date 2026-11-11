@@ -124,9 +124,7 @@ void main() {
     final card = find.byWidgetPredicate(
       (widget) =>
           widget.key is ValueKey<String> &&
-          (widget.key as ValueKey<String>).value.startsWith(
-            'account-card-',
-          ),
+          (widget.key as ValueKey<String>).value.startsWith('account-card-'),
     );
     if (card.evaluate().isNotEmpty) {
       await tester.tap(card.first);

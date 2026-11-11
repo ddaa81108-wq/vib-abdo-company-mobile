@@ -17,10 +17,8 @@ void main() {
           MaterialApp(
             debugShowCheckedModeBanner: false,
             theme: buildAppTheme(dark ? Brightness.dark : Brightness.light),
-            builder: (context, child) => Directionality(
-              textDirection: TextDirection.rtl,
-              child: child!,
-            ),
+            builder: (context, child) =>
+                Directionality(textDirection: TextDirection.rtl, child: child!),
             home: Scaffold(body: LoginDesignOption(option: option)),
           ),
         );
