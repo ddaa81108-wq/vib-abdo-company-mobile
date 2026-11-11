@@ -22,8 +22,19 @@ if [[ -e android/key.properties ]]; then
   echo "android/key.properties exists; move it away before running this check." >&2
   exit 2
 fi
-if [[ ! -f android/local.properties ]]; then
-  flutter build apk --config-only >/dev/null
+# A fresh clone has no android/gradlew (git-ignored) and no
+# android/local.properties. Flutter writes both on a config-only build, which
+# compiles nothing and signs nothing.
+if [[ ! -x android/gradlew || ! -f android/local.properties ]]; then
+  echo "android/gradlew or android/local.properties missing; running flutter build apk --config-only"
+  flutter pub get >/dev/null
+  env -u ANDROID_KEY_PROPERTIES -u ANDROID_KEYSTORE_PATH -u ANDROID_KEYSTORE_PASSWORD \
+    -u ANDROID_KEY_ALIAS -u ANDROID_KEY_PASSWORD -u ANDROID_REQUIRE_RELEASE_SIGNING \
+    flutter build apk --config-only >/dev/null
+fi
+if [[ ! -x android/gradlew ]]; then
+  echo "android/gradlew is still missing after flutter build apk --config-only." >&2
+  exit 2
 fi
 
 TMP=$(mktemp -d /tmp/vib-signing-check.XXXXXX)
