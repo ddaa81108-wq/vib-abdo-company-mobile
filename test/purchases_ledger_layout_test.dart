@@ -166,7 +166,7 @@ void main() {
         expect(
           find.descendant(
             of: find.byKey(const Key('purchase-entry-pe_1')),
-            matching: find.textContaining('553'),
+            matching: find.textContaining('2,553'),
           ),
           findsOneWidget,
         );

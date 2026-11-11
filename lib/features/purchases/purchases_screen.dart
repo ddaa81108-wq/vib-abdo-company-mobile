@@ -15,6 +15,7 @@ import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/mutation_form.dart';
+import 'purchase_running_balance.dart';
 
 /// Which ledger row is being written. A null [entryId] is a new row.
 class _LedgerDraft {
@@ -761,6 +762,7 @@ class _InlineLedgerRow extends ConsumerStatefulWidget {
     required this.scale,
     required this.actionWidth,
     this.entry,
+    this.runningAfter,
     super.key,
   });
 
@@ -772,6 +774,9 @@ class _InlineLedgerRow extends ConsumerStatefulWidget {
   final double scale;
   final double actionWidth;
   final PurchaseEntryDto? entry;
+
+  /// Website running «الباقي» for this saved row. Null on a blank new row.
+  final int? runningAfter;
 
   @override
   ConsumerState<_InlineLedgerRow> createState() => _InlineLedgerRowState();
@@ -880,9 +885,9 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
     final result = existing == null
         ? AppStrings.dash
         : widget.money.formatOrDash(existing.resultUnits, Currency.lyd);
-    final remaining = existing == null
+    final remaining = widget.runningAfter == null
         ? AppStrings.dash
-        : widget.money.formatOrDash(existing.remainingUnits, Currency.lyd);
+        : widget.money.format(widget.runningAfter!, Currency.lyd);
     Widget cell({
       required int index,
       required Widget child,
@@ -890,7 +895,9 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
     }) {
       return DecoratedBox(
         decoration: BoxDecoration(
-          color: sectionButtonGold.withValues(alpha: 0.14),
+          color: index == 7
+              ? const Color(0xFFFFE7A3)
+              : sectionButtonGold.withValues(alpha: 0.14),
           border: Border.all(
             color: focused ? sectionButtonGold : line,
             width: focused ? 2 : 1,
@@ -1063,7 +1070,7 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
               child: Text(
                 remaining,
                 textAlign: TextAlign.center,
-                style: cairo(12, 700, color: context.look.muted),
+                style: cairo(12, 900, color: const Color(0xFF211A08)),
               ),
             ),
           ),
@@ -1420,6 +1427,13 @@ class _PurchaseGrid extends ConsumerWidget {
     final look = context.look;
     final draft = ref.watch(_ledgerDraftProvider);
     final lines = _ledgerLines(entries);
+    final oldest = _oldestFirst(entries);
+    final running = purchaseRunningAfter(
+      oldestFirst: oldest,
+      closingUnits: openDay?.totalDebtUnits?.units,
+    );
+    const balanceInk = Color(0xFF211A08);
+    const balanceFill = Color(0xFFFFE7A3);
     final gold = _frameGold(context);
     final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
     final headerH = _ledgerHeaderH * scale;
@@ -1468,7 +1482,13 @@ class _PurchaseGrid extends ConsumerWidget {
         LtrText(rate, style: figure.copyWith(color: ink)),
         moneyCell(entry.resultUnits, Currency.lyd, color: ink),
         moneyCell(entry.paidUnits, Currency.lyd, color: ink),
-        moneyCell(entry.remainingUnits, Currency.lyd, color: ink),
+        Text(
+          running == null
+              ? AppStrings.dash
+              : money.format(running[entry.id]!, Currency.lyd),
+          key: Key('purchase-balance-${entry.id}'),
+          style: cairo(13, 900, color: balanceInk),
+        ),
         moneyCell(entry.vodafoneConsumedUnits, vodafoneCurrency, color: ink),
       ];
     }
@@ -1480,6 +1500,7 @@ class _PurchaseGrid extends ConsumerWidget {
       required Color lineColor,
       Widget? tail,
       Key? cellKey,
+      bool goldBalance = false,
     }) {
       return ColoredBox(
         color: color,
@@ -1491,6 +1512,7 @@ class _PurchaseGrid extends ConsumerWidget {
               DecoratedBox(
                 key: i == 0 && cellKey != null ? cellKey : null,
                 decoration: BoxDecoration(
+                  color: goldBalance && i == 7 ? balanceFill : null,
                   border: Border.all(color: lineColor, width: 1),
                 ),
                 child: SizedBox(
@@ -1588,11 +1610,13 @@ class _PurchaseGrid extends ConsumerWidget {
                       scale: scale,
                       actionWidth: actionW,
                       entry: entry,
+                      runningAfter: running?[entry.id],
                     )
                   : band(
                       height: rowH,
                       color: fill,
                       lineColor: _gridLine(context),
+                      goldBalance: true,
                       cellKey: Key('purchase-grid-cell-${entry.id}'),
                       cells: dataCells(line, look.ink),
                       tail: _writable(entry)
