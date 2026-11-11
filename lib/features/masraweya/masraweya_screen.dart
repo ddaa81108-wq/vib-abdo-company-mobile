@@ -1346,7 +1346,9 @@ class _WorkTable extends StatelessWidget {
   final String footerValue;
   final String? empty;
 
-  static const _flex = [2, 4, 4, 4];
+  /// التسلسل stays narrow. القيمة is wide enough for a long integer.
+  /// العمولة is narrower. The row total keeps a middle share.
+  static const _flex = [2, 8, 2, 3];
 
   @override
   Widget build(BuildContext context) {
@@ -1359,7 +1361,7 @@ class _WorkTable extends StatelessWidget {
         decoration: BoxDecoration(
           border: i == headers.length - 1 ? null : Border(left: line),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 6),
         alignment: Alignment.center,
         child: child,
       ),
