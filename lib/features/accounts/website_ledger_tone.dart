@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 
+import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 
 /// Website ledger footer (`account-balance-colors.css`).
@@ -92,6 +93,37 @@ const depositCardZero = Gloss(
 Gloss depositCardGloss(int? units) {
   if (units == null || units == 0) return depositCardZero;
   return units > 0 ? depositCardGreen : depositCardRed;
+}
+
+/// Website ledger footer heading (`LedgerTotal.tsx` lines 8–17).
+///
+/// Deposits use the sign labels, and «الحساب صفر» at zero. Customers and
+/// companies use the trust label only when the balance is negative.
+String websiteLedgerTotalLabel(AccountSection section, int? units) {
+  final deposits =
+      section == AccountSection.libyanDeposits ||
+      section == AccountSection.egyptianDeposits;
+  if (deposits) {
+    if (units == null) return AppStrings.ledgerDepositTotal;
+    if (units == 0) return 'الحساب صفر';
+    return depositCardLabel(section, units);
+  }
+  if (units != null && units < 0) {
+    return section == AccountSection.companies
+        ? AppStrings.companyTrust
+        : AppStrings.trustCustomer;
+  }
+  return AppStrings.ledgerTotal;
+}
+
+/// Short word beside a deposit total: أمانة only for a positive Libyan
+/// balance. Every other non-zero deposit balance is دين.
+String? depositLedgerKindWord(AccountSection section, int? units) {
+  if (units == null || units == 0) return null;
+  if (section == AccountSection.libyanDeposits && units > 0) {
+    return AppStrings.customerCreditWord;
+  }
+  return AppStrings.customerDebtWord;
 }
 
 /// The words on a website deposit card, from the sign only.
