@@ -289,7 +289,8 @@ void main() {
     expect(_text('40 د.ل'), findsWidgets);
     expect(_text('7 د.ل'), findsWidgets);
     expect(_text('100 د.ل'), findsWidgets);
-    expect(_text('50,000 د.ل'), findsWidgets);
+    expect(find.byKey(const Key('purchases-lifetime')), findsNothing);
+    expect(_text('50,000 د.ل'), findsNothing);
     expect(_text(MoneyValue.invalidLabel), findsWidgets);
     expect(_icon(), findsWidgets);
     expect(_text('10 د.ل'), findsNothing);

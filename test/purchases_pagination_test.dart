@@ -26,7 +26,8 @@ void main() {
     expect(find.byKey(const Key('purchase-entry-pe_1')), findsOneWidget);
     expect(find.byKey(const Key('purchase-entry-pe_page2')), findsNothing);
     expect(find.byKey(const Key('purchases-older')), findsOneWidget);
-    expect(find.textContaining('50,000'), findsWidgets);
+    expect(find.byKey(const Key('purchases-lifetime')), findsNothing);
+    expect(find.textContaining('50,000'), findsNothing);
 
     await tester.ensureVisible(find.byKey(const Key('purchases-older')));
     await tester.tap(find.byKey(const Key('purchases-older')));
@@ -35,8 +36,9 @@ void main() {
     expect(find.byKey(const Key('purchase-entry-pe_page2')), findsOneWidget);
     expect(find.byKey(const Key('purchase-entry-pe_1')), findsOneWidget);
     expect(find.byKey(const Key('purchases-older')), findsNothing);
-    expect(find.textContaining('50,000'), findsWidgets);
+    expect(find.textContaining('50,000'), findsNothing);
     expect(find.textContaining('50,001'), findsNothing);
+    expect(find.textContaining('1,053'), findsWidgets);
     expect(find.byKey(const Key('purchase-day-12')), findsOneWidget);
     expect(
       fake.purchaseQueries.where((query) => query['before'] == 11),

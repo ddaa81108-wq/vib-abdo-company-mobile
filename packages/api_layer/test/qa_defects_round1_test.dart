@@ -542,7 +542,11 @@ void main() {
               .having(
             (e) => e.details,
             'details',
-            {'pendingCount': 4, 'cashPendingCount': 1},
+            {
+              'pendingCount': 4,
+              'cashPendingCount': 1,
+              'cashPendingUnits': 250,
+            },
           ),
         ),
       );
@@ -562,7 +566,11 @@ void main() {
         throwsA(isA<ConflictException>().having(
           (e) => e.details,
           'details',
-          {'pendingCount': 0, 'cashPendingCount': 1},
+          {
+            'pendingCount': 0,
+            'cashPendingCount': 1,
+            'cashPendingUnits': 250,
+          },
         )),
       );
       await api.collections.markCashReceived('sb_2', meta);

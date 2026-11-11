@@ -23,6 +23,7 @@ import 'zero_review_preview.dart';
 import 'account_name_suggestions.dart';
 import 'company_card_tone.dart';
 import 'customer_card_tone.dart';
+import 'website_ledger_tone.dart';
 
 /// Customers, companies, Libyan deposits, and Egyptian deposits share this
 /// screen. [section] selects the repository path, currency, and labels.
@@ -80,7 +81,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     // phone (Ali, 2026-11-02; companies 2026-11-03). Each keeps its own data.
     final isCustomers = section == AccountSection.customers;
     final debtLook = isDebtLookSection(section);
-    final columns = debtLook && gridColumns < 2 ? 2 : gridColumns;
+    final columns = gridColumns < 2 ? 2 : gridColumns;
 
     final Widget searchField = TextField(
       key: const Key('account-search'),
@@ -1319,7 +1320,6 @@ class _AccountCard extends StatelessWidget {
     final showPin = canWrite;
     final showZero = onZeroPreview != null && !card.systemManaged;
     final showAssign = assigning && canSelectAccountForAssignment(card);
-    final look0 = context.look;
     // Customers: debt / credit / zero tone from the balance sign (Ali,
     // 2026-11-02) instead of the age gradient.
     final CustomerTone tone = switch (section) {
@@ -1332,13 +1332,9 @@ class _AccountCard extends StatelessWidget {
       AccountSection.companies => _companyTone(
         companyCardGloss(context, companyCardKind(card.balanceUnits)),
       ),
-      // Deposits (Ali's device shots): red for the server's overdue status
-      // (دين على العميل / دين علينا للعميل), black for zero, green otherwise.
-      _ => _companyTone(switch (card.ageStatus) {
-        'overdue' => look0.glossDebt,
-        'zero' => look0.glossZero,
-        _ => look0.glossCredit,
-      }),
+      // Deposits follow the website card: positive green, negative red,
+      // zero black, in both themes. Debt cards keep their own palette.
+      _ => _companyTone(depositCardGloss(card.balanceUnits?.asInt)),
     };
     // Every list card is glossy from its tone (customers, companies,
     // deposits).
@@ -1358,7 +1354,12 @@ class _AccountCard extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: gloss.fill,
             borderRadius: radius,
-            border: Border.all(color: tone.border),
+            border: Border.all(
+              color: isDebtLookSection(section)
+                  ? tone.border
+                  : const Color(0xFFE7AE12),
+              width: isDebtLookSection(section) ? 1 : 1.6,
+            ),
           ),
           child: InkWell(
             onTap: onOpen,
@@ -1375,20 +1376,7 @@ class _AccountCard extends StatelessWidget {
                   : _depositBody(
                       context,
                       tone: tone,
-                      // The status words (أمانة للعميل، دين على العميل،
-                      // دين علينا للعميل، لصالح المنظومة) from the server.
-                      age: ageVisual(
-                        colors: context.statusColors,
-                        ageStatus: card.ageStatus,
-                        section: section,
-                        // A day count (منذ N أيام) is not a status word.
-                        serverLabel:
-                            (card.ageStatusLabel ?? '').startsWith(
-                              AppStrings.sinceDays,
-                            )
-                            ? null
-                            : card.ageStatusLabel,
-                      ).label,
+                      age: depositCardLabel(section, card.balanceUnits?.asInt),
                       showAssign: showAssign,
                       showPin: showPin,
                       showZero: showZero,
@@ -1413,6 +1401,14 @@ extension on _AccountCard {
     required bool showZero,
   }) {
     final ink = tone.ink;
+    String depositAmount(MoneyFormatter money) {
+      final units = card.balanceUnits?.asInt;
+      if (units == null) {
+        return money.formatOrDash(card.balanceUnits, card.currency);
+      }
+      return money.format(units.abs(), card.currency);
+    }
+
     final gold = const Color(0xFFFBBF24);
     final last = card.lastActivityAt;
     return ConstrainedBox(
@@ -1430,7 +1426,7 @@ extension on _AccountCard {
                     age ?? '',
                     key: Key('account-age-${card.id}'),
                     textAlign: TextAlign.center,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: cairo(11, 800, color: ink.withValues(alpha: 0.9)),
                   ),
@@ -1482,7 +1478,7 @@ extension on _AccountCard {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: MoneyText(
-                  money.formatOrDash(card.balanceUnits, card.currency),
+                  depositAmount(money),
                   style: context.textExtras.amountLarge.copyWith(
                     color: tone.amount,
                   ),

@@ -179,6 +179,9 @@ class PermissionService extends ChangeNotifier {
   /// Management actions: explicit (proposed) code, or full access (flag / admin role flag).
   bool canDo(ManagementAction a) => canRaw(a.proposedCode);
 
+  /// Server `role === 'admin'`. Cancel-approval checks this and nothing else.
+  bool get isAdminRole => _role == AccountRole.admin;
+
   /// Zero-balance review, as the server implements it.
   ///
   /// Customers: the exact admin role only. `debts.write`, `debts.zero_review`,

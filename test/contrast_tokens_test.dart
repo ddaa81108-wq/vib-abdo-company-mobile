@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/ui/bars_style.dart';
 import 'package:flutter_api_layer/api_layer.dart' show SectionKey;
 import 'package:go_router/go_router.dart';
+import 'package:vib_abdo_company_mobile/features/home/home_design_options.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
@@ -127,33 +128,30 @@ Color _buttonForeground(WidgetTester tester, Finder finder) {
 /// is dark primary text plus cashPositive. DEF-026 is the light secondary text.
 /// DEF-020 through DEF-022 are other defects in QA's registry.
 void main() {
-  testWidgets('DEF-023 login brand meets AA on the scaffold in both themes', (
+  testWidgets('DEF-023 login word and greeting meet AA on the cream card', (
     tester,
   ) async {
+    const card = Color(0xFFF8F4EC);
+    const navy = Color(0xFF071525);
     for (final dark in [false, true]) {
       await pumpFakeApp(tester, size: const Size(360, 780));
       if (dark) await _darken(tester);
-      final mark = tester.widget<Text>(find.text(AppStrings.brandMark));
       final word = tester.widget<Text>(find.text(AppStrings.brandWord));
-      final theme = Theme.of(tester.element(find.text(AppStrings.brandMark)));
-      final base = theme.extension<AppSidebarPalette>()!.base;
-      final scaffold = theme.scaffoldBackgroundColor;
+      final hello = tester.widget<Text>(find.text('أهلًا بك'));
+      final scaffold = tester.widget<Scaffold>(
+        find.byKey(LoginScreen.screenKey),
+      );
 
-      expect(mark.style?.color, base);
-      expect(word.style?.color, base);
-      expect(mark.style?.fontSize, 40);
-      expect(word.style?.fontSize, 18);
-      expect(_isLargeText(mark.style!), isTrue);
-      expect(_isLargeText(word.style!), isFalse);
-      _expectTextContrast(mark, scaffold);
-      _expectTextContrast(word, scaffold);
-      if (dark) {
-        expect(base, AppSidebarPalette.glassNavy.base);
-        expect(scaffold, const Color(0xFF0B1020));
-      } else {
-        expect(base, AppSidebarPalette.fintechLight.base);
-        expect(scaffold, const Color(0xFFF5F7FB));
-      }
+      expect(word.style?.color, navy);
+      expect(hello.style?.color, const Color(0xFF16130C));
+      expect(word.style?.fontSize, 22);
+      expect(_isLargeText(word.style!), isTrue);
+      expect(_isLargeText(hello.style!), isTrue);
+      _expectTextContrast(word, card);
+      _expectTextContrast(hello, card);
+      expect(scaffold.backgroundColor, const Color(0xFF07111C));
+      expect(find.text('8'), findsNothing);
+      expect(find.text('طلب حساب'), findsNothing);
     }
   });
 
@@ -235,13 +233,14 @@ void main() {
       }
 
       await pumpFakeApp(tester, size: const Size(360, 780));
-      final note = tester.widget<Text>(find.text(AppStrings.noLanguage));
-      final theme = Theme.of(tester.element(find.text(AppStrings.noLanguage)));
-      expect(note.style?.color, theme.colorScheme.onSurfaceVariant);
-      expect(note.style?.fontSize, 11);
-      expect(_isLargeText(note.style!), isFalse);
-      _expectTextContrast(note, const Color(0xFFF5F7FB));
-      expect(theme.scaffoldBackgroundColor, const Color(0xFFF5F7FB));
+      final field = tester.widget<TextField>(
+        find.byKey(LoginScreen.usernameKey),
+      );
+      final hint = Text('', style: field.decoration?.hintStyle);
+      expect(hint.style?.color, const Color(0xFF4E463C));
+      expect(hint.style?.fontSize, 14);
+      expect(_isLargeText(hint.style!), isFalse);
+      _expectTextContrast(hint, const Color(0xFFF1EBE0));
     },
   );
 }
@@ -355,17 +354,17 @@ Future<void> _expectRenderedInk(
   final tileLabel = tester.widget<Text>(
     find.byKey(const Key('home-tile-label-customers')),
   );
-  final tileIcon = tester.widget<Icon>(
+  expect(
     find.descendant(
       of: find.byKey(HomeShell.sectionKey(SectionKey.customers)),
-      matching: find.byType(Icon),
+      matching: find.byType(HomeIconMark),
     ),
+    findsOneWidget,
   );
   final look = theme.extension<AppLook>()!;
-  // Customers tile: glossy blue; check both ends of its gradient.
+  // Customers tile: glossy blue. The mark is its own navy tile.
   for (final tileColor in [look.glossBlue.top, look.glossBlue.bottom]) {
     _expectContrast(tileLabel.style!.color!, tileColor, 4.5);
-    _expectContrast(tileIcon.color!, tileColor, 3);
   }
   // «عرض الكل» left home; the primary ink is still checked on /purchases.
   expect(

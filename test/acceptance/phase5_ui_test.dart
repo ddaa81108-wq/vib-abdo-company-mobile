@@ -53,7 +53,8 @@ void main() {
     expect(find.byKey(const Key('approve-sb_1')), findsOneWidget);
     expect(find.byKey(const Key('reject-sb_1')), findsOneWidget);
     expect(find.byKey(const Key('cash-sb_2')), findsNothing);
-    expect(find.byKey(const Key('close-batch')), findsNothing);
+    // Close is every admin role, including a limited admin (VIB-FIX-044).
+    expect(find.byKey(const Key('close-batch')), findsOneWidget);
     await _openPayroll(tester);
     expect(_heading(AppStrings.myPayroll), findsOneWidget);
     expect(_heading(AppStrings.payroll), findsNothing);

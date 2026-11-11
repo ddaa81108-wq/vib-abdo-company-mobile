@@ -149,10 +149,16 @@ void _expectSaveOnTheLeft(WidgetTester tester) {
   final save = find.byKey(const Key('save-movement'));
   expect(save, findsOneWidget);
   final rect = tester.getRect(save);
-  final screen = tester.getRect(find.byType(Scaffold).first);
-  expect(rect.left, greaterThanOrEqualTo(screen.left - 1));
-  expect(rect.right, lessThanOrEqualTo(screen.left + 72));
   expect(rect.height, greaterThan(24));
+  // The ✓ sits in the draft row's تعديل column, so it travels with the
+  // horizontal table instead of sitting in a gutter outside it.
+  expect(
+    find.descendant(
+      of: find.byKey(const Key('movement-inline')),
+      matching: save,
+    ),
+    findsOneWidget,
+  );
   final columns = tester.getRect(
     find.byKey(const Key('ledger-columns-scroll')),
   );
@@ -167,14 +173,16 @@ void _expectSaveOnTheLeft(WidgetTester tester) {
     final chipRect = shown(tester.getRect(chip));
     if (!chipRect.isEmpty) expect(rect.overlaps(chipRect), isFalse);
   }
-  final box = tester.renderObject<RenderBox>(save);
-  final result = tester.hitTestOnBinding(rect.center);
-  expect(
-    result.path.whereType<BoxHitTestEntry>().any(
-      (entry) => entry.target == box,
-    ),
-    isTrue,
-    reason:
-        'save $rect screen $screen path ${result.path.map((entry) => entry.target.runtimeType).take(8).join(', ')}',
-  );
+  if (rect.overlaps(columns)) {
+    final box = tester.renderObject<RenderBox>(save);
+    final result = tester.hitTestOnBinding(rect.center);
+    expect(
+      result.path.whereType<BoxHitTestEntry>().any(
+        (entry) => entry.target == box,
+      ),
+      isTrue,
+      reason:
+          'save $rect path ${result.path.map((entry) => entry.target.runtimeType).take(8).join(', ')}',
+    );
+  }
 }

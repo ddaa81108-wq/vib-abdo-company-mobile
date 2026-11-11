@@ -11,6 +11,7 @@ class CollectionAssignmentDto {
       this.section,
       this.phone,
       this.balanceUnits,
+      this.assignedBalanceUnits,
       this.assigneeName,
       this.assigneeUserId,
       this.status,
@@ -33,6 +34,10 @@ class CollectionAssignmentDto {
       section; // customers | companies | libyan-deposits | egyptian-deposits
   final String? phone;
   final MoneyValue? balanceUnits;
+
+  /// Value the assignment was given (`assignedBalanceUnits`). Null when the
+  /// server omits it; the card then shows «غير مسجلة» for that line.
+  final MoneyValue? assignedBalanceUnits;
   final String? assigneeName;
   final String? assigneeUserId;
   final String? status;
@@ -63,6 +68,11 @@ class CollectionAssignmentDto {
         balanceUnits: unitsOrNull(
           j['balanceUnits'],
           fieldPath: 'balanceUnits',
+          rowId: strOrNull(j['id']),
+        ),
+        assignedBalanceUnits: unitsOrNull(
+          j['assignedBalanceUnits'],
+          fieldPath: 'assignedBalanceUnits',
           rowId: strOrNull(j['id']),
         ),
         assigneeName: strOrNull(j['assigneeName']),
@@ -128,6 +138,8 @@ class CollectionSubmissionDto {
       this.businessDate,
       this.decidedAt,
       this.decisionNote,
+      this.approvedTransactionId,
+      this.currencyMismatch = false,
       this.raw = const {}});
   final String id;
   final String mode; // full | partial
@@ -157,6 +169,13 @@ class CollectionSubmissionDto {
   final String? businessDate;
   final DateTime? decidedAt;
   final String? decisionNote;
+
+  /// `approved_transaction_id` on the workspace receipt. Absent on
+  /// `GET /api/collections` submission rows.
+  final String? approvedTransactionId;
+
+  /// Workspace `currencyMismatch` (0/1). Linked receipts are 0.
+  final bool currencyMismatch;
   final Json raw;
 
   /// «ينتظر استلام النقدية»: approved and no `cashReceivedAt`. This is the
@@ -188,6 +207,8 @@ class CollectionSubmissionDto {
         businessDate: strOrNull(j['businessDate']),
         decidedAt: dateOrNull(j['decidedAt']),
         decisionNote: strOrNull(j['decisionNote']),
+        approvedTransactionId: strOrNull(j['approvedTransactionId']),
+        currencyMismatch: serverFlag(j['currencyMismatch']),
         raw: j,
       );
 }
@@ -258,16 +279,30 @@ class UnlinkedReceiptDto {
 /// One open work batch (`openBatches[]`).
 class CollectionBatchDto {
   const CollectionBatchDto(
-      {required this.id, this.businessDate, this.batchNumber, this.openedAt});
+      {required this.id,
+      this.businessDate,
+      this.batchNumber,
+      this.openedAt,
+      this.pendingCount,
+      this.cashPendingCount,
+      this.cashPendingUnits});
   final String id;
   final String? businessDate;
   final int? batchNumber;
   final String? openedAt;
+
+  /// Server counts on `openBatches[]`. Null when that payload omitted them.
+  final int? pendingCount;
+  final int? cashPendingCount;
+  final int? cashPendingUnits;
   factory CollectionBatchDto.fromJson(Json j) => CollectionBatchDto(
         id: str(j['id']),
         businessDate: strOrNull(j['businessDate']),
         batchNumber: intOrNull(j['batchNumber']),
         openedAt: strOrNull(j['openedAt']),
+        pendingCount: intOrNull(j['pendingCount']),
+        cashPendingCount: intOrNull(j['cashPendingCount']),
+        cashPendingUnits: intOrNull(j['cashPendingUnits']),
       );
 }
 
@@ -467,6 +502,28 @@ class CollectionsOverviewDto {
           .map(OutstandingCashDto.fromJson)
           .toList(growable: false),
       raw: d,
+    );
+  }
+
+  CollectionsOverviewDto withSubmissions(
+    List<CollectionSubmissionDto> submissions,
+  ) {
+    return CollectionsOverviewDto(
+      assignments: assignments,
+      submissions: submissions,
+      unlinkedReceipts: unlinkedReceipts,
+      employeeTotals: employeeTotals,
+      collectedUnits: collectedUnits,
+      dayTotalUnits: dayTotalUnits,
+      assignedCount: assignedCount,
+      pendingCount: pendingCount,
+      unlinkedPendingCount: unlinkedPendingCount,
+      cashOutstandingUnits: cashOutstandingUnits,
+      executedCount: executedCount,
+      batchId: batchId,
+      openBatches: openBatches,
+      outstandingCash: outstandingCash,
+      raw: raw,
     );
   }
 }

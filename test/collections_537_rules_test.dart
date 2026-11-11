@@ -247,21 +247,18 @@ void main() {
     await tester.ensureVisible(close);
     await tester.tap(close);
     await _pumpDialog(tester);
-    final confirm = find.byKey(const Key('confirm-mutation'));
-    if (confirm.evaluate().isNotEmpty) {
-      await tester.tap(confirm);
-      await settle(tester);
-    }
-
+    expect(find.text(CollectionsText.closePendingAlert), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('confirm-close-batch')))
+          .onPressed,
+      isNull,
+    );
     expect(
       fake.mutationPaths.where(
         (p) => p.contains('/api/collections/days/close'),
       ),
-      hasLength(1),
-    );
-    expect(
-      find.textContaining('لا يمكن مسح اليوم قبل اعتماد جميع العمليات'),
-      findsWidgets,
+      isEmpty,
     );
     final after = await tester.runAsync(() => layer.collections.overview());
     expect(after!.assignments, isNotEmpty);

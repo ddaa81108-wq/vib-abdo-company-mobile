@@ -79,7 +79,7 @@ void main() {
       // One pending receipt per card: both buttons are off now.
       expect(
         tester
-            .widget<OutlinedButton>(
+            .widget<ButtonStyleButton>(
               find.byKey(const Key('submit-as_1'), skipOffstage: false),
             )
             .onPressed,

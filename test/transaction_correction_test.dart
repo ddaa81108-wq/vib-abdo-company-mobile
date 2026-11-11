@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_api_layer/data/fake/fake_fixtures.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
+import 'package:vib_abdo_company_mobile/state/theme_controller.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import 'support/pump_app.dart';
@@ -561,14 +563,11 @@ void main() {
       await closeCorrection(tester, 'tx_1');
       await settle(tester);
 
-      await tester.tap(find.byKey(HomeShell.menuKey));
+      final context = tester.element(find.byKey(HomeShell.shellKey));
+      ProviderScope.containerOf(context)
+          .read(themeModeProvider.notifier)
+          .toggle();
       await settle(tester);
-      await tester.tap(find.text(AppStrings.themeDark));
-      await settle(tester);
-      if (find.byType(Drawer).evaluate().isNotEmpty) {
-        Navigator.of(tester.element(find.byType(Drawer))).pop();
-        await settle(tester);
-      }
 
       await openCorrection(tester, 'customers');
       final form = tester.element(find.byKey(const Key('correction-form')));

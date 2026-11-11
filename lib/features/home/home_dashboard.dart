@@ -12,6 +12,7 @@ import '../../ui/strings.dart';
 import '../../ui/theme.dart';
 import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
+import 'home_design_options.dart';
 import 'home_shell.dart';
 
 /// Readable debt sections in first-seen order. Each one gets its own control.
@@ -48,20 +49,6 @@ int homeTileColumns(double width, double textScale) {
   if (width <= AppBreakpoints.tablet) return 3;
   return 4;
 }
-
-/// Filled icon for a home tile. Presentation only; the drawer keeps
-/// [sectionIcon].
-IconData homeTileIcon(SectionKey section) => switch (section) {
-  SectionKey.customers => Icons.person,
-  SectionKey.collections => Icons.payments,
-  SectionKey.companies => Icons.apartment,
-  SectionKey.libyanDeposits => Icons.account_balance_wallet,
-  SectionKey.egyptianDeposits => Icons.currency_exchange,
-  SectionKey.masraweya => Icons.menu_book,
-  SectionKey.purchases => Icons.shopping_bag,
-  SectionKey.treasury => Icons.account_balance,
-  SectionKey.reports => Icons.insights,
-};
 
 /// Glossy tile finish per section, as in concepts 1 and 3: blue, violet,
 /// green. Presentation only.
@@ -102,81 +89,113 @@ class HomeDashboard extends ConsumerWidget {
     if (summary == null) {
       return const Center(child: Text(AppStrings.loading));
     }
-    final tiles = <Widget>[
-      for (final section in summary.sections)
-        HomeTile(
-          tileKey: HomeShell.sectionKey(section),
-          labelKey: Key('home-tile-label-${section.key}'),
-          icon: homeTileIcon(section),
-          gloss: homeTileGloss(section, context.look),
-          label: sectionLabel(section),
-          path: sectionPath(section),
-        ),
-      if (showsSettingsEntry(permissions))
-        HomeTile(
-          tileKey: settingsTileKey,
-          labelKey: const Key('home-tile-label-settings'),
-          icon: Icons.settings,
-          gloss: homeTileGloss(null, context.look),
-          label: AppStrings.settings,
-          path: '/settings',
-        ),
-    ];
-
     final pad = pagePadding(width);
     final columns = homeTileColumns(width - pad.horizontal, textScale);
-    final scroll = RefreshIndicator(
-      onRefresh: () async {
-        ref.invalidate(homeDashboardProvider);
-        ref.invalidate(unreadCountProvider);
-        ref.invalidate(unreadNotificationsCountProvider);
-      },
-      child: CustomScrollView(
-        key: screenKey,
-        slivers: [
-          SliverPadding(
-            padding: pad,
-            sliver: SliverMainAxisGroup(
-              slivers: [
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: AppSpacing.sm),
-                ),
-                if (summary.sections.isEmpty)
-                  const SliverToBoxAdapter(
-                    child: EmptyPane(message: AppStrings.noSections),
-                  ),
-                // Option 4 (Ali, 2026-11-01): the rows share the free height.
-                // Large text (one column) keeps natural tile heights and
-                // scrolls, so a capped tile never clips its label.
-                if (tiles.isNotEmpty && columns > 1)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    // No LayoutBuilder here: SliverFillRemaining measures
-                    // intrinsics.
-                    child: HomeFillGrid(tiles: tiles, columns: columns),
-                  ),
-                if (tiles.isNotEmpty && columns == 1)
-                  SliverToBoxAdapter(
-                    child: Column(
-                      key: const Key('home-tile-grid'),
-                      children: [
-                        for (final tile in tiles)
-                          Padding(
-                            padding: const EdgeInsetsDirectional.only(
-                              bottom: AppSpacing.md,
-                            ),
-                            child: tile,
-                          ),
-                      ],
+    Future<void> refresh() async {
+      ref.invalidate(homeDashboardProvider);
+      ref.invalidate(unreadCountProvider);
+      ref.invalidate(unreadNotificationsCountProvider);
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final look = context.look;
+        final count =
+            summary.sections.length + (showsSettingsEntry(permissions) ? 1 : 0);
+        final rows = count == 0 ? 0 : (count / columns).ceil();
+        const gap = 4.0;
+        final budget = constraints.maxHeight - pad.vertical - AppSpacing.xs;
+        final raw = rows == 0 ? 0.0 : (budget - gap * (rows - 1)) / rows;
+        // Text scale 1 shares the free height so every tile is on screen.
+        // A short leftover, or large text, keeps a natural tile and scrolls.
+        final fit = columns > 1 && textScale < 1.3 && raw >= 48;
+        final rowHeight = fit ? raw.clamp(48.0, 148.0) : null;
+        final icon = rowHeight == null
+            ? 48.0
+            : (rowHeight * 0.40).clamp(26.0, 52.0);
+        final font = rowHeight == null
+            ? 15.0
+            : (rowHeight * 0.145).clamp(11.0, 14.0);
+        final labelGap = rowHeight == null
+            ? AppSpacing.sm
+            : (rowHeight * 0.05).clamp(2.0, 6.0);
+
+        HomeTile tileFor({
+          required Key tileKey,
+          required Key labelKey,
+          required Widget mark,
+          required Gloss gloss,
+          required String label,
+          required String path,
+        }) {
+          return HomeTile(
+            tileKey: tileKey,
+            labelKey: labelKey,
+            mark: mark,
+            gloss: gloss,
+            label: label,
+            path: path,
+            fontSize: font,
+            gap: labelGap,
+          );
+        }
+
+        final tiles = <Widget>[
+          for (final section in summary.sections)
+            tileFor(
+              tileKey: HomeShell.sectionKey(section),
+              labelKey: Key('home-tile-label-${section.key}'),
+              mark: HomeIconMark(section: section, size: icon),
+              gloss: homeTileGloss(section, look),
+              label: sectionLabel(section),
+              path: sectionPath(section),
+            ),
+          if (showsSettingsEntry(permissions))
+            tileFor(
+              tileKey: settingsTileKey,
+              labelKey: const Key('home-tile-label-settings'),
+              mark: HomeIconMark.settings(size: icon),
+              gloss: homeTileGloss(null, look),
+              label: AppStrings.settings,
+              path: '/settings',
+            ),
+        ];
+
+        final grid = tiles.isEmpty
+            ? const EmptyPane(message: AppStrings.noSections)
+            : fit
+            ? HomeFillGrid(
+                tiles: tiles,
+                columns: columns,
+                rowHeight: rowHeight!,
+                gap: gap,
+              )
+            : Column(
+                key: const Key('home-tile-grid'),
+                children: [
+                  for (final tile in tiles)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(
+                        bottom: AppSpacing.md,
+                      ),
+                      child: tile,
                     ),
-                  ),
-              ],
+                ],
+              );
+
+        return RefreshIndicator(
+          onRefresh: refresh,
+          child: SingleChildScrollView(
+            key: screenKey,
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Padding(padding: pad, child: grid),
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
-    return scroll;
   }
 }
 
@@ -187,23 +206,26 @@ class HomeTile extends StatelessWidget {
   const HomeTile({
     required this.tileKey,
     required this.labelKey,
-    required this.icon,
+    required this.mark,
     required this.gloss,
     required this.label,
     required this.path,
+    this.fontSize = 15,
+    this.gap = AppSpacing.sm,
     super.key,
   });
 
   final Key tileKey;
   final Key labelKey;
-  final IconData icon;
+  final Widget mark;
   final Gloss gloss;
   final String label;
   final String path;
+  final double fontSize;
+  final double gap;
 
   @override
   Widget build(BuildContext context) {
-    final look = context.look;
     final radius = BorderRadius.circular(AppRadii.xxl);
     return Semantics(
       button: true,
@@ -226,36 +248,31 @@ class HomeTile extends StatelessWidget {
               child: GlossSheen(
                 gloss: gloss,
                 radius: radius,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 112),
+                child: Align(
+                  alignment: Alignment.center,
                   child: Padding(
                     padding: const EdgeInsetsDirectional.symmetric(
                       horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.lg,
+                      vertical: AppSpacing.xxs,
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: look.glass
-                                ? Colors.white.withValues(alpha: 0.16)
-                                : gloss.amount.withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(AppRadii.xl),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          mark,
+                          SizedBox(height: gap),
+                          Text(
+                            label,
+                            key: labelKey,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: cairo(fontSize, 700, color: gloss.ink),
                           ),
-                          child: Icon(icon, size: 30, color: gloss.amount),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          label,
-                          key: labelKey,
-                          textAlign: TextAlign.center,
-                          softWrap: true,
-                          style: cairo(16, 700, color: gloss.ink),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -268,47 +285,49 @@ class HomeTile extends StatelessWidget {
   }
 }
 
-/// Rows share the free height evenly; each tile keeps its own
-/// minimum (so small screens scroll) and is capped at 190.
+/// Equal rows that share the free height. Each cell is at least 48dp.
 class HomeFillGrid extends StatelessWidget {
-  const HomeFillGrid({required this.tiles, required this.columns, super.key});
+  const HomeFillGrid({
+    required this.tiles,
+    required this.columns,
+    required this.rowHeight,
+    required this.gap,
+    super.key,
+  });
 
   final List<Widget> tiles;
   final int columns;
+  final double rowHeight;
+  final double gap;
 
   @override
   Widget build(BuildContext context) {
     final rows = <Widget>[];
     for (var i = 0; i < tiles.length; i += columns) {
-      if (rows.isNotEmpty) rows.add(const SizedBox(height: AppSpacing.md));
+      if (rows.isNotEmpty) rows.add(SizedBox(height: gap));
       rows.add(
-        Flexible(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 190),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var c = 0; c < columns; c++) ...[
-                  if (c > 0) const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: i + c < tiles.length
-                        ? tiles[i + c]
-                        : const SizedBox.shrink(),
-                  ),
-                ],
+        SizedBox(
+          height: rowHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var c = 0; c < columns; c++) ...[
+                if (c > 0) SizedBox(width: gap),
+                Expanded(
+                  child: i + c < tiles.length
+                      ? tiles[i + c]
+                      : const SizedBox.shrink(),
+                ),
               ],
-            ),
+            ],
           ),
         ),
       );
     }
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
-      child: Column(
-        key: const Key('home-tile-grid'),
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: rows,
-      ),
+    return Column(
+      key: const Key('home-tile-grid'),
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: rows,
     );
   }
 }

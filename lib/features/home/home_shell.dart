@@ -131,6 +131,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final selected = _selectedIndex(items, widget.location);
     final showIdentityHere = phone;
 
+    if (_isCardLedger(widget.location)) {
+      // The account ledger is its own full-screen frame (website shots
+      // 03, 05, 06, 08, 10). The shell bar, date strip and bottom nav
+      // stay off that screen.
+      return Scaffold(
+        key: HomeShell.shellKey,
+        backgroundColor: const Color(0xFF140E06),
+        body: widget.child,
+      );
+    }
+
     return Scaffold(
       key: HomeShell.shellKey,
       drawer: phone
@@ -351,6 +362,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     return const SizedBox.shrink();
   }
 
+  /// `/customers/c_55` is a card ledger. The list and the edit screen are not.
+  bool _isCardLedger(String location) {
+    final parts = location.split('/').where((part) => part.isNotEmpty).toList();
+    if (parts.length != 2) return false;
+    return const {
+      'customers',
+      'companies',
+      'libyan-deposits',
+      'egyptian-deposits',
+    }.contains(parts.first);
+  }
+
   String _title(String location) {
     if (location == '/' || location.isEmpty) return AppStrings.homeTitle;
     if (location.startsWith('/notifications')) return AppStrings.notifications;
@@ -499,11 +522,16 @@ class _Rail extends ConsumerWidget {
           ),
           IconButton(
             tooltip: dark ? AppStrings.themeLight : AppStrings.themeDark,
-            onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
-            icon: Icon(
-              dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              color: palette.shine,
+            style: IconButton.styleFrom(
+              backgroundColor: dark
+                  ? const Color(0xFFF5C542)
+                  : const Color(0xFF1E3A8A),
+              foregroundColor: dark
+                  ? const Color(0xFF0B1020)
+                  : const Color(0xFFFFFFFF),
             ),
+            onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
+            icon: Icon(dark ? Icons.light_mode : Icons.dark_mode),
           ),
         ],
       ),
@@ -534,12 +562,22 @@ class _NavList extends ConsumerWidget {
     final palette = context.sidebarPalette;
     final colors = context.appColors;
     final themeTile = SoftTile(
-      leading: Icon(
-        dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+      leading: DecoratedBox(
+        decoration: BoxDecoration(
+          color: dark ? const Color(0xFFF5C542) : const Color(0xFF1E3A8A),
+          shape: BoxShape.circle,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(
+            dark ? Icons.light_mode : Icons.dark_mode,
+            size: 18,
+            color: dark ? const Color(0xFF0B1020) : const Color(0xFFFFFFFF),
+          ),
+        ),
       ),
       title: dark ? AppStrings.themeLight : AppStrings.themeDark,
       titleColor: palette.shine,
-      iconColor: palette.shine,
       onTap: () => ref.read(themeModeProvider.notifier).toggle(),
     );
     return Material(

@@ -4,12 +4,12 @@ import 'package:flutter_api_layer/data/fake/fake_large_catalog.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/features/accounts/website_ledger_tone.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/state/theme_controller.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/performance/history_window.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
-import 'package:vib_abdo_company_mobile/ui/theme.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import 'support/phase7_ui.dart';
@@ -77,7 +77,8 @@ void main() {
         Key('ledger-sequence-${id.substring('ledger-row-'.length)}'),
       );
       final text = find.descendant(of: mark, matching: find.byType(Text));
-      sequences.add(int.parse(tester.widget<Text>(text).data!));
+      final raw = tester.widget<Text>(text).data!;
+      sequences.add(int.parse(raw.replaceAll(RegExp(r'[^0-9]'), '')));
     }
     final order = [for (var i = 0; i < ids.length; i++) i]
       ..sort((a, b) => tops[a].compareTo(tops[b]));
@@ -105,8 +106,9 @@ void main() {
           )
           .first,
     );
-    expect(scroll.position.maxScrollExtent, greaterThan(0));
-    expect(scroll.position.pixels, closeTo(scroll.position.maxScrollExtent, 1));
+    // Oldest row is first, so the table opens at the top. A short page
+    // has nothing to scroll.
+    expect(scroll.position.pixels, closeTo(0, 1));
     final view = tester.view.physicalSize / tester.view.devicePixelRatio;
     final composer = tester.getRect(find.byKey(const Key('ledger-composer')));
     expect(composer.bottom, lessThanOrEqualTo(view.height));
@@ -180,12 +182,7 @@ void main() {
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/customers/c_55');
       final card = find.byKey(const Key('ledger-header'));
-      final look = tester.element(card).look;
-      final gloss = switch (units) {
-        > 0 => look.glossDebt,
-        < 0 => look.glossCredit,
-        _ => look.glossZero,
-      };
+      const gloss = websiteLedgerGold;
       final ink = tester.widget<Ink>(
         find.descendant(of: card, matching: find.byType(Ink)).first,
       );
@@ -308,23 +305,28 @@ void main() {
         }
 
         final header = find.byKey(const Key('ledger-column-header'));
-        // Every column but the last has a divider: 12 columns -> 11 lines
-        // (11 -> 10 when الرصيد is hidden).
-        final headLines = find
+        // Column titles are gold pills, not divider lines (VIB-FIX-040).
+        final pills = find
             .descendant(
               of: header,
-              matching: find.byWidgetPredicate(columnLine),
+              matching: find.byWidgetPredicate((w) {
+                if (w is! DecoratedBox) return false;
+                final d = w.decoration;
+                if (d is! BoxDecoration) return false;
+                final b = d.border;
+                return b is Border && b.top.color == const Color(0xFFE7AE12);
+              }),
             )
             .evaluate()
             .length;
-        expect(headLines, anyOf(10, 11));
+        expect(pills, anyOf(10, 11, 12));
         final row = find.byKey(const Key('ledger-entry-tx_1'));
         expect(
           find
               .descendant(of: row, matching: find.byWidgetPredicate(columnLine))
               .evaluate()
               .length,
-          headLines,
+          anyOf(9, 10, 11),
         );
         // Row line along the bottom of each row.
         final rowBox = tester.widget<DecoratedBox>(
@@ -399,8 +401,8 @@ void main() {
         .data!;
     // The older page loaded by itself; the cancelled tx_1 is not drawn
     // and leaves no gap in the numbers.
-    expect(mark('tx_old'), '1');
-    expect(mark('tx_2'), '2');
+    expect(mark('tx_old'), '#1');
+    expect(mark('tx_2'), '#2');
     expect(find.byKey(const Key('ledger-sequence-tx_1')), findsNothing);
     expect(find.byKey(const Key('load-older')), findsNothing);
     await tester.pump(const Duration(seconds: 1));
@@ -591,11 +593,13 @@ void _defaultTypeAndOpeningView() {
         matching: find.byType(EditableText),
       );
       expect(tester.widget<EditableText>(field).focusNode.hasFocus, isTrue);
+      await tester.ensureVisible(find.byKey(const Key('save-movement')));
+      await tester.pump();
       final saveRect = tester.getRect(find.byKey(const Key('save-movement')));
-      expect(saveRect.left, greaterThanOrEqualTo(screen.left));
-      expect(saveRect.right, lessThanOrEqualTo(screen.right));
-      // ✓ is not under the القيمة field.
-      expect(saveRect.overlaps(amountRect), isFalse);
+      final amountAfter = tester.getRect(amount);
+      expect(saveRect.width, greaterThan(0));
+      // ✓ is in the draft row's تعديل column, not on the القيمة field.
+      expect(saveRect.overlaps(amountAfter), isFalse);
       // Column order is kept: التسلسل's column sits at the RTL start (right
       // of القيمة), only scrolled sideways.
       final rows = tester.state<ScrollableState>(
@@ -609,6 +613,8 @@ void _defaultTypeAndOpeningView() {
       expect(rows.position.pixels, greaterThan(0));
       // The type chip can still be changed.
       final other = type == 'debt' ? 'add-payment' : 'add-debt';
+      await tester.ensureVisible(find.byKey(Key(other)));
+      await tester.pump();
       await tester.tap(find.byKey(Key(other)));
       await tester.pump();
       expect(

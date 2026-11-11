@@ -833,6 +833,7 @@ class UnitsField extends StatelessWidget {
     super.key,
     this.dense,
     this.showHint = true,
+    this.labelStyle,
     this.autofocus = false,
     this.focusNode,
     this.textInputAction,
@@ -850,6 +851,7 @@ class UnitsField extends StatelessWidget {
 
   /// False in the ledger's compact add row (Ali asked for no notes there).
   final bool showHint;
+  final TextStyle? labelStyle;
 
   /// Overrides the theme density. Null keeps the theme value.
   final bool? dense;
@@ -876,6 +878,8 @@ class UnitsField extends StatelessWidget {
       scrollPadding: scrollPadding,
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: labelStyle,
+        floatingLabelStyle: labelStyle,
         helperText: showHint ? AppStrings.unitsHint : null,
         helperMaxLines: 12,
         isDense: dense,

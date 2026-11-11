@@ -189,7 +189,8 @@ class _AdminViewState extends ConsumerState<_AdminView> {
       for (final tab in AdminTab.values) tab: adminTabRows(data, filter, tab),
     };
     final permissions = permissionsOf(ref);
-    final close = permissions.canDo(ManagementAction.collectionsCloseDay);
+    // The server allows every admin role. It does not check a close-day code.
+    final close = permissions.isAdminRole;
     final look = context.look;
 
     return Column(
@@ -257,6 +258,11 @@ class _AdminViewState extends ConsumerState<_AdminView> {
         _ActionBar(
           key: const Key('collections-action-bar'),
           oneRow: true,
+          tones: [
+            if (widget.onPayroll != null) const Color(0xFF178447),
+            if (close) const Color(0xFFB52835),
+            const Color(0xFF178447),
+          ],
           children: [
             if (widget.onPayroll != null)
               _BarButton(
@@ -267,6 +273,7 @@ class _AdminViewState extends ConsumerState<_AdminView> {
             if (close)
               _CloseBatchButton(
                 batch: batch,
+                settlement: settlement,
                 label: CollectionsText.closeShort,
               ),
             CollectionsExportButton(
@@ -493,6 +500,29 @@ class _EmployeeTotals extends StatelessWidget {
   }
 }
 
+/// Two compact cards on a phone, three when the row is wide.
+Widget _assignmentGrid(List<Widget> cards) {
+  if (cards.isEmpty) return const SizedBox.shrink();
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final cols = constraints.maxWidth < 560
+          ? 1
+          : constraints.maxWidth >= 720
+          ? 3
+          : 2;
+      const gap = 8.0;
+      final width = (constraints.maxWidth - gap * (cols - 1)) / cols;
+      return Wrap(
+        spacing: gap,
+        runSpacing: gap,
+        children: [
+          for (final card in cards) SizedBox(width: width, child: card),
+        ],
+      );
+    },
+  );
+}
+
 String _adminTabLabel(AdminTab tab) => switch (tab) {
   AdminTab.all => CollectionsText.tabAll,
   AdminTab.review => CollectionsText.tabReview,
@@ -526,13 +556,15 @@ class _AdminList extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final assignment in rows.assignments)
-          _AssignmentCard(
-            assignment: assignment,
-            history: collectionCardHistory(data, assignment.id),
-            money: money,
-            admin: true,
-          ),
+        _assignmentGrid([
+          for (final assignment in rows.assignments)
+            _AssignmentCard(
+              assignment: assignment,
+              history: collectionCardHistory(data, assignment.id),
+              money: money,
+              admin: true,
+            ),
+        ]),
         for (final receipt in rows.unlinked)
           _AdminUnlinkedCard(receipt: receipt, money: money),
         for (final item in rows.outstanding)
@@ -850,13 +882,15 @@ class _EmployeeViewState extends ConsumerState<_EmployeeView> {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (final assignment in rows.assignments)
-                      _AssignmentCard(
-                        assignment: assignment,
-                        history: collectionCardHistory(data, assignment.id),
-                        money: money,
-                        admin: false,
-                      ),
+                    _assignmentGrid([
+                      for (final assignment in rows.assignments)
+                        _AssignmentCard(
+                          assignment: assignment,
+                          history: collectionCardHistory(data, assignment.id),
+                          money: money,
+                          admin: false,
+                        ),
+                    ]),
                     for (final submission in rows.submissions)
                       _ReceiptRow(submission: submission, money: money),
                     for (final receipt in rows.unlinked)
@@ -980,13 +1014,33 @@ class _LabeledField extends StatelessWidget {
 /// The glossy bar of pill buttons (the website's green bar, in the app's
 /// hero gloss). Buttons inside take the bar's colours.
 class _ActionBar extends StatelessWidget {
-  const _ActionBar({required this.children, this.oneRow = false, super.key});
+  const _ActionBar({
+    required this.children,
+    this.oneRow = false,
+    this.tones,
+    super.key,
+  });
 
   final List<Widget> children;
   final bool oneRow;
 
+  /// When set, each button is a solid colour instead of the hero bar.
+  final List<Color>? tones;
+
   @override
   Widget build(BuildContext context) {
+    final tones = this.tones;
+    if (tones != null && tones.length == children.length) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(child: _solidButton(context, tones[i], children[i])),
+          ],
+        ],
+      );
+    }
     final look = context.look;
     final gloss = look.glossHero;
     final radius = BorderRadius.circular(AppRadii.xl);
@@ -1069,6 +1123,28 @@ class _ActionBar extends StatelessWidget {
   }
 }
 
+Widget _solidButton(BuildContext context, Color background, Widget child) {
+  final style = ButtonStyle(
+    minimumSize: const WidgetStatePropertyAll(Size(0, 40)),
+    backgroundColor: WidgetStatePropertyAll(background),
+    foregroundColor: const WidgetStatePropertyAll(Colors.white),
+    iconColor: const WidgetStatePropertyAll(Colors.white),
+    side: const WidgetStatePropertyAll(BorderSide.none),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+    textStyle: WidgetStatePropertyAll(cairo(11, 800)),
+    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 6)),
+  );
+  return Theme(
+    data: Theme.of(context).copyWith(
+      outlinedButtonTheme: OutlinedButtonThemeData(style: style),
+      filledButtonTheme: FilledButtonThemeData(style: style),
+    ),
+    child: child,
+  );
+}
+
 class _BarButton extends StatelessWidget {
   const _BarButton({
     required this.buttonKey,
@@ -1095,15 +1171,17 @@ class _BarButton extends StatelessWidget {
   }
 }
 
-/// «إغلاق ومسح الدفعة» for the chosen batch. 537 refuses an unsettled
-/// batch (COLLECTION_DAY_NOT_SETTLED); that message is shown, never hidden.
+/// «الإغلاق» opens the website's confirm dialog, then
+/// `POST /api/collections/days/close`. The next overview is the server's.
 class _CloseBatchButton extends ConsumerWidget {
   const _CloseBatchButton({
     required this.batch,
+    required this.settlement,
     this.label = CollectionsText.closeBatch,
   });
 
   final CollectionBatchDto? batch;
+  final BatchSettlement settlement;
   final String label;
 
   @override
@@ -1116,35 +1194,203 @@ class _CloseBatchButton extends ConsumerWidget {
         child: Text(label, textAlign: TextAlign.center),
       );
     }
-    return GuardedMutation(
-      buttonKey: const Key('close-batch'),
-      inputs: 'close:${batch.id}',
-      label: label,
-      confirmText: CollectionsText.closeConfirm,
-      destructive: true,
-      onVersionConflict: () => ref.invalidate(collectionsProvider),
-      onSubmit: (meta) async {
-        try {
-          await ref
-              .read(apiLayerProvider)
-              .collections
-              .closeDay(batchId: batch.id, meta: meta);
-        } on ConflictException catch (error) {
-          ref.invalidate(collectionsProvider);
-          if (context.mounted) {
-            ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text(error.message)));
-          }
-          return error.message;
-        }
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text(CollectionsText.batchClosed)),
-          );
-        }
-        ref.invalidate(collectionsProvider);
-        return null;
+    final pending = batch.pendingCount ?? settlement.reviewCount;
+    final cashCount = batch.cashPendingCount ?? 0;
+    final cashUnits = batch.cashPendingUnits ?? settlement.cashUnits;
+    return FilledButton(
+      key: const Key('close-batch'),
+      onPressed: () {
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => _CloseBatchDialog(
+            batchId: batch.id,
+            pendingCount: pending,
+            cashPendingCount: cashCount,
+            cashPendingUnits: cashUnits,
+          ),
+        );
       },
+      child: Text(
+        label,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+class _CloseBatchDialog extends ConsumerStatefulWidget {
+  const _CloseBatchDialog({
+    required this.batchId,
+    required this.pendingCount,
+    required this.cashPendingCount,
+    required this.cashPendingUnits,
+  });
+
+  final String batchId;
+  final int pendingCount;
+  final int cashPendingCount;
+  final int cashPendingUnits;
+
+  @override
+  ConsumerState<_CloseBatchDialog> createState() => _CloseBatchDialogState();
+}
+
+class _CloseBatchDialogState extends ConsumerState<_CloseBatchDialog> {
+  var _exception = false;
+  var _busy = false;
+  var _changed = false;
+  String? _error;
+  final _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  bool get _outstanding =>
+      widget.cashPendingCount > 0 || widget.cashPendingUnits > 0;
+
+  bool get _canConfirm {
+    if (_busy || widget.pendingCount > 0 || _changed) return false;
+    if (!_outstanding) return true;
+    return _exception && _reason.text.trim().length >= 5;
+  }
+
+  Future<void> _send() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final ack = await ref
+          .read(apiLayerProvider)
+          .collections
+          .closeDay(
+            batchId: widget.batchId,
+            meta: MutationMeta(),
+            allowOutstandingCash: _exception,
+            reason: _exception ? _reason.text.trim() : null,
+            expectedCashPendingCount: _exception
+                ? widget.cashPendingCount
+                : null,
+            expectedCashPendingUnits: _exception
+                ? widget.cashPendingUnits
+                : null,
+          );
+      ref.invalidate(collectionsProvider);
+      if (!mounted) return;
+      if (ack.raw['closed'] == false) {
+        setState(() {
+          _busy = false;
+          _error = failureText(
+            ref.read(errorHandlerProvider).toFailure(StateError('${ack.raw}')),
+          );
+        });
+        return;
+      }
+      Navigator.pop(context);
+    } catch (error) {
+      ref.invalidate(collectionsProvider);
+      if (!mounted) return;
+      final failure = ref.read(errorHandlerProvider).toFailure(error);
+      final changed = failure.code == 'COLLECTION_CASH_CHANGED';
+      setState(() {
+        _busy = false;
+        _changed = changed;
+        _error = failure.message;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final money = ref.watch(apiLayerProvider).money;
+    return AlertDialog(
+      title: const Text(CollectionsText.closeDialogTitle),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              _outstanding
+                  ? CollectionsText.closeOutstandingIntro
+                  : CollectionsText.closeConfirm,
+            ),
+            if (widget.pendingCount > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                CollectionsText.closePendingAlert,
+                key: const Key('close-batch-pending'),
+              ),
+            ],
+            if (_outstanding) ...[
+              const SizedBox(height: 8),
+              Text(
+                'نقدية غير مستلمة: ${money.format(widget.cashPendingUnits, Currency.lyd)} — ${widget.cashPendingCount} استلام',
+                key: const Key('close-batch-outstanding'),
+              ),
+              CheckboxListTile(
+                key: const Key('close-batch-exception'),
+                contentPadding: EdgeInsets.zero,
+                value: _exception,
+                onChanged: _busy || widget.pendingCount > 0
+                    ? null
+                    : (value) => setState(() {
+                        _exception = value ?? false;
+                        _changed = false;
+                        _error = null;
+                      }),
+                title: const Text(CollectionsText.closeException),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              if (_exception) ...[
+                const Text(CollectionsText.closeExceptionNote),
+                TextField(
+                  key: const Key('close-batch-reason'),
+                  controller: _reason,
+                  maxLength: 500,
+                  minLines: 2,
+                  maxLines: 3,
+                  enabled: !_busy,
+                  decoration: const InputDecoration(
+                    labelText: CollectionsText.closeExceptionReason,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ],
+              if (_changed)
+                const Text(
+                  CollectionsText.closeCashChanged,
+                  key: Key('close-batch-changed'),
+                ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(_error!, key: const Key('close-batch-error')),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.pop(context),
+          child: const Text(CollectionsText.closeNo),
+        ),
+        FilledButton(
+          key: const Key('confirm-close-batch'),
+          onPressed: _canConfirm ? _send : null,
+          child: Text(
+            _exception
+                ? CollectionsText.closeYesException
+                : CollectionsText.closeYes,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1167,11 +1413,14 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final look = context.look;
-    final radius = BorderRadius.circular(AppRadii.xl);
+    final radius = BorderRadius.circular(12);
     final figure = context.textExtras.amount.copyWith(color: look.ink);
+    final tile = Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFF1A2230)
+        : const Color(0xFFFFFFFF);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: look.card,
+        color: tile,
         borderRadius: radius,
         border: Border.all(color: look.cardBorder),
         boxShadow: look.glass
@@ -1188,7 +1437,7 @@ class _SummaryCard extends StatelessWidget {
         borderRadius: radius,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            border: BorderDirectional(start: BorderSide(color: edge, width: 5)),
+            border: BorderDirectional(start: BorderSide(color: edge, width: 6)),
           ),
           child: Padding(
             padding: const EdgeInsetsDirectional.all(AppSpacing.xs),
@@ -1240,9 +1489,8 @@ class _TabChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final look = context.look;
-    final gloss = look.glossHero;
     final radius = BorderRadius.circular(AppRadii.xl);
-    final ink = selected ? look.onHero : look.ink;
+    final ink = selected ? const Color(0xFF211600) : look.ink;
     final body = Padding(
       padding: const EdgeInsetsDirectional.symmetric(
         horizontal: 4,
@@ -1294,17 +1542,11 @@ class _TabChip extends StatelessWidget {
           borderRadius: radius,
           child: selected
               ? DecoratedBox(
-                  decoration: gloss
-                      .decoration(radius)
-                      .copyWith(boxShadow: gloss.glowShadow),
-                  child: ClipRRect(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE7AE12),
                     borderRadius: radius,
-                    child: GlossSheen(
-                      gloss: gloss,
-                      radius: radius,
-                      child: body,
-                    ),
                   ),
+                  child: body,
                 )
               : DecoratedBox(
                   decoration: BoxDecoration(
@@ -1492,67 +1734,245 @@ class _AssignmentCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tone = collectionCardTone(assignment);
     final gloss = collectionToneGloss(context, tone);
-    var partial = 0;
-    return GlossCard(
-      key: Key('assignment-${assignment.id}'),
-      gloss: gloss,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox.shrink(
-            key: Key('tone-${assignment.id}-${collectionToneName(tone)}'),
-          ),
-          _CardHeader(
-            name: assignment.customerName,
-            subtitle: assignment.assigneeName,
-            amount: money.formatOrDash(assignment.balanceUnits, Currency.lyd),
-            gloss: gloss,
-            amountKey: Key('assignment-balance-${assignment.id}'),
-          ),
-          if (!admin) ...[
-            const SizedBox(height: AppSpacing.xxs),
-            LtrText(
-              assignment.phone ?? CollectionsText.noPhone,
-              key: Key('phone-${assignment.id}'),
-              style: cairo(12, 600, color: gloss.ink),
+    final balanceText = money.formatOrDash(
+      assignment.balanceUnits,
+      Currency.lyd,
+    );
+    final assignedText = assignment.assignedBalanceUnits == null
+        ? 'غير مسجلة'
+        : money.formatOrDash(assignment.assignedBalanceUnits, Currency.lyd);
+    Widget pair(String label, String value, {Key? key}) {
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: cairo(9, 700, color: gloss.ink.withValues(alpha: 0.8)),
+            ),
+            Text(
+              value,
+              key: key,
+              style: cairo(14, 800, color: gloss.amount),
             ),
           ],
-          const SizedBox(height: AppSpacing.sm),
-          if (history.isEmpty && admin)
-            Text(
-              CollectionsText.noHistory,
-              style: cairo(12, 500, color: gloss.ink),
-            ),
-          for (final item in history)
-            _SubmissionLine(
-              submission: item,
-              title: item.mode == 'full'
-                  ? CollectionsText.fullReceipt
-                  : CollectionsText.partialReceiptN(++partial),
-              money: money,
-              gloss: gloss,
-              admin: admin,
-            ),
-          if (!admin) _EmployeeActions(assignment: assignment, money: money),
+        ),
+      );
+    }
+
+    return DecoratedBox(
+      key: Key('assignment-${assignment.id}'),
+      decoration: BoxDecoration(
+        gradient: gloss.fill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: gloss.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0xE6E7AE12),
+            blurRadius: 0,
+            offset: Offset(0, 5),
+          ),
         ],
       ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(13),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox.shrink(
+              key: Key('tone-${assignment.id}-${collectionToneName(tone)}'),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          assignment.customerName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: cairo(13, 800, color: gloss.ink),
+                        ),
+                      ),
+                      if ((assignment.assigneeName ?? '').isNotEmpty)
+                        Flexible(
+                          child: Padding(
+                            padding: const EdgeInsetsDirectional.only(start: 6),
+                            child: Text(
+                              assignment.assigneeName!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: cairo(10, 600, color: gloss.ink),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      pair(
+                        'قيمة التوجيه',
+                        assignedText,
+                        key: Key('assigned-amount-${assignment.id}'),
+                      ),
+                      pair(
+                        'الرصيد الحالي',
+                        balanceText,
+                        key: Key('assignment-balance-${assignment.id}'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _collectionStateLabel(assignment),
+                          key: Key('assignment-state-${assignment.id}'),
+                          style: cairo(10, 800, color: gloss.ink),
+                        ),
+                      ),
+                      if (history.isNotEmpty ||
+                          assignment.cashOutstandingCount > 0)
+                        Text(
+                          '${history.isNotEmpty ? history.length : assignment.cashOutstandingCount} استلام',
+                          style: cairo(10, 800, color: gloss.ink),
+                        ),
+                    ],
+                  ),
+                  if (!admin)
+                    LtrText(
+                      assignment.phone ?? CollectionsText.noPhone,
+                      key: Key('phone-${assignment.id}'),
+                      style: cairo(10, 600, color: gloss.ink),
+                    ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, thickness: 1, color: Color(0x66FFFFFF)),
+            Material(
+              color: Colors.transparent,
+              child: Theme(
+                data: Theme.of(context)
+                    .copyWith(dividerColor: Colors.transparent),
+                child: _ReceiptFold(
+                  initiallyExpanded:
+                      !admin ||
+                      history.any(
+                        (item) => item.status == 'pending' || item.awaitingCash,
+                      ),
+                  ink: gloss.ink,
+                  children: [
+                    if (history.isEmpty && admin)
+                      Text(
+                        CollectionsText.noHistory,
+                        style: cairo(11, 600, color: gloss.ink),
+                      ),
+                    for (final item in history)
+                      _SubmissionLine(
+                        assignment: assignment,
+                        submission: item,
+                        money: money,
+                        admin: admin,
+                      ),
+                    if (!admin)
+                      _EmployeeActions(assignment: assignment, money: money),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(
+              height: 5,
+              child: ColoredBox(color: Color(0xFFE7AE12)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The words on a website collection card, from fields the server already
+/// sends. No status is invented.
+String _collectionStateLabel(CollectionAssignmentDto card) {
+  if (card.latestStatus == 'rejected' && !card.hasPending) {
+    return 'رُفضت العملية — التوجيه مستمر';
+  }
+  if (card.hasPending) return 'يحتاج مراجعة';
+  if (card.cashOutstandingCount > 0) return 'نقدية لم تُسلّم';
+  if (card.latestCashReceivedAt != null) return 'تم تسليم النقدية';
+  return 'جاهز للمتابعة';
+}
+
+/// «تفاصيل الاستلامات»: ◂ while closed, ▾ while open, on the right of the words.
+class _ReceiptFold extends StatefulWidget {
+  const _ReceiptFold({
+    required this.initiallyExpanded,
+    required this.ink,
+    required this.children,
+  });
+
+  final bool initiallyExpanded;
+  final Color ink;
+  final List<Widget> children;
+
+  @override
+  State<_ReceiptFold> createState() => _ReceiptFoldState();
+}
+
+class _ReceiptFoldState extends State<_ReceiptFold> {
+  late bool _open = widget.initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      initiallyExpanded: widget.initiallyExpanded,
+      onExpansionChanged: (open) => setState(() => _open = open),
+      showTrailingIcon: false,
+      minTileHeight: 34,
+      visualDensity: VisualDensity.compact,
+      tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+      childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _open ? Icons.keyboard_arrow_down : Icons.chevron_left,
+            size: 18,
+            color: widget.ink,
+            textDirection: TextDirection.ltr,
+          ),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'تفاصيل الاستلامات',
+                style: cairo(11, 800, color: widget.ink),
+              ),
+            ),
+          ),
+        ],
+      ),
+      children: widget.children,
     );
   }
 }
 
 class _SubmissionLine extends ConsumerWidget {
   const _SubmissionLine({
+    required this.assignment,
     required this.submission,
-    required this.title,
     required this.money,
-    required this.gloss,
     required this.admin,
   });
 
+  final CollectionAssignmentDto assignment;
   final CollectionSubmissionDto submission;
-  final String title;
   final MoneyFormatter money;
-  final Gloss gloss;
   final bool admin;
 
   @override
@@ -1564,66 +1984,191 @@ class _SubmissionLine extends ConsumerWidget {
         admin && permissions.canDo(ManagementAction.collectionsCashReceived);
     final pending = submission.status == 'pending';
     final awaiting = submission.awaitingCash;
+    final transactionId = (submission.approvedTransactionId ?? '').trim();
+    final cancel =
+        admin &&
+        permissions.isAdminRole &&
+        awaiting &&
+        transactionId.isNotEmpty &&
+        !submission.currencyMismatch;
+    final received = submission.cashReceivedAt != null;
+    final formatted = money.formatOrDash(submission.amountUnits, Currency.lyd);
+    final name = (submission.customerName ?? '').trim().isEmpty
+        ? assignment.customerName
+        : submission.customerName!.trim();
+    final who = (submission.submittedByName ?? '').trim();
+    final kind = submission.mode == 'full'
+        ? CollectionsText.fullReceipt
+        : CollectionsText.partialReceipt;
+    final stamp = _receiptStamp(submission.createdAt);
+    const ink = Color(0xFF211600);
+    const muted = Color(0xFF78716C);
+    Widget pill(Color fill, Color ink, Color edge, Widget child) {
+      return _pillAction(fill, ink, edge, child);
+    }
+
+    final actions = <Widget>[
+      if (decide && pending) ...[
+        pill(
+          const Color(0xFFE4F3E9),
+          const Color(0xFF145535),
+          const Color(0xFFABCAB7),
+          GuardedMutation(
+            buttonKey: Key('approve-${submission.id}'),
+            inputs: 'approve:${submission.id}',
+            label: AppStrings.approve,
+            onVersionConflict: () => ref.invalidate(collectionsProvider),
+            onSubmit: (meta) => _decide(ref, CollectionDecision.approve, meta),
+          ),
+        ),
+        const SizedBox(width: 6),
+        pill(
+          const Color(0xFFFBE8E7),
+          const Color(0xFF8F2831),
+          const Color(0xFFDFB3B7),
+          GuardedMutation(
+            buttonKey: Key('reject-${submission.id}'),
+            inputs: 'reject:${submission.id}',
+            label: AppStrings.reject,
+            onVersionConflict: () => ref.invalidate(collectionsProvider),
+            onSubmit: (meta) => _decide(ref, CollectionDecision.reject, meta),
+          ),
+        ),
+      ],
+      if (cash && awaiting)
+        pill(
+          const Color(0xFFE4F3E9),
+          const Color(0xFF145535),
+          const Color(0xFFABCAB7),
+          GuardedMutation(
+            buttonKey: Key('cash-${submission.id}'),
+            inputs: 'cash:${submission.id}',
+            label: CollectionsText.confirmCash,
+            reportErrorInline: false,
+            onVersionConflict: () => ref.invalidate(collectionsProvider),
+            onSubmit: (meta) async {
+              await ref
+                  .read(apiLayerProvider)
+                  .collections
+                  .markCashReceived(submission.id, meta);
+              ref.invalidate(collectionsProvider);
+              return null;
+            },
+          ),
+        ),
+      if (cash && awaiting && cancel) const SizedBox(width: 6),
+      if (cancel)
+        pill(
+          const Color(0xFFFBE8E7),
+          const Color(0xFF8F2831),
+          const Color(0xFFDFB3B7),
+          FilledButton(
+            key: Key('cancel-approval-${submission.id}'),
+            onPressed: () => _cancelApproval(context, ref, transactionId),
+            child: const Text(CollectionsText.cancelApproval),
+          ),
+        ),
+    ];
     return Padding(
       key: Key('submission-${submission.id}'),
-      padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.sm),
-      child: _HistoryLine(
-        gloss: gloss,
-        title: title,
-        amount: money.formatOrDash(submission.amountUnits, Currency.lyd),
-        status: pending
-            ? _Badge(text: CollectionsText.awaitingApproval, gloss: gloss)
-            : awaiting
-            ? _AwaitingCash(
-                id: submission.id,
-                gloss: gloss,
-                // Employee wording from the website's employee section.
-                text: admin
-                    ? CollectionsText.awaitingCash
-                    : CollectionsText.waitingCashFromAdmin,
-              )
-            : submission.cashReceivedAt != null
-            ? _Badge(
-                key: Key('cash-done-${submission.id}'),
-                text: CollectionsText.cashReceived,
-                gloss: gloss,
-              )
-            : null,
-        actions: [
-          if (decide && pending) ...[
-            GuardedMutation(
-              buttonKey: Key('approve-${submission.id}'),
-              inputs: 'approve:${submission.id}',
-              label: AppStrings.approve,
-              onVersionConflict: () => ref.invalidate(collectionsProvider),
-              onSubmit: (meta) =>
-                  _decide(ref, CollectionDecision.approve, meta),
-            ),
-            GuardedMutation(
-              buttonKey: Key('reject-${submission.id}'),
-              inputs: 'reject:${submission.id}',
-              label: AppStrings.reject,
-              filled: false,
-              onVersionConflict: () => ref.invalidate(collectionsProvider),
-              onSubmit: (meta) => _decide(ref, CollectionDecision.reject, meta),
-            ),
-          ],
-          if (cash && awaiting)
-            GuardedMutation(
-              buttonKey: Key('cash-${submission.id}'),
-              inputs: 'cash:${submission.id}',
-              label: CollectionsText.cashReceived,
-              onVersionConflict: () => ref.invalidate(collectionsProvider),
-              onSubmit: (meta) async {
-                await ref
-                    .read(apiLayerProvider)
-                    .collections
-                    .markCashReceived(submission.id, meta);
-                ref.invalidate(collectionsProvider);
-                return null;
-              },
-            ),
-        ],
+      padding: const EdgeInsetsDirectional.only(bottom: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE7E5E4)),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const ColoredBox(
+                color: Color(0xFFE7AE12),
+                child: SizedBox(height: 3, width: double.infinity),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: cairo(13, 800, color: ink),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _lydFigure(formatted),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      who.isEmpty ? kind : '$who · $kind',
+                      style: cairo(10, 600, color: muted),
+                    ),
+                    if (stamp.isNotEmpty)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Text(
+                            stamp,
+                            style: cairo(10, 600, color: muted),
+                          ),
+                        ),
+                      ),
+                    if (awaiting)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: _AwaitingCash(
+                          id: submission.id,
+                          text: admin
+                              ? CollectionsText.awaitingCash
+                              : CollectionsText.waitingCashFromAdmin,
+                        ),
+                      ),
+                    if (actions.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: actions,
+                          ),
+                        ),
+                      ),
+                    ] else if (received || submission.status == 'rejected')
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: _neutralPill(
+                          submission.status == 'rejected'
+                              ? CollectionsText.rejected
+                              : CollectionsText.cashReceived,
+                          key: received
+                              ? Key('cash-done-${submission.id}')
+                              : null,
+                        ),
+                      )
+                    else if (pending)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: _neutralPill(CollectionsText.awaitingApproval),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1639,6 +2184,42 @@ class _SubmissionLine extends ConsumerWidget {
         .decide(submission.id, decision, meta: meta);
     ref.invalidate(collectionsProvider);
     return null;
+  }
+
+  Future<void> _cancelApproval(
+    BuildContext context,
+    WidgetRef ref,
+    String transactionId,
+  ) async {
+    final reason = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => _CancelApprovalDialog(
+        name: (submission.customerName ?? '').trim().isEmpty
+            ? assignment.customerName
+            : submission.customerName!.trim(),
+        amount: money.formatOrDash(submission.amountUnits, Currency.lyd),
+      ),
+    );
+    if (reason == null || !context.mounted) return;
+    final meta = MutationMeta();
+    try {
+      await ref
+          .read(apiLayerProvider)
+          .collections
+          .cancelApproval(
+            submission.id,
+            reason: reason,
+            expectedTransactionId: transactionId,
+            meta: meta,
+          );
+      ref.invalidate(collectionsProvider);
+    } catch (error) {
+      if (!context.mounted) return;
+      final failure = ref.read(errorHandlerProvider).toFailure(error);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(failureText(failure))));
+    }
   }
 }
 
@@ -1693,59 +2274,69 @@ class _EmployeeActions extends ConsumerWidget {
       );
     }
 
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
+    return Row(
       children: [
-        if (blocked)
-          FilledButton(
-            key: Key('full-${assignment.id}'),
-            onPressed: null,
-            child: const Text(CollectionsText.fullReceipt),
-          )
-        else
-          GuardedMutation(
-            buttonKey: Key('full-${assignment.id}'),
-            inputs: 'full:${assignment.id}:$balance',
-            label: CollectionsText.fullReceipt,
-            confirmText: CollectionsText.fullConfirm(
-              money.formatOrDash(assignment.balanceUnits, Currency.lyd),
-            ),
-            onVersionConflict: () => ref.invalidate(collectionsProvider),
-            // 537f073 expects the current debt with a full receipt and
-            // refuses it if the debt changed (FULL_AMOUNT_CHANGED).
-            onSubmit: (_) => _send(context, ref, 'full', balance),
-          ),
-        OutlinedButton(
-          key: Key('submit-${assignment.id}'),
-          onPressed: blocked || !online
-              ? null
-              : () => showAppForm<void>(
-                  context,
-                  PartialReceiptForm(assignment: assignment),
+        Expanded(
+          child: blocked
+              ? _whiteAction(
+                  key: Key('full-${assignment.id}'),
+                  label: CollectionsText.fullReceipt,
+                  onPressed: null,
+                )
+              : _siteAction(
+                  const Color(0xFFFFFFFF),
+                  const Color(0xFF174D43),
+                  GuardedMutation(
+                    buttonKey: Key('full-${assignment.id}'),
+                    inputs: 'full:${assignment.id}:$balance',
+                    label: CollectionsText.fullReceipt,
+                    confirmText: CollectionsText.fullConfirm(
+                      money.formatOrDash(assignment.balanceUnits, Currency.lyd),
+                    ),
+                    onVersionConflict: () =>
+                        ref.invalidate(collectionsProvider),
+                    // 537f073 expects the current debt with a full receipt and
+                    // refuses it if the debt changed (FULL_AMOUNT_CHANGED).
+                    onSubmit: (_) => _send(context, ref, 'full', balance),
+                  ),
                 ),
-          child: const Text(CollectionsText.partialReceipt),
         ),
-        OutlinedButton.icon(
-          key: Key('call-${assignment.id}'),
-          onPressed: inactive || phone == null || phone.isEmpty
-              ? null
-              : () async {
-                  // Opens the dialer (tel:), as the website's link does.
-                  // Without a dialer the number is copied instead.
-                  final dialed = await ref.read(phoneDialerProvider)(phone);
-                  if (dialed) return;
-                  await Clipboard.setData(ClipboardData(text: phone));
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(CollectionsText.phoneCopied),
-                      ),
-                    );
-                  }
-                },
-          icon: const Icon(Icons.phone_outlined, size: 16),
-          label: const Text(CollectionsText.call),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _whiteAction(
+            key: Key('submit-${assignment.id}'),
+            label: CollectionsText.partialReceipt,
+            onPressed: blocked || !online
+                ? null
+                : () => showAppForm<void>(
+                    context,
+                    PartialReceiptForm(assignment: assignment),
+                  ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _whiteAction(
+            key: Key('call-${assignment.id}'),
+            label: CollectionsText.call,
+            icon: Icons.phone_outlined,
+            onPressed: inactive || phone == null || phone.isEmpty
+                ? null
+                : () async {
+                    // Opens the dialer (tel:), as the website's link does.
+                    // Without a dialer the number is copied instead.
+                    final dialed = await ref.read(phoneDialerProvider)(phone);
+                    if (dialed) return;
+                    await Clipboard.setData(ClipboardData(text: phone));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(CollectionsText.phoneCopied),
+                        ),
+                      );
+                    }
+                  },
+          ),
         ),
       ],
     );
@@ -1780,20 +2371,72 @@ class _EmployeeActions extends ConsumerWidget {
 
 // --------------------------------------------------------------- pieces
 
+/// White (or solid) action on a coloured collection card, matching the
+/// website's `.collection-card button` so the label stays readable.
+Widget _siteAction(Color background, Color foreground, Widget child) {
+  return Theme(
+    data: ThemeData(
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: background,
+          foregroundColor: foreground,
+          disabledBackgroundColor: background.withValues(alpha: 0.55),
+          disabledForegroundColor: foreground.withValues(alpha: 0.7),
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          textStyle: cairo(11, 800),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+    ),
+    child: child,
+  );
+}
+
+Widget _whiteAction({
+  required Key key,
+  required String label,
+  required VoidCallback? onPressed,
+  IconData? icon,
+}) {
+  return FilledButton(
+    key: key,
+    style: FilledButton.styleFrom(
+      backgroundColor: const Color(0xFFFFFFFF),
+      foregroundColor: const Color(0xFF174D43),
+      disabledBackgroundColor: const Color(0xFFE7E5E4),
+      disabledForegroundColor: const Color(0xFF174D43).withValues(alpha: 0.45),
+      minimumSize: const Size(0, 44),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      textStyle: cairo(11, 800),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    ),
+    onPressed: onPressed,
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[Icon(icon, size: 14), const SizedBox(width: 3)],
+          Text(label),
+        ],
+      ),
+    ),
+  );
+}
+
 class _CardHeader extends StatelessWidget {
   const _CardHeader({
     required this.name,
     required this.amount,
     required this.gloss,
     this.subtitle,
-    this.amountKey,
   });
 
   final String name;
   final String? subtitle;
   final String amount;
   final Gloss gloss;
-  final Key? amountKey;
 
   /// Name, the employee, then the balance on its own line at the start, so
   /// a long name never pushes the figure off a narrow card.
@@ -1814,7 +2457,6 @@ class _CardHeader extends StatelessWidget {
           alignment: AlignmentDirectional.centerStart,
           child: MoneyText(
             amount,
-            key: amountKey,
             style: context.textExtras.amount.copyWith(color: gloss.amount),
           ),
         ),
@@ -1830,7 +2472,6 @@ class _HistoryLine extends StatelessWidget {
     this.amount,
     this.trailing,
     this.status,
-    this.actions = const [],
   });
 
   final Gloss gloss;
@@ -1838,7 +2479,6 @@ class _HistoryLine extends StatelessWidget {
   final String? amount;
   final String? trailing;
   final Widget? status;
-  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
@@ -1872,15 +2512,6 @@ class _HistoryLine extends StatelessWidget {
                 ?status,
               ],
             ),
-            if (actions.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xs),
-              _ActionSurface(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: actions,
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -1891,23 +2522,171 @@ class _HistoryLine extends StatelessWidget {
 class _AwaitingCash extends StatelessWidget {
   const _AwaitingCash({
     required this.id,
-    required this.gloss,
+    this.gloss,
     this.text = CollectionsText.awaitingCash,
   });
 
   final String id;
-  final Gloss gloss;
+  final Gloss? gloss;
   final String text;
 
   @override
   Widget build(BuildContext context) {
+    if (gloss == null) {
+      return Padding(
+        key: ValueKey('awaiting-cash-$id'),
+        padding: EdgeInsets.zero,
+        child: Text(
+          text,
+          style: cairo(10, 600, color: const Color(0xFF78716C)),
+        ),
+      );
+    }
     return _Badge(
       key: ValueKey('awaiting-cash-$id'),
       text: text,
-      gloss: gloss,
+      gloss: gloss!,
       strong: true,
     );
   }
+}
+
+/// Amount with a smaller «د.ل», kept LTR so the unit stays on the number.
+Widget _lydFigure(String formatted) {
+  final cut = formatted.lastIndexOf(' ');
+  final number = cut < 0 ? formatted : formatted.substring(0, cut);
+  final unit = cut < 0 ? '' : formatted.substring(cut);
+  return Directionality(
+    textDirection: TextDirection.ltr,
+    child: Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: number,
+            style: cairo(16, 800, color: const Color(0xFF211600)),
+          ),
+          TextSpan(
+            text: unit,
+            style: cairo(10, 700, color: const Color(0xFF211600)),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Light fill, dark label, stadium shape. The action itself is unchanged.
+Widget _pillAction(Color fill, Color ink, Color edge, Widget child) {
+  return Theme(
+    data: ThemeData(
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: fill,
+          foregroundColor: ink,
+          disabledBackgroundColor: fill.withValues(alpha: 0.55),
+          disabledForegroundColor: ink.withValues(alpha: 0.7),
+          minimumSize: const Size(0, 34),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          textStyle: cairo(11, 800),
+          shape: const StadiumBorder(),
+          side: BorderSide(color: edge),
+        ),
+      ),
+    ),
+    child: child,
+  );
+}
+
+Widget _neutralPill(String text, {Key? key}) {
+  return DecoratedBox(
+    key: key,
+    decoration: BoxDecoration(
+      color: const Color(0xFFF4F4F5),
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(color: const Color(0xFFE7E5E4)),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      child: Text(text, style: cairo(10, 700, color: const Color(0xFF44403C))),
+    ),
+  );
+}
+
+/// The website's cancel dialog: reason of 5–500 characters, then the POST.
+class _CancelApprovalDialog extends StatefulWidget {
+  const _CancelApprovalDialog({required this.name, required this.amount});
+
+  final String name;
+  final String amount;
+
+  @override
+  State<_CancelApprovalDialog> createState() => _CancelApprovalDialogState();
+}
+
+class _CancelApprovalDialogState extends State<_CancelApprovalDialog> {
+  final _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = _reason.text.trim().length >= 5;
+    return AlertDialog(
+      title: const Text(CollectionsText.cancelApprovalTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('${widget.name} — ${widget.amount}'),
+          const SizedBox(height: 8),
+          const Text(CollectionsText.cancelApprovalBody),
+          const SizedBox(height: 8),
+          TextField(
+            key: const Key('cancel-approval-reason'),
+            controller: _reason,
+            autofocus: true,
+            maxLength: 500,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: CollectionsText.cancelApprovalReason,
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(AppStrings.back),
+        ),
+        FilledButton(
+          key: const Key('confirm-cancel-approval'),
+          onPressed: ready
+              ? () => Navigator.pop(context, _reason.text.trim())
+              : null,
+          child: const Text(CollectionsText.cancelApprovalConfirm),
+        ),
+      ],
+    );
+  }
+}
+
+/// `2026/11/10، 3:43 م` from the receipt's own timestamp.
+String _receiptStamp(DateTime? at) {
+  if (at == null) return '';
+  final local = at.toLocal();
+  final month = local.month.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  final hour = local.hour;
+  final clock = hour % 12 == 0 ? 12 : hour % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final mark = hour < 12 ? 'ص' : 'م';
+  return '${local.year}/$month/$day، $clock:$minute $mark';
 }
 
 class _Badge extends StatelessWidget {
@@ -1938,30 +2717,6 @@ class _Badge extends StatelessWidget {
           text,
           style: cairo(11, strong ? 800 : 600, color: gloss.ink),
         ),
-      ),
-    );
-  }
-}
-
-/// Buttons sit on the page surface, not on the coloured card, so they keep
-/// the theme's contrast on every card tone.
-class _ActionSurface extends StatelessWidget {
-  const _ActionSurface({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final look = context.look;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: look.card,
-        borderRadius: BorderRadius.circular(AppRadii.md),
-        border: Border.all(color: look.cardBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.sm),
-        child: child,
       ),
     );
   }

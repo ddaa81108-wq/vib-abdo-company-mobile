@@ -50,7 +50,13 @@ void main() {
     await expectLater(
       api.collections.closeDay(batchId: 'b_1', meta: MutationMeta()),
       throwsA(
-        isA<ForbiddenException>().having((e) => e.message, 'message', message),
+        isA<ForbiddenException>()
+            .having((e) => e.code, 'code', 'PERMISSION_DENIED')
+            .having(
+              (e) => e.message,
+              'message',
+              'ليست لديك صلاحية لهذه العملية.',
+            ),
       ),
     );
     await expectLater(

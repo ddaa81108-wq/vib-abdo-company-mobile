@@ -148,8 +148,11 @@ abstract final class AppStrings {
       'تأكيد حفظ اليوم؟ تُرسل القيم كما أدخلتها، وما يظهر بعد الحفظ هو رد الخادم.';
   static const openingConfirm =
       'تأكيد حفظ الرصيد الافتتاحي؟ يُرسل المبلغ كما أدخلته، والرصيد الجديد يظهر من الخادم فقط.';
-  static const openDayCorrection = 'فتح تصحيح اليوم';
-  static const closeDayCorrection = 'إغلاق تصحيح اليوم';
+  static const openDayCorrection = 'تعديل اليوم';
+  static const closeDayCorrection = 'إنهاء تعديل اليوم';
+  static const purchaseToday = 'اليوم الحالي';
+  static const purchaseCarried = 'مُرحّل';
+  static const purchaseEditing = 'مفتوح للتعديل';
   static const openCorrectionConfirm =
       'تأكيد فتح تصحيح اليوم؟ بعد التأكيد يُرسل الطلب كما هو، وتظهر حالة اليوم من الخادم.';
   static const closeCorrectionConfirm =

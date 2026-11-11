@@ -117,20 +117,22 @@ List<String> unreadableText(WidgetTester tester, {double minRatio = 3}) {
       continue;
     }
     if (_disabled(element)) continue;
-    final foreground = _textColor(element, text);
-    if (foreground == null || foreground.a == 0) continue;
     final background = _backgroundOf(element);
     if (background == null) continue;
-    final painted = foreground.a >= 1
-        ? foreground
-        : _composite(foreground, background);
-    final ratio = _contrast(painted, background);
-    if (ratio < minRatio) {
-      failures.add(
-        '"${_clip(sample)}" '
-        '${_hex(painted)} on ${_hex(background)} '
-        '${ratio.toStringAsFixed(2)}:1',
-      );
+    for (final foreground in _foregrounds(element, text)) {
+      if (foreground.a == 0) continue;
+      final painted = foreground.a >= 1
+          ? foreground
+          : _composite(foreground, background);
+      final ratio = _contrast(painted, background);
+      if (ratio < minRatio) {
+        failures.add(
+          '"${_clip(sample)}" '
+          '${_hex(painted)} on ${_hex(background)} '
+          '${ratio.toStringAsFixed(2)}:1',
+        );
+        break;
+      }
     }
   }
   return failures;
@@ -159,12 +161,39 @@ bool _disabled(Element element) {
   return disabled;
 }
 
-Color? _textColor(Element element, Text text) {
-  final direct = text.style?.color;
-  if (direct != null) return direct;
-  final span = text.textSpan;
-  if (span is TextSpan && span.style?.color != null) return span.style!.color;
-  return DefaultTextStyle.of(element).style.color;
+/// Every colour actually painted by [text]. A rich span with its own colour
+/// is measured as that colour; a span without one inherits the parent, then
+/// [DefaultTextStyle]. The root span's missing colour is not a substitute
+/// for a coloured child (that used to score cream-card figures as the dark
+/// theme's light grey).
+List<Color> _foregrounds(Element element, Text text) {
+  final fallback = DefaultTextStyle.of(element).style.color;
+  final colors = <Color>[];
+  void add(Color? color) {
+    final resolved = color ?? fallback;
+    if (resolved != null) colors.add(resolved);
+  }
+
+  if (text.textSpan == null) {
+    add(text.style?.color);
+    return colors;
+  }
+
+  void walk(InlineSpan span, Color? inherited) {
+    if (span is! TextSpan) return;
+    final color = span.style?.color ?? inherited;
+    final content = span.text;
+    if (content != null && content.trim().isNotEmpty) add(color);
+    final children = span.children;
+    if (children == null) return;
+    for (final child in children) {
+      walk(child, color);
+    }
+  }
+
+  walk(text.textSpan!, text.style?.color);
+  if (colors.isEmpty) add(text.style?.color);
+  return colors;
 }
 
 Color? _backgroundOf(Element start) {

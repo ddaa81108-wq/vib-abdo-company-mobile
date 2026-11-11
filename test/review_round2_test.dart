@@ -87,8 +87,8 @@ void main() {
 
       expect(find.byKey(const Key('screen-purchases')), findsOneWidget);
       expect(find.text(AppStrings.retry), findsNothing);
-      expect(find.textContaining('50,000'), findsWidgets);
-      expect(find.text(MoneyValue.invalidLabel), findsWidgets);
+      expect(find.byKey(const Key('purchases-lifetime')), findsNothing);
+      expect(find.textContaining('50,000'), findsNothing);
       expect(find.text('1 د.ل'), findsNothing);
       expect(find.textContaining('47,447'), findsNothing);
     },

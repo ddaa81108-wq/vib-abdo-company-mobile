@@ -80,24 +80,11 @@ void main() {
         () => layer.purchases.list(PurchaseBook.alBayan),
       );
       final totals = book.registerTotals!;
+      expect(find.byKey(const Key('purchases-lifetime')), findsNothing);
       expect(
         _inside(
-          const Key('purchases-lifetime'),
-          _fmt(money, totals.remainingUnits, Currency.lyd),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        _inside(
-          const Key('purchases-lifetime'),
-          _fmt(money, totals.resultUnits, Currency.lyd),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        _inside(
-          const Key('purchases-lifetime'),
-          _fmt(money, totals.paidUnits, Currency.lyd),
+          const Key('purchase-total-debt'),
+          _fmt(money, book.day?.totalDebtUnits, Currency.lyd),
         ),
         findsOneWidget,
       );

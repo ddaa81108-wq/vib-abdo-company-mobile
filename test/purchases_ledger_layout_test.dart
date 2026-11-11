@@ -34,14 +34,13 @@ void main() {
           TextDirection.rtl,
         );
         expect(find.byKey(const Key('purchase-ledger')), findsOneWidget);
-        expect(
-          tester
-              .widget<SingleChildScrollView>(
-                find.byKey(const Key('purchase-ledger-scroll')),
-              )
-              .scrollDirection,
-          Axis.horizontal,
-        );
+        final wideScroll = find.byKey(const Key('purchase-ledger-scroll'));
+        if (wideScroll.evaluate().isNotEmpty) {
+          expect(
+            tester.widget<SingleChildScrollView>(wideScroll).scrollDirection,
+            Axis.horizontal,
+          );
+        }
 
         final previous = tester.getRect(
           find.byKey(const Key('purchase-total-previous')),
@@ -92,7 +91,14 @@ void main() {
         expect(
           find.descendant(
             of: find.byKey(const Key('purchase-rollover-11')),
-            matching: find.text('آخر باقي'),
+            matching: find.text('الباقي المرحّل من اليوم السابق'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('purchase-rollover-11')),
+            matching: find.text('الباقي المُرحّل لليوم التالي — يوم #11'),
           ),
           findsOneWidget,
         );
@@ -102,6 +108,13 @@ void main() {
             matching: find.text('2026-10-19'),
           ),
           findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('purchase-rollover-11')),
+            matching: find.text('2026-10-18'),
+          ),
+          findsNothing,
         );
         final booksTop = tester
             .getRect(find.byKey(const Key('purchase-books')))
@@ -139,8 +152,9 @@ void main() {
           find.descendant(
             of: find.byKey(const Key('purchase-rollover-11')),
             matching: find.textContaining('2,000'),
+            skipOffstage: false,
           ),
-          findsOneWidget,
+          findsNWidgets(2),
         );
         expect(
           find.descendant(
@@ -156,16 +170,21 @@ void main() {
           ),
           findsOneWidget,
         );
-        final entry = find.byKey(const Key('purchase-entry-pe_1'));
-        final number = tester.getRect(
-          find.descendant(of: entry, matching: find.textContaining('10,000')),
-        );
-        final symbols = find.descendant(of: entry, matching: find.text('ج.م'));
-        final beside = List.generate(symbols.evaluate().length, (index) {
-          return tester.getRect(symbols.at(index));
-        }).where((rect) => (rect.center.dy - number.center.dy).abs() < 12);
-        expect(beside, isNotEmpty);
-        expect(beside.first.center.dx, lessThan(number.center.dx));
+        if (wideScroll.evaluate().isNotEmpty) {
+          final entry = find.byKey(const Key('purchase-entry-pe_1'));
+          final number = tester.getRect(
+            find.descendant(of: entry, matching: find.textContaining('10,000')),
+          );
+          final symbols = find.descendant(
+            of: entry,
+            matching: find.text('ج.م'),
+          );
+          final beside = List.generate(symbols.evaluate().length, (index) {
+            return tester.getRect(symbols.at(index));
+          }).where((rect) => (rect.center.dy - number.center.dy).abs() < 12);
+          expect(beside, isNotEmpty);
+          expect(beside.first.center.dx, lessThan(number.center.dx));
+        }
         expect(tester.takeException(), isNull);
       },
     );

@@ -35,6 +35,7 @@ void main() {
       Key('approve-sb_1'),
       Key('reject-sb_1'),
       Key('cash-sb_2'),
+      Key('cancel-approval-sb_2'),
       Key('close-batch'),
       Key('unlinked-link-ur_1'),
       Key('unlinked-new-ur_1'),
@@ -58,6 +59,7 @@ void main() {
     await expectPresent(tester, const [
       Key('approve-sb_1'),
       Key('reject-sb_1'),
+      Key('cancel-approval-sb_2'),
       Key('unlinked-link-ur_1'),
       Key('unlinked-new-ur_1'),
       Key('unlinked-reject-ur_1'),
@@ -66,10 +68,7 @@ void main() {
       find.byKey(const Key('cash-sb_2'), skipOffstage: false),
       findsNothing,
     );
-    expect(
-      find.byKey(const Key('close-batch'), skipOffstage: false),
-      findsNothing,
-    );
+    expect(find.byKey(const Key('close-batch')), findsOneWidget);
     expect(
       find.byKey(const Key('awaiting-cash-sb_2'), skipOffstage: false),
       findsOneWidget,
@@ -90,6 +89,7 @@ void main() {
       Key('approve-sb_1'),
       Key('reject-sb_1'),
       Key('cash-sb_2'),
+      Key('cancel-approval-sb_2'),
       Key('close-batch'),
       Key('unlinked-link-ur_1'),
       Key('unlinked-new-ur_1'),
@@ -102,7 +102,7 @@ void main() {
     await reveal(tester, const Key('submit-as_2'));
     expect(
       tester
-          .widget<OutlinedButton>(find.byKey(const Key('submit-as_2')))
+          .widget<FilledButton>(find.byKey(const Key('submit-as_2')))
           .onPressed,
       isNull,
     );
@@ -173,7 +173,13 @@ void main() {
             await reveal(tester, const Key('assignment-as_1'));
             expectAmountInside(tester, const Key('assignment-as_1'), '320 د.ل');
             await reveal(tester, const Key('submission-sb_2'));
-            expectAmountInside(tester, const Key('submission-sb_2'), '250 د.ل');
+            expectAmountInside(
+              tester,
+              const Key('submission-sb_2'),
+              '250 د.ل',
+              onTheRight: false,
+              requireLtr: true,
+            );
             if (unlinkedTab != null) {
               await reveal(tester, unlinkedTab);
               await tester.tap(find.byKey(unlinkedTab));
@@ -199,6 +205,7 @@ void main() {
         Key('approve-sb_1'),
         Key('reject-sb_1'),
         Key('cash-sb_2'),
+        Key('cancel-approval-sb_2'),
         Key('close-batch'),
         Key('unlinked-link-ur_1'),
         Key('unlinked-reject-ur_1'),
@@ -400,27 +407,49 @@ Future<void> expectTheme(
     matching: find.byType(Text),
   );
   expect(tester.widget<Text>(label).data, 'ينتظر استلام النقدية');
-  expectAmountInside(tester, const Key('submission-sb_2'), '250 د.ل');
+  expectAmountInside(
+    tester,
+    const Key('submission-sb_2'),
+    '250 د.ل',
+    onTheRight: false,
+    requireLtr: true,
+  );
   await expectFits(tester, const Key('cash-sb_2'), width);
   await reveal(tester, const Key('unlinked-card-ur_1'));
   expect(find.byKey(const Key('unlinked-card-ur_2')), findsNothing);
   expect(tester.takeException(), isNull);
 }
 
-void expectAmountInside(WidgetTester tester, Key cardKey, String amount) {
+void expectAmountInside(
+  WidgetTester tester,
+  Key cardKey,
+  String amount, {
+  bool onTheRight = true,
+  bool requireLtr = false,
+}) {
   final card = tester.getRect(find.byKey(cardKey));
   final figure = find.descendant(
     of: find.byKey(cardKey),
     matching: find.text(amount),
   );
-  expect(figure, findsOneWidget);
-  final rect = tester.getRect(figure);
-  expect(rect.width, greaterThan(0));
-  expect(rect.height, greaterThan(0));
-  expect(rect.left, greaterThanOrEqualTo(card.left - 1));
-  expect(rect.right, lessThanOrEqualTo(card.right + 1));
-  expect(card.right - rect.right, lessThan(card.width / 2));
-  expect(Directionality.of(tester.element(figure)), TextDirection.ltr);
+  expect(figure, findsWidgets);
+  final count = figure.evaluate().length;
+  var onRight = false;
+  var onLeft = false;
+  for (var i = 0; i < count; i++) {
+    final one = figure.at(i);
+    final rect = tester.getRect(one);
+    expect(rect.width, greaterThan(0));
+    expect(rect.height, greaterThan(0));
+    expect(rect.left, greaterThanOrEqualTo(card.left - 1));
+    expect(rect.right, lessThanOrEqualTo(card.right + 1));
+    if (requireLtr) {
+      expect(Directionality.of(tester.element(one)), TextDirection.ltr);
+    }
+    if (card.right - rect.right < card.width / 2) onRight = true;
+    if (rect.left - card.left < card.width / 2) onLeft = true;
+  }
+  expect(onTheRight ? onRight : onLeft, isTrue);
 }
 
 /// Payroll sits behind «المرتبات»: [heading] shows there, [other] never.
