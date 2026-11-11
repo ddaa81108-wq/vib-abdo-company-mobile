@@ -65,8 +65,9 @@ void main() {
 
     await go(tester, '/purchases');
     expect(find.byKey(const Key('screen-purchases')), findsOneWidget);
+    expect(find.byKey(const Key('purchases-lifetime')), findsNothing);
     expect(
-      _inside(const Key('purchases-lifetime'), '2,553 د.ل'),
+      _inside(const Key('purchase-total-debt'), '2,553 د.ل'),
       findsOneWidget,
     );
     expect(find.text('553 د.ل'), findsWidgets);

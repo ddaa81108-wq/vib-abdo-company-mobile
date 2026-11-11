@@ -51,8 +51,14 @@ void main() {
     expect(
       find.descendant(
         of: rollover,
-        matching: find.byTooltip('الباقي المرحّل من اليوم السابق'),
-        skipOffstage: false,
+        matching: find.text('الباقي المرحّل من اليوم السابق'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: rollover,
+        matching: find.text('الباقي المُرحّل لليوم التالي — يوم #11'),
       ),
       findsOneWidget,
     );
@@ -65,8 +71,8 @@ void main() {
       findsNothing,
     );
     expect(
-      find.descendant(of: rollover, matching: find.textContaining('يوم #')),
-      findsNothing,
+      find.descendant(of: rollover, matching: find.textContaining('يوم #11')),
+      findsOneWidget,
     );
     expect(
       find.descendant(
@@ -79,7 +85,44 @@ void main() {
     final gap = tester.getRect(rollover);
     final today = tester.getRect(find.byKey(const Key('purchase-entry-pe_1')));
     expect(gap.bottom, lessThanOrEqualTo(today.top + 1));
-    expect(gap.height, lessThan(56));
+    expect(gap.height, lessThan(120));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('purchases open on the last day with totals underneath', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(360, 800));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+
+    expect(find.text('إجماليات السجل من البداية'), findsNothing);
+    expect(find.byKey(const Key('purchases-lifetime')), findsNothing);
+
+    final header = tester.getRect(find.byKey(const Key('purchase-ledger')));
+    final latest = tester.getRect(
+      find.byKey(const ValueKey('purchase-inline-new')),
+    );
+    final view = tester.view.physicalSize / tester.view.devicePixelRatio;
+    expect(header.top, lessThan(200));
+    expect(latest.bottom, lessThanOrEqualTo(view.height + 1));
+    expect(latest.top, greaterThan(header.bottom));
+
+    final totals = tester.getRect(find.byKey(const Key('purchase-day-12')));
+    expect(totals.top, greaterThanOrEqualTo(latest.bottom - 1));
+
+    final openLabel = tester.getRect(
+      find.text('الباقي المرحّل من اليوم السابق'),
+    );
+    final closeLabel = tester.getRect(
+      find.text('الباقي المُرحّل لليوم التالي — يوم #11'),
+    );
+    for (final rect in [openLabel, closeLabel]) {
+      expect(rect.left, greaterThanOrEqualTo(-1));
+      expect(rect.right, lessThanOrEqualTo(view.width + 1));
+    }
+    expect(find.byKey(const Key('purchase-carry-open-11')), findsOneWidget);
+    expect(find.byKey(const Key('purchase-carry-close-11')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -102,7 +145,7 @@ void main() {
       ),
     );
     final amount = tester.getRect(
-      find.byKey(const Key('purchase-carry-cell-11')),
+      find.byKey(const Key('purchase-carry-open-11')),
     );
     expect((amount.center.dx - header.center.dx).abs(), lessThan(4));
     final date = tester.getRect(find.byKey(const Key('purchase-day-date-11')));
@@ -115,7 +158,7 @@ void main() {
     );
     final button = tester.getRect(find.byKey(const Key('day-correction-11')));
     expect((button.center.dx - mark.center.dx).abs(), lessThan(24));
-    expect(tester.getSize(rollover).height, lessThan(56));
+    expect(tester.getSize(rollover).height, lessThan(120));
     expect(tester.takeException(), isNull);
   });
 
@@ -168,6 +211,35 @@ void main() {
       scrollable: _verticalScrollable,
     );
     await saveShot(tester, 'purchases-separator-wide');
+
+    await pumpFakeApp(tester, size: const Size(360, 800));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+    await saveShot(tester, 'purchases-entry-light-360x800');
+    await _toggleTheme(tester);
+    await saveShot(tester, 'purchases-entry-dark-360x800');
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('purchase-rollover-11')),
+      40,
+      scrollable: _verticalScrollable,
+    );
+    await saveShot(tester, 'purchases-separator-dark-360');
+
+    await pumpFakeApp(tester, size: const Size(360, 800));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('purchase-rollover-11')),
+      40,
+      scrollable: _verticalScrollable,
+    );
+    await saveShot(tester, 'purchases-separator-light-360');
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('purchase-day-12')),
+      80,
+      scrollable: _verticalScrollable,
+    );
+    await saveShot(tester, 'purchases-totals-below-360');
   }, tags: const ['screenshots']);
 }
 

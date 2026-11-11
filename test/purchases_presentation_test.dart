@@ -59,6 +59,11 @@ void main() {
 
         expect(textScaleOf(tester), scale);
         expectRtl(tester);
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('purchase-day-12')),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
         expect(find.byKey(const Key('purchase-books')), findsOneWidget);
         expect(find.byKey(const Key('purchase-day-12')), findsOneWidget);
         expect(find.byKey(const ValueKey('add-purchase-12')), findsOneWidget);
@@ -71,12 +76,7 @@ void main() {
         expect(find.byKey(const Key('purchase-entry-pe_1')), findsOneWidget);
         expect(find.byKey(const Key('edit-pe_1')), findsOneWidget);
         expect(find.byKey(const Key('delete-pe_1')), findsOneWidget);
-        await tester.scrollUntilVisible(
-          find.byKey(const Key('purchases-lifetime')),
-          200,
-          scrollable: find.byType(Scrollable).first,
-        );
-        expect(find.byKey(const Key('purchases-lifetime')), findsOneWidget);
+        expect(find.byKey(const Key('purchases-lifetime')), findsNothing);
         expect(tester.takeException(), isNull);
       });
     }
@@ -126,11 +126,8 @@ void main() {
     expect(find.text(AppStrings.emptyPurchases), findsOneWidget);
     expect(find.byKey(const Key('add-purchase-12')), findsNothing);
     expect(find.byKey(const Key('finalize-day-12')), findsNothing);
-    final lifetime = find.byKey(const Key('purchases-lifetime'));
-    expect(
-      find.descendant(of: lifetime, matching: find.textContaining('10')),
-      findsWidgets,
-    );
+    expect(find.byKey(const Key('purchases-lifetime')), findsNothing);
+    expect(find.text('إجماليات السجل من البداية'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

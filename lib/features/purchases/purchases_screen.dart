@@ -8,7 +8,6 @@ import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
-import '../accounts/website_ledger_tone.dart';
 import '../../ui/presentation.dart';
 import '../../ui/strings.dart';
 import '../../ui/theme.dart';
@@ -28,6 +27,48 @@ final _ledgerDraftProvider = StateProvider.autoDispose<_LedgerDraft?>((ref) {
   ref.watch(purchaseBookProvider);
   return null;
 });
+
+/// Opens on the last work day, under the pinned ledger header.
+class _PurchasesScroll extends StatefulWidget {
+  const _PurchasesScroll({required this.builder});
+
+  final List<Widget> Function(GlobalKey latest) builder;
+
+  @override
+  State<_PurchasesScroll> createState() => _PurchasesScrollState();
+}
+
+class _PurchasesScrollState extends State<_PurchasesScroll> {
+  final _controller = ScrollController();
+  final _latest = GlobalKey();
+  var _placed = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _revealLatest() {
+    if (_placed || !_controller.hasClients) return;
+    final target = _latest.currentContext;
+    if (target == null) return;
+    _placed = true;
+    Scrollable.ensureVisible(target, alignment: 1, duration: Duration.zero);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _revealLatest());
+    return CustomScrollView(
+      key: PurchasesScreen.screenKey,
+      controller: _controller,
+      physics: const AlwaysScrollableScrollPhysics(),
+      scrollCacheExtent: const ScrollCacheExtent.pixels(6000),
+      slivers: widget.builder(_latest),
+    );
+  }
+}
 
 class PurchasesScreen extends ConsumerWidget {
   const PurchasesScreen({super.key});
@@ -81,26 +122,18 @@ class PurchasesScreen extends ConsumerWidget {
               builder: (context, entries, controls) {
                 final draft = ref.watch(_ledgerDraftProvider);
                 final empty = day == null && entries.isEmpty && draft == null;
-                return CustomScrollView(
-                  key: PurchasesScreen.screenKey,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  scrollCacheExtent: const ScrollCacheExtent.pixels(6000),
-                  slivers: [
+                final editable =
+                    day != null &&
+                    (day.status == 'draft' || day.correctionOpen);
+                return _PurchasesScroll(
+                  builder: (latest) => [
                     SliverPadding(
                       padding: pagePadding(MediaQuery.sizeOf(context).width),
                       sliver: SliverMainAxisGroup(
                         slivers: [
-                          if (day != null)
-                            SliverToBoxAdapter(
-                              child: _DayCard(
-                                day: day,
-                                money: money,
-                                canWrite: canWrite,
-                                canFinalize: canFinalize,
-                                online: online,
-                                book: book,
-                              ),
-                            ),
+                          SliverToBoxAdapter(
+                            child: _OlderPurchasesBar(controls: controls),
+                          ),
                           if (empty)
                             const SliverToBoxAdapter(
                               child: EmptyPane(
@@ -108,7 +141,7 @@ class PurchasesScreen extends ConsumerWidget {
                                 message: AppStrings.emptyPurchases,
                               ),
                             ),
-                          if (entries.isNotEmpty || draft != null)
+                          if (entries.isNotEmpty || draft != null || editable)
                             _PurchaseGrid(
                               entries: entries,
                               money: money,
@@ -117,18 +150,24 @@ class PurchasesScreen extends ConsumerWidget {
                               canWrite: canWrite,
                               canFinalize: canFinalize,
                               online: online,
+                              latestKey: latest,
                             ),
-                          SliverToBoxAdapter(
-                            child: _OlderPurchasesBar(controls: controls),
-                          ),
-                          // registerTotals cover the whole merchant register.
-                          // Later pages are not added into this figure.
-                          SliverToBoxAdapter(
-                            child: _RegisterTotals(
-                              totals: data.registerTotals,
-                              money: money,
+                          if (day != null)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  top: AppSpacing.md,
+                                ),
+                                child: _DayCard(
+                                  day: day,
+                                  money: money,
+                                  canWrite: canWrite,
+                                  canFinalize: canFinalize,
+                                  online: online,
+                                  book: book,
+                                ),
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -145,19 +184,17 @@ class PurchasesScreen extends ConsumerWidget {
 
 /// The website's words for المشتريات (display only).
 abstract final class _PText {
-  static const lifetime = 'إجماليات السجل من البداية';
-  static const lifeResult = 'إجمالي الناتج';
-  static const lifePaid = 'إجمالي المسدد';
-  static const lifeRemaining = 'الباقي الحالي';
-  static const lifeVodafone = 'إجمالي مستهلك فودافون';
   static const previousValue = 'القيمة السابقة';
   static const workToday = 'إجمالي شغل اليوم';
   static const paidTotal = 'إجمالي المسدد';
   static const vodafoneOurs = 'باقي فودافون لصالحنا';
   static const addDeal = 'إضافة معاملة';
 
-  /// Website `PurchaseCarryRow`: the full carry line, not a second caption.
+  /// Website `PurchaseCarryRow`.
   static const carryForward = 'الباقي المرحّل من اليوم السابق';
+
+  /// Website closing row, before the day number (`PurchaseEntryGroup`).
+  static const carryToNext = 'الباقي المُرحّل لليوم التالي — يوم #';
   static const colSeq = 'ت';
   static const colKind = 'النوع';
   static const colValue = 'القيمة ج.م';
@@ -167,11 +204,6 @@ abstract final class _PText {
   static const result = 'الناتج';
   static const remaining = 'الباقي';
 }
-
-Color _green(BuildContext c) => c.statusColors.creditText;
-Color _amber(BuildContext c) => Theme.of(c).brightness == Brightness.dark
-    ? const Color(0xFFFBBF24)
-    : const Color(0xFFB45309);
 
 /// Light-mode [sectionGold] is orange. The statement frame uses button gold.
 Color _frameGold(BuildContext context) =>
@@ -403,97 +435,6 @@ class _OlderPurchasesBar extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _RegisterTotals extends StatelessWidget {
-  const _RegisterTotals({required this.totals, required this.money});
-
-  final PurchasesRegisterTotalsDto? totals;
-  final MoneyFormatter money;
-
-  @override
-  Widget build(BuildContext context) {
-    String f(MoneyValue? v, Currency c) => money.formatOrDash(v, c);
-    final remaining = totals?.remainingUnits?.asInt;
-    final remainingGloss = remaining == null || remaining == 0
-        ? websiteLedgerSlate
-        : remaining > 0
-        ? websiteLedgerRed
-        : websiteLedgerGreen;
-    return DecoratedBox(
-      key: const Key('purchases-lifetime'),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE7AE12), width: 1.4),
-        color: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF141414)
-            : const Color(0xFFFFFBF0),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              _PText.lifetime,
-              textAlign: TextAlign.center,
-              style: cairo(
-                14,
-                800,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xFFF6E7A8)
-                    : const Color(0xFF6B4E00),
-              ),
-            ),
-            const SizedBox(height: 8),
-            DecoratedBox(
-              decoration: remainingGloss.decoration(BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  children: [
-                    Text(
-                      _PText.lifeRemaining,
-                      style: cairo(12, 700, color: remainingGloss.ink),
-                    ),
-                    Text(
-                      f(totals?.remainingUnits, Currency.lyd),
-                      style: cairo(20, 800, color: remainingGloss.amount),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            PairGrid(
-              children: [
-                EdgeSummary(
-                  title: _PText.lifeResult,
-                  value: f(totals?.resultUnits, Currency.lyd),
-                  edge: sectionGold(context),
-                ),
-                EdgeSummary(
-                  title: _PText.lifePaid,
-                  value: f(totals?.paidUnits, Currency.lyd),
-                  edge: _green(context),
-                ),
-                EdgeSummary(
-                  title: _PText.lifeVodafone,
-                  value: f(totals?.vodafoneConsumedUnits, vodafoneCurrency),
-                  edge: _amber(context),
-                ),
-                EdgeSummary(
-                  title: AppStrings.vodafoneRemaining,
-                  value: f(totals?.vodafoneRemainingUnits, vodafoneCurrency),
-                  edge: _green(context),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1400,6 +1341,7 @@ class _LedgerBreakLine extends _LedgerLine {
     required this.dayId,
     required this.closing,
     required this.nextDate,
+    required this.dayNumber,
     required this.dayStatus,
     required this.correctionOpen,
     required this.dayVersion,
@@ -1409,6 +1351,7 @@ class _LedgerBreakLine extends _LedgerLine {
 
   /// `businessDate` of the first row of the following day. Not today's clock.
   final String? nextDate;
+  final int? dayNumber;
   final String? dayStatus;
   final bool correctionOpen;
   final int? dayVersion;
@@ -1428,6 +1371,7 @@ List<_LedgerLine> _ledgerLines(List<PurchaseEntryDto> entries) {
           dayId: closed.dayId ?? 'unknown-$i',
           closing: closed.dayClosingDebtUnits,
           nextDate: entry.businessDate,
+          dayNumber: closed.dayNumber,
           dayStatus: closed.dayStatus,
           correctionOpen: closed.correctionOpen,
           dayVersion: closed.dayVersion,
@@ -1448,6 +1392,7 @@ class _PurchaseGrid extends ConsumerWidget {
     required this.canWrite,
     required this.canFinalize,
     required this.online,
+    required this.latestKey,
   });
 
   final List<PurchaseEntryDto> entries;
@@ -1457,6 +1402,7 @@ class _PurchaseGrid extends ConsumerWidget {
   final bool canWrite;
   final bool canFinalize;
   final bool online;
+  final GlobalKey latestKey;
 
   /// A draft row on the open day can be edited. A carried day
   /// («مُرحّل») can be edited only after «تعديل اليوم» sets
@@ -1604,134 +1550,24 @@ class _PurchaseGrid extends ConsumerWidget {
           :final dayId,
           :final closing,
           :final nextDate,
+          :final dayNumber,
           :final dayStatus,
           :final correctionOpen,
           :final dayVersion,
         ):
-          final widths = [for (final col in _ledgerCols) col.$2 * scale];
-          final remaining = _ledgerCols.indexWhere(
-            (col) => col.$1 == _PText.remaining,
-          );
-          final breakH = 40.0 * scale;
-          const breakInk = Color(0xFF211600);
-          const breakGold = Color(0xFFE7AE12);
-          const breakFill = Color(0xFFF6E7A8);
-          Widget slot(
-            double width,
-            Widget child, {
-            Key? key,
-            AlignmentGeometry alignment = Alignment.center,
-          }) {
-            return DecoratedBox(
-              key: key,
-              decoration: BoxDecoration(
-                color: breakFill,
-                border: Border.all(color: breakGold),
-              ),
-              child: SizedBox(
-                width: width,
-                height: breakH,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Align(
-                    alignment: alignment,
-                    child: FittedBox(fit: BoxFit.scaleDown, child: child),
-                  ),
-                ),
-              ),
-            );
-          }
-
-          final showCorrection =
-              canFinalize && dayStatus == 'finalized' && dayVersion != null;
           scrollBands.add(
-            Row(
-              key: Key('purchase-rollover-$dayId'),
-              textDirection: TextDirection.rtl,
-              children: [
-                slot(
-                  widths[0] + widths[1],
-                  Text(
-                    nextDate ?? AppStrings.dash,
-                    key: Key('purchase-day-date-$dayId'),
-                    style: cairo(14, 800, color: breakInk),
-                  ),
-                  alignment: AlignmentDirectional.centerStart,
-                ),
-                for (var i = 2; i < widths.length; i++)
-                  if (i == remaining)
-                    slot(
-                      widths[i],
-                      Tooltip(
-                        message: _PText.carryForward,
-                        child: MoneyText(
-                          money.formatOrDash(closing, Currency.lyd),
-                          key: Key('purchase-carry-$dayId'),
-                          style: figure.copyWith(color: breakInk, fontSize: 13),
-                        ),
-                      ),
-                      key: Key('purchase-carry-cell-$dayId'),
-                    )
-                  else
-                    slot(widths[i], const SizedBox.shrink()),
-                slot(
-                  actionW,
-                  showCorrection
-                      ? Theme(
-                          data: Theme.of(context).copyWith(
-                            filledButtonTheme: FilledButtonThemeData(
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size(0, 28),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                visualDensity: VisualDensity.compact,
-                                textStyle: cairo(11, 700),
-                                backgroundColor: const Color(0xFF14532D),
-                                foregroundColor: breakFill,
-                              ),
-                            ),
-                          ),
-                          child: GuardedMutation(
-                            buttonKey: Key('day-correction-$dayId'),
-                            inputs:
-                                'day-correction:$dayId:$correctionOpen:$dayVersion',
-                            expectedVersion: dayVersion,
-                            label: correctionOpen
-                                ? AppStrings.closeDayCorrection
-                                : AppStrings.openDayCorrection,
-                            reportErrorInline: false,
-                            onVersionConflict: () =>
-                                ref.invalidate(purchasesProvider),
-                            onSubmit: (meta) async {
-                              final ack = await ref
-                                  .read(apiLayerProvider)
-                                  .purchases
-                                  .setDayCorrection(
-                                    book,
-                                    dayId,
-                                    open: !correctionOpen,
-                                    meta: meta,
-                                  );
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      '${AppStrings.serverReply} ${ack.id ?? ''}',
-                                    ),
-                                  ),
-                                );
-                              }
-                              ref.invalidate(purchasesProvider);
-                              return null;
-                            },
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ],
+            _DayCarryBreak(
+              dayId: dayId,
+              closing: closing,
+              nextDate: nextDate,
+              dayNumber: dayNumber,
+              dayStatus: dayStatus,
+              correctionOpen: correctionOpen,
+              dayVersion: dayVersion,
+              scale: scale,
+              money: money,
+              canFinalize: canFinalize,
+              book: book,
             ),
           );
         case _LedgerEntryLine(:final entry):
@@ -1823,7 +1659,12 @@ class _PurchaseGrid extends ConsumerWidget {
       }
     }
 
-    if (draft != null && draft.entryId == null && openDay != null) {
+    final editable =
+        openDay != null &&
+        (openDay!.status == 'draft' || openDay!.correctionOpen);
+    final showNew =
+        canWrite && editable && (draft == null || draft.entryId == null);
+    if (showNew) {
       scrollBands.add(
         _InlineLedgerRow(
           key: const ValueKey('purchase-inline-new'),
@@ -1842,7 +1683,361 @@ class _PurchaseGrid extends ConsumerWidget {
       header: scrollBands.first,
       rows: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: scrollBands.skip(1).toList(),
+        children: [
+          ...scrollBands.skip(1),
+          SizedBox(key: latestKey, width: 1, height: 1),
+        ],
+      ),
+    );
+  }
+}
+
+/// Horizontal offset of the ledger body, so a carry row can pin its label
+/// and amount inside the phone viewport.
+class _LedgerHScroll extends ChangeNotifier {
+  double offset = 0;
+  double viewport = 0;
+
+  void publish({required double offset, required double viewport}) {
+    if ((this.offset - offset).abs() < 0.5 &&
+        (this.viewport - viewport).abs() < 0.5) {
+      return;
+    }
+    this.offset = offset;
+    this.viewport = viewport;
+    notifyListeners();
+  }
+}
+
+class _LedgerHScrollScope extends InheritedNotifier<_LedgerHScroll> {
+  const _LedgerHScrollScope({
+    required _LedgerHScroll super.notifier,
+    required super.child,
+  });
+
+  static _LedgerHScroll? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<_LedgerHScrollScope>()
+        ?.notifier;
+  }
+}
+
+/// End-of-day carry, a thin divider, then the next day's opening carry.
+/// On a wide screen the gold pill sits in the «الباقي» column. On a phone
+/// the label and the pill stay inside the visible width.
+class _DayCarryBreak extends ConsumerWidget {
+  const _DayCarryBreak({
+    required this.dayId,
+    required this.closing,
+    required this.nextDate,
+    required this.dayNumber,
+    required this.dayStatus,
+    required this.correctionOpen,
+    required this.dayVersion,
+    required this.scale,
+    required this.money,
+    required this.canFinalize,
+    required this.book,
+  });
+
+  final String dayId;
+  final MoneyValue? closing;
+  final String? nextDate;
+  final int? dayNumber;
+  final String? dayStatus;
+  final bool correctionOpen;
+  final int? dayVersion;
+  final double scale;
+  final MoneyFormatter money;
+  final bool canFinalize;
+  final PurchaseBook book;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final widths = [for (final col in _ledgerCols) col.$2 * scale];
+    final actionW = _ledgerActionWidth * scale;
+    final tableWidth =
+        widths.fold<double>(0, (sum, width) => sum + width) + actionW;
+    final remaining = _ledgerCols.indexWhere(
+      (col) => col.$1 == _PText.remaining,
+    );
+    // Columns are laid out RTL, so «الباقي» sits just right of فودافون and
+    // the action column.
+    final pillLeft = actionW + widths[8];
+    final pillWidth = widths[remaining];
+    final amount = money.formatOrDash(closing, Currency.lyd);
+    final showCorrection =
+        canFinalize && dayStatus == 'finalized' && dayVersion != null;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final closeBg = dark ? const Color(0xFF181B17) : const Color(0xFFEEE3C9);
+    final closeInk = dark ? const Color(0xFFFFE9A0) : const Color(0xFF4C3A13);
+    final openBg = dark ? const Color(0xFF121614) : const Color(0xFFFFFBF0);
+    final openInk = dark ? const Color(0xFFF6E7A8) : const Color(0xFF211600);
+
+    Widget row({
+      required Color background,
+      required Color ink,
+      required String label,
+      required Key pillKey,
+      String? date,
+      Widget? button,
+    }) {
+      return _PinnedCarryRow(
+        tableWidth: tableWidth,
+        height: 40 * scale,
+        background: background,
+        ink: ink,
+        label: label,
+        amount: amount,
+        pillKey: pillKey,
+        pillLeft: pillLeft,
+        pillWidth: pillWidth,
+        date: date,
+        dateKey: date == null ? null : Key('purchase-day-date-$dayId'),
+        button: button,
+      );
+    }
+
+    return Column(
+      key: Key('purchase-rollover-$dayId'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        row(
+          background: closeBg,
+          ink: closeInk,
+          label: '${_PText.carryToNext}${dayNumber ?? '—'}',
+          pillKey: Key('purchase-carry-close-$dayId'),
+        ),
+        SizedBox(
+          key: Key('purchase-day-divider-$dayId'),
+          width: tableWidth,
+          height: 6,
+          child: const ColoredBox(color: Color(0xFF111111)),
+        ),
+        row(
+          background: openBg,
+          ink: openInk,
+          label: _PText.carryForward,
+          pillKey: Key('purchase-carry-open-$dayId'),
+          date: nextDate ?? AppStrings.dash,
+          button: showCorrection
+              ? _correctionButton(
+                  context,
+                  ref,
+                  dayId: dayId,
+                  correctionOpen: correctionOpen,
+                  dayVersion: dayVersion!,
+                  book: book,
+                )
+              : null,
+        ),
+      ],
+    );
+  }
+}
+
+Widget _correctionButton(
+  BuildContext context,
+  WidgetRef ref, {
+  required String dayId,
+  required bool correctionOpen,
+  required int dayVersion,
+  required PurchaseBook book,
+}) {
+  return Theme(
+    data: Theme.of(context).copyWith(
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 28),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+          textStyle: cairo(11, 700),
+          backgroundColor: const Color(0xFF14532D),
+          foregroundColor: const Color(0xFFF6E7A8),
+        ),
+      ),
+    ),
+    child: GuardedMutation(
+      buttonKey: Key('day-correction-$dayId'),
+      inputs: 'day-correction:$dayId:$correctionOpen:$dayVersion',
+      expectedVersion: dayVersion,
+      label: correctionOpen
+          ? AppStrings.closeDayCorrection
+          : AppStrings.openDayCorrection,
+      reportErrorInline: false,
+      onVersionConflict: () => ref.invalidate(purchasesProvider),
+      onSubmit: (meta) async {
+        final ack = await ref
+            .read(apiLayerProvider)
+            .purchases
+            .setDayCorrection(book, dayId, open: !correctionOpen, meta: meta);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${AppStrings.serverReply} ${ack.id ?? ''}'),
+            ),
+          );
+        }
+        ref.invalidate(purchasesProvider);
+        return null;
+      },
+    ),
+  );
+}
+
+class _PinnedCarryRow extends StatelessWidget {
+  const _PinnedCarryRow({
+    required this.tableWidth,
+    required this.height,
+    required this.background,
+    required this.ink,
+    required this.label,
+    required this.amount,
+    required this.pillKey,
+    required this.pillLeft,
+    required this.pillWidth,
+    this.date,
+    this.dateKey,
+    this.button,
+  });
+
+  final double tableWidth;
+  final double height;
+  final Color background;
+  final Color ink;
+  final String label;
+  final String amount;
+  final Key pillKey;
+  final double pillLeft;
+  final double pillWidth;
+  final String? date;
+  final Key? dateKey;
+  final Widget? button;
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = _LedgerHScrollScope.maybeOf(context);
+    final offset = metrics?.offset ?? 0;
+    final viewport = metrics == null || metrics.viewport <= 0
+        ? tableWidth
+        : metrics.viewport;
+    final wide = viewport + 1 >= tableWidth && offset < 1;
+    final pill = DecoratedBox(
+      key: pillKey,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFEAA1), Color(0xFFD1A840)],
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Text(
+          amount,
+          style: cairo(13, 800, color: const Color(0xFF211A08)),
+        ),
+      ),
+    );
+    final labelText = Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: cairo(12, 800, color: ink),
+    );
+    final dateText = date == null
+        ? null
+        : Text(
+            date!,
+            key: dateKey,
+            style: cairo(13, 800, color: ink),
+          );
+
+    Widget wideBody() {
+      final unit =
+          tableWidth /
+          (_ledgerCols.fold<double>(0, (sum, col) => sum + col.$2) +
+              _ledgerActionWidth);
+      final dateWidth = (_ledgerCols[0].$2 + _ledgerCols[1].$2) * unit;
+      return Stack(
+        children: [
+          if (dateText != null)
+            Positioned(
+              right: 8,
+              top: 0,
+              bottom: 0,
+              width: dateWidth - 12,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: dateText,
+              ),
+            ),
+          Positioned(
+            left: pillLeft + pillWidth + 6,
+            right: dateText == null ? 8 : dateWidth + 4,
+            top: 0,
+            bottom: 0,
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: labelText,
+            ),
+          ),
+          Positioned(
+            left: pillLeft,
+            width: pillWidth,
+            top: 0,
+            bottom: 0,
+            child: Center(child: pill),
+          ),
+          if (button != null)
+            Positioned(
+              left: 0,
+              width: _ledgerActionWidth * unit,
+              top: 0,
+              bottom: 0,
+              child: Center(child: FittedBox(child: button)),
+            ),
+        ],
+      );
+    }
+
+    Widget phoneBody() {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: AlignmentDirectional.centerStart,
+          child: Row(
+            textDirection: TextDirection.rtl,
+            children: [
+              if (dateText != null) ...[dateText, const SizedBox(width: 8)],
+              labelText,
+              const SizedBox(width: 8),
+              pill,
+              if (button != null) ...[const SizedBox(width: 8), button!],
+            ],
+          ),
+        ),
+      );
+    }
+
+    final visible = viewport.clamp(0.0, tableWidth);
+    return SizedBox(
+      width: tableWidth,
+      height: height,
+      child: Stack(
+        children: [
+          Positioned.fill(child: ColoredBox(color: background)),
+          Positioned(
+            right: offset,
+            width: visible,
+            top: 0,
+            bottom: 0,
+            child: wide ? wideBody() : phoneBody(),
+          ),
+        ],
       ),
     );
   }
@@ -1870,13 +2065,25 @@ class _LedgerScroller extends StatefulWidget {
 class _LedgerScrollerState extends State<_LedgerScroller> {
   final _head = ScrollController();
   final _body = ScrollController();
+  final _metrics = _LedgerHScroll();
   var _syncing = false;
+  var _viewport = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _body.addListener(() => _copy(_body, _head));
+    _body.addListener(() {
+      _copy(_body, _head);
+      _publish();
+    });
     _head.addListener(() => _copy(_head, _body));
+  }
+
+  void _publish() {
+    _metrics.publish(
+      offset: _body.hasClients ? _body.offset : 0,
+      viewport: _viewport,
+    );
   }
 
   void _copy(ScrollController from, ScrollController to) {
@@ -1892,6 +2099,7 @@ class _LedgerScrollerState extends State<_LedgerScroller> {
   void dispose() {
     _head.dispose();
     _body.dispose();
+    _metrics.dispose();
     super.dispose();
   }
 
@@ -1926,11 +2134,25 @@ class _LedgerScrollerState extends State<_LedgerScroller> {
             decoration: BoxDecoration(
               border: Border.all(color: widget.gold, width: 1.4),
             ),
-            child: SingleChildScrollView(
-              key: const Key('purchase-ledger-scroll'),
-              controller: _body,
-              scrollDirection: Axis.horizontal,
-              child: widget.rows,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                if ((width - _viewport).abs() > 0.5) {
+                  _viewport = width;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _publish();
+                  });
+                }
+                return SingleChildScrollView(
+                  key: const Key('purchase-ledger-scroll'),
+                  controller: _body,
+                  scrollDirection: Axis.horizontal,
+                  child: _LedgerHScrollScope(
+                    notifier: _metrics,
+                    child: widget.rows,
+                  ),
+                );
+              },
             ),
           ),
         ),
