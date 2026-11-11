@@ -500,6 +500,17 @@
 - يعتمد على: 043. لا مسار جديد ولا خط على الدخول الحي.
 - التراجع: `git revert b637d9b95cc9961a8e16749affff2ea45a0e29ff`. afterward: `flutter test test/login_preview_045_test.dart --exclude-tags screenshots --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-046
+
+- الالتزام: `3c7b8eda7b49d4efed440047c7d5b370dd2e062f`
+- العنوان: VIB-FIX-046: Use login design 8 on the live login screen.
+- العرض: علي اختار تصميم الدخول 8.
+- السبب: المعاينة كانت منفصلة عن شاشة الدخول الحية.
+- السلوك: الدخول الحي صار التصميم 8: خلفية كحلية وموجات وخطوط ذهبية ودائرة ومعين، وبطاقة كريمية بإطار ذهبي وزوايا، وVIB وأهلًا بك، واسم المستخدم وكلمة المرور وزر إظهار، وزر «تسجيل الدخول» الكحلي. شارة الرقم 8 أزيلت. الخطأ داخل البطاقة. منطق الدخول والجلسة وMFA كما هو. بلا طلب حساب. البطاقة تُمرَّر عند فتح لوحة المفاتيح ولا تفيض على 360×640 بمقياس 1.3.
+- الدليل: `test/live_login_046_test.dart`.
+- يعتمد على: 045. لا مسار جديد.
+- التراجع: `git revert 3c7b8eda7b49d4efed440047c7d5b370dd2e062f`. afterward: `flutter test test/live_login_046_test.dart --exclude-tags screenshots --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
