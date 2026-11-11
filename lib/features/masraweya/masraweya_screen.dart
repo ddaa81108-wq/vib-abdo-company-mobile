@@ -237,9 +237,43 @@ class _DayViewState extends ConsumerState<_DayView> {
       _bind(data);
       return;
     }
-    if (_autosave.phase == MasraweyaSavePhase.saved) {
-      _autosave.noteServerTotals(data);
+    // A remote edit (the website, or another phone) replaces the fields
+    // only when this screen is not holding an unsaved row.
+    if (masraweyaRemoteReplacesDraft(
+          phase: _autosave.phase,
+          fieldFocused: _fieldFocused(),
+        ) &&
+        !_matchesServer(data)) {
+      _bind(data);
+      return;
     }
+    _autosave.noteServerTotals(data);
+  }
+
+  bool _matchesServer(MasraweyaDayDto day) {
+    if ((_purchases?.text ?? '') != _digits(day.purchasesUnits)) return false;
+    if (_previous != null &&
+        _previous!.text != _digits(day.previousValueUnits)) {
+      return false;
+    }
+    if (day.entries.length != _rows.length) return false;
+    for (var i = 0; i < _rows.length; i++) {
+      if (_rows[i].value.text != _digits(day.entries[i].valueUnits)) {
+        return false;
+      }
+      if (_rows[i].commission.text != _digits(day.entries[i].commissionUnits)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _fieldFocused() {
+    if (_previousFocus.hasFocus || _purchasesFocus.hasFocus) return true;
+    for (final node in _foci) {
+      if (node.hasFocus) return true;
+    }
+    return false;
   }
 
   void _bind(MasraweyaDayDto day) {

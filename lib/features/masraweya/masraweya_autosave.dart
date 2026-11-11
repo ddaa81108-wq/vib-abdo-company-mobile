@@ -13,6 +13,15 @@ enum MasraweyaDraftIssue {
 
 enum MasraweyaSavePhase { saved, dirty, saving, error, conflict }
 
+/// A server day may replace the on-screen fields only when nothing is
+/// half-typed. Focus or a dirty/saving/error draft keeps the local text.
+bool masraweyaRemoteReplacesDraft({
+  required MasraweyaSavePhase phase,
+  required bool fieldFocused,
+}) {
+  return phase == MasraweyaSavePhase.saved && !fieldFocused;
+}
+
 /// One work row as typed. Empty rows are omitted. A half-filled row blocks.
 class MasraweyaRowDraft {
   const MasraweyaRowDraft({
