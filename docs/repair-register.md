@@ -555,6 +555,17 @@
 - يعتمد على: 042 و047. لا مسار جديد.
 - التراجع: `git revert 8491b65f4bf1a6d5a0a6a39a4f850dd41139a1c8`. afterward: `flutter test test/home_purchases_050_test.dart --exclude-tags screenshots --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-051
+
+- الالتزام: `6dddb221e5cb55358a426030874bdc7b237fde14`
+- العنوان: VIB-FIX-051: Put the purchase day break on one ledger row.
+- العرض: فاصل اليوم ما زال يكدّس العبارة والمبلغ والتاريخ والزر فوق بعض.
+- السبب: الشريط كان عمودًا بعرض الجدول، فالمبلغ لا يقع تحت عمود «الباقي» والزر لا يقع تحت عمود التعديل.
+- السلوك: صف واحد بمحاذاة أعمدة الدفتر. التاريخ الجديد في أول الأعمدة من اليمين. المبلغ تحت «الباقي»، وعبارة «الباقي المرحّل من اليوم السابق» تلميح لأن العمود لا يتسع لها في سطر. «تعديل اليوم» في العمود الأخير. الرأس اللاصق وإجماليات الخادم وتعديل اليوم المرحّل كما هي.
+- الدليل: `test/home_purchases_050_test.dart`. `flutter analyze` بلا ملاحظات. التنسيق على مسارات CI يخرج 0. التطبيق `flutter test --exclude-tags screenshots --dart-define=USE_FAKE_API=true`: 825 نجحت، 8 تُركت، 0 فشلت.
+- يعتمد على: 042 و050. لا مسار جديد.
+- التراجع: `git revert 6dddb221e5cb55358a426030874bdc7b237fde14`. afterward: `flutter test test/home_purchases_050_test.dart test/purchases_ledger_layout_test.dart --exclude-tags screenshots --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
