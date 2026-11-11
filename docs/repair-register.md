@@ -588,6 +588,17 @@
 - يعتمد على: 052. لا مسار جديد.
 - التراجع: `git revert ef5f2b96344f8026d0f3f7cb19a052d588f63670`. afterward: `flutter test test/home_purchases_050_test.dart --name "carry pills" --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-054
+
+- الالتزام: `5ebeee6a68fd2a9bff5277349d72347075b97679`
+- العنوان: VIB-FIX-054: Show the website running balance in the purchases الباقي column.
+- العرض: عمود «الباقي» في التطبيق كان يطبع `remainingUnits` لكل صف، وهو الناتج ناقص المسدد لذلك الصف. الموقع يطبع الرصيد التراكمي بعد المعاملة.
+- السبب: الخادم يخزّن `remaining_units = result − paid` في `parseEntry`. الموقع لا يطبع هذا الحقل في العمود. يثبت المشي على `totalDebtUnits` لليوم المفتوح ويمشي من الأحدث إلى الأقدم.
+- السلوك: كل صف يعرض الرصيد بعد المعاملة من هذا المشي، بخلفية `#FFE7A3` وحبر `#211A08`. صف الترحيل يبقى على `dayClosingDebtUnits`. غياب إجمالي اليوم، أو صف بناتج أو مسدد غير صالح، يفرغ العمود كله. صف جديد فارغ يبقى «—» لأن التطبيق لا يحسب الناتج محليًا. التنسيق يبقى عبر `MoneyFormatter` مع «د.ل».
+- الدليل: `test/purchase_running_balance_test.dart`. `flutter analyze` بلا ملاحظات. التنسيق على مسارات CI يخرج 0. التطبيق `flutter test --exclude-tags screenshots --dart-define=USE_FAKE_API=true`: 837 نجحت، 8 تُركت، 0 فشلت. الحزمة `flutter test --dart-define=USE_FAKE_API=true`: 551 نجحت، 14 تُركت، 0 فشلت.
+- يعتمد على: 052 لصفوف الترحيل. لا مسار جديد ولا تغيير في الخادم.
+- التراجع: `git revert 5ebeee6a68fd2a9bff5277349d72347075b97679`. afterward: `flutter test test/purchase_running_balance_test.dart --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
