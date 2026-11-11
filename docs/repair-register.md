@@ -577,6 +577,17 @@
 - يعتمد على: 042 و051. لا مسار جديد.
 - التراجع: `git revert 649a0bbb7ae45419a7f09c8576da7ae53152c6c6`. afterward: `flutter test test/home_purchases_050_test.dart test/purchases_presentation_test.dart --exclude-tags screenshots --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-053
+
+- الالتزام: `ef5f2b96344f8026d0f3f7cb19a052d588f63670`
+- العنوان: VIB-FIX-053: Keep the purchase carry amount on one line.
+- العرض: حبة المبلغ «2,000 د.ل» تحت «الباقي» كانت تنزل على سطرين في صفي الترحيل.
+- السبب: عرض عمود الباقي أضيق من النص، والنص كان يلتف داخل الحبة.
+- السلوك: المبلغ سطر واحد. الحبة تتسع أكثر من العمود وتبقى في وسطه، بلا التفاف وبلا فيض، على 360 و1024 و1280 وبمقياس 1.3. بقية 052 كما هي.
+- الدليل: `test/home_purchases_050_test.dart`. `flutter analyze` بلا ملاحظات. التنسيق على مسارات CI يخرج 0. التطبيق `flutter test --exclude-tags screenshots --dart-define=USE_FAKE_API=true`: 832 نجحت، 8 تُركت، 0 فشلت.
+- يعتمد على: 052. لا مسار جديد.
+- التراجع: `git revert ef5f2b96344f8026d0f3f7cb19a052d588f63670`. afterward: `flutter test test/home_purchases_050_test.dart --name "carry pills" --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
