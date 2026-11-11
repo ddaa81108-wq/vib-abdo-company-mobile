@@ -98,7 +98,13 @@ class EditAccountCardButton extends ConsumerWidget {
           children: [
             Icon(Icons.edit_outlined, size: 16),
             SizedBox(width: 4),
-            Text('تعديل البيانات'),
+            Flexible(
+              child: Text(
+                'تعديل البيانات',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
       );

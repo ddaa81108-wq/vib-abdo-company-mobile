@@ -97,7 +97,7 @@ void main() {
         final card = find.byWidgetPredicate(
           (widget) =>
               widget.key is ValueKey<String> &&
-              '${(widget.key as ValueKey<String>).value}'.startsWith(
+              (widget.key as ValueKey<String>).value.startsWith(
                 'account-card-',
               ),
         );
@@ -124,7 +124,7 @@ void main() {
     final card = find.byWidgetPredicate(
       (widget) =>
           widget.key is ValueKey<String> &&
-          '${(widget.key as ValueKey<String>).value}'.startsWith(
+          (widget.key as ValueKey<String>).value.startsWith(
             'account-card-',
           ),
     );

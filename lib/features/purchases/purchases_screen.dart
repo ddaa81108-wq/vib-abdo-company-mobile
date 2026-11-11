@@ -438,7 +438,13 @@ class _RegisterTotals extends StatelessWidget {
             Text(
               _PText.lifetime,
               textAlign: TextAlign.center,
-              style: cairo(14, 800, color: const Color(0xFFE7AE12)),
+              style: cairo(
+                14,
+                800,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFFF6E7A8)
+                    : const Color(0xFF6B4E00),
+              ),
             ),
             const SizedBox(height: 8),
             DecoratedBox(
@@ -1481,7 +1487,8 @@ class _PurchaseGrid extends ConsumerWidget {
     final actionW = _ledgerActionWidth * scale;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final headerFill = const Color(0xFF14532D);
-    final breakInk = dark ? const Color(0xFFE7E5E4) : const Color(0xFF44403C);
+    // The carried-balance bar is gold in both themes.
+    const breakInk = Color(0xFF44403C);
     final figure = context.textExtras.amount.copyWith(
       fontSize: 13,
       color: look.ink,

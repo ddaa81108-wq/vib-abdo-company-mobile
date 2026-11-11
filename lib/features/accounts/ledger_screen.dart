@@ -317,10 +317,12 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                           ),
                         ),
                       ),
-                      EditAccountCardButton(
-                        section: section,
-                        card: loadedCard,
-                        compact: true,
+                      Flexible(
+                        child: EditAccountCardButton(
+                          section: section,
+                          card: loadedCard,
+                          compact: true,
+                        ),
                       ),
                       Expanded(
                         child: Align(
@@ -889,11 +891,11 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
     final look = context.look;
     final columns = widget.columns!;
     final full = widget.type == 'full';
-    final small = cairo(10.5, 500, color: look.muted);
+    final small = cairo(10.5, 500, color: const Color(0xFF4E463C));
     final dash = Text(AppStrings.dash, style: small);
     InputDecoration field(String label, {Widget? prefix}) => InputDecoration(
       hintText: label,
-      hintStyle: cairo(11.5, 600, color: look.muted),
+      hintStyle: cairo(11.5, 600, color: const Color(0xFF4E463C)),
       isDense: true,
       prefixIcon: prefix,
       prefixIconConstraints: const BoxConstraints(minWidth: 26),
@@ -913,6 +915,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       key: const Key('movement-amount'),
       controller: _amount,
       label: AppStrings.ledgerColValue,
+      labelStyle: cairo(11.5, 600, color: const Color(0xFF4E463C)),
       dense: true,
       showHint: false,
       // Ready to type on entry and after each save (Ali, 2026-11-03).
@@ -966,6 +969,11 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
                   CalculationMode.multiply => '×',
                   CalculationMode.divide => '÷',
                   CalculationMode.direct => 'مباشر',
+                },
+                semanticsLabel: switch (mode) {
+                  CalculationMode.multiply => AppStrings.multiply,
+                  CalculationMode.divide => AppStrings.divide,
+                  CalculationMode.direct => AppStrings.direct,
                 },
                 style: cairo(
                   11,
@@ -2164,14 +2172,16 @@ class _EntryTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final reversed = entry.status == 'reversed';
     final look = context.look;
-    final scheme = Theme.of(context).colorScheme;
-    final muted = reversed ? scheme.onSurfaceVariant : scheme.onSurface;
+    // The table sits on the cream frame in both themes, so the ink stays dark.
+    const ledgerInk = Color(0xFF1C1917);
+    const ledgerMuted = Color(0xFF44403C);
+    final muted = reversed ? ledgerMuted : ledgerInk;
     final strike = reversed ? TextDecoration.lineThrough : null;
     final body = cairo(12, 600, color: muted).copyWith(decoration: strike);
     final small = cairo(
       10.5,
       500,
-      color: look.muted,
+      color: ledgerMuted,
     ).copyWith(decoration: strike);
     final number = context.textExtras.tableNumber.copyWith(
       fontSize: 12.5,
@@ -2185,7 +2195,7 @@ class _EntryTile extends ConsumerWidget {
       context,
       section,
       entry.type,
-      reversed ? scheme.onSurfaceVariant : scheme.onSurface,
+      muted,
     );
     final amount = MoneyText(
       money.formatOrDash(entry.amountUnits, section.currency),
@@ -2300,7 +2310,7 @@ class _EntryTile extends ConsumerWidget {
             if (reversed)
               Text(
                 AppStrings.reversed,
-                style: cairo(10.5, 800, color: scheme.onSurfaceVariant),
+                style: cairo(10.5, 800, color: const Color(0xFF44403C)),
               ),
             if (entry.corrected)
               Text(AppStrings.corrected, style: cairo(10.5, 800, color: muted)),
@@ -2339,9 +2349,7 @@ class _EntryTile extends ConsumerWidget {
     final viewport = _InlineViewport.of(context);
     // Zebra by the row number, so every page stripes the same way.
     final odd = (ordinal ?? entry.sequence ?? 0).isOdd;
-    final zebra = Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xFF1C1917)
-        : (odd ? const Color(0xFFFFFBF3) : Colors.white);
+    final zebra = odd ? const Color(0xFFFFFBF3) : Colors.white;
     return Column(
       key: Key('ledger-entry-${entry.id}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2349,11 +2357,9 @@ class _EntryTile extends ConsumerWidget {
         DecoratedBox(
           decoration: BoxDecoration(
             color: reversed
-                ? scheme.surfaceContainerHighest
+                ? const Color(0xFFE7E5E4)
                 : editing
-                ? look.strip
-                : odd
-                ? null
+                ? const Color(0xFFFFF3C4)
                 : zebra,
             border: Border(bottom: BorderSide(color: _gridLine(context))),
           ),
@@ -2633,9 +2639,10 @@ Color _movementAmountColor(
       section == AccountSection.egyptianDeposits) {
     return type == 'payment' ? colors.debtText : colors.creditText;
   }
+  // The row is cream or white in both themes, so the status ink stays dark.
   return switch (type) {
-    'debt' => colors.debtText,
-    'payment' => colors.creditText,
+    'debt' => AppStatusColors.light.debtText,
+    'payment' => AppStatusColors.light.creditText,
     _ => fallback,
   };
 }
@@ -2731,10 +2738,9 @@ class _SequenceMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
+        color: const Color(0xFFFFF8E8),
         borderRadius: BorderRadius.circular(AppRadii.sm),
       ),
       child: Padding(
@@ -2860,20 +2866,28 @@ class _OperationPill extends StatelessWidget {
       CalculationMode.divide => '÷',
       _ => 'مباشر',
     };
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFF17191F),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        child: Text(
-          label,
-          style: cairo(
-            11,
-            800,
-            color: Colors.white,
-          ).copyWith(decoration: reversed ? TextDecoration.lineThrough : null),
+    final spoken = switch (mode) {
+      CalculationMode.multiply => AppStrings.multiply,
+      CalculationMode.divide => AppStrings.divide,
+      _ => AppStrings.direct,
+    };
+    return Semantics(
+      label: spoken,
+      excludeSemantics: true,
+      container: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFF17191F),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          child: Text(
+            label,
+            style: cairo(11, 800, color: Colors.white).copyWith(
+              decoration: reversed ? TextDecoration.lineThrough : null,
+            ),
+          ),
         ),
       ),
     );

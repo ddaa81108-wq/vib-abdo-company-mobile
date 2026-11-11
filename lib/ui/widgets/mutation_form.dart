@@ -208,12 +208,14 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
       accepted = error == null;
       if (!accepted && mounted && error.isNotEmpty) {
         setState(() => _error = error);
+        _showUnlessInline(error);
       }
     } catch (error) {
       if (!mounted) return;
       final message = _presentFailure(error);
       if (!mounted) return;
       setState(() => _error = message);
+      _showUnlessInline(message);
     } finally {
       if (accepted) {
         _lock.succeed();
@@ -227,6 +229,19 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
       }
       if (mounted) setState(() => _lock.busy = false);
     }
+  }
+
+  /// A check-mark in a narrow column cannot hold a sentence. The message
+  /// still has to be on screen.
+  void _showUnlessInline(String message) {
+    if (widget.reportErrorInline) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(message, key: const Key('mutation-error'))),
+      );
   }
 
   /// Keeps the cached id only when this control still describes the send that

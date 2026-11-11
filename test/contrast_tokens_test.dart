@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/ui/bars_style.dart';
 import 'package:flutter_api_layer/api_layer.dart' show SectionKey;
 import 'package:go_router/go_router.dart';
+import 'package:vib_abdo_company_mobile/features/home/home_design_options.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
@@ -353,17 +354,17 @@ Future<void> _expectRenderedInk(
   final tileLabel = tester.widget<Text>(
     find.byKey(const Key('home-tile-label-customers')),
   );
-  final tileIcon = tester.widget<Icon>(
+  expect(
     find.descendant(
       of: find.byKey(HomeShell.sectionKey(SectionKey.customers)),
-      matching: find.byType(Icon),
+      matching: find.byType(HomeIconMark),
     ),
+    findsOneWidget,
   );
   final look = theme.extension<AppLook>()!;
-  // Customers tile: glossy blue; check both ends of its gradient.
+  // Customers tile: glossy blue. The mark is its own navy tile.
   for (final tileColor in [look.glossBlue.top, look.glossBlue.bottom]) {
     _expectContrast(tileLabel.style!.color!, tileColor, 4.5);
-    _expectContrast(tileIcon.color!, tileColor, 3);
   }
   // «عرض الكل» left home; the primary ink is still checked on /purchases.
   expect(

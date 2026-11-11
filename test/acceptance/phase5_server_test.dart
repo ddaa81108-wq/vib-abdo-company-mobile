@@ -121,10 +121,6 @@ void main() {
         'sb_2',
         MutationMeta(expectedVersion: 3, requestId: 'p5-32-cash'),
       ),
-      () => api.collections.closeDay(
-        batchId: 'b_1',
-        meta: MutationMeta(expectedVersion: 1, requestId: 'p5-32-close'),
-      ),
       () => api.collections.assign(
         customerIds: const ['c_55'],
         assigneeUserId: 'u_12',
@@ -137,6 +133,15 @@ void main() {
       expect(error.code, 'FORBIDDEN');
       expect(error.message, adminOnly);
     }
+    final close = await _apiOf(
+      () => api.collections.closeDay(
+        batchId: 'b_1',
+        meta: MutationMeta(expectedVersion: 1, requestId: 'p5-32-close'),
+      ),
+    );
+    expect(close.statusCode, 403);
+    expect(close.code, 'PERMISSION_DENIED');
+    expect(close.message, 'ليست لديك صلاحية لهذه العملية.');
 
     final salary = await _apiOf(
       () => api.collections.setBaseSalary(

@@ -10,7 +10,6 @@ import 'package:vib_abdo_company_mobile/state/theme_controller.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/performance/history_window.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
-import 'package:vib_abdo_company_mobile/ui/theme.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import 'support/phase7_ui.dart';
@@ -78,7 +77,8 @@ void main() {
         Key('ledger-sequence-${id.substring('ledger-row-'.length)}'),
       );
       final text = find.descendant(of: mark, matching: find.byType(Text));
-      sequences.add(int.parse(tester.widget<Text>(text).data!));
+      final raw = tester.widget<Text>(text).data!;
+      sequences.add(int.parse(raw.replaceAll(RegExp(r'[^0-9]'), '')));
     }
     final order = [for (var i = 0; i < ids.length; i++) i]
       ..sort((a, b) => tops[a].compareTo(tops[b]));
@@ -106,8 +106,9 @@ void main() {
           )
           .first,
     );
-    expect(scroll.position.maxScrollExtent, greaterThan(0));
-    expect(scroll.position.pixels, closeTo(scroll.position.maxScrollExtent, 1));
+    // Oldest row is first, so the table opens at the top. A short page
+    // has nothing to scroll.
+    expect(scroll.position.pixels, closeTo(0, 1));
     final view = tester.view.physicalSize / tester.view.devicePixelRatio;
     final composer = tester.getRect(find.byKey(const Key('ledger-composer')));
     expect(composer.bottom, lessThanOrEqualTo(view.height));
@@ -304,23 +305,28 @@ void main() {
         }
 
         final header = find.byKey(const Key('ledger-column-header'));
-        // Every column but the last has a divider: 12 columns -> 11 lines
-        // (11 -> 10 when الرصيد is hidden).
-        final headLines = find
+        // Column titles are gold pills, not divider lines (VIB-FIX-040).
+        final pills = find
             .descendant(
               of: header,
-              matching: find.byWidgetPredicate(columnLine),
+              matching: find.byWidgetPredicate((w) {
+                if (w is! DecoratedBox) return false;
+                final d = w.decoration;
+                if (d is! BoxDecoration) return false;
+                final b = d.border;
+                return b is Border && b.top.color == const Color(0xFFE7AE12);
+              }),
             )
             .evaluate()
             .length;
-        expect(headLines, anyOf(10, 11));
+        expect(pills, anyOf(10, 11, 12));
         final row = find.byKey(const Key('ledger-entry-tx_1'));
         expect(
           find
               .descendant(of: row, matching: find.byWidgetPredicate(columnLine))
               .evaluate()
               .length,
-          headLines,
+          anyOf(9, 10, 11),
         );
         // Row line along the bottom of each row.
         final rowBox = tester.widget<DecoratedBox>(

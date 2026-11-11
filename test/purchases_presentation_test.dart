@@ -61,12 +61,25 @@ void main() {
         expectRtl(tester);
         expect(find.byKey(const Key('purchase-books')), findsOneWidget);
         expect(find.byKey(const Key('purchase-day-12')), findsOneWidget);
+        expect(find.byKey(const ValueKey('add-purchase-12')), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('finalize-day-12')),
+          findsOneWidget,
+        );
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('purchase-entry-pe_1')),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
         expect(find.byKey(const Key('purchase-entry-pe_1')), findsOneWidget);
-        expect(find.byKey(const Key('purchases-lifetime')), findsOneWidget);
-        expect(find.byKey(const Key('add-purchase-12')), findsOneWidget);
-        expect(find.byKey(const Key('finalize-day-12')), findsOneWidget);
         expect(find.byKey(const Key('edit-pe_1')), findsOneWidget);
         expect(find.byKey(const Key('delete-pe_1')), findsOneWidget);
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('purchases-lifetime')),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(find.byKey(const Key('purchases-lifetime')), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
     }

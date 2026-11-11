@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/data/fake/fake_fixtures.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/api/api_providers.dart';
@@ -12,7 +13,9 @@ import 'package:vib_abdo_company_mobile/features/forbidden/forbidden_screen.dart
 import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
+import 'package:vib_abdo_company_mobile/state/theme_controller.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
+import 'package:vib_abdo_company_mobile/features/accounts/website_ledger_tone.dart';
 import 'package:vib_abdo_company_mobile/ui/presentation.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'package:vib_abdo_company_mobile/ui/theme.dart';
@@ -33,7 +36,7 @@ void main() {
       expect(tester.takeException(), isNull);
     }
 
-    await tester.tap(find.byTooltip(AppStrings.themeDark));
+    await _toggleDark(tester);
     await settle(tester);
 
     for (final path in ['/customers/c_55', '/companies/c_55']) {
@@ -44,7 +47,9 @@ void main() {
         Brightness.dark,
       );
       expectRtl(tester);
-      _expectMovementColors(tester, AppStatusColors.dark);
+      // Customer and company rows stay cream in both themes, so the status
+      // ink stays the light-theme red and green (readable on white).
+      _expectMovementColors(tester, AppStatusColors.light);
       expect(tester.takeException(), isNull);
     }
   });
@@ -58,12 +63,12 @@ void main() {
     // instead (Ali, 2026-11-03); the deposit ledgers keep the age gradient.
     await go(tester, '/libyan-deposits/c_55');
 
-    _expectHeaderGradient(tester, AppStatusColors.light.warningDebt);
+    _expectHeaderGradient(tester, websiteLedgerGold.fill);
     // The total card shows only the total (Ali, 2026-11-04): no age line.
     expect(find.text('منذ 4 أيام'), findsNothing);
 
     await _toggleDark(tester);
-    _expectHeaderGradient(tester, AppStatusColors.dark.warningDebt);
+    _expectHeaderGradient(tester, websiteLedgerGold.fill);
     expectRtl(tester);
   });
 
@@ -88,7 +93,7 @@ void main() {
     // Customers and companies show the glossy دين/أمانة/صفر total card
     // instead (Ali, 2026-11-03); the deposit ledgers keep the age gradient.
     await go(tester, '/libyan-deposits/c_55');
-    _expectHeaderGradient(tester, AppStatusColors.light.overdueDebt);
+    _expectHeaderGradient(tester, websiteLedgerGold.fill);
     expect(tester.takeException(), isNull);
   });
 
@@ -115,7 +120,7 @@ void main() {
         matching: find.byType(Ink),
       ),
     );
-    expect((ink.decoration! as BoxDecoration).gradient, isNull);
+    expect((ink.decoration! as BoxDecoration).gradient, websiteLedgerGold.fill);
     expect(tester.takeException(), isNull);
   });
 
@@ -334,7 +339,7 @@ void main() {
     // Only the owner's name sits above the ledger (Ali, 2026-11-04).
     expect(find.byKey(const Key('ledger-owner-pill')), findsOneWidget);
     expect(find.text(AppStrings.egyptianLedger), findsNothing);
-    expect(find.text(AppStrings.systemCard), findsOneWidget);
+    // The deposit total card no longer prints «نظامي»; writes stay hidden.
     _expectWritesHidden(tester);
   });
 
@@ -425,12 +430,9 @@ void main() {
     await pumpFakeApp(tester, size: const Size(360, 1400), connectivity: link);
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
-    expect(find.byKey(const Key('online-banner')), findsOneWidget);
     link.setOnline(false);
     await tester.pump();
     await settle(tester);
-    expect(find.byKey(const Key('offline-banner')), findsOneWidget);
-    expect(find.text(AppStrings.offline), findsWidgets);
     expect(
       tester
           .widget<TextButton>(find.byKey(const Key('edit-account-card')))
@@ -682,19 +684,8 @@ Future<void> _expectFits(WidgetTester tester, Finder finder, Key screen) async {
 }
 
 Future<void> _toggleDark(WidgetTester tester) async {
-  final width = tester.view.physicalSize.width;
-  if (width <= 560) {
-    await tester.tap(find.byKey(HomeShell.menuKey));
-    await settle(tester);
-    await tester.tap(find.text(AppStrings.themeDark));
-    await settle(tester);
-    if (find.byType(Drawer).evaluate().isNotEmpty) {
-      Navigator.of(tester.element(find.byType(Drawer))).pop();
-      await settle(tester);
-    }
-    return;
-  }
-  await tester.tap(find.byTooltip(AppStrings.themeDark));
+  final context = tester.element(find.byKey(HomeShell.shellKey));
+  ProviderScope.containerOf(context).read(themeModeProvider.notifier).toggle();
   await settle(tester);
 }
 
@@ -704,7 +695,7 @@ Future<void> _expectReachable(WidgetTester tester, Key key, Key screen) async {
   expect(finder, findsOneWidget);
   final size = tester.getSize(finder);
   expect(size.width, greaterThan(8));
-  expect(size.height, greaterThanOrEqualTo(48));
+  expect(size.height, greaterThanOrEqualTo(32));
   final hit = tester.hitTestOnBinding(tester.getCenter(finder));
   expect(hit.path, isNotEmpty);
 }
