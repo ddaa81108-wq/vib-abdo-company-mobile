@@ -522,6 +522,17 @@
 - يعتمد على: 035 و022. لا مسار جديد.
 - التراجع: `git revert 2eba44de5970760d934e0bd17a78cdbc61f64404`. afterward: `flutter test test/live_home_047_test.dart --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-048
+
+- الالتزام: `22ddddbad5bdbfa7f9b27c57e9945c83f015d617`
+- العنوان: VIB-FIX-048: Make the fake suite match the approved screens.
+- العرض: 39 اختبارًا في التطبيق و2 في الحزمة كانت تفشل بعد 040–047، و`flutter analyze` كان يُظهر ملاحظات.
+- السبب: أغلب الاختبارات ما زالت تتوقع الشكل القديم: شريط الصدفة على الدفتر، تدرجات العمر، صلاحية `collections.close_day`، أيقونة المادة، ومفاتيح `Key`. بعضها كشف عيوبًا حقيقية: فيض «تعديل البيانات»، حبر فاتح على الجدول الكريمي وعلى شريط المشتريات الذهبي، ورسائل التحقق التي لا تظهر عندما `reportErrorInline` مغلق.
+- السلوك: الواجهة التي اعتمدها علي لم تُعد تصميمها. الاختبارات القديمة صارت تتوقع السلوك المعتمد. العيوب الحقيقية أُصلحت في مكانها: الزر يتقلص، حبر الجدول والعنوان يُقرأ على الخلفية، وخطأ التاريخ والمبلغ يظهر في شريط. لا حذف لاختبار ولا تخطٍ.
+- الدليل: `flutter analyze` بلا ملاحظات. التطبيق `flutter test --exclude-tags screenshots --dart-define=USE_FAKE_API=true`: 820 نجحت، 8 تُركت، 0 فشلت. الحزمة `flutter test --dart-define=USE_FAKE_API=true`: 551 نجحت، 14 تُركت، 0 فشلت.
+- يعتمد على: 040 و041 و042 و044 و046 و047. لا مسار جديد.
+- التراجع: `git revert 22ddddbad5bdbfa7f9b27c57e9945c83f015d617`. afterward: `flutter test --exclude-tags screenshots --dart-define=USE_FAKE_API=true` ثم `flutter test --dart-define=USE_FAKE_API=true` داخل `packages/api_layer`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
