@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
@@ -126,6 +127,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final width in const [360.0, 1024.0, 1280.0]) {
+    for (final scale in const [1.0, 1.3]) {
+      testWidgets(
+        'carry pills stay one line at ${width.toInt()} scale $scale',
+        (tester) async {
+          await pumpFakeApp(tester, size: Size(width, 800), textScale: scale);
+          await signIn(tester, username: 'admin.demo', password: 'demo-only');
+          await go(tester, '/purchases');
+          await tester.scrollUntilVisible(
+            find.byKey(const Key('purchase-rollover-11')),
+            80,
+            scrollable: _verticalScrollable,
+          );
+          for (final key in const [
+            Key('purchase-carry-open-11'),
+            Key('purchase-carry-close-11'),
+          ]) {
+            _expectSingleLineAmount(tester, key);
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   testWidgets('the separator row lines up with the ledger columns', (
     tester,
   ) async {
@@ -251,6 +277,23 @@ final _verticalScrollable = find.descendant(
         axisDirectionToAxis(widget.axisDirection) == Axis.vertical,
   ),
 );
+
+void _expectSingleLineAmount(WidgetTester tester, Key key) {
+  final textFinder = find.descendant(
+    of: find.byKey(key),
+    matching: find.byType(Text),
+  );
+  final text = tester.widget<Text>(textFinder);
+  expect(text.maxLines, 1);
+  expect(text.softWrap, isFalse);
+  final render = tester.renderObject<RenderParagraph>(textFinder);
+  final boxes = render.getBoxesForSelection(
+    TextSelection(baseOffset: 0, extentOffset: text.data!.length),
+  );
+  final tops = boxes.map((box) => box.top.round()).toSet();
+  expect(tops, hasLength(1));
+  expect(tester.takeException(), isNull);
+}
 
 void _expectGridFits(WidgetTester tester, {required bool settings}) {
   final scrollable = find.descendant(

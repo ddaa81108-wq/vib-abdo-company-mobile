@@ -1937,6 +1937,8 @@ class _PinnedCarryRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         child: Text(
           amount,
+          maxLines: 1,
+          softWrap: false,
           style: cairo(13, 800, color: const Color(0xFF211A08)),
         ),
       ),
@@ -1962,6 +1964,7 @@ class _PinnedCarryRow extends StatelessWidget {
               _ledgerActionWidth);
       final dateWidth = (_ledgerCols[0].$2 + _ledgerCols[1].$2) * unit;
       return Stack(
+        clipBehavior: Clip.none,
         children: [
           if (dateText != null)
             Positioned(
@@ -1989,7 +1992,14 @@ class _PinnedCarryRow extends StatelessWidget {
             width: pillWidth,
             top: 0,
             bottom: 0,
-            child: Center(child: pill),
+            child: OverflowBox(
+              alignment: Alignment.center,
+              minWidth: 0,
+              maxWidth: 240,
+              minHeight: 0,
+              maxHeight: double.infinity,
+              child: pill,
+            ),
           ),
           if (button != null)
             Positioned(
@@ -2028,6 +2038,7 @@ class _PinnedCarryRow extends StatelessWidget {
       width: tableWidth,
       height: height,
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           Positioned.fill(child: ColoredBox(color: background)),
           Positioned(
