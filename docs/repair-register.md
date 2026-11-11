@@ -533,6 +533,17 @@
 - يعتمد على: 040 و041 و042 و044 و046 و047. لا مسار جديد.
 - التراجع: `git revert 22ddddbad5bdbfa7f9b27c57e9945c83f015d617`. afterward: `flutter test --exclude-tags screenshots --dart-define=USE_FAKE_API=true` ثم `flutter test --dart-define=USE_FAKE_API=true` داخل `packages/api_layer`.
 
+## VIB-FIX-049
+
+- الالتزام: `7c32407d3b503094a9135e135c15003f93e27bed`
+- العنوان: VIB-FIX-049: Format the files the CI format check flagged.
+- العرض: فحص التنسيق في CI على رأس `06985194` كان يفشل.
+- السبب: `dart format` على Dart 3.13.5 يريد إعادة لف خمسة ملفات: `purchases_screen.dart` و`ali_preview_screenshots_test.dart` و`collections_close_batch_test.dart` و`login_design_screenshots_test.dart` و`purchases_presentation_test.dart`.
+- السلوك: تنسيق فقط. لا تغيير في السلوك ولا في الواجهة. المسارات نفسها التي يفحصها CI: `lib` و`test` و`packages/api_layer/lib` و`packages/api_layer/test`.
+- الدليل: `dart format --output=none --set-exit-if-changed` يخرج 0. `flutter analyze` بلا ملاحظات. التطبيق 820 نجحت و8 تُركت. الحزمة 551 نجحت و14 تُركت.
+- يعتمد على: 008 و011 و048. لا مسار جديد.
+- التراجع: `git revert 7c32407d3b503094a9135e135c15003f93e27bed`. afterward: `dart format --output=none --set-exit-if-changed lib test packages/api_layer/lib packages/api_layer/test`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
