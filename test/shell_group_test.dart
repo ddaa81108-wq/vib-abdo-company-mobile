@@ -423,10 +423,10 @@ void main() {
     );
   });
 
-  testWidgets('home tiles fill a tall phone and scroll on a small one', (
+  testWidgets('home tiles fill a phone and stay on screen when they can', (
     tester,
   ) async {
-    // 430x932: five rows grow to the bottom bar, no empty band below.
+    // 430x932: five rows grow toward the bottom bar, no empty band below.
     await pumpFakeApp(tester, size: const Size(430, 932));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     final barTop = tester.getRect(find.byType(PhoneBottomNav)).top;
@@ -436,15 +436,17 @@ void main() {
     expect(settings.height, lessThanOrEqualTo(190));
     expect(tester.takeException(), isNull);
 
-    // 320x568: tiles keep their minimum height and the grid scrolls.
+    // 320x568: rows shrink (still at least 48) so the last tile stays above
+    // the bar instead of being pushed off the screen.
     await pumpFakeApp(tester, size: const Size(320, 568));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     final first = tester.getRect(
       find.byKey(HomeShell.sectionKey(SectionKey.customers)),
     );
-    expect(first.height, greaterThanOrEqualTo(112));
+    expect(first.height, greaterThanOrEqualTo(48));
+    final smallBar = tester.getRect(find.byType(PhoneBottomNav)).top;
     final small = tester.getRect(find.byKey(HomeDashboard.settingsTileKey));
-    expect(small.top, greaterThan(568));
+    expect(small.bottom, lessThanOrEqualTo(smallBar + 1));
     expect(tester.takeException(), isNull);
   });
 

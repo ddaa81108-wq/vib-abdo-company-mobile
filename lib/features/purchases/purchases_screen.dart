@@ -155,7 +155,9 @@ abstract final class _PText {
   static const paidTotal = 'إجمالي المسدد';
   static const vodafoneOurs = 'باقي فودافون لصالحنا';
   static const addDeal = 'إضافة معاملة';
-  static const lastRemaining = 'آخر باقي';
+
+  /// Website `PurchaseCarryRow`: the full carry line, not a second caption.
+  static const carryForward = 'الباقي المرحّل من اليوم السابق';
   static const colSeq = 'ت';
   static const colKind = 'النوع';
   static const colValue = 'القيمة ج.م';
@@ -1368,7 +1370,6 @@ const _ledgerCols = <(String, double)>[
 const _ledgerActionWidth = 96.0;
 const _ledgerHeaderH = 56.0;
 const _ledgerRowH = 64.0;
-const _ledgerBreakH = 48.0;
 
 /// Oldest day first, then that day's server [PurchaseEntryDto.sequence].
 List<PurchaseEntryDto> _oldestFirst(List<PurchaseEntryDto> entries) {
@@ -1399,8 +1400,6 @@ class _LedgerBreakLine extends _LedgerLine {
     required this.dayId,
     required this.closing,
     required this.nextDate,
-    required this.dayNumber,
-    required this.closedDate,
     required this.dayStatus,
     required this.correctionOpen,
     required this.dayVersion,
@@ -1410,8 +1409,6 @@ class _LedgerBreakLine extends _LedgerLine {
 
   /// `businessDate` of the first row of the following day. Not today's clock.
   final String? nextDate;
-  final int? dayNumber;
-  final String? closedDate;
   final String? dayStatus;
   final bool correctionOpen;
   final int? dayVersion;
@@ -1431,8 +1428,6 @@ List<_LedgerLine> _ledgerLines(List<PurchaseEntryDto> entries) {
           dayId: closed.dayId ?? 'unknown-$i',
           closing: closed.dayClosingDebtUnits,
           nextDate: entry.businessDate,
-          dayNumber: closed.dayNumber,
-          closedDate: closed.businessDate,
           dayStatus: closed.dayStatus,
           correctionOpen: closed.correctionOpen,
           dayVersion: closed.dayVersion,
@@ -1483,12 +1478,9 @@ class _PurchaseGrid extends ConsumerWidget {
     final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
     final headerH = _ledgerHeaderH * scale;
     final rowH = _ledgerRowH * scale;
-    final breakH = _ledgerBreakH * scale;
     final actionW = _ledgerActionWidth * scale;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final headerFill = const Color(0xFF14532D);
-    // The carried-balance bar is gold in both themes.
-    const breakInk = Color(0xFF44403C);
     final figure = context.textExtras.amount.copyWith(
       fontSize: 13,
       color: look.ink,
@@ -1612,8 +1604,6 @@ class _PurchaseGrid extends ConsumerWidget {
           :final dayId,
           :final closing,
           :final nextDate,
-          :final dayNumber,
-          :final closedDate,
           :final dayStatus,
           :final correctionOpen,
           :final dayVersion,
@@ -1625,7 +1615,6 @@ class _PurchaseGrid extends ConsumerWidget {
             ConstrainedBox(
               key: Key('purchase-rollover-$dayId'),
               constraints: BoxConstraints(
-                minHeight: breakH + 8,
                 minWidth: tableWidth,
                 maxWidth: tableWidth,
               ),
@@ -1637,110 +1626,103 @@ class _PurchaseGrid extends ConsumerWidget {
                   ),
                 ),
                 child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(12, 10, 12, 10),
-                  child: Row(
-                    textDirection: TextDirection.rtl,
+                  padding: const EdgeInsetsDirectional.fromSTEB(10, 6, 10, 6),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'الباقي المرحّل من اليوم السابق',
-                              style: cairo(
-                                12,
-                                800,
-                                color: const Color(0xFF211600),
-                              ),
+                      Row(
+                        textDirection: TextDirection.rtl,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _PText.carryForward,
+                            style: cairo(
+                              12,
+                              800,
+                              color: const Color(0xFF211600),
                             ),
-                            Text(
-                              'يوم #${dayNumber ?? '—'}',
-                              style: cairo(
-                                13,
-                                800,
-                                color: const Color(0xFF211600),
-                              ),
-                            ),
-                            Text(
-                              closedDate ?? AppStrings.dash,
-                              style: cairo(12, 700, color: breakInk),
-                            ),
-                            Text(
-                              nextDate ?? AppStrings.dash,
-                              style: cairo(12, 700, color: breakInk),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF111111),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: sectionButtonGold),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsetsDirectional.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
                           ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _PText.lastRemaining,
-                                style: cairo(11, 700, color: sectionButtonGold),
+                          const SizedBox(width: 8),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              gradient: const LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Color(0xFFFFEAA1), Color(0xFFD1A840)],
                               ),
-                              MoneyText(
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsetsDirectional.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              child: MoneyText(
                                 money.formatOrDash(closing, Currency.lyd),
                                 style: figure.copyWith(
-                                  color: const Color(0xFFFFF8CC),
-                                  fontSize: 16,
+                                  color: const Color(0xFF211A08),
+                                  fontSize: 14,
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                      if (canFinalize &&
-                          dayStatus == 'finalized' &&
-                          dayVersion != null) ...[
-                        const SizedBox(width: 8),
-                        GuardedMutation(
-                          buttonKey: Key('day-correction-$dayId'),
-                          inputs:
-                              'day-correction:$dayId:$correctionOpen:$dayVersion',
-                          expectedVersion: dayVersion,
-                          label: correctionOpen
-                              ? AppStrings.closeDayCorrection
-                              : AppStrings.openDayCorrection,
-                          onVersionConflict: () =>
-                              ref.invalidate(purchasesProvider),
-                          onSubmit: (meta) async {
-                            final ack = await ref
-                                .read(apiLayerProvider)
-                                .purchases
-                                .setDayCorrection(
-                                  book,
-                                  dayId,
-                                  open: !correctionOpen,
-                                  meta: meta,
-                                );
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    '${AppStrings.serverReply} ${ack.id ?? ''}',
-                                  ),
-                                ),
-                              );
-                            }
-                            ref.invalidate(purchasesProvider);
-                            return null;
-                          },
-                        ),
-                      ],
+                      const SizedBox(height: 4),
+                      Row(
+                        textDirection: TextDirection.rtl,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            nextDate ?? AppStrings.dash,
+                            key: Key('purchase-day-date-$dayId'),
+                            style: cairo(
+                              15,
+                              800,
+                              color: const Color(0xFF211600),
+                            ),
+                          ),
+                          if (canFinalize &&
+                              dayStatus == 'finalized' &&
+                              dayVersion != null) ...[
+                            const SizedBox(width: 8),
+                            GuardedMutation(
+                              buttonKey: Key('day-correction-$dayId'),
+                              inputs:
+                                  'day-correction:$dayId:$correctionOpen:$dayVersion',
+                              expectedVersion: dayVersion,
+                              label: correctionOpen
+                                  ? AppStrings.closeDayCorrection
+                                  : AppStrings.openDayCorrection,
+                              onVersionConflict: () =>
+                                  ref.invalidate(purchasesProvider),
+                              onSubmit: (meta) async {
+                                final ack = await ref
+                                    .read(apiLayerProvider)
+                                    .purchases
+                                    .setDayCorrection(
+                                      book,
+                                      dayId,
+                                      open: !correctionOpen,
+                                      meta: meta,
+                                    );
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '${AppStrings.serverReply} ${ack.id ?? ''}',
+                                      ),
+                                    ),
+                                  );
+                                }
+                                ref.invalidate(purchasesProvider);
+                                return null;
+                              },
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
                 ),

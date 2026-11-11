@@ -91,7 +91,7 @@ void main() {
         expect(
           find.descendant(
             of: find.byKey(const Key('purchase-rollover-11')),
-            matching: find.text('آخر باقي'),
+            matching: find.text('الباقي المرحّل من اليوم السابق'),
           ),
           findsOneWidget,
         );
@@ -101,6 +101,20 @@ void main() {
             matching: find.text('2026-10-19'),
           ),
           findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('purchase-rollover-11')),
+            matching: find.textContaining('يوم #'),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('purchase-rollover-11')),
+            matching: find.text('2026-10-18'),
+          ),
+          findsNothing,
         );
         final booksTop = tester
             .getRect(find.byKey(const Key('purchase-books')))
