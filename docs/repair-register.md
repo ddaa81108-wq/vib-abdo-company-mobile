@@ -478,6 +478,17 @@
 - يعتمد على: 027. إنشاء الحسابات من الإعدادات كما هو.
 - التراجع: `git revert 8e00286745837d416c83c3bbce97d0ab6473780f`. afterward: `flutter test test/screens_ui_test.dart --name "login is RTL" --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-044
+
+- الالتزام: `fa1953beefa532d23825e9806b694486642cdfad`
+- العنوان: VIB-FIX-044: Close the collections batch the way the website does.
+- العرض: زر «الإغلاق» في استلامات الديون لا يمسح دفعة العمل.
+- السبب: الزر كان يرسل تأكيدًا من سطر واحد إلى `POST /api/collections/days/close`. الدفعة التجريبية والحقيقية غالبًا فيها مراجعة معلّقة أو نقدية لم تُستلم، فيرد الخادم 409 `COLLECTION_DAY_NOT_SETTLED`. الرسالة كانت عابرة، بلا حوار الإغلاق الاستثنائي، والزر كان مربوطًا بصلاحية `collections.close_day` بينما الخادم يقبل أي دور `admin`.
+- السلوك: الحوار يطابق الموقع: «تأكيد مسح دفعة العمل». إن وُجدت عمليات تنتظر الاعتماد يُعطّل التأكيد. إن بقيت نقدية غير مستلمة يظهر الإغلاق الاستثنائي مع السبب. النجاح يمسح الدفعة من النظرة التالية، والدفعة الجديدة تُفتح عند أول كتابة لاحقة. أي رسالة خطأ من الخادم تبقى في الحوار بالعربية.
+- الدليل: `packages/api_layer/test/collection_close_day_test.dart` و`test/collections_close_batch_test.dart`.
+- يعتمد على: 019 و039. لا مسار جديد.
+- التراجع: `git revert fa1953beefa532d23825e9806b694486642cdfad`. afterward: `flutter test test/collections_close_batch_test.dart --exclude-tags screenshots --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
