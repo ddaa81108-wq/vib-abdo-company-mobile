@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../ui/theme.dart';
+import 'login_preview_045.dart';
 
 /// Preview-only login layouts. The live [LoginScreen] is unchanged.
 class LoginDesignGallery extends StatelessWidget {
@@ -11,7 +12,7 @@ class LoginDesignGallery extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        for (final option in [1, 2, 3, 4]) ...[
+        for (final option in [1, 2, 3, 4, 5, 6, 7, 8]) ...[
           Text('خيار $option', style: cairo(14, 800)),
           const SizedBox(height: 8),
           SizedBox(height: 640, child: LoginDesignOption(option: option)),
@@ -33,6 +34,7 @@ class LoginDesignOption extends StatelessWidget {
       2 => const _SplitHero(),
       3 => const _CreamMinimal(),
       4 => const _BlackLines(),
+      5 || 6 || 7 || 8 => LoginPreview045(option: option),
       _ => const _GlassParticles(),
     };
   }
