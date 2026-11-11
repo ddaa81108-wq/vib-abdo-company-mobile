@@ -850,6 +850,95 @@ class _TickButton extends StatelessWidget {
   }
 }
 
+/// Pencil and trash on one line, the same pill height as the save tick.
+class _RowIconButton extends StatelessWidget {
+  const _RowIconButton({
+    required this.buttonKey,
+    required this.icon,
+    required this.tooltip,
+    required this.fill,
+    required this.border,
+    required this.scale,
+    this.onPressed,
+    this.mutation = false,
+    this.inputs,
+    this.expectedVersion,
+    this.confirmText,
+    this.onSubmit,
+  });
+
+  final Key buttonKey;
+  final IconData icon;
+  final String tooltip;
+  final Color fill;
+  final Color border;
+  final double scale;
+  final VoidCallback? onPressed;
+  final bool mutation;
+  final String? inputs;
+  final int? expectedVersion;
+  final String? confirmText;
+  final Future<String?> Function(MutationMeta meta)? onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    final phone = MediaQuery.sizeOf(context).width < 700;
+    final side = (phone ? 40.0 : 32.0) * scale;
+    final style = ButtonStyle(
+      backgroundColor: WidgetStatePropertyAll(fill),
+      foregroundColor: const WidgetStatePropertyAll(Colors.white),
+      iconColor: const WidgetStatePropertyAll(Colors.white),
+      minimumSize: WidgetStatePropertyAll(Size(side, side)),
+      maximumSize: WidgetStatePropertyAll(Size(side, side)),
+      fixedSize: WidgetStatePropertyAll(Size(side, side)),
+      padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      shape: WidgetStatePropertyAll(
+        CircleBorder(side: BorderSide(color: border)),
+      ),
+    );
+    final themed = Theme(
+      data: Theme.of(context).copyWith(
+        iconButtonTheme: IconButtonThemeData(style: style),
+        textButtonTheme: TextButtonThemeData(style: style),
+        filledButtonTheme: FilledButtonThemeData(style: style),
+        iconTheme: IconThemeData(size: 16 * scale, color: Colors.white),
+      ),
+      child: mutation
+          ? GuardedMutation(
+              buttonKey: buttonKey,
+              inputs: inputs ?? '',
+              expectedVersion: expectedVersion,
+              label: tooltip,
+              glyph: icon,
+              tooltip: tooltip,
+              filled: false,
+              confirmText: confirmText,
+              reportErrorInline: false,
+              onSubmit: onSubmit!,
+            )
+          : TextButton(
+              key: buttonKey,
+              style: TextButton.styleFrom(
+                minimumSize: Size(side, side),
+                fixedSize: Size(side, side),
+                padding: EdgeInsets.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+              onPressed: onPressed,
+              child: Icon(icon, size: 16 * scale),
+            ),
+    );
+    return SizedBox(
+      width: side,
+      height: side,
+      child: Center(child: themed),
+    );
+  }
+}
+
 /// Website cancel control (`purchases-presentation.css` line 97).
 class _CancelTick extends StatelessWidget {
   const _CancelTick({required this.scale, required this.onPressed});
@@ -1807,55 +1896,47 @@ class _PurchaseGrid extends ConsumerWidget {
                       cellKey: Key('purchase-grid-cell-${entry.id}'),
                       cells: dataCells(line, look.ink),
                       tail: _writable(entry)
-                          ? Theme(
-                              data: Theme.of(context).copyWith(
-                                textButtonTheme: TextButtonThemeData(
-                                  style: TextButton.styleFrom(
-                                    minimumSize: const Size(44, 44),
-                                    padding: EdgeInsets.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
+                          ? Row(
+                              key: Key('purchase-row-actions-${entry.id}'),
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                _RowIconButton(
+                                  buttonKey: Key('edit-${entry.id}'),
+                                  icon: Icons.edit_outlined,
+                                  tooltip: AppStrings.edit,
+                                  fill: const Color(0xFF008851),
+                                  border: const Color(0xFF8AEFBF),
+                                  scale: scale,
+                                  onPressed: online
+                                      ? () =>
+                                            ref
+                                                .read(
+                                                  _ledgerDraftProvider.notifier,
+                                                )
+                                                .state = _LedgerDraft(
+                                              entryId: entry.id,
+                                            )
+                                      : null,
                                 ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  GatedButton(
-                                    buttonKey: Key('edit-${entry.id}'),
-                                    allowed: true,
-                                    online: online,
-                                    filled: false,
-                                    glyph: Icons.edit_outlined,
-                                    label: AppStrings.edit,
-                                    onPressed: () =>
-                                        ref
-                                            .read(_ledgerDraftProvider.notifier)
-                                            .state = _LedgerDraft(
-                                          entryId: entry.id,
-                                        ),
-                                  ),
-                                  Expanded(
-                                    child: GuardedMutation(
-                                      buttonKey: Key('delete-${entry.id}'),
-                                      inputs:
-                                          'delete:${entry.id}:${entry.dayVersion}:${entry.version}',
-                                      expectedVersion: entry.dayVersion,
-                                      label: AppStrings.delete,
-                                      glyph: Icons.delete_outline,
-                                      filled: false,
-                                      destructive: true,
-                                      confirmText: AppStrings.confirmDelete,
-                                      onSubmit: (meta) => _deleteEntry(
-                                        context,
-                                        ref,
-                                        entry,
-                                        meta,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                SizedBox(width: 4 * scale),
+                                _RowIconButton(
+                                  buttonKey: Key('delete-${entry.id}'),
+                                  icon: Icons.delete_outline,
+                                  tooltip: AppStrings.delete,
+                                  fill: const Color(0xFFBD152C),
+                                  border: const Color(0xFFFF9BAD),
+                                  scale: scale,
+                                  mutation: true,
+                                  inputs:
+                                      'delete:${entry.id}:${entry.dayVersion}:${entry.version}',
+                                  expectedVersion: entry.dayVersion,
+                                  confirmText: AppStrings.confirmDelete,
+                                  onSubmit: (meta) =>
+                                      _deleteEntry(context, ref, entry, meta),
+                                ),
+                              ],
                             )
                           : entry.dayStatus == 'finalized'
                           ? _SavedTick(
