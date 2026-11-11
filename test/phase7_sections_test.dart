@@ -76,7 +76,7 @@ void main() {
             find.byKey(const Key('purchase-balance-pe_1'), skipOffstage: false),
           )
           .data,
-      '2,553 د.ل',
+      '2,553',
     );
     expect(
       tester
@@ -87,7 +87,7 @@ void main() {
             ),
           )
           .data,
-      '2,000 د.ل',
+      '2,000',
     );
 
     await go(tester, '/treasury');

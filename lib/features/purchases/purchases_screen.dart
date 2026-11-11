@@ -15,6 +15,7 @@ import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/mutation_form.dart';
+import 'purchase_preview.dart';
 import 'purchase_running_balance.dart';
 
 /// Which ledger row is being written. A null [entryId] is a new row.
@@ -152,6 +153,7 @@ class PurchasesScreen extends ConsumerWidget {
                               canFinalize: canFinalize,
                               online: online,
                               latestKey: latest,
+                              historyContinues: controls.cursor != null,
                             ),
                           if (day != null)
                             SliverToBoxAdapter(
@@ -191,8 +193,12 @@ abstract final class _PText {
   static const vodafoneOurs = 'باقي فودافون لصالحنا';
   static const addDeal = 'إضافة معاملة';
 
-  /// Website `PurchaseCarryRow`.
+  /// Website `PurchaseCarryRow` when the loaded page is the start of history.
   static const carryForward = 'الباقي المرحّل من اليوم السابق';
+
+  /// Website `PurchaseCarryRow` when `index === 0 && page.nextBefore !== null`
+  /// (`PurchaseRegister.tsx` passes that as `partialOpening`).
+  static const priorShown = 'الرصيد السابق للمعاملات المعروضة';
 
   /// Website closing row, before the day number (`PurchaseEntryGroup`).
   static const carryToNext = 'الباقي المُرحّل لليوم التالي — يوم #';
@@ -762,7 +768,7 @@ class _InlineLedgerRow extends ConsumerStatefulWidget {
     required this.scale,
     required this.actionWidth,
     this.entry,
-    this.runningAfter,
+    this.balanceBefore,
     super.key,
   });
 
@@ -775,8 +781,9 @@ class _InlineLedgerRow extends ConsumerStatefulWidget {
   final double actionWidth;
   final PurchaseEntryDto? entry;
 
-  /// Website running «الباقي» for this saved row. Null on a blank new row.
-  final int? runningAfter;
+  /// Balance before this row. A new row uses the open day's `totalDebtUnits`.
+  /// An editor uses that row's running `before`.
+  final int? balanceBefore;
 
   @override
   ConsumerState<_InlineLedgerRow> createState() => _InlineLedgerRowState();
@@ -882,12 +889,23 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
     final line = _gridLine(context);
     final width = _ledgerCols.map((col) => col.$2 * widget.scale).toList();
     final existing = widget.entry;
-    final result = existing == null
+    final multiply = _mode == CalculationMode.multiply;
+    final drafted = purchaseDraftResult(
+      valueText: _egp.text,
+      rateText: _rate.text,
+      multiply: multiply,
+    );
+    final preview = purchasePreviewBalance(
+      before: widget.balanceBefore,
+      valueText: _egp.text,
+      rateText: _rate.text,
+      paidText: _paid.text,
+      multiply: multiply,
+    );
+    final result = widget.money.formatNumber(drafted);
+    final remaining = preview == null
         ? AppStrings.dash
-        : widget.money.formatOrDash(existing.resultUnits, Currency.lyd);
-    final remaining = widget.runningAfter == null
-        ? AppStrings.dash
-        : widget.money.format(widget.runningAfter!, Currency.lyd);
+        : widget.money.formatNumber(preview);
     Widget cell({
       required int index,
       required Widget child,
@@ -1043,6 +1061,7 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
             child: Center(
               child: Text(
                 result,
+                key: const Key('purchase-preview-result'),
                 textAlign: TextAlign.center,
                 style: cairo(12, 700, color: context.look.muted),
               ),
@@ -1069,6 +1088,7 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
             child: Center(
               child: Text(
                 remaining,
+                key: const Key('purchase-preview-balance'),
                 textAlign: TextAlign.center,
                 style: cairo(12, 900, color: const Color(0xFF211A08)),
               ),
@@ -1320,6 +1340,16 @@ const _ledgerHeaderH = 56.0;
 const _ledgerRowH = 64.0;
 
 /// Oldest day first, then that day's server [PurchaseEntryDto.sequence].
+/// Ledger integers the website prints with `purchaseNumber` and no currency.
+/// The day cards keep «د.ل» and «ج.م» (`PurchaseMetrics.tsx`).
+String _gridAmount(MoneyFormatter money, MoneyValue? value) {
+  if (value == null) return AppStrings.dash;
+  if (value.isInvalid) return MoneyValue.invalidLabel;
+  final units = value.units;
+  if (units == null) return AppStrings.dash;
+  return money.formatNumber(units);
+}
+
 List<PurchaseEntryDto> _oldestFirst(List<PurchaseEntryDto> entries) {
   final copy = [...entries];
   copy.sort((a, b) {
@@ -1400,6 +1430,7 @@ class _PurchaseGrid extends ConsumerWidget {
     required this.canFinalize,
     required this.online,
     required this.latestKey,
+    required this.historyContinues,
   });
 
   final List<PurchaseEntryDto> entries;
@@ -1410,6 +1441,9 @@ class _PurchaseGrid extends ConsumerWidget {
   final bool canFinalize;
   final bool online;
   final GlobalKey latestKey;
+
+  /// Website `page.nextBefore !== null`: older rows exist beyond this page.
+  final bool historyContinues;
 
   /// A draft row on the open day can be edited. A carried day
   /// («مُرحّل») can be edited only after «تعديل اليوم» sets
@@ -1428,7 +1462,7 @@ class _PurchaseGrid extends ConsumerWidget {
     final draft = ref.watch(_ledgerDraftProvider);
     final lines = _ledgerLines(entries);
     final oldest = _oldestFirst(entries);
-    final running = purchaseRunningAfter(
+    final running = purchaseRunningBalances(
       oldestFirst: oldest,
       closingUnits: openDay?.totalDebtUnits?.units,
     );
@@ -1445,11 +1479,12 @@ class _PurchaseGrid extends ConsumerWidget {
       fontSize: 13,
       color: look.ink,
     );
-    Widget moneyCell(MoneyValue? value, Currency currency, {Color? color}) {
+    Widget gridNumber(MoneyValue? value, {Color? color, Key? key}) {
       return FittedBox(
         fit: BoxFit.scaleDown,
         child: MoneyText(
-          money.formatOrDash(value, currency),
+          _gridAmount(money, value),
+          key: key,
           style: color == null ? figure : figure.copyWith(color: color),
         ),
       );
@@ -1477,19 +1512,19 @@ class _PurchaseGrid extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
           style: cairo(13, 700, color: ink),
         ),
-        moneyCell(entry.egpValueUnits, Currency.egp, color: ink),
+        gridNumber(entry.egpValueUnits, color: ink),
         op,
         LtrText(rate, style: figure.copyWith(color: ink)),
-        moneyCell(entry.resultUnits, Currency.lyd, color: ink),
-        moneyCell(entry.paidUnits, Currency.lyd, color: ink),
+        gridNumber(entry.resultUnits, color: ink),
+        gridNumber(entry.paidUnits, color: ink),
         Text(
           running == null
               ? AppStrings.dash
-              : money.format(running[entry.id]!, Currency.lyd),
+              : money.formatNumber(running.after[entry.id]!),
           key: Key('purchase-balance-${entry.id}'),
           style: cairo(13, 900, color: balanceInk),
         ),
-        moneyCell(entry.vodafoneConsumedUnits, vodafoneCurrency, color: ink),
+        gridNumber(entry.vodafoneConsumedUnits, color: ink),
       ];
     }
 
@@ -1566,6 +1601,17 @@ class _PurchaseGrid extends ConsumerWidget {
       ),
     ];
 
+    if (historyContinues && oldest.isNotEmpty) {
+      scrollBands.add(
+        _HistoryOpeningCarry(
+          scale: scale,
+          amount: running == null
+              ? AppStrings.dash
+              : money.formatNumber(running.before[oldest.first.id]!),
+        ),
+      );
+    }
+
     for (final line in lines) {
       switch (line) {
         case _LedgerBreakLine(
@@ -1610,7 +1656,7 @@ class _PurchaseGrid extends ConsumerWidget {
                       scale: scale,
                       actionWidth: actionW,
                       entry: entry,
-                      runningAfter: running?[entry.id],
+                      balanceBefore: running?.before[entry.id],
                     )
                   : band(
                       height: rowH,
@@ -1697,6 +1743,7 @@ class _PurchaseGrid extends ConsumerWidget {
           money: money,
           scale: scale,
           actionWidth: actionW,
+          balanceBefore: openDay?.totalDebtUnits?.units,
         ),
       );
     }
@@ -1746,6 +1793,41 @@ class _LedgerHScrollScope extends InheritedNotifier<_LedgerHScroll> {
   }
 }
 
+/// Opening carry above the oldest loaded row when `nextBefore` is still set.
+/// The website's first `PurchaseCarryRow` uses `partialOpening` for that case.
+class _HistoryOpeningCarry extends StatelessWidget {
+  const _HistoryOpeningCarry({required this.scale, required this.amount});
+
+  final double scale;
+  final String amount;
+
+  @override
+  Widget build(BuildContext context) {
+    final widths = [for (final col in _ledgerCols) col.$2 * scale];
+    final actionW = _ledgerActionWidth * scale;
+    final tableWidth =
+        widths.fold<double>(0, (sum, width) => sum + width) + actionW;
+    final remaining = _ledgerCols.indexWhere(
+      (col) => col.$1 == _PText.remaining,
+    );
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return KeyedSubtree(
+      key: const Key('purchase-prior-row'),
+      child: _PinnedCarryRow(
+        tableWidth: tableWidth,
+        height: 40 * scale,
+        background: dark ? const Color(0xFF121614) : const Color(0xFFFFFBF0),
+        ink: dark ? const Color(0xFFF6E7A8) : const Color(0xFF211600),
+        label: _PText.priorShown,
+        amount: amount,
+        pillKey: const Key('purchase-prior-balance'),
+        pillLeft: actionW + widths[8],
+        pillWidth: widths[remaining],
+      ),
+    );
+  }
+}
+
 /// End-of-day carry, a thin divider, then the next day's opening carry.
 /// On a wide screen the gold pill sits in the «الباقي» column. On a phone
 /// the label and the pill stay inside the visible width.
@@ -1789,7 +1871,7 @@ class _DayCarryBreak extends ConsumerWidget {
     // the action column.
     final pillLeft = actionW + widths[8];
     final pillWidth = widths[remaining];
-    final amount = money.formatOrDash(closing, Currency.lyd);
+    final amount = _gridAmount(money, closing);
     final showCorrection =
         canFinalize && dayStatus == 'finalized' && dayVersion != null;
     final dark = Theme.of(context).brightness == Brightness.dark;

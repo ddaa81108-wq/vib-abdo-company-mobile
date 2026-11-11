@@ -67,16 +67,26 @@ void main() {
         ),
       ),
     );
-    expect(find.text('2,000 د.ل'), findsWidgets);
     expect(
       tester
           .widget<Text>(find.byKey(const Key('purchase-balance-pe_old')))
           .data,
-      '2,000 د.ل',
+      '2,000',
     );
     expect(
       tester.widget<Text>(find.byKey(const Key('purchase-balance-pe_1'))).data,
-      '2,553 د.ل',
+      '2,553',
+    );
+    expect(
+      tester
+          .widget<Text>(
+            find.descendant(
+              of: find.byKey(const Key('purchase-carry-close-11')),
+              matching: find.byType(Text),
+            ),
+          )
+          .data,
+      '2,000',
     );
     expect(tester.takeException(), isNull);
   });

@@ -172,18 +172,14 @@ void main() {
         );
         if (wideScroll.evaluate().isNotEmpty) {
           final entry = find.byKey(const Key('purchase-entry-pe_1'));
-          final number = tester.getRect(
+          expect(
             find.descendant(of: entry, matching: find.textContaining('10,000')),
+            findsOneWidget,
           );
-          final symbols = find.descendant(
-            of: entry,
-            matching: find.text('ج.م'),
+          expect(
+            find.descendant(of: entry, matching: find.text('ج.م')),
+            findsNothing,
           );
-          final beside = List.generate(symbols.evaluate().length, (index) {
-            return tester.getRect(symbols.at(index));
-          }).where((rect) => (rect.center.dy - number.center.dy).abs() < 12);
-          expect(beside, isNotEmpty);
-          expect(beside.first.center.dx, lessThan(number.center.dx));
         }
         expect(tester.takeException(), isNull);
       },

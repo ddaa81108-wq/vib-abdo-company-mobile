@@ -18,12 +18,22 @@ import 'package:flutter_api_layer/api_layer.dart';
 /// the anchor is the current day's closing total. If the anchor is missing,
 /// or any loaded row has an invalid result or payment, every cell is blank
 /// (the website returns an empty map).
-Map<String, int>? purchaseRunningAfter({
+/// `after` is the cell. `before` is the balance the website passes to the
+/// opening carry and to the inline editor.
+final class PurchaseRunning {
+  const PurchaseRunning({required this.before, required this.after});
+
+  final Map<String, int> before;
+  final Map<String, int> after;
+}
+
+PurchaseRunning? purchaseRunningBalances({
   required List<PurchaseEntryDto> oldestFirst,
   required int? closingUnits,
 }) {
   if (closingUnits == null) return null;
   var balance = closingUnits;
+  final before = <String, int>{};
   final after = <String, int>{};
   for (var i = oldestFirst.length - 1; i >= 0; i--) {
     final entry = oldestFirst[i];
@@ -41,6 +51,17 @@ Map<String, int>? purchaseRunningAfter({
     }
     after[entry.id] = balance;
     balance = balance - resultUnits + paidUnits;
+    before[entry.id] = balance;
   }
-  return after;
+  return PurchaseRunning(before: before, after: after);
+}
+
+Map<String, int>? purchaseRunningAfter({
+  required List<PurchaseEntryDto> oldestFirst,
+  required int? closingUnits,
+}) {
+  return purchaseRunningBalances(
+    oldestFirst: oldestFirst,
+    closingUnits: closingUnits,
+  )?.after;
 }
