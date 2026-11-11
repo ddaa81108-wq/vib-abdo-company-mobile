@@ -91,7 +91,8 @@ void main() {
         expect(
           find.descendant(
             of: find.byKey(const Key('purchase-rollover-11')),
-            matching: find.text('الباقي المرحّل من اليوم السابق'),
+            matching: find.byTooltip('الباقي المرحّل من اليوم السابق'),
+            skipOffstage: false,
           ),
           findsOneWidget,
         );
@@ -152,6 +153,7 @@ void main() {
           find.descendant(
             of: find.byKey(const Key('purchase-rollover-11')),
             matching: find.textContaining('2,000'),
+            skipOffstage: false,
           ),
           findsOneWidget,
         );

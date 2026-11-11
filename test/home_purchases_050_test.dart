@@ -51,7 +51,8 @@ void main() {
     expect(
       find.descendant(
         of: rollover,
-        matching: find.text('الباقي المرحّل من اليوم السابق'),
+        matching: find.byTooltip('الباقي المرحّل من اليوم السابق'),
+        skipOffstage: false,
       ),
       findsOneWidget,
     );
@@ -67,10 +68,54 @@ void main() {
       find.descendant(of: rollover, matching: find.textContaining('يوم #')),
       findsNothing,
     );
-    expect(find.text(AppStrings.openDayCorrection), findsWidgets);
+    expect(
+      find.descendant(
+        of: rollover,
+        matching: find.text(AppStrings.openDayCorrection),
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
     final gap = tester.getRect(rollover);
     final today = tester.getRect(find.byKey(const Key('purchase-entry-pe_1')));
     expect(gap.bottom, lessThanOrEqualTo(today.top + 1));
+    expect(gap.height, lessThan(56));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the separator row lines up with the ledger columns', (
+    tester,
+  ) async {
+    await pumpFakeApp(tester, size: const Size(1280, 800));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+    final rollover = find.byKey(const Key('purchase-rollover-11'));
+    await tester.scrollUntilVisible(
+      rollover,
+      80,
+      scrollable: _verticalScrollable,
+    );
+    final header = tester.getRect(
+      find.descendant(
+        of: find.byKey(const Key('purchase-ledger')),
+        matching: find.text('الباقي'),
+      ),
+    );
+    final amount = tester.getRect(
+      find.byKey(const Key('purchase-carry-cell-11')),
+    );
+    expect((amount.center.dx - header.center.dx).abs(), lessThan(4));
+    final date = tester.getRect(find.byKey(const Key('purchase-day-date-11')));
+    expect(date.center.dx, greaterThan(amount.center.dx));
+    final mark = tester.getRect(
+      find.descendant(
+        of: find.byKey(const Key('purchase-ledger')),
+        matching: find.text('✓'),
+      ),
+    );
+    final button = tester.getRect(find.byKey(const Key('day-correction-11')));
+    expect((button.center.dx - mark.center.dx).abs(), lessThan(24));
+    expect(tester.getSize(rollover).height, lessThan(56));
     expect(tester.takeException(), isNull);
   });
 
@@ -113,6 +158,16 @@ void main() {
       scrollable: _verticalScrollable,
     );
     await saveShot(tester, 'purchases-separator-dark');
+
+    await pumpFakeApp(tester, size: const Size(1280, 800));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/purchases');
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('purchase-rollover-11')),
+      80,
+      scrollable: _verticalScrollable,
+    );
+    await saveShot(tester, 'purchases-separator-wide');
   }, tags: const ['screenshots']);
 }
 

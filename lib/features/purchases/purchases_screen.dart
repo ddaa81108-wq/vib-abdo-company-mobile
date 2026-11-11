@@ -1608,125 +1608,130 @@ class _PurchaseGrid extends ConsumerWidget {
           :final correctionOpen,
           :final dayVersion,
         ):
-          final tableWidth =
-              _ledgerCols.fold<double>(0, (sum, col) => sum + col.$2 * scale) +
-              actionW;
-          scrollBands.add(
-            ConstrainedBox(
-              key: Key('purchase-rollover-$dayId'),
-              constraints: BoxConstraints(
-                minWidth: tableWidth,
-                maxWidth: tableWidth,
+          final widths = [for (final col in _ledgerCols) col.$2 * scale];
+          final remaining = _ledgerCols.indexWhere(
+            (col) => col.$1 == _PText.remaining,
+          );
+          final breakH = 40.0 * scale;
+          const breakInk = Color(0xFF211600);
+          const breakGold = Color(0xFFE7AE12);
+          const breakFill = Color(0xFFF6E7A8);
+          Widget slot(
+            double width,
+            Widget child, {
+            Key? key,
+            AlignmentGeometry alignment = Alignment.center,
+          }) {
+            return DecoratedBox(
+              key: key,
+              decoration: BoxDecoration(
+                color: breakFill,
+                border: Border.all(color: breakGold),
               ),
-              child: DecoratedBox(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF6E7A8),
-                  border: Border.symmetric(
-                    horizontal: BorderSide(color: Color(0xFFE7AE12), width: 2),
-                  ),
-                ),
+              child: SizedBox(
+                width: width,
+                height: breakH,
                 child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(10, 6, 10, 6),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        textDirection: TextDirection.rtl,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _PText.carryForward,
-                            style: cairo(
-                              12,
-                              800,
-                              color: const Color(0xFF211600),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              gradient: const LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [Color(0xFFFFEAA1), Color(0xFFD1A840)],
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsetsDirectional.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              child: MoneyText(
-                                money.formatOrDash(closing, Currency.lyd),
-                                style: figure.copyWith(
-                                  color: const Color(0xFF211A08),
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        textDirection: TextDirection.rtl,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            nextDate ?? AppStrings.dash,
-                            key: Key('purchase-day-date-$dayId'),
-                            style: cairo(
-                              15,
-                              800,
-                              color: const Color(0xFF211600),
-                            ),
-                          ),
-                          if (canFinalize &&
-                              dayStatus == 'finalized' &&
-                              dayVersion != null) ...[
-                            const SizedBox(width: 8),
-                            GuardedMutation(
-                              buttonKey: Key('day-correction-$dayId'),
-                              inputs:
-                                  'day-correction:$dayId:$correctionOpen:$dayVersion',
-                              expectedVersion: dayVersion,
-                              label: correctionOpen
-                                  ? AppStrings.closeDayCorrection
-                                  : AppStrings.openDayCorrection,
-                              onVersionConflict: () =>
-                                  ref.invalidate(purchasesProvider),
-                              onSubmit: (meta) async {
-                                final ack = await ref
-                                    .read(apiLayerProvider)
-                                    .purchases
-                                    .setDayCorrection(
-                                      book,
-                                      dayId,
-                                      open: !correctionOpen,
-                                      meta: meta,
-                                    );
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        '${AppStrings.serverReply} ${ack.id ?? ''}',
-                                      ),
-                                    ),
-                                  );
-                                }
-                                ref.invalidate(purchasesProvider);
-                                return null;
-                              },
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Align(
+                    alignment: alignment,
+                    child: FittedBox(fit: BoxFit.scaleDown, child: child),
                   ),
                 ),
               ),
+            );
+          }
+
+          final showCorrection =
+              canFinalize && dayStatus == 'finalized' && dayVersion != null;
+          scrollBands.add(
+            Row(
+              key: Key('purchase-rollover-$dayId'),
+              textDirection: TextDirection.rtl,
+              children: [
+                slot(
+                  widths[0] + widths[1],
+                  Text(
+                    nextDate ?? AppStrings.dash,
+                    key: Key('purchase-day-date-$dayId'),
+                    style: cairo(14, 800, color: breakInk),
+                  ),
+                  alignment: AlignmentDirectional.centerStart,
+                ),
+                for (var i = 2; i < widths.length; i++)
+                  if (i == remaining)
+                    slot(
+                      widths[i],
+                      Tooltip(
+                        message: _PText.carryForward,
+                        child: MoneyText(
+                          money.formatOrDash(closing, Currency.lyd),
+                          key: Key('purchase-carry-$dayId'),
+                          style: figure.copyWith(color: breakInk, fontSize: 13),
+                        ),
+                      ),
+                      key: Key('purchase-carry-cell-$dayId'),
+                    )
+                  else
+                    slot(widths[i], const SizedBox.shrink()),
+                slot(
+                  actionW,
+                  showCorrection
+                      ? Theme(
+                          data: Theme.of(context).copyWith(
+                            filledButtonTheme: FilledButtonThemeData(
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size(0, 28),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                                textStyle: cairo(11, 700),
+                                backgroundColor: const Color(0xFF14532D),
+                                foregroundColor: breakFill,
+                              ),
+                            ),
+                          ),
+                          child: GuardedMutation(
+                            buttonKey: Key('day-correction-$dayId'),
+                            inputs:
+                                'day-correction:$dayId:$correctionOpen:$dayVersion',
+                            expectedVersion: dayVersion,
+                            label: correctionOpen
+                                ? AppStrings.closeDayCorrection
+                                : AppStrings.openDayCorrection,
+                            reportErrorInline: false,
+                            onVersionConflict: () =>
+                                ref.invalidate(purchasesProvider),
+                            onSubmit: (meta) async {
+                              final ack = await ref
+                                  .read(apiLayerProvider)
+                                  .purchases
+                                  .setDayCorrection(
+                                    book,
+                                    dayId,
+                                    open: !correctionOpen,
+                                    meta: meta,
+                                  );
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '${AppStrings.serverReply} ${ack.id ?? ''}',
+                                    ),
+                                  ),
+                                );
+                              }
+                              ref.invalidate(purchasesProvider);
+                              return null;
+                            },
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
             ),
           );
         case _LedgerEntryLine(:final entry):
