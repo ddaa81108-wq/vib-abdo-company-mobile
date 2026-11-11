@@ -621,6 +621,17 @@
 - يعتمد على: 055. لا مسار جديد ولا تغيير في الخادم.
 - التراجع: `git revert e612f59eb6ab954386f7e535679583e0215ab7fe`. afterward: `flutter test test/purchase_tick_056_test.dart --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-057
+
+- الالتزام: `2e11daecb1e546907e1374681d786612f9d18e16`
+- العنوان: VIB-FIX-057: Align the purchases edit and delete icons on one line.
+- العرض: في صف المشتريات المرحّل كانت أيقونة الحذف أعلى من القلم.
+- السبب: زر الحذف كان داخل عمود يتمدد فيملأ ارتفاع الخلية ويجلس في أعلاها، بينما القلم في وسطها.
+- السلوك: الزران في صف واحد بعرض ثابت، في وسط الخلية أفقيًا وعموديًا. الحذف `#BD152C` وحد `#FF9BAD`، والتعديل `#008851` وحد `#8AEFBF`. تحت عرض 700 المقاس 40، وفوقه 32.
+- الدليل: `test/ali_057_060_test.dart` «purchase edit and delete share one centered line».
+- يعتمد على: 056. لا مسار جديد ولا تغيير في الخادم.
+- التراجع: `git revert 2e11daecb1e546907e1374681d786612f9d18e16`. afterward: `flutter test test/ali_057_060_test.dart --dart-define=USE_FAKE_API=true --name "purchase edit"`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
