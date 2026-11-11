@@ -78,8 +78,19 @@ abstract interface class CollectionsRepository {
   /// [meta] is not sent.
   Future<MutationAck> markUnlinkedCashReceived(
       String receiptId, MutationMeta meta);
+
+  /// `POST /api/collections/days/close`.
+  ///
+  /// Body is `batchId`, `confirmed: true`, and, for an exceptional close,
+  /// `allowOutstandingCash`, `reason`, `expectedCashPendingCount`, and
+  /// `expectedCashPendingUnits`. Admin role only.
   Future<MutationAck> closeDay(
-      {required String batchId, required MutationMeta meta});
+      {required String batchId,
+      required MutationMeta meta,
+      bool allowOutstandingCash = false,
+      String? reason,
+      int? expectedCashPendingCount,
+      int? expectedCashPendingUnits});
 
   Future<PayrollDto> payroll();
   Future<MutationAck> addPayrollEntry(
@@ -235,9 +246,23 @@ class RemoteCollectionsRepository implements CollectionsRepository {
 
   @override
   Future<MutationAck> closeDay(
-          {required String batchId, required MutationMeta meta}) =>
-      _post(ApiEndpoints.collectionDaysClose,
-          {...meta.toBody(), 'batchId': batchId, 'confirmed': true});
+          {required String batchId,
+          required MutationMeta meta,
+          bool allowOutstandingCash = false,
+          String? reason,
+          int? expectedCashPendingCount,
+          int? expectedCashPendingUnits}) =>
+      _post(ApiEndpoints.collectionDaysClose, {
+        ...meta.toBody(),
+        'batchId': batchId,
+        'confirmed': true,
+        if (allowOutstandingCash) 'allowOutstandingCash': true,
+        if (reason != null) 'reason': reason,
+        if (expectedCashPendingCount != null)
+          'expectedCashPendingCount': expectedCashPendingCount,
+        if (expectedCashPendingUnits != null)
+          'expectedCashPendingUnits': expectedCashPendingUnits,
+      });
 
   @override
   Future<PayrollDto> payroll() async {

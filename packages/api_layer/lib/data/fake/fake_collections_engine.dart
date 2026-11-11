@@ -428,6 +428,7 @@ class FakeCollectionsEngine {
               'businessDate': b['businessDate'],
               'batchNumber': b['batchNumber'],
               'openedAt': b['openedAt'],
+              ..._batchCloseCounts('${b['id']}'),
             },
       ],
     };
@@ -937,6 +938,26 @@ class FakeCollectionsEngine {
     return _cash(r, id);
   }
 
+  Map<String, int> _batchCloseCounts(String batchId) {
+    var pending = 0, cashCount = 0, cashUnits = 0;
+    for (final row in [
+      ..._submissions.where((s) => s['batchId'] == batchId),
+      ..._unlinked.where((r) => r['batchId'] == batchId),
+    ]) {
+      if (row['status'] == 'pending') pending++;
+      if (row['status'] == 'approved' && row['cashReceivedAt'] == null) {
+        cashCount++;
+        final amount = row['amountUnits'];
+        if (amount is int) cashUnits += amount;
+      }
+    }
+    return {
+      'pendingCount': pending,
+      'cashPendingCount': cashCount,
+      'cashPendingUnits': cashUnits,
+    };
+  }
+
   /// `POST /api/collections/days/close`.
   Map<String, dynamic> closeDay(Map body) {
     final batchId = body['batchId'] is String ? '${body['batchId']}' : '';
@@ -955,21 +976,50 @@ class FakeCollectionsEngine {
         'replayed': true
       };
     }
-    var pending = 0, cash = 0;
-    final rows = [
-      ..._submissions.where((s) => s['batchId'] == batchId),
-      ..._unlinked.where((r) => r['batchId'] == batchId),
-    ];
-    for (final row in rows) {
-      if (row['status'] == 'pending') pending++;
-      if (row['status'] == 'approved' && row['cashReceivedAt'] == null) cash++;
+    final counts = _batchCloseCounts(batchId);
+    final pending = counts['pendingCount']!;
+    final cash = counts['cashPendingCount']!;
+    final cashUnits = counts['cashPendingUnits']!;
+    final exceptional = body['allowOutstandingCash'] == true;
+    if (pending > 0 || (!exceptional && cash > 0)) {
+      _fail(409, 'COLLECTION_DAY_NOT_SETTLED',
+          'لا يمكن مسح اليوم قبل اعتماد جميع العمليات واستلام كل النقدية.', {
+        'pendingCount': pending,
+        'cashPendingCount': cash,
+        'cashPendingUnits': cashUnits,
+      });
     }
-    if (pending > 0 || cash > 0) {
-      _fail(
-          409,
-          'COLLECTION_DAY_NOT_SETTLED',
-          'لا يمكن مسح اليوم قبل اعتماد جميع العمليات واستلام كل النقدية.',
-          {'pendingCount': pending, 'cashPendingCount': cash});
+    if (exceptional) {
+      final reason = body['reason'] is String ? '${body['reason']}'.trim() : '';
+      if (reason.length < 5 || reason.length > 500) {
+        _fail(400, 'EXCEPTION_REASON_REQUIRED',
+            'اكتب سبب الإغلاق الاستثنائي من 5 إلى 500 حرف.');
+      }
+      if (body['expectedCashPendingCount'] != cash ||
+          body['expectedCashPendingUnits'] != cashUnits) {
+        _fail(
+            409,
+            'COLLECTION_CASH_CHANGED',
+            'تغيّرت النقدية غير المستلمة. راجع القيم وأعد التأكيد.',
+            {'cashPendingCount': cash, 'cashPendingUnits': cashUnits});
+      }
+      for (final assignment in _assignments) {
+        if (assignment['batchId'] == batchId) {
+          assignment['status'] = 'cancelled';
+        }
+      }
+      batch['status'] = 'closed';
+      return {
+        'batchId': batchId,
+        'businessDate': batch['businessDate'],
+        'closed': true,
+        'archived': cash > 0,
+        'deletedAssignments': 0,
+        'deletedSubmissions': 0,
+        'cashPendingCount': cash,
+        'cashPendingUnits': cashUnits,
+        'eventSequences': [7],
+      };
     }
     final deletedSubmissions =
         _submissions.where((s) => s['batchId'] == batchId).length;

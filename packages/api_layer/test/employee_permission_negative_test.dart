@@ -363,8 +363,13 @@ final _forbidden = <_Call>[
     '/api/collections/unlinked-receipts/ur_2/cash-received',
     body: _mutation('ucash', version: 4),
   ),
-  _Call('POST', '/api/collections/days/close',
-      body: _mutation('close', version: 1)),
+  _Call(
+    'POST',
+    '/api/collections/days/close',
+    body: _mutation('close', version: 1),
+    message: 'ليست لديك صلاحية لهذه العملية.',
+    code: 'PERMISSION_DENIED',
+  ),
   _Call('POST', '/api/collections/payroll/entries',
       body: _mutation('payroll-entry')),
   _Call(

@@ -51,6 +51,20 @@ abstract final class CollectionsText {
   static const closeBatch = 'إغلاق ومسح الدفعة';
   static const closeConfirm =
       'هل تم اعتماد جميع العمليات واستلام النقدية بالكامل؟ ستُمسح الدفعة نهائيًا، ولن يتأثر سجل ديون العملاء.';
+  static const closeDialogTitle = 'تأكيد مسح دفعة العمل';
+  static const closeOutstandingIntro =
+      'الإغلاق العادي يتطلب استلام النقدية بالكامل. يمكن للإدارة الإغلاق الاستثنائي مع حفظ المبالغ غير المستلمة وسجلاتها.';
+  static const closePendingAlert =
+      'توجد عمليات تنتظر الاعتماد. راجعها قبل إغلاق الدفعة.';
+  static const closeException = 'إغلاق استثنائي مع بقاء النقدية مستحقة';
+  static const closeExceptionNote =
+      'ستختفي كروت الدفعة، وتبقى الاستلامات محفوظة في «نقدية سابقة لم تُسلّم» حتى استلامها فعليًا. لا تتغير أرصدة العملاء.';
+  static const closeExceptionReason = 'سبب الإغلاق الاستثنائي';
+  static const closeCashChanged =
+      'تغيّرت النقدية غير المستلمة. ألغِ التحديد وراجع القيم ثم أعد التأكيد.';
+  static const closeYes = 'نعم، امسح الدفعة';
+  static const closeYesException = 'نعم، أغلق استثنائيًا';
+  static const closeNo = 'لا';
   static String batchLabel(String? date, int? number) =>
       [?date, if (number != null) 'دفعة $number'].join(' • ');
   static const batchClosed = 'تم إغلاق الدفعة ومسحها.';

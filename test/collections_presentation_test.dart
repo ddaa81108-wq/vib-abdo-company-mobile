@@ -68,10 +68,7 @@ void main() {
       find.byKey(const Key('cash-sb_2'), skipOffstage: false),
       findsNothing,
     );
-    expect(
-      find.byKey(const Key('close-batch'), skipOffstage: false),
-      findsNothing,
-    );
+    expect(find.byKey(const Key('close-batch')), findsOneWidget);
     expect(
       find.byKey(const Key('awaiting-cash-sb_2'), skipOffstage: false),
       findsOneWidget,

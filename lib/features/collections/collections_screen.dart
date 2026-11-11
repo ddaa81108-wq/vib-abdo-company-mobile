@@ -189,7 +189,8 @@ class _AdminViewState extends ConsumerState<_AdminView> {
       for (final tab in AdminTab.values) tab: adminTabRows(data, filter, tab),
     };
     final permissions = permissionsOf(ref);
-    final close = permissions.canDo(ManagementAction.collectionsCloseDay);
+    // The server allows every admin role. It does not check a close-day code.
+    final close = permissions.isAdminRole;
     final look = context.look;
 
     return Column(
@@ -272,6 +273,7 @@ class _AdminViewState extends ConsumerState<_AdminView> {
             if (close)
               _CloseBatchButton(
                 batch: batch,
+                settlement: settlement,
                 label: CollectionsText.closeShort,
               ),
             CollectionsExportButton(
@@ -1169,15 +1171,17 @@ class _BarButton extends StatelessWidget {
   }
 }
 
-/// «إغلاق ومسح الدفعة» for the chosen batch. 537 refuses an unsettled
-/// batch (COLLECTION_DAY_NOT_SETTLED); that message is shown, never hidden.
+/// «الإغلاق» opens the website's confirm dialog, then
+/// `POST /api/collections/days/close`. The next overview is the server's.
 class _CloseBatchButton extends ConsumerWidget {
   const _CloseBatchButton({
     required this.batch,
+    required this.settlement,
     this.label = CollectionsText.closeBatch,
   });
 
   final CollectionBatchDto? batch;
+  final BatchSettlement settlement;
   final String label;
 
   @override
@@ -1190,35 +1194,203 @@ class _CloseBatchButton extends ConsumerWidget {
         child: Text(label, textAlign: TextAlign.center),
       );
     }
-    return GuardedMutation(
-      buttonKey: const Key('close-batch'),
-      inputs: 'close:${batch.id}',
-      label: label,
-      confirmText: CollectionsText.closeConfirm,
-      destructive: true,
-      onVersionConflict: () => ref.invalidate(collectionsProvider),
-      onSubmit: (meta) async {
-        try {
-          await ref
-              .read(apiLayerProvider)
-              .collections
-              .closeDay(batchId: batch.id, meta: meta);
-        } on ConflictException catch (error) {
-          ref.invalidate(collectionsProvider);
-          if (context.mounted) {
-            ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text(error.message)));
-          }
-          return error.message;
-        }
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text(CollectionsText.batchClosed)),
-          );
-        }
-        ref.invalidate(collectionsProvider);
-        return null;
+    final pending = batch.pendingCount ?? settlement.reviewCount;
+    final cashCount = batch.cashPendingCount ?? 0;
+    final cashUnits = batch.cashPendingUnits ?? settlement.cashUnits;
+    return FilledButton(
+      key: const Key('close-batch'),
+      onPressed: () {
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => _CloseBatchDialog(
+            batchId: batch.id,
+            pendingCount: pending,
+            cashPendingCount: cashCount,
+            cashPendingUnits: cashUnits,
+          ),
+        );
       },
+      child: Text(
+        label,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+class _CloseBatchDialog extends ConsumerStatefulWidget {
+  const _CloseBatchDialog({
+    required this.batchId,
+    required this.pendingCount,
+    required this.cashPendingCount,
+    required this.cashPendingUnits,
+  });
+
+  final String batchId;
+  final int pendingCount;
+  final int cashPendingCount;
+  final int cashPendingUnits;
+
+  @override
+  ConsumerState<_CloseBatchDialog> createState() => _CloseBatchDialogState();
+}
+
+class _CloseBatchDialogState extends ConsumerState<_CloseBatchDialog> {
+  var _exception = false;
+  var _busy = false;
+  var _changed = false;
+  String? _error;
+  final _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  bool get _outstanding =>
+      widget.cashPendingCount > 0 || widget.cashPendingUnits > 0;
+
+  bool get _canConfirm {
+    if (_busy || widget.pendingCount > 0 || _changed) return false;
+    if (!_outstanding) return true;
+    return _exception && _reason.text.trim().length >= 5;
+  }
+
+  Future<void> _send() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final ack = await ref
+          .read(apiLayerProvider)
+          .collections
+          .closeDay(
+            batchId: widget.batchId,
+            meta: MutationMeta(),
+            allowOutstandingCash: _exception,
+            reason: _exception ? _reason.text.trim() : null,
+            expectedCashPendingCount: _exception
+                ? widget.cashPendingCount
+                : null,
+            expectedCashPendingUnits: _exception
+                ? widget.cashPendingUnits
+                : null,
+          );
+      ref.invalidate(collectionsProvider);
+      if (!mounted) return;
+      if (ack.raw['closed'] == false) {
+        setState(() {
+          _busy = false;
+          _error = failureText(
+            ref.read(errorHandlerProvider).toFailure(StateError('${ack.raw}')),
+          );
+        });
+        return;
+      }
+      Navigator.pop(context);
+    } catch (error) {
+      ref.invalidate(collectionsProvider);
+      if (!mounted) return;
+      final failure = ref.read(errorHandlerProvider).toFailure(error);
+      final changed = failure.code == 'COLLECTION_CASH_CHANGED';
+      setState(() {
+        _busy = false;
+        _changed = changed;
+        _error = failure.message;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final money = ref.watch(apiLayerProvider).money;
+    return AlertDialog(
+      title: const Text(CollectionsText.closeDialogTitle),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              _outstanding
+                  ? CollectionsText.closeOutstandingIntro
+                  : CollectionsText.closeConfirm,
+            ),
+            if (widget.pendingCount > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                CollectionsText.closePendingAlert,
+                key: const Key('close-batch-pending'),
+              ),
+            ],
+            if (_outstanding) ...[
+              const SizedBox(height: 8),
+              Text(
+                'نقدية غير مستلمة: ${money.format(widget.cashPendingUnits, Currency.lyd)} — ${widget.cashPendingCount} استلام',
+                key: const Key('close-batch-outstanding'),
+              ),
+              CheckboxListTile(
+                key: const Key('close-batch-exception'),
+                contentPadding: EdgeInsets.zero,
+                value: _exception,
+                onChanged: _busy || widget.pendingCount > 0
+                    ? null
+                    : (value) => setState(() {
+                        _exception = value ?? false;
+                        _changed = false;
+                        _error = null;
+                      }),
+                title: const Text(CollectionsText.closeException),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              if (_exception) ...[
+                const Text(CollectionsText.closeExceptionNote),
+                TextField(
+                  key: const Key('close-batch-reason'),
+                  controller: _reason,
+                  maxLength: 500,
+                  minLines: 2,
+                  maxLines: 3,
+                  enabled: !_busy,
+                  decoration: const InputDecoration(
+                    labelText: CollectionsText.closeExceptionReason,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ],
+              if (_changed)
+                const Text(
+                  CollectionsText.closeCashChanged,
+                  key: Key('close-batch-changed'),
+                ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(_error!, key: const Key('close-batch-error')),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.pop(context),
+          child: const Text(CollectionsText.closeNo),
+        ),
+        FilledButton(
+          key: const Key('confirm-close-batch'),
+          onPressed: _canConfirm ? _send : null,
+          child: Text(
+            _exception
+                ? CollectionsText.closeYesException
+                : CollectionsText.closeYes,
+          ),
+        ),
+      ],
     );
   }
 }

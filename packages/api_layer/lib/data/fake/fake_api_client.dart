@@ -1968,7 +1968,10 @@ class FakeApiClient implements ApiClient {
       return;
     }
     if (seg.length > 2 && seg[1] == 'days' && last == 'close') {
-      _requireAction(ManagementAction.collectionsCloseDay);
+      // The server checks role === admin. It does not require collections.close_day.
+      if (_access.role != AccountRole.admin) {
+        _fail(403, 'PERMISSION_DENIED', 'ليست لديك صلاحية لهذه العملية.');
+      }
       return;
     }
     if (seg.length > 1 && seg[1] == 'payroll') {

@@ -279,16 +279,30 @@ class UnlinkedReceiptDto {
 /// One open work batch (`openBatches[]`).
 class CollectionBatchDto {
   const CollectionBatchDto(
-      {required this.id, this.businessDate, this.batchNumber, this.openedAt});
+      {required this.id,
+      this.businessDate,
+      this.batchNumber,
+      this.openedAt,
+      this.pendingCount,
+      this.cashPendingCount,
+      this.cashPendingUnits});
   final String id;
   final String? businessDate;
   final int? batchNumber;
   final String? openedAt;
+
+  /// Server counts on `openBatches[]`. Null when that payload omitted them.
+  final int? pendingCount;
+  final int? cashPendingCount;
+  final int? cashPendingUnits;
   factory CollectionBatchDto.fromJson(Json j) => CollectionBatchDto(
         id: str(j['id']),
         businessDate: strOrNull(j['businessDate']),
         batchNumber: intOrNull(j['batchNumber']),
         openedAt: strOrNull(j['openedAt']),
+        pendingCount: intOrNull(j['pendingCount']),
+        cashPendingCount: intOrNull(j['cashPendingCount']),
+        cashPendingUnits: intOrNull(j['cashPendingUnits']),
       );
 }
 
