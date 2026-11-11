@@ -760,6 +760,128 @@ class _DayCard extends ConsumerWidget {
   }
 }
 
+/// Website saved-row tick (`purchases-presentation.css` `.purchase-saved-mark`).
+class _SavedTick extends StatelessWidget {
+  const _SavedTick({required this.scale, required this.markKey});
+
+  final double scale;
+  final Key markKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      key: markKey,
+      label: 'تم حفظ المعاملة وترحيل اليوم',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFF007B45),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0xFFA4F6CA)),
+        ),
+        child: SizedBox(
+          width: 38 * scale,
+          height: 22 * scale,
+          child: Icon(Icons.check, size: 16 * scale, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+/// Website confirm tick. Wide screens use the 37×26 pill
+/// (`purchases-presentation.css` lines 94–96). Under 700px the same pill is
+/// 40×40 (`purchases-unified-gold.css` line 201).
+class _TickButton extends StatelessWidget {
+  const _TickButton({
+    required this.buttonKey,
+    required this.icon,
+    required this.label,
+    required this.scale,
+    required this.fill,
+    required this.border,
+    required this.inputs,
+    required this.onSubmit,
+    this.expectedVersion,
+  });
+
+  final Key buttonKey;
+  final IconData icon;
+  final String label;
+  final double scale;
+  final Color fill;
+  final Color border;
+  final String inputs;
+  final int? expectedVersion;
+  final Future<String?> Function(MutationMeta meta) onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    final phone = MediaQuery.sizeOf(context).width < 700;
+    final width = (phone ? 40.0 : 37.0) * scale;
+    final height = (phone ? 40.0 : 26.0) * scale;
+    return Theme(
+      data: Theme.of(context).copyWith(
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: fill,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: fill.withValues(alpha: 0.45),
+            minimumSize: Size(width, height),
+            maximumSize: Size(width, height),
+            fixedSize: Size(width, height),
+            padding: EdgeInsets.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+            shape: StadiumBorder(side: BorderSide(color: border)),
+          ),
+        ),
+        iconTheme: IconThemeData(size: 14 * scale, color: Colors.white),
+      ),
+      child: GuardedMutation(
+        buttonKey: buttonKey,
+        inputs: inputs,
+        expectedVersion: expectedVersion,
+        glyph: icon,
+        label: label,
+        reportErrorInline: false,
+        onSubmit: onSubmit,
+      ),
+    );
+  }
+}
+
+/// Website cancel control (`purchases-presentation.css` line 97).
+class _CancelTick extends StatelessWidget {
+  const _CancelTick({required this.scale, required this.onPressed});
+
+  final double scale;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final phone = MediaQuery.sizeOf(context).width < 700;
+    final width = (phone ? 40.0 : 37.0) * scale;
+    final height = (phone ? 40.0 : 26.0) * scale;
+    return Tooltip(
+      message: AppStrings.cancel,
+      child: Material(
+        color: const Color(0xFFBD152C),
+        shape: const StadiumBorder(side: BorderSide(color: Color(0xFFFF9BAD))),
+        child: InkWell(
+          key: const Key('cancel-purchase'),
+          customBorder: const StadiumBorder(),
+          onTap: onPressed,
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: Icon(Icons.close, size: 14 * scale, color: Colors.white),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _InlineLedgerRow extends ConsumerStatefulWidget {
   const _InlineLedgerRow({
     required this.book,
@@ -945,192 +1067,211 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
         focusedBorder: InputBorder.none,
       ),
     );
+    final tick = widget.scale;
     return Theme(
       data: quietFields,
-      child: Row(
-        key: const Key('purchase-inline-row'),
-        textDirection: TextDirection.rtl,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          cell(
-            index: 0,
-            child: Center(
-              child: Text(
-                existing?.sequence?.toString() ?? '—',
-                style: cairo(14, 800, color: context.look.ink),
+      child: IntrinsicHeight(
+        child: Row(
+          key: const Key('purchase-inline-row'),
+          textDirection: TextDirection.rtl,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            cell(
+              index: 0,
+              child: Center(
+                child: Text(
+                  existing?.sequence?.toString() ?? '—',
+                  style: cairo(14, 800, color: context.look.ink),
+                ),
               ),
             ),
-          ),
-          cell(
-            index: 1,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  height: 48,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final kind in _kinds)
-                          Padding(
-                            padding: const EdgeInsetsDirectional.only(end: 4),
-                            child: ChoiceChip(
-                              key: Key('purchase-kind-${kind.$1}'),
-                              label: Text(kind.$2),
-                              selected: _itemCode == kind.$1,
-                              onSelected: (_) =>
-                                  setState(() => _itemCode = kind.$1),
+            cell(
+              index: 1,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 48,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (final kind in _kinds)
+                            Padding(
+                              padding: const EdgeInsetsDirectional.only(end: 4),
+                              child: ChoiceChip(
+                                key: Key('purchase-kind-${kind.$1}'),
+                                label: Text(kind.$2),
+                                selected: _itemCode == kind.$1,
+                                onSelected: (_) =>
+                                    setState(() => _itemCode = kind.$1),
+                              ),
                             ),
-                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (custom)
+                    TextField(
+                      key: const Key('purchase-custom-label'),
+                      controller: _customLabel,
+                      decoration: const InputDecoration(
+                        labelText: AppStrings.customItemName,
+                        isDense: true,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            cell(
+              index: 2,
+              focused: _valueFocus.hasFocus,
+              child: UnitsField(
+                key: const Key('purchase-field-value'),
+                controller: _egp,
+                focusNode: _valueFocus,
+                label: '',
+                showHint: false,
+                dense: true,
+                scrollPadding: fieldPad,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => _next(_rateFocus),
+                onSubmitted: (_) => _next(_rateFocus),
+              ),
+            ),
+            cell(
+              index: 3,
+              focused: _opFocus.hasFocus,
+              child: DropdownButton<CalculationMode>(
+                focusNode: _opFocus,
+                value: _mode,
+                isExpanded: true,
+                items: const [
+                  DropdownMenuItem(
+                    value: CalculationMode.divide,
+                    child: CalculationMark(CalculationMode.divide),
+                  ),
+                  DropdownMenuItem(
+                    value: CalculationMode.multiply,
+                    child: CalculationMark(CalculationMode.multiply),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() => _mode = value ?? CalculationMode.divide);
+                  _next(_rateFocus);
+                },
+              ),
+            ),
+            cell(
+              index: 4,
+              focused: _rateFocus.hasFocus,
+              child: TextField(
+                key: const Key('purchase-field-rate'),
+                controller: _rate,
+                focusNode: _rateFocus,
+                textDirection: TextDirection.ltr,
+                textInputAction: TextInputAction.next,
+                scrollPadding: fieldPad,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  border: InputBorder.none,
+                ),
+                onEditingComplete: () => _next(_paidFocus),
+                onSubmitted: (_) => _next(_paidFocus),
+              ),
+            ),
+            cell(
+              index: 5,
+              child: Center(
+                child: Text(
+                  result,
+                  key: const Key('purchase-preview-result'),
+                  textAlign: TextAlign.center,
+                  style: cairo(12, 700, color: context.look.muted),
+                ),
+              ),
+            ),
+            cell(
+              index: 6,
+              focused: _paidFocus.hasFocus,
+              child: UnitsField(
+                key: const Key('purchase-field-paid'),
+                controller: _paid,
+                focusNode: _paidFocus,
+                label: '',
+                showHint: false,
+                dense: true,
+                scrollPadding: fieldPad,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => _next(_vodafoneFocus),
+                onSubmitted: (_) => _next(_vodafoneFocus),
+              ),
+            ),
+            cell(
+              index: 7,
+              child: Center(
+                child: Text(
+                  remaining,
+                  key: const Key('purchase-preview-balance'),
+                  textAlign: TextAlign.center,
+                  style: cairo(12, 900, color: const Color(0xFF211A08)),
+                ),
+              ),
+            ),
+            cell(
+              index: 8,
+              focused: _vodafoneFocus.hasFocus,
+              child: UnitsField(
+                key: const Key('purchase-field-vodafone'),
+                controller: _vodafone,
+                focusNode: _vodafoneFocus,
+                label: '',
+                showHint: false,
+                dense: true,
+                scrollPadding: fieldPad,
+                textInputAction: TextInputAction.done,
+              ),
+            ),
+            DecoratedBox(
+              key: const Key('purchase-action-edit'),
+              decoration: BoxDecoration(
+                color: sectionButtonGold.withValues(alpha: 0.14),
+                border: Border.all(color: line),
+              ),
+              child: SizedBox(
+                width: widget.actionWidth,
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _TickButton(
+                        buttonKey: const Key('save-purchase'),
+                        icon: Icons.check,
+                        label: AppStrings.save,
+                        scale: tick,
+                        fill: const Color(0xFF008851),
+                        border: const Color(0xFF8AEFBF),
+                        inputs:
+                            '$_itemCode|${_customLabel.text}|$_mode|${_egp.text}|${_rate.text}|${_paid.text}|${_vodafone.text}',
+                        expectedVersion: widget.version,
+                        onSubmit: _submit,
+                      ),
+                      if (existing != null) ...[
+                        SizedBox(width: 4 * tick),
+                        _CancelTick(
+                          scale: tick,
+                          onPressed: () =>
+                              ref.read(_ledgerDraftProvider.notifier).state =
+                                  null,
+                        ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
-                if (custom)
-                  TextField(
-                    key: const Key('purchase-custom-label'),
-                    controller: _customLabel,
-                    decoration: const InputDecoration(
-                      labelText: AppStrings.customItemName,
-                      isDense: true,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          cell(
-            index: 2,
-            focused: _valueFocus.hasFocus,
-            child: UnitsField(
-              key: const Key('purchase-field-value'),
-              controller: _egp,
-              focusNode: _valueFocus,
-              label: '',
-              showHint: false,
-              dense: true,
-              scrollPadding: fieldPad,
-              textInputAction: TextInputAction.next,
-              onEditingComplete: () => _next(_rateFocus),
-              onSubmitted: (_) => _next(_rateFocus),
-            ),
-          ),
-          cell(
-            index: 3,
-            focused: _opFocus.hasFocus,
-            child: DropdownButton<CalculationMode>(
-              focusNode: _opFocus,
-              value: _mode,
-              isExpanded: true,
-              items: const [
-                DropdownMenuItem(
-                  value: CalculationMode.divide,
-                  child: CalculationMark(CalculationMode.divide),
-                ),
-                DropdownMenuItem(
-                  value: CalculationMode.multiply,
-                  child: CalculationMark(CalculationMode.multiply),
-                ),
-              ],
-              onChanged: (value) {
-                setState(() => _mode = value ?? CalculationMode.divide);
-                _next(_rateFocus);
-              },
-            ),
-          ),
-          cell(
-            index: 4,
-            focused: _rateFocus.hasFocus,
-            child: TextField(
-              key: const Key('purchase-field-rate'),
-              controller: _rate,
-              focusNode: _rateFocus,
-              textDirection: TextDirection.ltr,
-              textInputAction: TextInputAction.next,
-              scrollPadding: fieldPad,
-              decoration: const InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-              ),
-              onEditingComplete: () => _next(_paidFocus),
-              onSubmitted: (_) => _next(_paidFocus),
-            ),
-          ),
-          cell(
-            index: 5,
-            child: Center(
-              child: Text(
-                result,
-                key: const Key('purchase-preview-result'),
-                textAlign: TextAlign.center,
-                style: cairo(12, 700, color: context.look.muted),
               ),
             ),
-          ),
-          cell(
-            index: 6,
-            focused: _paidFocus.hasFocus,
-            child: UnitsField(
-              key: const Key('purchase-field-paid'),
-              controller: _paid,
-              focusNode: _paidFocus,
-              label: '',
-              showHint: false,
-              dense: true,
-              scrollPadding: fieldPad,
-              textInputAction: TextInputAction.next,
-              onEditingComplete: () => _next(_vodafoneFocus),
-              onSubmitted: (_) => _next(_vodafoneFocus),
-            ),
-          ),
-          cell(
-            index: 7,
-            child: Center(
-              child: Text(
-                remaining,
-                key: const Key('purchase-preview-balance'),
-                textAlign: TextAlign.center,
-                style: cairo(12, 900, color: const Color(0xFF211A08)),
-              ),
-            ),
-          ),
-          cell(
-            index: 8,
-            focused: _vodafoneFocus.hasFocus,
-            child: UnitsField(
-              key: const Key('purchase-field-vodafone'),
-              controller: _vodafone,
-              focusNode: _vodafoneFocus,
-              label: '',
-              showHint: false,
-              dense: true,
-              scrollPadding: fieldPad,
-              textInputAction: TextInputAction.done,
-            ),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: sectionButtonGold.withValues(alpha: 0.14),
-              border: Border.all(color: line),
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: widget.actionWidth,
-                maxWidth: widget.actionWidth,
-                minHeight: 72,
-              ),
-              child: GuardedMutation(
-                buttonKey: const Key('save-purchase'),
-                inputs:
-                    '$_itemCode|${_customLabel.text}|$_mode|${_egp.text}|${_rate.text}|${_paid.text}|${_vodafone.text}',
-                expectedVersion: widget.version,
-                glyph: Icons.check,
-                label: AppStrings.save,
-                onSubmit: _submit,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1569,7 +1710,7 @@ class _PurchaseGrid extends ConsumerWidget {
                   maxWidth: actionW,
                   minHeight: height,
                 ),
-                child: tail ?? const SizedBox.shrink(),
+                child: Center(child: tail ?? const SizedBox.shrink()),
               ),
             ),
           ],
@@ -1717,10 +1858,9 @@ class _PurchaseGrid extends ConsumerWidget {
                               ),
                             )
                           : entry.dayStatus == 'finalized'
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: Color(0xFF15803D),
-                              size: 22,
+                          ? _SavedTick(
+                              scale: scale,
+                              markKey: Key('purchase-saved-mark-${entry.id}'),
                             )
                           : null,
                     ),

@@ -164,6 +164,7 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
           )
         : const SizedBox.shrink();
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         button,
@@ -179,6 +180,9 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
       _lock.busy = true;
       _error = null;
     });
+    if (!widget.reportErrorInline) {
+      ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+    }
     _lock.expectedVersion = widget.expectedVersion;
     final sentInputs = widget.inputs;
     _draftUserId = _signedInUserId();
