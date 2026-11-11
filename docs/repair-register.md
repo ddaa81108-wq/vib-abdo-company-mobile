@@ -566,6 +566,17 @@
 - يعتمد على: 042 و050. لا مسار جديد.
 - التراجع: `git revert 6dddb221e5cb55358a426030874bdc7b237fde14`. afterward: `flutter test test/home_purchases_050_test.dart test/purchases_ledger_layout_test.dart --exclude-tags screenshots --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-052
+
+- الالتزام: `649a0bbb7ae45419a7f09c8576da7ae53152c6c6`
+- العنوان: VIB-FIX-052: Match the website purchase day break and move totals below.
+- العرض: فاصل اليوم لم يطابق الموقع، وكتلة «إجماليات السجل من البداية» ظاهرة، وبطاقات الإجمالي فوق الدفتر، والصفحة لا تفتح على آخر يوم.
+- السبب: الصف الواحد كان بين اليومين فقط. الموقع يضع صف إقفال ثم فاصلًا ثم صف افتتاح. الإجماليات كانت فوق الجدول.
+- السلوك: في نهاية اليوم «الباقي المُرحّل لليوم التالي — يوم #N» مع حبة ذهبية بالمبلغ تحت «الباقي». ثم شريط داكن رفيع. ثم «الباقي المرحّل من اليوم السابق» بنفس المبلغ، والتاريخ الجديد يمينًا و«تعديل اليوم» في آخر الصف. على الهاتف العبارة والمبلغ ظاهران بلا تمرير أفقي. على الشاشة العريضة الحبة تحت عمود الباقي. المبلغ من `dayClosingDebtUnits`. كتلة إجماليات السجل حُذفت. بطاقات اليوم نُقلت تحت الدفتر بنفس ألوانها. عند الدخول الرأس اللاصق أعلى الشاشة وآخر يوم مع صف الإدخال ظاهر، والإجماليات تحته. تحميل الأقدم عند الصعود كما كان.
+- الدليل: `test/home_purchases_050_test.dart`. `flutter analyze` بلا ملاحظات. التنسيق على مسارات CI يخرج 0. التطبيق `flutter test --exclude-tags screenshots --dart-define=USE_FAKE_API=true`: 826 نجحت، 8 تُركت، 0 فشلت.
+- يعتمد على: 042 و051. لا مسار جديد.
+- التراجع: `git revert 649a0bbb7ae45419a7f09c8576da7ae53152c6c6`. afterward: `flutter test test/home_purchases_050_test.dart test/purchases_presentation_test.dart --exclude-tags screenshots --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
