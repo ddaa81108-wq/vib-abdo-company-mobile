@@ -755,6 +755,7 @@
 - الدليل: `test/fix068_fcm_test.dart`. بناء debug APK بلا ملف Firebase نجح محليًا، و`FirebaseInitProvider` غير موجود في الحزمة.
 - يعتمد على: مسودة الخادم `cursor/fcm-mobile-push-5c94` في `wep-erp-support`. ليست مدمجة وليست منشورة. بلا ملف حساب الخدمة الخادم لا يرسل.
 - التراجع: `git revert 00e990c1f0de70cc2d716e28652d085444115d60`. afterward: `flutter test test/fix068_fcm_test.dart test/push_transport_test.dart --dart-define=USE_FAKE_API=true`.
+- ملحق بلا نشر: `11d36aab6b70a24bb942368564b7782d96472f84` يثبت أن غياب إعداد Firebase يُبقي النقل بلا عمل. خطة النسخ والتحقق والتراجع بخطوة واحدة في `docs/fcm-deploy-rollback.ar.md`. لا تُنفَّذ الآن. مسودة الخادم المحلية `46b55c854f1c6eb3012d37dd6cae3ffedd995586` فوق `5d45a155893c546c163cf67b33ebf1e816a64a3f`، والتراجع هناك يحذف الجدولين الجديدين وإصدار 59 فقط، ولا يستعيد نسخة مالية أقدم.
 
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
