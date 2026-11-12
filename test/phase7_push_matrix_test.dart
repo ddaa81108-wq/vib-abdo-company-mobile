@@ -81,7 +81,15 @@ void main() {
       'phone': '0910000000',
       'token': 'secret-token',
     });
-    await settle(tester);
+    await tester.pump();
+    for (
+      var i = 0;
+      i < 20 &&
+          find.byKey(ForegroundNotificationBanner.bannerKey).evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
 
     expect(find.byKey(ForegroundNotificationBanner.bannerKey), findsOneWidget);
     expect(posted, isNotEmpty);

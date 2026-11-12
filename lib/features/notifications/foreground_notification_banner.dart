@@ -23,6 +23,9 @@ class ForegroundNotificationBanner extends ConsumerStatefulWidget {
 
   static const bannerKey = Key('notification-banner');
 
+  /// How long a banner stays if it is not tapped or swiped away.
+  static const hold = Duration(seconds: 5);
+
   @override
   ConsumerState<ForegroundNotificationBanner> createState() =>
       _ForegroundNotificationBannerState();
@@ -32,6 +35,7 @@ class _ForegroundNotificationBannerState
     extends ConsumerState<ForegroundNotificationBanner>
     with WidgetsBindingObserver {
   AppNotification? _note;
+  Timer? _hide;
 
   @override
   void initState() {
@@ -41,8 +45,27 @@ class _ForegroundNotificationBannerState
 
   @override
   void dispose() {
+    _hide?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// One card. A newer row replaces it and starts the hold again.
+  /// Nothing is marked read.
+  void _present(AppNotification note) {
+    _hide?.cancel();
+    setState(() => _note = note);
+    _hide = Timer(ForegroundNotificationBanner.hold, () {
+      if (!mounted || _note?.notificationId != note.notificationId) return;
+      setState(() => _note = null);
+    });
+  }
+
+  void _clear() {
+    _hide?.cancel();
+    _hide = null;
+    if (!mounted) return;
+    setState(() => _note = null);
   }
 
   @override
@@ -59,7 +82,7 @@ class _ForegroundNotificationBannerState
     ref.listen(foregroundNotificationsProvider, (previous, next) {
       final note = next.asData?.value;
       if (note == null) return;
-      setState(() => _note = note);
+      _present(note);
       unawaited(_announce(note));
     });
     final note = _note;
@@ -82,22 +105,27 @@ class _ForegroundNotificationBannerState
                   AppSpacing.lg,
                   0,
                 ),
-                child: Material(
-                  elevation: 6,
-                  color: theme.colorScheme.inverseSurface,
-                  borderRadius: BorderRadius.circular(AppRadii.card),
-                  child: InkWell(
-                    key: ForegroundNotificationBanner.bannerKey,
-                    onTap: () => _open(note),
-                    child: Padding(
-                      padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-                      child: Text(
-                        notificationHeadline(note),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onInverseSurface,
-                          fontWeight: FontWeight.w700,
+                child: Dismissible(
+                  key: ValueKey('banner-${note.notificationId}'),
+                  direction: DismissDirection.horizontal,
+                  onDismissed: (_) => _clear(),
+                  child: Material(
+                    elevation: 6,
+                    color: theme.colorScheme.inverseSurface,
+                    borderRadius: BorderRadius.circular(AppRadii.card),
+                    child: InkWell(
+                      key: ForegroundNotificationBanner.bannerKey,
+                      onTap: () => _open(note),
+                      child: Padding(
+                        padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
+                        child: Text(
+                          notificationHeadline(note),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onInverseSurface,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -126,7 +154,7 @@ class _ForegroundNotificationBannerState
   }
 
   Future<void> _open(AppNotification note) async {
-    setState(() => _note = null);
+    _clear();
     final result = await ref
         .read(notificationOpenSeamProvider)
         .open(note, origin: NotificationOpenOrigin.banner);
