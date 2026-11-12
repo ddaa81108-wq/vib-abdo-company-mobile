@@ -688,6 +688,17 @@
 - يعتمد على: لا مسار جديد ولا تغيير في الخادم.
 - التراجع: `git revert 9149c413806b9566bc7f497d8eeb16a85f38c8e2`. afterward: `flutter test test/speech_watermark_062_test.dart --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-063
+
+- الالتزام: `a038918095163b8623e42d8452e8325fdcf5396e`
+- العنوان: VIB-FIX-063: Dismiss the incoming banner after five seconds.
+- العرض: لافتة الإشعار الداخل كانت تبقى حتى الضغط.
+- السبب: `_note` في `foreground_notification_banner.dart` لا يُمسح إلا في `_open`. لا مؤقت ولا سحب.
+- السلوك: المؤقت خمس ثوانٍ من `ForegroundNotificationBanner.hold`. الضغط ما زال يفتح. السحب يُغلق. إشعار أحدث يستبدل السابق ويعيد المؤقت. الإغلاق التلقائي والسحب لا يعلّمان الصف مقروءًا، فقائمة الإشعارات كما هي.
+- الدليل: `test/banner_063_test.dart`. الساعة الوهمية عبر `tester.pump`.
+- يعتمد على: لا مسار جديد ولا تغيير في الخادم.
+- التراجع: `git revert a038918095163b8623e42d8452e8325fdcf5396e`. afterward: `flutter test test/banner_063_test.dart --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
