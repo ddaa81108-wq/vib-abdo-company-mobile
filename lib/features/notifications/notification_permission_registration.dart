@@ -36,26 +36,34 @@ Future<bool> notificationRuntimePermissionIsImplicit(
 /// request the platform will not show.
 class UiNotificationPermissionAdapter
     implements transport.NotificationPermissionService {
-  UiNotificationPermissionAdapter(this._ui, this._readSdk);
+  UiNotificationPermissionAdapter(this._ui, this._readSdk, {this.ask = false});
 
   final NotificationPermissionService _ui;
   final Future<int> Function() _readSdk;
 
+  /// When FCM is configured, the first registration asks for
+  /// `POST_NOTIFICATIONS` if the user has not answered yet.
+  final bool ask;
+
   @override
   Future<bool> get granted async {
     if (await notificationRuntimePermissionIsImplicit(_readSdk)) return true;
-    final status = await _ui.status();
+    var status = await _ui.status();
+    if (ask && status == NotificationPermissionChoice.denied) {
+      status = await _ui.request();
+    }
     return status == NotificationPermissionChoice.granted;
   }
 }
 
 /// Root-scope override. The registrar is created in that same container, so a
 /// nested scope never reaches it.
-Override notificationPermissionRegistrarOverride() {
+Override notificationPermissionRegistrarOverride({bool ask = false}) {
   return notificationPermissionProvider.overrideWith(
     (ref) => UiNotificationPermissionAdapter(
       ref.watch(notificationPermissionServiceProvider),
       ref.watch(notificationSdkIntProvider),
+      ask: ask,
     ),
   );
 }

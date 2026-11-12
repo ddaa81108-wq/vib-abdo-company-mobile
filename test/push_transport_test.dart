@@ -92,7 +92,7 @@ void main() {
       expect(parsePushTransport('fcm'), PushTransportKind.fcm);
       expect(createPushTransport(''), isA<NoopPushTransport>());
 
-      const fcm = FcmPushTransport();
+      final fcm = FcmPushTransport();
       expect(await fcm.currentToken(), isNull);
       expect(fcm.registersDevices, isTrue);
       final devices = RecordingDeviceRegistrationClient();

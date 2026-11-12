@@ -64,7 +64,7 @@ The Google Services Gradle plugin is on the classpath, and it is **applied only 
 
 `google-services.json` is in `.gitignore`. Do not commit one.
 
-The Firebase Messaging SDK is **not** a dependency. The manifest meta-data is there for the day that SDK is added. Until then it is unused.
+`firebase_core` and `firebase_messaging` are dependencies. They start only after `Firebase.initializeApp()` succeeds. Without `google-services.json` that call fails closed, the transport stays the no-op, and SSE is unchanged. The manifest removes `FirebaseInitProvider` so a missing config does not crash process start. The channel meta-data still names `vib_notices_sound_v1`.
 
 `tool/decode_google_services_json.sh` writes `android/app/google-services.json` from the environment variable below. An empty variable is a no-op. The script prints the Android package name and does not print the file. The release job `Release build rejects fake API` runs it only after the fake-API rejection check, and only when the secret is present.
 
