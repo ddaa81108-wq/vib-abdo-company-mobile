@@ -95,8 +95,13 @@ void main() {
 
     await go(tester, '/customers');
     expectRtl(tester);
-    // Customer cards show only name, value and assignee (Ali, 2026-11-02).
-    expect(find.byKey(Key('account-age-${customerCard.id}')), findsNothing);
+    // Website cardLabel: 4 days is «مرّ عليه 3 أيام».
+    expect(
+      tester
+          .widget<Text>(find.byKey(Key('account-age-${customerCard.id}')))
+          .data,
+      'مرّ عليه 3 أيام',
+    );
     expect(
       tester.widget<Text>(find.byKey(const Key('ticker-age-c_55'))).data,
       singleAgeText(
@@ -106,15 +111,12 @@ void main() {
       ),
     );
 
-    // Company cards use the customer card words too (Ali, 2026-11-03):
-    // دين, no age line.
     await go(tester, '/companies');
-    expect(find.byKey(Key('account-age-${companyCard.id}')), findsNothing);
     expect(
       tester
-          .widget<Text>(find.byKey(Key('account-kind-${companyCard.id}')))
+          .widget<Text>(find.byKey(Key('account-age-${companyCard.id}')))
           .data,
-      AppStrings.customerDebtWord,
+      'مرّ عليه 3 أيام',
     );
     // Deposit cards show the status word, never the day count (Ali,
     // 2026-11-04).
@@ -139,13 +141,10 @@ void main() {
       expectRtl(tester);
       final theme = Theme.of(tester.element(find.byType(HomeShell)));
       expect(theme.brightness, dark ? Brightness.dark : Brightness.light);
-      _expectAmountOnStart(tester, '320 د.ل');
-      // Customer and company cards use the debt/credit/zero gloss (Ali,
-      // 2026-11-02 / 2026-11-03): c_55 is a debt, so glossy red in both.
-      final look = tester.element(find.byType(HomeShell)).look;
-      expect(_cardGradient(tester).colors.first, look.glossDebt.top);
+      _expectAmountCentered(tester, '320 د.ل');
+      expect(_cardGradient(tester).colors.first, const Color(0xFFBD3B47));
       await go(tester, '/companies');
-      expect(_cardGradient(tester).colors.first, look.glossDebt.top);
+      expect(_cardGradient(tester).colors.first, const Color(0xFFBD3B47));
     }
   });
 
@@ -166,8 +165,7 @@ void main() {
       path: '/customers',
       add: true,
       assign: true,
-      // Customers cards no longer show pin (Ali, 2026-11-02).
-      pin: false,
+      pin: true,
       // #25 shows this only for a 0 balance with a pending review. The
       // fixed fixture's 0-balance card has no pending review, so it stays hidden.
       zero: false,
@@ -179,8 +177,7 @@ void main() {
       path: '/companies',
       add: true,
       assign: true,
-      // Companies use the customers' card design (Ali, 2026-11-03).
-      pin: false,
+      pin: true,
       zero: false,
       rate: false,
     );
@@ -308,9 +305,7 @@ void main() {
             find.byKey(const Key('account-card-c_55')),
             list,
           );
-          if (path != '/customers' && path != '/companies') {
-            await _reveal(tester, find.byKey(const Key('pin-c_55')), list);
-          }
+          await _reveal(tester, find.byKey(const Key('pin-c_55')), list);
           if (path == '/customers' || path == '/companies') {
             await _reveal(tester, find.byKey(const Key('assign-mode')), list);
           }
@@ -396,7 +391,7 @@ void main() {
   });
 }
 
-void _expectAmountOnStart(WidgetTester tester, String amount) {
+void _expectAmountCentered(WidgetTester tester, String amount) {
   final card = tester.getRect(find.byKey(const Key('account-card-c_55')));
   final box = tester.getRect(
     find.descendant(
@@ -404,8 +399,9 @@ void _expectAmountOnStart(WidgetTester tester, String amount) {
       matching: find.text(amount),
     ),
   );
-  // A full-width amount (the test font is wide) counts as start-aligned.
-  expect(card.right - box.right, lessThanOrEqualTo(box.left - card.left));
+  final rightGap = card.right - box.right;
+  final leftGap = box.left - card.left;
+  expect((rightGap - leftGap).abs(), lessThan(24));
 }
 
 LinearGradient _cardGradient(WidgetTester tester) {

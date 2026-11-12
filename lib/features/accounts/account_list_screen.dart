@@ -23,6 +23,7 @@ import 'zero_review_preview.dart';
 import 'account_name_suggestions.dart';
 import 'company_card_tone.dart';
 import 'customer_card_tone.dart';
+import 'website_account_card.dart';
 import 'website_ledger_tone.dart';
 
 /// Customers, companies, Libyan deposits, and Egyptian deposits share this
@@ -59,7 +60,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     final now = DateTime.now();
     if (_toggleId == card.id &&
         _toggleAt != null &&
-        now.difference(_toggleAt!) < const Duration(milliseconds: 50)) {
+        now.difference(_toggleAt!) < const Duration(milliseconds: 250)) {
       return;
     }
     _toggleId = card.id;
@@ -354,32 +355,29 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                                     padding: const EdgeInsetsDirectional.only(
                                       bottom: AppSpacing.md,
                                     ),
-                                    child: SizedBox(
-                                      height: customerCardHeight(context),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          for (final i in [
-                                            row * 2,
-                                            row * 2 + 1,
-                                          ]) ...[
-                                            if (i == row * 2 + 1)
-                                              const SizedBox(
-                                                width: AppSpacing.md,
-                                              ),
-                                            Expanded(
-                                              child: i < cards.length
-                                                  ? _accountCard(
-                                                      card: cards[i],
-                                                      canWrite: canWrite,
-                                                      permissions: permissions,
-                                                    )
-                                                  : const SizedBox.shrink(),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        for (final i in [
+                                          row * 2,
+                                          row * 2 + 1,
+                                        ]) ...[
+                                          if (i == row * 2 + 1)
+                                            const SizedBox(
+                                              width: AppSpacing.md,
                                             ),
-                                          ],
+                                          Expanded(
+                                            child: i < cards.length
+                                                ? _accountCard(
+                                                    card: cards[i],
+                                                    canWrite: canWrite,
+                                                    permissions: permissions,
+                                                  )
+                                                : const SizedBox.shrink(),
+                                          ),
                                         ],
-                                      ),
+                                      ],
                                     ),
                                   ),
                                   childCount: (cards.length + 1) ~/ 2,
@@ -475,9 +473,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             for (final card in cards)
               SizedBox(
                 width: cardWidth,
-                height: isDebtLookSection(section)
-                    ? customerCardHeight(context)
-                    : null,
+                height: null,
                 child: _accountCard(
                   card: card,
                   canWrite: canWrite,
@@ -1197,133 +1193,6 @@ class _AccountCard extends StatelessWidget {
   final VoidCallback? onZeroPreview;
   final bool zeroOnline;
 
-  /// Customers: name, value under it, the assigned employee if any, and the
-  /// existing zero-review action as a check button (Ali, 2026-11-02).
-  Widget _customerBody(
-    BuildContext context, {
-    required CustomerTone tone,
-    required bool showZero,
-  }) {
-    final word = section == AccountSection.companies
-        ? companyCardWord(companyCardKind(card.balanceUnits))
-        : switch (customerBalanceKind(card.balanceUnits)) {
-            CustomerBalanceKind.debt => AppStrings.customerDebtWord,
-            CustomerBalanceKind.credit => AppStrings.customerCreditWord,
-            _ => null,
-          };
-    final body = Padding(
-      padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // The facts clip instead of overflowing when text is large.
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const NeverScrollableScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          card.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: cairo(16, 800, color: tone.ink),
-                        ),
-                      ),
-                      if (card.systemManaged)
-                        Tooltip(
-                          message: AppStrings.systemCard,
-                          child: Icon(
-                            Icons.lock_outline,
-                            size: 16,
-                            color: tone.ink,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  if (word != null)
-                    Text(
-                      word,
-                      key: Key('account-kind-${card.id}'),
-                      style: cairo(12, 800, color: tone.amount),
-                    ),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: AlignmentDirectional.centerStart,
-                      child: MoneyText(
-                        money.formatOrDash(card.balanceUnits, card.currency),
-                        style: context.textExtras.amountLarge.copyWith(
-                          color: tone.amount,
-                          fontSize: 22,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (card.activeAssigneeName != null)
-                    Text(
-                      '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
-                      key: Key('account-assignee-${card.id}'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: cairo(
-                        12,
-                        700,
-                        color: tone.ink.withValues(alpha: 0.75),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          if (showZero)
-            Row(
-              children: [
-                const Spacer(),
-                if (showZero)
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: IconButton(
-                      key: ValueKey('zero-review-${card.id}'),
-                      tooltip: AppStrings.zeroReview,
-                      style: IconButton.styleFrom(
-                        minimumSize: const Size(48, 48),
-                      ),
-                      onPressed: zeroOnline ? onZeroPreview : null,
-                      icon: const Icon(Icons.check_circle_outline),
-                    ),
-                  ),
-              ],
-            ),
-        ],
-      ),
-    );
-    // Icons on the glossy card (lock, zero review) take the card ink.
-    final theme = Theme.of(context);
-    return Theme(
-      data: theme.copyWith(
-        iconTheme: theme.iconTheme.copyWith(color: tone.ink),
-        iconButtonTheme: IconButtonThemeData(
-          style: IconButton.styleFrom(
-            minimumSize: const Size(48, 48),
-            foregroundColor: tone.ink,
-          ),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(foregroundColor: tone.ink),
-        ),
-      ),
-      child: body,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final showPin = canWrite && !assigning;
@@ -1349,16 +1218,45 @@ class _AccountCard extends StatelessWidget {
     // Every list card is glossy from its tone (customers, companies,
     // deposits).
     final Gloss gloss = tone.gloss ?? context.look.glossGrey;
-    final radius = BorderRadius.circular(AppRadii.card);
-    final cardBody = isDebtLookSection(section)
-        ? _customerBody(context, tone: tone, showZero: showZero)
-        : _depositBody(
-            context,
-            tone: tone,
-            age: depositCardLabel(section, card.balanceUnits?.asInt),
-            showPin: showPin,
-            showZero: showZero,
-          );
+    final radius = BorderRadius.circular(16);
+    final units = card.balanceUnits?.asInt;
+    final fill = websiteCardGradient(section, units);
+    final amount = websiteCardAmount(money, card);
+    final cardBody = WebsiteAccountCardBody(
+      card: card,
+      status: websiteCardStatus(section, card),
+      amount: amount,
+      movement: websiteCardMovement(card.lastActivityAt),
+      ink: Colors.white,
+      showAssignee:
+          section == AccountSection.customers ||
+          section == AccountSection.companies,
+      pin: showPin
+          ? GuardedMutation(
+              buttonKey: Key('pin-${card.id}'),
+              inputs: 'pin:${card.id}:${card.pinned}:${card.version}',
+              expectedVersion: card.version,
+              label: card.pinned ? AppStrings.unpin : AppStrings.pin,
+              tooltip: card.pinned ? AppStrings.unpin : AppStrings.pin,
+              icon: card.pinned ? Icons.push_pin : Icons.push_pin_outlined,
+              onSubmit: (meta) => onPin(meta),
+            )
+          : null,
+      zero: showZero
+          ? IconButton(
+              key: ValueKey('zero-review-${card.id}'),
+              tooltip: AppStrings.zeroReview,
+              style: IconButton.styleFrom(
+                foregroundColor: Colors.white,
+                minimumSize: const Size(28, 28),
+                padding: EdgeInsets.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: zeroOnline ? onZeroPreview : null,
+              icon: const Icon(Icons.check_circle_outline, size: 18),
+            )
+          : null,
+    );
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
@@ -1373,19 +1271,13 @@ class _AccountCard extends StatelessWidget {
           opacity: blocked ? 0.68 : 1,
           child: Ink(
             decoration: BoxDecoration(
-              gradient: gloss.fill,
+              gradient: fill,
               borderRadius: radius,
               border: Border.all(
                 color: selected
                     ? const Color(0xFF6DD7BC)
-                    : isDebtLookSection(section)
-                    ? tone.border
-                    : const Color(0xFFE7AE12),
-                width: selected
-                    ? 3
-                    : isDebtLookSection(section)
-                    ? 1
-                    : 1.6,
+                    : const Color(0xFFEAC04A),
+                width: selected ? 3 : 1.4,
               ),
             ),
             child: InkWell(
@@ -1428,160 +1320,6 @@ class _AccountCard extends StatelessWidget {
   }
 }
 
-extension on _AccountCard {
-  /// Deposit card (Ali's device shots): pin at the corner, status label,
-  /// name, amount, then «آخر حركة» under a thin line. Server values only.
-  Widget _depositBody(
-    BuildContext context, {
-    required CustomerTone tone,
-    required String? age,
-    required bool showPin,
-    required bool showZero,
-  }) {
-    final ink = tone.ink;
-    String depositAmount(MoneyFormatter money) {
-      final units = card.balanceUnits?.asInt;
-      if (units == null) {
-        return money.formatOrDash(card.balanceUnits, card.currency);
-      }
-      return money.format(units.abs(), card.currency);
-    }
-
-    final gold = const Color(0xFFFBBF24);
-    final last = card.lastActivityAt;
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 150),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(10, 8, 10, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    age ?? '',
-                    key: Key('account-age-${card.id}'),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: cairo(11, 800, color: ink.withValues(alpha: 0.9)),
-                  ),
-                ),
-                if (showPin)
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF1A1300).withValues(alpha: 0.7),
-                      border: Border.all(color: gold.withValues(alpha: 0.8)),
-                    ),
-                    child: IconTheme.merge(
-                      data: IconThemeData(color: gold, size: 18),
-                      child: SizedBox(
-                        width: 34,
-                        height: 34,
-                        child: FittedBox(
-                          child: GuardedMutation(
-                            buttonKey: Key('pin-${card.id}'),
-                            inputs:
-                                'pin:${card.id}:${card.pinned}:${card.version}',
-                            expectedVersion: card.version,
-                            label: card.pinned
-                                ? AppStrings.unpin
-                                : AppStrings.pin,
-                            tooltip: card.pinned
-                                ? AppStrings.unpin
-                                : AppStrings.pin,
-                            icon: card.pinned
-                                ? Icons.push_pin
-                                : Icons.push_pin_outlined,
-                            onSubmit: (meta) => onPin(meta),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            Text(
-              card.name,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: cairo(16, 800, color: ink),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: MoneyText(
-                  depositAmount(money),
-                  style: context.textExtras.amountLarge.copyWith(
-                    color: tone.amount,
-                  ),
-                ),
-              ),
-            ),
-            if (card.systemManaged)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.lock_outline, size: 14, color: ink),
-                  const SizedBox(width: AppSpacing.xxs),
-                  Flexible(
-                    child: Text(
-                      AppStrings.systemCard,
-                      style: cairo(10.5, 800, color: ink),
-                    ),
-                  ),
-                ],
-              ),
-            const SizedBox(height: AppSpacing.xs),
-            Divider(height: 1, color: ink.withValues(alpha: 0.25)),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              '${AppStrings.lastActivity}: ${formatIsoDate(last)}'
-              '${last == null ? '' : '، ${_clockText(last)}'}',
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: cairo(10.5, 700, color: ink.withValues(alpha: 0.9)),
-            ),
-            if (card.activeAssigneeName != null)
-              Text(
-                '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
-                textAlign: TextAlign.center,
-                style: cairo(10.5, 600, color: ink.withValues(alpha: 0.85)),
-              ),
-            if (showZero)
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: AppSpacing.xs,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (showZero)
-                    IconButton(
-                      key: ValueKey('zero-review-${card.id}'),
-                      tooltip: AppStrings.zeroReview,
-                      onPressed: zeroOnline ? onZeroPreview : null,
-                      icon: const Icon(Icons.check_circle_outline),
-                    ),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-String _clockText(DateTime value) {
-  final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
-  final minute = value.minute.toString().padLeft(2, '0');
-  return '$hour:$minute ${value.hour < 12 ? 'ص' : 'م'}';
-}
-
 CustomerTone _companyTone(Gloss gloss) => CustomerTone(
   background: gloss.bottom,
   border: gloss.border,
@@ -1589,12 +1327,6 @@ CustomerTone _companyTone(Gloss gloss) => CustomerTone(
   amount: gloss.amount,
   gloss: gloss,
 );
-
-/// One height for every customer card, grown with the text scale.
-double customerCardHeight(BuildContext context) {
-  final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
-  return 128 * scale;
-}
 
 /// Customers: add on the right, search in the middle, assign on the left.
 /// Very narrow or large-text screens put the buttons above the search.
