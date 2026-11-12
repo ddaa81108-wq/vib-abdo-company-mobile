@@ -55,10 +55,13 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
       _sawBackground = true;
+      // Anything that arrives while away is backlog, not a voice replay.
+      ref.read(notificationsProvider.notifier).holdSpeech();
     }
     _sync();
     if (state == AppLifecycleState.resumed && _sawBackground) {
       _sawBackground = false;
+      ref.read(notificationsProvider.notifier).holdSpeech();
       refreshAllLiveSections(ref);
     }
   }
