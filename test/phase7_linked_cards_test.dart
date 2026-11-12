@@ -82,8 +82,7 @@ void main() {
       await go(tester, '/customers');
 
       expect(find.text('متبقي المصراوية تجريبي'), findsOneWidget);
-      // Customer cards mark system cards with a lock and tooltip.
-      expect(find.byTooltip(AppStrings.systemCard), findsWidgets);
+      expect(find.text('مرتبط تلقائيًا'), findsWidgets);
 
       final card = await tester.runAsync(
         () => layer.accounts.get(

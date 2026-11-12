@@ -277,17 +277,11 @@ void main() {
     final total = _fmt(money, page.summary.totalDebtUnits, Currency.lyd);
     expect(_inside(const Key('screen-customers'), total), findsWidgets);
     expect(
-      _inside(
-        const Key('screen-customers'),
-        money.format(1250000000, Currency.lyd),
-      ),
+      _inside(const Key('screen-customers'), '1.250.000.000 د.ل'),
       findsOneWidget,
     );
     expect(
-      _inside(
-        const Key('screen-customers'),
-        money.format(999999995, Currency.lyd),
-      ),
+      _inside(const Key('screen-customers'), '999.999.995 د.ل'),
       findsOneWidget,
     );
     expect(find.text('1,000,000,000 د.ل'), findsNothing);

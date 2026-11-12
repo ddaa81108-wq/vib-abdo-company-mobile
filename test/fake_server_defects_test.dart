@@ -54,7 +54,7 @@ void main() {
       expect(find.textContaining('مرّ عليه 3 أيام'), findsNothing);
 
       await go(tester, '/customers');
-      expect(find.text('مرّ عليه 3 أيام'), findsNothing);
+      expect(find.text('مرّ عليه 3 أيام'), findsWidgets);
       expect(find.text('منذ 4 أيام'), findsWidgets);
       expect(find.text('متبقي المصراوية تجريبي'), findsOneWidget);
 

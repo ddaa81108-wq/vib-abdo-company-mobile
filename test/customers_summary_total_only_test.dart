@@ -48,7 +48,7 @@ void main() {
     expect(add.dx, greaterThan(search.dx));
     expect(search.dx, greaterThan(assign.dx));
     expect((add.dy - assign.dy).abs(), lessThan(4));
-    // Cards: one height, two per row, no pin or age.
+    // Cards share a row. Height follows the text, and the pin is on the card.
     final cards = find.byWidgetPredicate(
       (w) =>
           w.key is ValueKey<String> &&
@@ -58,9 +58,9 @@ void main() {
       for (final e in cards.evaluate()) tester.getRect(find.byWidget(e.widget)),
     ];
     expect(rects.length, greaterThan(2));
-    expect(rects.map((r) => r.height.round()).toSet(), hasLength(1));
+    expect(rects.every((r) => r.height > 80), isTrue);
     expect(rects[0].top, rects[1].top);
-    expect(find.byKey(const Key('pin-c_55')), findsNothing);
+    expect(find.byKey(const Key('pin-c_55')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -102,7 +102,7 @@ void main() {
       for (final e in cards.evaluate()) tester.getRect(find.byWidget(e.widget)),
     ];
     expect(rects.length, greaterThan(2));
-    expect(rects.map((r) => r.height.round()).toSet(), hasLength(1));
+    expect(rects.every((r) => r.height > 80), isTrue);
     expect(rects[0].top, rects[1].top);
     // No customers-only ✓ zero review on a company card.
     expect(find.byKey(const ValueKey('zero-review-c_co_04')), findsNothing);

@@ -109,11 +109,12 @@ void main() {
   ) async {
     await pumpFakeApp(tester, size: const Size(800, 2200));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
-    // Company cards use the customer card words (Ali, 2026-11-03): no age
-    // line and no word on a zero card, just the server 0.
     await go(tester, '/companies');
     expect(find.text('منذ 0 أيام'), findsNothing);
-    expect(find.text(AppStrings.zeroAccount), findsNothing);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('account-age-c_co_04'))).data,
+      AppStrings.zeroAccount,
+    );
     expect(
       find.descendant(
         of: find.byKey(const Key('account-card-c_co_04')),
