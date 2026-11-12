@@ -98,18 +98,13 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('assign-mode')));
     await tester.tap(find.byKey(const Key('assign-mode')));
     await settle(tester);
-    // Only cards with a positive debt get a checkbox (537 website rule).
-    expect(find.byType(Checkbox), findsNWidgets(3));
+    // Only a positive debt is a selection target. The whole card is the
+    // target; there is no inner checkbox.
+    expect(find.byType(Checkbox), findsNothing);
     for (final id in ['b', 'd', 'g']) {
       expect(find.byKey(ValueKey('assign-select-$id')), findsOneWidget);
     }
-    final systemCard = find
-        .ancestor(of: find.text('كارت النظام'), matching: find.byType(Material))
-        .first;
-    expect(
-      find.descendant(of: systemCard, matching: find.byType(Checkbox)),
-      findsNothing,
-    );
+    expect(find.byKey(const ValueKey('assign-select-sys')), findsNothing);
   });
 
   testWidgets('deposit lists show no filter chip row (Ali, 2026-11-04)', (

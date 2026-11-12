@@ -47,6 +47,30 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   final _selected = <String>{};
   String? _reply;
 
+  /// One tap can be delivered twice: the recognizer that went down, then the
+  /// recognizer created when that setState rebuilds the card. The second
+  /// delivery would undo the selection. Ignore a repeat of the same card
+  /// inside a short window.
+  String? _toggleId;
+  DateTime? _toggleAt;
+
+  void _toggleSelection(AccountCardDto card) {
+    if (!canSelectAccountForAssignment(card)) return;
+    final now = DateTime.now();
+    if (_toggleId == card.id &&
+        _toggleAt != null &&
+        now.difference(_toggleAt!) < const Duration(milliseconds: 50)) {
+      return;
+    }
+    _toggleId = card.id;
+    _toggleAt = now;
+    setState(() {
+      _selected.contains(card.id)
+          ? _selected.remove(card.id)
+          : _selected.add(card.id);
+    });
+  }
+
   AccountSection get section => widget.section;
 
   @override
@@ -479,12 +503,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       assigning: _assigning,
       selected: _selected.contains(card.id),
       onOpen: () => context.go('/${section.path}/${card.id}'),
-      onToggle: () => setState(() {
-        if (!canSelectAccountForAssignment(card)) return;
-        _selected.contains(card.id)
-            ? _selected.remove(card.id)
-            : _selected.add(card.id);
-      }),
+      onToggle: () => _toggleSelection(card),
       onPin: (meta) => _pin(card, meta),
       zeroOnline: ref.watch(onlineProvider),
       onZeroPreview:
@@ -1183,7 +1202,6 @@ class _AccountCard extends StatelessWidget {
   Widget _customerBody(
     BuildContext context, {
     required CustomerTone tone,
-    required bool showAssign,
     required bool showZero,
   }) {
     final word = section == AccountSection.companies
@@ -1264,18 +1282,9 @@ class _AccountCard extends StatelessWidget {
               ),
             ),
           ),
-          if (showAssign || showZero)
+          if (showZero)
             Row(
               children: [
-                if (showAssign)
-                  SizedBox.square(
-                    dimension: 32,
-                    child: Checkbox(
-                      key: ValueKey('assign-select-${card.id}'),
-                      value: selected,
-                      onChanged: (_) => onToggle(),
-                    ),
-                  ),
                 const Spacer(),
                 if (showZero)
                   SizedBox(
@@ -1317,9 +1326,10 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final showPin = canWrite;
-    final showZero = onZeroPreview != null && !card.systemManaged;
-    final showAssign = assigning && canSelectAccountForAssignment(card);
+    final showPin = canWrite && !assigning;
+    final showZero = onZeroPreview != null && !card.systemManaged && !assigning;
+    final selectable = assigning && canSelectAccountForAssignment(card);
+    final blocked = assigning && !selectable;
     // Customers: debt / credit / zero tone from the balance sign (Ali,
     // 2026-11-02) instead of the age gradient.
     final CustomerTone tone = switch (section) {
@@ -1340,6 +1350,15 @@ class _AccountCard extends StatelessWidget {
     // deposits).
     final Gloss gloss = tone.gloss ?? context.look.glossGrey;
     final radius = BorderRadius.circular(AppRadii.card);
+    final cardBody = isDebtLookSection(section)
+        ? _customerBody(context, tone: tone, showZero: showZero)
+        : _depositBody(
+            context,
+            tone: tone,
+            age: depositCardLabel(section, card.balanceUnits?.asInt),
+            showPin: showPin,
+            showZero: showZero,
+          );
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
@@ -1350,37 +1369,57 @@ class _AccountCard extends StatelessWidget {
         color: tone.background,
         borderRadius: radius,
         clipBehavior: Clip.antiAlias,
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: gloss.fill,
-            borderRadius: radius,
-            border: Border.all(
-              color: isDebtLookSection(section)
-                  ? tone.border
-                  : const Color(0xFFE7AE12),
-              width: isDebtLookSection(section) ? 1 : 1.6,
+        child: Opacity(
+          opacity: blocked ? 0.68 : 1,
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: gloss.fill,
+              borderRadius: radius,
+              border: Border.all(
+                color: selected
+                    ? const Color(0xFF6DD7BC)
+                    : isDebtLookSection(section)
+                    ? tone.border
+                    : const Color(0xFFE7AE12),
+                width: selected
+                    ? 3
+                    : isDebtLookSection(section)
+                    ? 1
+                    : 1.6,
+              ),
             ),
-          ),
-          child: InkWell(
-            onTap: onOpen,
-            child: GlossSheen(
-              gloss: gloss,
-              radius: radius,
-              child: isDebtLookSection(section)
-                  ? _customerBody(
-                      context,
-                      tone: tone,
-                      showAssign: showAssign,
-                      showZero: showZero,
-                    )
-                  : _depositBody(
-                      context,
-                      tone: tone,
-                      age: depositCardLabel(section, card.balanceUnits?.asInt),
-                      showAssign: showAssign,
-                      showPin: showPin,
-                      showZero: showZero,
+            child: InkWell(
+              key: selectable ? ValueKey('assign-select-${card.id}') : null,
+              onTap: assigning ? (selectable ? onToggle : null) : onOpen,
+              onLongPress: null,
+              child: Stack(
+                children: [
+                  GlossSheen(
+                    gloss: gloss,
+                    radius: radius,
+                    child: IgnorePointer(ignoring: assigning, child: cardBody),
+                  ),
+                  if (selected)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          key: ValueKey('assign-check-${card.id}'),
+                          decoration: BoxDecoration(
+                            color: const Color(0x6630C48A),
+                            borderRadius: radius,
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.check_circle,
+                              color: Colors.white,
+                              size: 36,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1396,7 +1435,6 @@ extension on _AccountCard {
     BuildContext context, {
     required CustomerTone tone,
     required String? age,
-    required bool showAssign,
     required bool showPin,
     required bool showZero,
   }) {
@@ -1516,18 +1554,12 @@ extension on _AccountCard {
                 textAlign: TextAlign.center,
                 style: cairo(10.5, 600, color: ink.withValues(alpha: 0.85)),
               ),
-            if (showAssign || showZero)
+            if (showZero)
               Wrap(
                 alignment: WrapAlignment.center,
                 spacing: AppSpacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  if (showAssign)
-                    Checkbox(
-                      key: ValueKey('assign-select-${card.id}'),
-                      value: selected,
-                      onChanged: (_) => onToggle(),
-                    ),
                   if (showZero)
                     IconButton(
                       key: ValueKey('zero-review-${card.id}'),
