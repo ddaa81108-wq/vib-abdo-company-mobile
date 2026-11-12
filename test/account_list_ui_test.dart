@@ -11,8 +11,6 @@ import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/ui/presentation.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
-import 'package:vib_abdo_company_mobile/ui/theme.dart';
-
 import 'support/pump_app.dart';
 
 void main() {
