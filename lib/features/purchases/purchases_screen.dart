@@ -40,10 +40,17 @@ class _PurchasesScroll extends StatefulWidget {
   State<_PurchasesScroll> createState() => _PurchasesScrollState();
 }
 
+/// The first open may scroll to the latest day. A finger that already
+/// moved the list is left alone.
+bool purchaseAutoScroll({required double openedAt, required double offset}) {
+  return (offset - openedAt).abs() <= 1;
+}
+
 class _PurchasesScrollState extends State<_PurchasesScroll> {
   final _controller = ScrollController();
   final _latest = GlobalKey();
   var _placed = false;
+  double? _openedAt;
 
   @override
   void dispose() {
@@ -53,9 +60,13 @@ class _PurchasesScrollState extends State<_PurchasesScroll> {
 
   void _revealLatest() {
     if (_placed || !_controller.hasClients) return;
+    _openedAt ??= _controller.offset;
     final target = _latest.currentContext;
     if (target == null) return;
     _placed = true;
+    if (!purchaseAutoScroll(openedAt: _openedAt!, offset: _controller.offset)) {
+      return;
+    }
     Scrollable.ensureVisible(target, alignment: 1, duration: Duration.zero);
   }
 
@@ -2451,6 +2462,7 @@ class _LedgerScrollerState extends State<_LedgerScroller> {
           pinned: true,
           delegate: _FixedHead(
             height: widget.headerHeight,
+            gold: widget.gold,
             child: DecoratedBox(
               key: const Key('purchase-ledger'),
               decoration: BoxDecoration(
@@ -2502,9 +2514,10 @@ class _LedgerScrollerState extends State<_LedgerScroller> {
 }
 
 class _FixedHead extends SliverPersistentHeaderDelegate {
-  _FixedHead({required this.height, required this.child});
+  _FixedHead({required this.height, required this.gold, required this.child});
 
   final double height;
+  final Color gold;
   final Widget child;
 
   @override
@@ -2522,9 +2535,11 @@ class _FixedHead extends SliverPersistentHeaderDelegate {
     return SizedBox(height: height, child: child);
   }
 
+  /// A new child widget is built on every parent refresh. Rebuilding the
+  /// pinned header for that alone re-laid the columns and shook the list.
   @override
   bool shouldRebuild(covariant _FixedHead oldDelegate) =>
-      oldDelegate.height != height || oldDelegate.child != child;
+      oldDelegate.height != height || oldDelegate.gold != gold;
 }
 
 Future<String?> _deleteEntry(

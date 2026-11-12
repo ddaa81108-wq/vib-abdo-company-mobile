@@ -226,7 +226,9 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
       if (!mounted || _olderFor != key) return;
       final atBottom = _atBottom(_rows) && _atBottom(_innerRows);
       if (atBottom) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToEntry());
+        // Follow the new bottom only. The sideways alignment runs once,
+        // on the first open, so later pages do not shake the columns.
+        WidgetsBinding.instance.addPostFrameCallback((_) => _pinEntry());
       }
       setState(() {
         _olderPages.add(older);
@@ -643,6 +645,12 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   void _jumpToEntry() {
     if (!mounted) return;
     _toValueField();
+    _pinEntry();
+  }
+
+  /// Keep the entry row in view while older pages arrive. No sideways jump.
+  void _pinEntry() {
+    if (!mounted) return;
     if (_innerRows.hasClients) {
       _innerRows.jumpTo(_innerRows.position.maxScrollExtent);
     }

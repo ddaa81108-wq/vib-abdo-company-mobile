@@ -4,12 +4,18 @@ import 'package:flutter_api_layer/data/fake/fake_large_catalog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/features/masraweya/masraweya_autosave.dart';
+import 'package:vib_abdo_company_mobile/features/purchases/purchases_screen.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 
 import 'support/phase7_ui.dart' show go;
 import 'support/pump_app.dart';
 
 void main() {
+  test('a finger that moved the purchases list is not pulled back', () {
+    expect(purchaseAutoScroll(openedAt: 0, offset: 0), isTrue);
+    expect(purchaseAutoScroll(openedAt: 0, offset: 48), isFalse);
+  });
+
   test('a remote masraweya digit edits the existing controller', () {
     final controller = TextEditingController(text: '10');
     addTearDown(controller.dispose);
@@ -80,6 +86,29 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 50));
     expect(tester.element(row), same(before));
     expect(scroll.position.pixels, held);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a live collections refresh keeps the scroll', (tester) async {
+    await pumpFakeApp(tester, size: const Size(390, 844));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    await go(tester, '/collections');
+    final scrollable = find.descendant(
+      of: find.byKey(const Key('screen-collections')),
+      matching: find.byType(Scrollable),
+    );
+    final state = tester.state<ScrollableState>(scrollable.first);
+    if (state.position.maxScrollExtent > 30) {
+      state.position.jumpTo(30);
+    }
+    final held = state.position.pixels;
+    await tester.pump();
+    ProviderScope.containerOf(
+      tester.element(find.byKey(const Key('screen-collections'))),
+    ).invalidate(collectionsProvider);
+    await tester.pumpAndSettle(const Duration(milliseconds: 50));
+    expect(tester.state<ScrollableState>(scrollable.first), same(state));
+    expect(state.position.pixels, held);
     expect(tester.takeException(), isNull);
   });
 
