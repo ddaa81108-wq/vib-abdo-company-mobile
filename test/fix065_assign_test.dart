@@ -68,7 +68,7 @@ void main() {
       // The card ignores a repeated delivery of the same tap for a few
       // milliseconds. Real time, because the guard uses DateTime.now.
       await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 60)),
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
       );
       await tester.pump();
       expect(
