@@ -745,6 +745,17 @@
 - يعتمد على: لا مسار جديد ولا تغيير في الخادم.
 - التراجع: `git revert df1ae997207f9604fdb562a9b2974ad8180cd1be`. afterward: `flutter test test/fix067_background_sound_test.dart --dart-define=USE_FAKE_API=true`.
 
+## VIB-FIX-068
+
+- الالتزام: `00e990c1f0de70cc2d716e28652d085444115d60`
+- العنوان: VIB-FIX-068: Play the notification sound through FCM when the app is killed.
+- العرض: إزالة التطبيق من الأخيرة، أو إغلاقه بالقوة، أو إعادة تشغيل الجهاز تقطع صوت التنبيه. اتصال 067 يبقى فقط ما دامت العملية حية.
+- السبب: محرك Flutter يموت مع العملية، وأندرويد 12 يمنع خدمة أمامية من الإقلاع. الصوت الموثوق بعد القتل يأتي من رسالة نظام على القناة الموجودة.
+- السلوك: `firebase_core` و`firebase_messaging`. بلا `google-services.json` يفشل `initializeApp` مغلقًا، والنقل يبقى بلا عمل، وSSE كما هو، والبناء ينجح. بعد الدخول يُطلب `POST_NOTIFICATIONS` مرة إن كان Firebase قد اشتغل، ويُرسل رمز الجهاز إلى `POST /api/mobile-push/devices` ويُحدَّث عند التبديل، ويُحذف عند الخروج. رسالة النظام تحمل `channel_id` = `vib_notices_sound_v1` فالنظام يشغّل الصوت والتطبيق مقتول. في المقدمة SSE هو مصدر النغمة، ولا يُضاف شريط ثانٍ. علامة النطق من 062 تبقى: المعرّف يُنطق مرة إن كان أحدث من العلامة.
+- الدليل: `test/fix068_fcm_test.dart`. بناء debug APK بلا ملف Firebase نجح محليًا، و`FirebaseInitProvider` غير موجود في الحزمة.
+- يعتمد على: مسودة الخادم `cursor/fcm-mobile-push-5c94` في `wep-erp-support`. ليست مدمجة وليست منشورة. بلا ملف حساب الخدمة الخادم لا يرسل.
+- التراجع: `git revert 00e990c1f0de70cc2d716e28652d085444115d60`. afterward: `flutter test test/fix068_fcm_test.dart test/push_transport_test.dart --dart-define=USE_FAKE_API=true`.
+
 ## ما لم يُرقم لأنه ليس إصلاح عميل
 
 اشتراك دفع المتصفح (`BrowserPushControls`) ولوحة تجربة أصوات المتصفح لا مقابل لهما بلا عقد دفع للهاتف. `GET /api/notifications` يعيد غير المقروء فقط ويحذف الصف عند التعليم كمقروء؛ التطبيق يستعمل نفس المسار. لا مسار جديد في هذه الجولة.
