@@ -312,47 +312,53 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               final glossyTotal =
                   section == AccountSection.customers ||
                   section == AccountSection.companies;
-              // Top: the owner's name in a pill, then small round buttons
-              // (jump, تعديل البيانات, ×). Nothing else above the table.
+              // One horizontal row, as before 060: name, تعديل البيانات, ✕.
+              // Ten extra dp under the status area so the row is not jammed
+              // against the top (the old padding was 8).
               final bar = DecoratedBox(
                 key: const Key('ledger-top-bar'),
                 decoration: const BoxDecoration(color: Color(0xFF111111)),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
-                  child: Column(
+                  padding: const EdgeInsets.fromLTRB(8, 18, 10, 8),
+                  child: Row(
                     children: [
-                      _OwnerPill(
-                        name: loadedCard.name,
-                        section: _ledgerTitle(section),
+                      Expanded(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: _OwnerPill(
+                            name: loadedCard.name,
+                            section: _ledgerTitle(section),
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 2),
-                      Center(
+                      Flexible(
                         child: EditAccountCardButton(
                           section: section,
                           card: loadedCard,
                           compact: true,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Center(
-                        child: IconButton(
-                          key: const Key('ledger-close'),
-                          tooltip: AppStrings.back,
-                          style: IconButton.styleFrom(
-                            backgroundColor: const Color(0xFF211600),
-                            foregroundColor: const Color(0xFFF6E7A8),
-                            side: const BorderSide(
-                              color: Color(0xFFE7AE12),
-                              width: 1.4,
+                      Expanded(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: IconButton(
+                            key: const Key('ledger-close'),
+                            tooltip: AppStrings.back,
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFF211600),
+                              foregroundColor: const Color(0xFFF6E7A8),
+                              side: const BorderSide(
+                                color: Color(0xFFE7AE12),
+                                width: 1.4,
+                              ),
+                              minimumSize: const Size(36, 36),
+                              fixedSize: const Size(36, 36),
                             ),
-                            minimumSize: const Size(36, 36),
-                            fixedSize: const Size(36, 36),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            onPressed: () => context.canPop()
+                                ? context.pop()
+                                : context.go('/${section.path}'),
+                            icon: const Icon(Icons.close_rounded, size: 18),
                           ),
-                          onPressed: () => context.canPop()
-                              ? context.pop()
-                              : context.go('/${section.path}'),
-                          icon: const Icon(Icons.close_rounded, size: 18),
                         ),
                       ),
                     ],
@@ -400,17 +406,12 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               return LayoutBuilder(
                 builder: (context, constraints) {
                   final maxPinned = constraints.maxHeight.isFinite
-                      ? constraints.maxHeight * 0.26
-                      : MediaQuery.sizeOf(context).height * 0.26;
+                      ? constraints.maxHeight * 0.34
+                      : MediaQuery.sizeOf(context).height * 0.34;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxHeight: MediaQuery.sizeOf(context).height * 0.22,
-                        ),
-                        child: SingleChildScrollView(child: bar),
-                      ),
+                      bar,
                       Expanded(
                         child: Stack(
                           children: [
@@ -1429,59 +1430,24 @@ class _Header extends StatelessWidget {
               child: Column(
                 children: [
                   Text(
-                    websiteLedgerTotalLabel(section, units),
+                    depositCardLabel(section, units),
                     key: const Key('ledger-total-heading'),
                     textAlign: TextAlign.center,
                     style: cairo(13, 800, color: gloss.ink),
                   ),
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: AppSpacing.sm,
-                    runSpacing: 2,
-                    children: [
-                      MoneyText(
-                        text,
-                        key: const Key('ledger-header-balance'),
-                        style: context.textExtras.amountLarge.copyWith(
-                          color: gloss.amount,
-                        ),
-                      ),
-                      if (depositLedgerKindWord(section, units) != null)
-                        DecoratedBox(
-                          key: const Key('ledger-header-kind'),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(999),
-                            color: gloss.ink.withValues(alpha: 0.12),
-                            border: Border.all(
-                              color: gloss.ink.withValues(alpha: 0.4),
-                            ),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsetsDirectional.symmetric(
-                              horizontal: AppSpacing.sm,
-                              vertical: AppSpacing.xxs,
-                            ),
-                            child: Text(
-                              depositLedgerKindWord(section, units)!,
-                              style: cairo(12, 800, color: gloss.amount),
-                            ),
-                          ),
-                        ),
-                      if (units == 0)
-                        Text(
-                          'الحساب مسدّد',
-                          key: const Key('ledger-header-settled'),
-                          style: cairo(12, 800, color: gloss.ink),
-                        )
-                      else if (value.nextSequence != null)
-                        Text(
-                          'التالي #${value.nextSequence}',
-                          key: const Key('ledger-header-next'),
-                          style: cairo(12, 800, color: gloss.ink),
-                        ),
-                    ],
+                  MoneyText(
+                    text,
+                    key: const Key('ledger-header-balance'),
+                    style: context.textExtras.amountLarge.copyWith(
+                      color: gloss.amount,
+                    ),
                   ),
+                  if (units == 0)
+                    Text(
+                      'الحساب مسدّد',
+                      key: const Key('ledger-header-kind'),
+                      style: cairo(12, 800, color: gloss.ink),
+                    ),
                 ],
               ),
             ),
@@ -1651,7 +1617,7 @@ class _TotalCard extends StatelessWidget {
         CompanyLedgerKind.zero => AppStrings.ledgerZeroWord,
         CompanyLedgerKind.unknown => null,
       };
-      heading = websiteLedgerTotalLabel(section, shown?.asInt);
+      heading = companyLedgerHeading(kind);
       credit = kind == CompanyLedgerKind.credit;
     } else {
       final kind = customerBalanceKind(shown);
@@ -1662,7 +1628,7 @@ class _TotalCard extends StatelessWidget {
         CustomerBalanceKind.zero => AppStrings.ledgerZeroWord,
         CustomerBalanceKind.unknown => null,
       };
-      heading = websiteLedgerTotalLabel(section, shown?.asInt);
+      heading = AppStrings.ledgerTotal;
       credit = kind == CustomerBalanceKind.credit;
     }
     final units = shown?.asInt;
@@ -1697,23 +1663,23 @@ class _TotalCard extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: cairo(12, 700, color: gloss.ink),
                 ),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: AppSpacing.sm,
-                  runSpacing: 2,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: MoneyText(
-                        text,
-                        key: const Key('ledger-header-balance'),
-                        style: context.textExtras.amountLarge.copyWith(
-                          color: gloss.amount,
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: MoneyText(
+                          text,
+                          key: const Key('ledger-header-balance'),
+                          style: context.textExtras.amountLarge.copyWith(
+                            color: gloss.amount,
+                          ),
                         ),
                       ),
                     ),
-                    if (word != null)
+                    if (word != null) ...[
+                      const SizedBox(width: AppSpacing.sm),
                       DecoratedBox(
                         key: const Key('ledger-header-kind'),
                         decoration: BoxDecoration(
@@ -1734,15 +1700,16 @@ class _TotalCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                    if (card.nextSequence != null)
-                      Text(
-                        units == 0
-                            ? 'الحساب مسدّد'
-                            : 'التالي #${card.nextSequence}',
-                        style: cairo(11, 700, color: gloss.ink),
-                      ),
+                    ],
                   ],
                 ),
+                if (card.nextSequence != null)
+                  Text(
+                    units == 0
+                        ? 'الحساب مسدّد'
+                        : 'التالي #${card.nextSequence}',
+                    style: cairo(11, 700, color: gloss.ink),
+                  ),
                 if (reloadError != null)
                   Semantics(
                     container: true,

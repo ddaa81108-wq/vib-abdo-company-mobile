@@ -142,7 +142,7 @@ void main() {
   });
 
   testWidgets(
-    'the ledger name, edit, and close are stacked and clear the nav',
+    'the ledger name, edit, and close share one row and clear the nav',
     (tester) async {
       tester.view.viewPadding = const FakeViewPadding(bottom: 34);
       addTearDown(tester.view.resetViewPadding);
@@ -152,11 +152,14 @@ void main() {
       final name = tester.getRect(find.byKey(const Key('ledger-top-bar')));
       final edit = tester.getRect(find.byKey(const Key('edit-account-card')));
       final close = tester.getRect(find.byKey(const Key('ledger-close')));
-      expect(edit.top, greaterThan(name.top + 20));
-      expect(close.top, greaterThan(edit.bottom - 1));
-      expect((edit.center.dx - 180).abs(), lessThan(40));
+      // One horizontal row. The bar's contents sit about 18dp under its top.
+      expect(edit.top - name.top, greaterThanOrEqualTo(12));
+      expect((edit.center.dy - close.center.dy).abs(), lessThan(6));
+      expect(edit.top, greaterThan(name.top));
+      expect(edit.bottom, lessThan(name.bottom));
       final pinned = tester.getRect(find.byKey(const Key('ledger-pinned')));
       expect(pinned.bottom, lessThanOrEqualTo(800));
+      expect(find.text('إجمالي الدين الحالي'), findsOneWidget);
       await tester.pumpAndSettle(const Duration(milliseconds: 50));
       expect(tester.takeException(), isNull);
     },
