@@ -61,7 +61,9 @@ class _PurchasesScrollState extends State<_PurchasesScroll> {
 
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) => _revealLatest());
+    if (!_placed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _revealLatest());
+    }
     return CustomScrollView(
       key: PurchasesScreen.screenKey,
       controller: _controller,

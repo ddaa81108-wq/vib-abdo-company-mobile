@@ -157,6 +157,7 @@ void main() {
       expect((edit.center.dx - 180).abs(), lessThan(40));
       final pinned = tester.getRect(find.byKey(const Key('ledger-pinned')));
       expect(pinned.bottom, lessThanOrEqualTo(800));
+      await tester.pumpAndSettle(const Duration(milliseconds: 50));
       expect(tester.takeException(), isNull);
     },
   );

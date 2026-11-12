@@ -244,10 +244,65 @@ class _DayViewState extends ConsumerState<_DayView> {
           fieldFocused: _fieldFocused(),
         ) &&
         !_matchesServer(data)) {
-      _bind(data);
+      _adoptRemote(data);
       return;
     }
     _autosave.noteServerTotals(data);
+  }
+
+  /// A remote day updates the controllers already on screen. Replacing them
+  /// would flash the table and drop the scroll position.
+  void _adoptRemote(MasraweyaDayDto day) {
+    if (_purchases == null) {
+      _bind(day);
+      return;
+    }
+    _binding = true;
+    masraweyaWriteDigits(_purchases!, _digits(day.purchasesUnits));
+    final previous = _previous;
+    if (previous != null) {
+      masraweyaWriteDigits(previous, _digits(day.previousValueUnits));
+    }
+    final shared = _rows.length < day.entries.length
+        ? _rows.length
+        : day.entries.length;
+    for (var i = 0; i < shared; i++) {
+      masraweyaWriteDigits(_rows[i].value, _digits(day.entries[i].valueUnits));
+      masraweyaWriteDigits(
+        _rows[i].commission,
+        _digits(day.entries[i].commissionUnits),
+      );
+    }
+    if (day.entries.length > _rows.length) {
+      for (var i = _rows.length; i < day.entries.length; i++) {
+        _rows.add(
+          _listenedRow(
+            _EntryFields(
+              value: day.entries[i].valueUnits,
+              commission: day.entries[i].commissionUnits,
+            ),
+          ),
+        );
+        _foci.add(FocusNode()..addListener(_scheduleLeaveCheck));
+        _foci.add(FocusNode()..addListener(_scheduleLeaveCheck));
+      }
+    } else if (day.entries.length < _rows.length) {
+      for (var i = _rows.length - 1; i >= day.entries.length; i--) {
+        final row = _rows.removeAt(i);
+        row.value.removeListener(_onRowText);
+        row.commission.removeListener(_onRowText);
+        row.dispose();
+        final second = _foci.removeAt(i * 2 + 1);
+        final first = _foci.removeAt(i * 2);
+        second.removeListener(_scheduleLeaveCheck);
+        first.removeListener(_scheduleLeaveCheck);
+        second.dispose();
+        first.dispose();
+      }
+    }
+    _autosave.authoritative = day;
+    _binding = false;
+    _autosave.noteServerTotals(day);
   }
 
   bool _matchesServer(MasraweyaDayDto day) {

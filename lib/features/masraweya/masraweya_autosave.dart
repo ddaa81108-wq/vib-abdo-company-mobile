@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 
 import '../../ui/widgets/common.dart';
@@ -20,6 +21,17 @@ bool masraweyaRemoteReplacesDraft({
   required bool fieldFocused,
 }) {
   return phase == MasraweyaSavePhase.saved && !fieldFocused;
+}
+
+/// Writes server digits into the controller that is already on screen.
+/// The field widget is not replaced, so the cursor and scroll stay put.
+bool masraweyaWriteDigits(TextEditingController controller, String digits) {
+  if (controller.text == digits) return false;
+  controller.value = TextEditingValue(
+    text: digits,
+    selection: TextSelection.collapsed(offset: digits.length),
+  );
+  return true;
 }
 
 /// One work row as typed. Empty rows are omitted. A half-filled row blocks.

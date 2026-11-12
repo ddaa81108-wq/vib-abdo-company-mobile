@@ -115,19 +115,29 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   /// sideways just far enough that القيمة of the new row is fully on screen
   /// (focused, ✓ pinned beside it). Columns keep their order; التسلسل and the
   /// date may start off screen. Wide screens stay at the start.
-  void _toValueField([int frames = 12]) {
+  ///
+  /// Retries only while a controller is not laid out yet. Once the offset
+  /// matches, it stops. It does not schedule extra frames.
+  void _toValueField([int frames = 4]) {
     if (!mounted) return;
+    var waiting = false;
     for (final c in [_columnsScroll, _headerScroll, _composerScroll]) {
-      if (!c.hasClients) continue;
+      if (!c.hasClients) {
+        waiting = true;
+        continue;
+      }
       final position = c.position;
       final target = _LedgerColumns.valueOffset(position.viewportDimension)
           .clamp(position.minScrollExtent, position.maxScrollExtent);
-      if ((c.offset - target).abs() > 0.5) c.jumpTo(target);
+      if ((c.offset - target).abs() > 0.5) {
+        c.jumpTo(target);
+        waiting = true;
+      }
     }
-    if (frames > 0) {
-      WidgetsBinding.instance
-        ..addPostFrameCallback((_) => _toValueField(frames - 1))
-        ..scheduleFrame();
+    if (waiting && frames > 0) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _toValueField(frames - 1),
+      );
     }
   }
 
@@ -399,26 +409,36 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                         ),
                         child: SingleChildScrollView(child: bar),
                       ),
-                      jumps,
                       Expanded(
-                        child: KeptData<LedgerPage>(
-                          value: ledger,
-                          resetKey: '${section.path}/$id/ledger',
-                          expand: true,
-                          onRetry: () =>
-                              ref.invalidate(ledgerProvider((section, id))),
-                          messageOf: messageOf,
-                          failureOf: failureOf,
-                          loading: const _LedgerLoading(),
-                          builder: (page) => _ledgerBody(
-                            context,
-                            page: page,
-                            card: card,
-                            online: online,
-                            money: money,
-                            canWrite: canWrite,
-                            padding: padding,
-                          ),
+                        child: Stack(
+                          children: [
+                            KeptData<LedgerPage>(
+                              value: ledger,
+                              resetKey: '${section.path}/$id/ledger',
+                              expand: true,
+                              onRetry: () =>
+                                  ref.invalidate(ledgerProvider((section, id))),
+                              messageOf: messageOf,
+                              failureOf: failureOf,
+                              loading: const _LedgerLoading(),
+                              builder: (page) => _ledgerBody(
+                                context,
+                                page: page,
+                                card: card,
+                                online: online,
+                                money: money,
+                                canWrite: canWrite,
+                                padding: padding,
+                              ),
+                            ),
+                            // Over the rows, so showing the buttons does not
+                            // resize the list and shake the scroll.
+                            PositionedDirectional(
+                              top: 0,
+                              start: 0,
+                              child: jumps,
+                            ),
+                          ],
                         ),
                       ),
                       ConstrainedBox(
@@ -455,7 +475,10 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     required bool canWrite,
     required EdgeInsetsDirectional padding,
   }) {
-    final resetKey = '${section.path}/$id/${identityHashCode(page)}';
+    // The account and the older-page cursor. A new payload of the same
+    // window (a live refresh) must not throw away the rows already shown.
+    final accountKey = '${section.path}/$id';
+    final resetKey = '$accountKey/${page.page.nextCursor}';
     _syncOlder(resetKey, page);
     // The website's merge: older items first, then the newer page. A row
     // already seen is not repeated.
@@ -509,8 +532,9 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
       onEditDone: _closeInlineEdit,
       onCancel: (meta) => _cancel(context, ref, rows[index], meta),
     );
-    if (_openedAtBottomFor != resetKey) {
-      _openedAtBottomFor = resetKey;
+    // Once per account. A later payload keeps the scroll where the reader left it.
+    if (_openedAtBottomFor != accountKey) {
+      _openedAtBottomFor = accountKey;
       WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToEntry());
     }
     return LayoutBuilder(
