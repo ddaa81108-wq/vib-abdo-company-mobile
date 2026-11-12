@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +12,7 @@ import '../../ui/tokens.dart';
 import '../../ui/widgets/common.dart';
 import '../../ui/widgets/environment_badge.dart';
 import '../../ui/widgets/section_kit.dart';
+import 'firebase_debug_token.dart';
 
 /// The version baked into this client. Not a remote changelog.
 const appReleaseLabel = '1.0.0+1';
@@ -89,6 +91,8 @@ class DevelopmentScreen extends ConsumerWidget {
               ],
             ),
           ),
+          if (kDebugMode)
+            developmentFirebaseSection(includeDebugRow: kDebugMode),
           const SizedBox(height: AppSpacing.md),
           const Text(
             'التشخيص لا يعرض كلمة المرور ولا رمز الجلسة ولا رمز الحماية.',
