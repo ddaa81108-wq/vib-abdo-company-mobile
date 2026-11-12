@@ -64,7 +64,7 @@ The Google Services Gradle plugin is on the classpath, and it is **applied only 
 
 `google-services.json` is in `.gitignore`. Do not commit one.
 
-`firebase_core` and `firebase_messaging` are dependencies. They start only after `Firebase.initializeApp()` succeeds. Without `google-services.json` that call fails closed, the transport stays the no-op, and SSE is unchanged. The manifest removes `FirebaseInitProvider` so a missing config does not crash process start. The channel meta-data still names `vib_notices_sound_v1`.
+`firebase_core` and `firebase_messaging` are dependencies. `FirebaseInitProvider` stays in the merged manifest. With `google-services.json` it starts Firebase before Dart, so a notification payload on `vib_notices_sound_v1` is shown by Android when the process is dead. Without the file the provider logs and skips, Dart `initializeApp` fails closed, the transport stays the no-op, and SSE is unchanged. `VibApplication` creates that high-importance channel at process start. The channel meta-data still names `vib_notices_sound_v1`.
 
 `tool/decode_google_services_json.sh` writes `android/app/google-services.json` from the environment variable below. An empty variable is a no-op. `GOOGLE_SERVICES_JSON_DEST` overrides the output path for tests so a test never deletes the app file. The script prints the Android package name and does not print the file. The debug APK job and the release job `Release build rejects fake API` decode it when `GOOGLE_SERVICES_JSON_BASE64` is set, and then set `ENABLE_GOOGLE_SERVICES=true` so a present secret cannot build an APK that silently omits Firebase. An empty secret leaves the flag unset.
 

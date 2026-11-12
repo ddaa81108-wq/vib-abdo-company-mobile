@@ -70,8 +70,8 @@ void main() {
     expect(NotificationChannels.collectionsId, 'vib_notices_sound_v1');
     final manifest = File('android/app/src/main/AndroidManifest.xml')
         .readAsStringSync();
-    expect(manifest, contains('FirebaseInitProvider'));
-    expect(manifest, contains('tools:node="remove"'));
+    expect(manifest, isNot(contains('tools:node="remove"')));
+    expect(manifest, contains('.VibApplication'));
     expect(manifest, contains('vib_notices_sound_v1'));
   });
 }
