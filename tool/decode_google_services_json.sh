@@ -9,7 +9,8 @@ if [[ -z "${GOOGLE_SERVICES_JSON_BASE64//[[:space:]]/}" ]]; then
   exit 0
 fi
 
-dest="android/app/google-services.json"
+# Tests pass a temp path. The default is the app file. A failure deletes only dest.
+dest="${GOOGLE_SERVICES_JSON_DEST:-android/app/google-services.json}"
 mkdir -p "$(dirname "$dest")"
 tmp=$(mktemp)
 if ! printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | tr -d '[:space:]' | base64 -d > "$tmp"; then

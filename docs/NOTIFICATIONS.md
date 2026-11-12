@@ -66,7 +66,7 @@ The Google Services Gradle plugin is on the classpath, and it is **applied only 
 
 `firebase_core` and `firebase_messaging` are dependencies. They start only after `Firebase.initializeApp()` succeeds. Without `google-services.json` that call fails closed, the transport stays the no-op, and SSE is unchanged. The manifest removes `FirebaseInitProvider` so a missing config does not crash process start. The channel meta-data still names `vib_notices_sound_v1`.
 
-`tool/decode_google_services_json.sh` writes `android/app/google-services.json` from the environment variable below. An empty variable is a no-op. The script prints the Android package name and does not print the file. The release job `Release build rejects fake API` runs it only after the fake-API rejection check, and only when the secret is present.
+`tool/decode_google_services_json.sh` writes `android/app/google-services.json` from the environment variable below. An empty variable is a no-op. `GOOGLE_SERVICES_JSON_DEST` overrides the output path for tests so a test never deletes the app file. The script prints the Android package name and does not print the file. The debug APK job and the release job `Release build rejects fake API` decode it when `GOOGLE_SERVICES_JSON_BASE64` is set, and then set `ENABLE_GOOGLE_SERVICES=true` so a present secret cannot build an APK that silently omits Firebase. An empty secret leaves the flag unset.
 
 ### Secret names
 
@@ -74,7 +74,7 @@ Names only. No values belong in git, in logs, or in this file.
 
 | Name | Where it is read |
 | --- | --- |
-| `GOOGLE_SERVICES_JSON_BASE64` | Release job in `.github/workflows/ci.yml`, via `tool/decode_google_services_json.sh` |
+| `GOOGLE_SERVICES_JSON_BASE64` | Debug APK job and the release job in `.github/workflows/ci.yml`, via `tool/decode_google_services_json.sh`. A non-empty value also sets `ENABLE_GOOGLE_SERVICES=true` for that build. |
 | `GOOGLE_SERVICES_JSON_STAGING_BASE64` | Not read by CI. Use it if staging and production files are stored separately, and copy the one you are shipping into `GOOGLE_SERVICES_JSON_BASE64` for that release. |
 | `GOOGLE_SERVICES_JSON_PROD_BASE64` | Not read by CI. Same as the staging name. |
 
