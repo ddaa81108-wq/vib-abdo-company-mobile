@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vib_abdo_company_mobile/notifications/firebase_messaging_runtime.dart';
 import 'package:vib_abdo_company_mobile/notifications/notification_channels.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_transport.dart';
 
@@ -42,6 +43,16 @@ void main() {
       ),
       isTrue,
     );
+  });
+
+  test('absent Firebase config keeps the no-op transport', () async {
+    final transport = await resolveAppPushTransport(
+      runtime: const UnavailableFcmRuntime(),
+    );
+    expect(transport, isA<NoopPushTransport>());
+    expect(transport.registersDevices, isFalse);
+    expect(await transport.currentToken(), isNull);
+    expect(transport.payloads, isA<Stream<Map<String, dynamic>>>());
   });
 
   test(

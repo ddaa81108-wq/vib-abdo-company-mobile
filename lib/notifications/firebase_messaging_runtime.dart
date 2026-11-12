@@ -98,11 +98,13 @@ Map<String, dynamic> _data(RemoteMessage message) {
 
 /// Chooses the process transport. An empty define tries Firebase and falls
 /// back to the no-op when the config is absent, so SSE stays as it is.
-Future<PushTransport> resolveAppPushTransport() async {
+///
+/// [runtime] is for tests. Production passes nothing and uses the plugin.
+Future<PushTransport> resolveAppPushTransport({FcmRuntime? runtime}) async {
   final raw = kPushTransportName.trim().toLowerCase();
   if (raw == 'fake') return FakePushTransport();
   if (raw == 'noop') return const NoopPushTransport();
-  fcmRuntime = PluginFcmRuntime();
+  fcmRuntime = runtime ?? PluginFcmRuntime();
   final fcm = FcmPushTransport();
   final ready = await fcm.prepare();
   if (ready || raw == 'fcm') return fcm;
