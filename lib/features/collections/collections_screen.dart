@@ -198,64 +198,60 @@ class _AdminViewState extends ConsumerState<_AdminView> {
       children: [
         CollectionsPanel(
           key: const Key('collections-filter-card'),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _LabeledField(
-                label: CollectionsText.filterBatch,
-                child: DropdownButtonFormField<String>(
-                  key: const Key('collections-filter-batch'),
-                  initialValue: batch?.id,
-                  isExpanded: true,
-                  hint: const Text(CollectionsText.noOpenBatches),
-                  items: [
-                    for (final b in batches)
-                      DropdownMenuItem(
-                        value: b.id,
-                        child: Text(
-                          CollectionsText.batchLabel(
-                            b.businessDate,
-                            b.batchNumber,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          style: cairo(13, 700, color: look.ink),
-                        ),
-                      ),
-                  ],
-                  onChanged: batches.isEmpty
-                      ? null
-                      : (id) => setState(() => _batchId = id),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              _LabeledField(
-                label: CollectionsText.filterEmployee,
-                child: DropdownButtonFormField<String?>(
-                  key: const Key('collections-filter-employee'),
-                  initialValue: employee,
-                  isExpanded: true,
-                  items: [
-                    DropdownMenuItem<String?>(
-                      value: null,
+          child: _PeerRow(
+            first: _LabeledField(
+              label: CollectionsText.filterBatch,
+              child: DropdownButtonFormField<String>(
+                key: const Key('collections-filter-batch'),
+                initialValue: batch?.id,
+                isExpanded: true,
+                hint: const Text(CollectionsText.noOpenBatches),
+                items: [
+                  for (final b in batches)
+                    DropdownMenuItem(
+                      value: b.id,
                       child: Text(
-                        CollectionsText.allEmployees,
+                        CollectionsText.batchLabel(
+                          b.businessDate,
+                          b.batchNumber,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                         style: cairo(13, 700, color: look.ink),
                       ),
                     ),
-                    for (final name in employees)
-                      DropdownMenuItem<String?>(
-                        value: name,
-                        child: Text(
-                          name,
-                          overflow: TextOverflow.ellipsis,
-                          style: cairo(13, 700, color: look.ink),
-                        ),
-                      ),
-                  ],
-                  onChanged: (name) => setState(() => _employee = name),
-                ),
+                ],
+                onChanged: batches.isEmpty
+                    ? null
+                    : (id) => setState(() => _batchId = id),
               ),
-            ],
+            ),
+            second: _LabeledField(
+              label: CollectionsText.filterEmployee,
+              child: DropdownButtonFormField<String?>(
+                key: const Key('collections-filter-employee'),
+                initialValue: employee,
+                isExpanded: true,
+                items: [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text(
+                      CollectionsText.allEmployees,
+                      style: cairo(13, 700, color: look.ink),
+                    ),
+                  ),
+                  for (final name in employees)
+                    DropdownMenuItem<String?>(
+                      value: name,
+                      child: Text(
+                        name,
+                        overflow: TextOverflow.ellipsis,
+                        style: cairo(13, 700, color: look.ink),
+                      ),
+                    ),
+                ],
+                onChanged: (name) => setState(() => _employee = name),
+              ),
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -290,6 +286,11 @@ class _AdminViewState extends ConsumerState<_AdminView> {
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
+        Text(
+          CollectionsText.closeScopeNote,
+          style: cairo(12, 500, color: look.muted),
+        ),
+        const SizedBox(height: AppSpacing.xxs),
         Wrap(
           key: const Key('close-batch-note'),
           spacing: AppSpacing.lg,
@@ -349,19 +350,29 @@ class _AdminViewState extends ConsumerState<_AdminView> {
             ),
           ],
         ),
-        const SizedBox(height: AppSpacing.sm),
-        TextField(
-          key: const Key('collections-search'),
-          controller: _search,
-          onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(
-            hintText: CollectionsText.searchViewHint,
-            prefixIcon: Icon(Icons.search),
-            isDense: true,
-          ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          CollectionsText.unlinkedWithin(summary.unlinkedPendingCount),
+          style: cairo(11, 500, color: look.muted),
+        ),
+        Text(
+          CollectionsText.summaryNote,
+          style: cairo(11, 500, color: look.muted),
         ),
         const SizedBox(height: AppSpacing.sm),
-        _EmployeeTotalsMenu(rows: data.employeeTotals, money: money),
+        _PeerRow(
+          first: TextField(
+            key: const Key('collections-search'),
+            controller: _search,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              hintText: CollectionsText.searchViewHint,
+              prefixIcon: Icon(Icons.search),
+              isDense: true,
+            ),
+          ),
+          second: _EmployeeTotalsMenu(rows: data.employeeTotals, money: money),
+        ),
         const SizedBox(height: AppSpacing.sm),
         _NumberRow(
           key: const Key('collections-tabs'),
@@ -494,7 +505,11 @@ Widget _assignmentGrid(List<Widget> cards) {
   if (cards.isEmpty) return const SizedBox.shrink();
   return LayoutBuilder(
     builder: (context, constraints) {
-      const cols = 1;
+      final cols = constraints.maxWidth < 560
+          ? 1
+          : constraints.maxWidth >= 720
+          ? 3
+          : 2;
       const gap = 8.0;
       final width = (constraints.maxWidth - gap * (cols - 1)) / cols;
       return Wrap(
@@ -750,7 +765,7 @@ class _EmployeeViewState extends ConsumerState<_EmployeeView> {
       children: [
         _ActionBar(
           key: const Key('collections-action-bar'),
-          stack: true,
+          oneRow: true,
           children: [
             if (widget.write)
               _BarButton(
@@ -810,6 +825,11 @@ class _EmployeeViewState extends ConsumerState<_EmployeeView> {
               edge: _amber(context),
             ),
           ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          CollectionsText.cashToHandNote,
+          style: cairo(11, 500, color: look.muted),
         ),
         const SizedBox(height: AppSpacing.sm),
         _NumberRow(
@@ -930,7 +950,27 @@ class _ReceiptRow extends StatelessWidget {
 
 // --------------------------------------------------------------- layout
 
-/// Equal full-width rows, one under the other, split by a hairline.
+/// Two peers that stay side by side, including at text scale 1.3.
+class _PeerRow extends StatelessWidget {
+  const _PeerRow({required this.first, required this.second});
+
+  final Widget first;
+  final Widget second;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: first),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(child: second),
+      ],
+    );
+  }
+}
+
+/// Equal cells in one horizontal row. Content scales down instead of clipping.
 class _NumberRow extends StatelessWidget {
   const _NumberRow({required this.children, super.key});
 
@@ -938,16 +978,16 @@ class _NumberRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final line = context.look.cardBorder;
-    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < children.length; i++) ...[
-          if (i > 0) Divider(height: 1, thickness: 1, color: line),
-          SizedBox(height: 48 * scale, child: children[i]),
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(child: children[i]),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
@@ -977,14 +1017,12 @@ class _ActionBar extends StatelessWidget {
   const _ActionBar({
     required this.children,
     this.oneRow = false,
-    this.stack = false,
     this.tones,
     super.key,
   });
 
   final List<Widget> children;
   final bool oneRow;
-  final bool stack;
 
   /// When set, each button is a solid colour instead of the hero bar.
   final List<Color>? tones;
@@ -993,17 +1031,12 @@ class _ActionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final tones = this.tones;
     if (tones != null && tones.length == children.length) {
-      final line = context.look.cardBorder;
-      final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) Divider(height: 1, thickness: 1, color: line),
-            SizedBox(
-              height: 48 * scale,
-              child: _solidButton(context, tones[i], children[i]),
-            ),
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(child: _solidButton(context, tones[i], children[i])),
           ],
         ],
       );
@@ -1054,10 +1087,9 @@ class _ActionBar extends StatelessWidget {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final narrow =
-                        stack ||
-                        (!oneRow &&
-                            (_tight(context, constraints.maxWidth) ||
-                                constraints.maxWidth / children.length < 104));
+                        !oneRow &&
+                        (_tight(context, constraints.maxWidth) ||
+                            constraints.maxWidth / children.length < 104);
                     if (narrow) {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1408,26 +1440,27 @@ class _SummaryCard extends StatelessWidget {
             border: BorderDirectional(start: BorderSide(color: edge, width: 6)),
           ),
           child: Padding(
-            padding: const EdgeInsetsDirectional.symmetric(horizontal: 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
+            padding: const EdgeInsetsDirectional.all(AppSpacing.xs),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
                     title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: cairo(13, 700, color: look.ink),
+                    textAlign: TextAlign.center,
+                    style: cairo(11, 700, color: look.ink),
                   ),
-                ),
-                const SizedBox(width: 8),
-                money
-                    ? MoneyText(value, style: figure.copyWith(fontSize: 15))
-                    : Text(
-                        value,
-                        textDirection: TextDirection.ltr,
-                        style: figure.copyWith(fontSize: 15),
-                      ),
-              ],
+                  const SizedBox(height: 2),
+                  money
+                      ? MoneyText(value, style: figure.copyWith(fontSize: 15))
+                      : Text(
+                          value,
+                          textDirection: TextDirection.ltr,
+                          style: figure.copyWith(fontSize: 15),
+                        ),
+                ],
+              ),
             ),
           ),
         ),

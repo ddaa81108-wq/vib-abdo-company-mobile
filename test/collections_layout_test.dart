@@ -10,7 +10,7 @@ import 'support/pump_app.dart';
 /// Headless layout checks for the collections redesign. Fake sessions only.
 void main() {
   testWidgets(
-    'admin collections rows stack at equal height at 440 and text scale 1.3',
+    'admin collections row stays horizontal at 440 and text scale 1.3',
     (tester) async {
       await _open(tester, 'admin.demo', textScale: 1.3);
 
@@ -29,32 +29,32 @@ void main() {
       expect(find.text('بانتظار الاعتماد'), findsWidgets);
       expect(find.byKey(const Key('employee-totals')), findsNothing);
 
-      _expectStacked(tester, const [
+      _expectSameRow(tester, const [
         Key('metric-approved'),
         Key('metric-cash-received'),
         Key('metric-remaining'),
         Key('metric-pending'),
       ]);
-      _expectStacked(tester, const [
+      _expectSameRow(tester, const [
         Key('collections-tab-all'),
         Key('collections-tab-review'),
         Key('collections-tab-cash'),
         Key('collections-tab-previous'),
       ]);
-      _expectStacked(tester, const [
+      _expectSameRow(tester, const [
         Key('collections-payroll'),
         Key('close-batch'),
         Key('collections-export-pdf'),
       ]);
-      expect(find.text(CollectionsText.closeScopeNote), findsNothing);
-      expect(find.text(CollectionsText.summaryNote), findsNothing);
-      final batch = tester.getRect(
-        find.byKey(const Key('collections-filter-batch')),
-      );
-      final employee = tester.getRect(
-        find.byKey(const Key('collections-filter-employee')),
-      );
-      expect(employee.top, greaterThan(batch.bottom - 1));
+      _expectRightToLeft(tester, const [
+        Key('collections-payroll'),
+        Key('close-batch'),
+        Key('collections-export-pdf'),
+      ]);
+      _expectRightToLeft(tester, const [
+        Key('collections-filter-batch'),
+        Key('collections-filter-employee'),
+      ]);
 
       final approved = _plain(tester, const Key('metric-approved'));
       await tester.enterText(
@@ -65,27 +65,12 @@ void main() {
       expect(find.text(CollectionsText.noMatch), findsOneWidget);
       expect(_plain(tester, const Key('metric-approved')), approved);
 
-      final collectionsScroll = find
-          .descendant(
-            of: find.byKey(const Key('screen-collections')),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('employee-totals-toggle')),
-        200,
-        scrollable: collectionsScroll,
-      );
-      await tester.drag(collectionsScroll, const Offset(0, -40));
-      await tester.pump();
       await tester.tap(find.byKey(const Key('employee-totals-toggle')));
       await tester.pump();
       expect(find.byKey(const Key('employee-totals')), findsOneWidget);
       expect(find.text('موظف استلام تجريبي'), findsWidgets);
       expect(find.text('موظف آخر تجريبي'), findsWidgets);
 
-      tester.state<ScrollableState>(collectionsScroll).position.jumpTo(0);
-      await tester.pump();
       await tester.tap(find.byKey(const Key('collections-payroll')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('collections-payroll-back')), findsOneWidget);
@@ -119,19 +104,19 @@ void main() {
       expect(find.text(CollectionsText.tabMyCards), findsWidgets);
       expect(find.text(CollectionsText.tabMyReceipts), findsWidgets);
       expect(find.text(CollectionsText.tabMyCash), findsWidgets);
-      expect(find.text(CollectionsText.cashToHandNote), findsNothing);
+      expect(find.text(CollectionsText.cashToHandNote), findsOneWidget);
 
-      _expectStacked(tester, const [
+      _expectSameRow(tester, const [
         Key('metric-assigned'),
         Key('metric-pending'),
         Key('metric-cash'),
       ]);
-      _expectStacked(tester, const [
+      _expectSameRow(tester, const [
         Key('collections-tab-cards'),
         Key('collections-tab-receipts'),
         Key('collections-tab-cash'),
       ]);
-      _expectStacked(tester, const [
+      _expectRightToLeft(tester, const [
         Key('unlinked-collection'),
         Key('collections-payroll'),
         Key('collections-export-pdf'),
@@ -160,11 +145,23 @@ Future<void> _open(
   await tester.pumpAndSettle();
 }
 
-void _expectStacked(WidgetTester tester, List<Key> keys) {
+void _expectSameRow(WidgetTester tester, List<Key> keys) {
   final rects = [for (final key in keys) tester.getRect(find.byKey(key))];
-  for (var i = 1; i < rects.length; i++) {
-    expect(rects[i].top, greaterThan(rects[i - 1].bottom - 1));
-    expect((rects[i].height - rects.first.height).abs(), lessThan(4));
+  final top = rects.first.top;
+  final width = rects.first.width;
+  for (final rect in rects) {
+    expect((rect.top - top).abs(), lessThan(2));
+    expect((rect.width - width).abs(), lessThan(8));
+    expect(rect.height, greaterThan(24));
+  }
+}
+
+void _expectRightToLeft(WidgetTester tester, List<Key> keys) {
+  final centers = [
+    for (final key in keys) tester.getRect(find.byKey(key)).center.dx,
+  ];
+  for (var i = 1; i < centers.length; i++) {
+    expect(centers[i - 1], greaterThan(centers[i]));
   }
 }
 
