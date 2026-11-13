@@ -1218,7 +1218,10 @@ class _SearchRevealState extends State<_SearchReveal> {
 
   void _reveal() {
     if (!mounted) return;
-    final wanted = GoRouterState.of(context).uri.queryParameters['card'];
+    // GoRouterState.of walks every navigator and never returns when this
+    // card is built during a route change (the page is not associated yet).
+    // The router's own state is the location that opened ?card=.
+    final wanted = GoRouter.of(context).state.uri.queryParameters['card'];
     if (wanted != widget.id) return;
     Scrollable.ensureVisible(context, alignment: 0.15);
   }

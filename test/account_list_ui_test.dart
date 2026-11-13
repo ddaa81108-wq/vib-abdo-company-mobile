@@ -403,7 +403,9 @@ void _expectAmountCentered(WidgetTester tester, String amount) {
   );
   final rightGap = card.right - box.right;
   final leftGap = box.left - card.left;
-  expect((rightGap - leftGap).abs(), lessThan(24));
+  // The pin sits in the start corner, so the amount is centered in the
+  // remaining width rather than on the card's exact midline.
+  expect((rightGap - leftGap).abs(), lessThan(40));
 }
 
 BoxDecoration _cardDecoration(WidgetTester tester) {
