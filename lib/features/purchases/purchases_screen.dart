@@ -1691,11 +1691,11 @@ class _PurchaseGrid extends ConsumerWidget {
   /// A draft row on the open day can be edited. A carried day
   /// («مُرحّل») can be edited only after «تعديل اليوم» sets
   /// `correctionOpen` on that day, which is the website's rule.
+  /// An open day shows a pencil on each saved row. A posted day shows the
+  /// check until «تعديل اليوم» reopens it.
   bool _writable(PurchaseEntryDto entry) {
     if (!canWrite || entry.dayVersion == null) return false;
-    if (entry.dayStatus == 'draft') {
-      return entry.dayId != null && entry.dayId == openDay?.id;
-    }
+    if (entry.dayStatus == 'draft') return true;
     return entry.dayStatus == 'finalized' && entry.correctionOpen;
   }
 
@@ -1951,7 +1951,8 @@ class _PurchaseGrid extends ConsumerWidget {
                                 ),
                               ],
                             )
-                          : entry.dayStatus == 'finalized'
+                          : entry.dayStatus == 'finalized' &&
+                                !entry.correctionOpen
                           ? _SavedTick(
                               scale: scale,
                               markKey: Key('purchase-saved-mark-${entry.id}'),
@@ -2147,6 +2148,19 @@ class _DayCarryBreak extends ConsumerWidget {
           ink: closeInk,
           label: '${_PText.carryToNext}${dayNumber ?? '—'}',
           pillKey: Key('purchase-carry-close-$dayId'),
+          // The label names this day («يوم #N»), whose rows sit above the
+          // divider. The button used to sit on the next day's opening row,
+          // so it read as opening the day below.
+          button: showCorrection
+              ? _correctionButton(
+                  context,
+                  ref,
+                  dayId: dayId,
+                  correctionOpen: correctionOpen,
+                  dayVersion: dayVersion!,
+                  book: book,
+                )
+              : null,
         ),
         SizedBox(
           key: Key('purchase-day-divider-$dayId'),
@@ -2160,16 +2174,6 @@ class _DayCarryBreak extends ConsumerWidget {
           label: _PText.carryForward,
           pillKey: Key('purchase-carry-open-$dayId'),
           date: nextDate ?? AppStrings.dash,
-          button: showCorrection
-              ? _correctionButton(
-                  context,
-                  ref,
-                  dayId: dayId,
-                  correctionOpen: correctionOpen,
-                  dayVersion: dayVersion!,
-                  book: book,
-                )
-              : null,
         ),
       ],
     );
