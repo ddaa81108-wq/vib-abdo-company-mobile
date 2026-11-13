@@ -114,17 +114,10 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     final money = ref.watch(apiLayerProvider).money;
     final canWrite = permissions.canWrite(section.sectionKey);
     final width = MediaQuery.sizeOf(context).width;
-    final gridColumns = accountListColumns(
-      width,
-      textScale: MediaQuery.textScalerOf(context).scale(1),
-    );
-    // Customers and companies share the debt-card design. Ali, 2026-11-13:
-    // one card per row so the wider card can carry the status, name, amount
-    // and movement without clipping. Each section keeps its own data.
+    // Ali, 2026-11-13 (085): all four sections are one full-width card,
+    // at every width. Each section keeps its own data and header.
     final isCustomers = section == AccountSection.customers;
     final debtLook = isDebtLookSection(section);
-    final oneRow = debtLook || section == AccountSection.egyptianDeposits;
-    final columns = oneRow ? 1 : (gridColumns < 2 ? 2 : gridColumns);
 
     final Widget searchField = TextField(
       key: const Key('account-search'),
@@ -370,7 +363,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                             SliverToBoxAdapter(
                               child: _cardWrap(
                                 cards: cards,
-                                columns: columns,
                                 canWrite: canWrite,
                                 permissions: permissions,
                               ),
@@ -456,7 +448,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
 
   Widget _cardWrap({
     required List<AccountCardDto> cards,
-    required int columns,
     required bool canWrite,
     required PermissionService permissions,
   }) {
@@ -468,33 +459,17 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       );
     }
 
-    // Egyptian deposits, and the debt sections, are one full-width card.
-    // A Wrap can still place two children side by side if the measured
-    // width is short, so a single column is a vertical list.
-    if (columns <= 1 || section == AccountSection.egyptianDeposits) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final item in cards)
-            Padding(
-              padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
-              child: cardFor(item),
-            ),
-        ],
-      );
-    }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cardWidth = _cardWidth(constraints.maxWidth, columns);
-        return Wrap(
-          spacing: AppSpacing.md,
-          runSpacing: AppSpacing.md,
-          children: [
-            for (final item in cards)
-              SizedBox(width: cardWidth, child: cardFor(item)),
-          ],
-        );
-      },
+    // One card per row in every section. A Wrap can still place two
+    // children side by side, so the list is a vertical column.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final item in cards)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
+            child: cardFor(item),
+          ),
+      ],
     );
   }
 
@@ -506,9 +481,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     return _AccountCard(
       section: section,
       card: card,
-      wide:
-          isDebtLookSection(section) ||
-          section == AccountSection.egyptianDeposits,
+      wide: true,
       money: ref.watch(apiLayerProvider).money,
       canWrite: canWrite && !card.systemManaged,
       assigning: _assigning,
@@ -526,14 +499,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
           ? () => _openZeroPreview(card)
           : null,
     );
-  }
-
-  double _cardWidth(double maxWidth, int columns) {
-    if (columns <= 1 || maxWidth <= 0) return maxWidth;
-    final raw = (maxWidth - AppSpacing.md * (columns - 1)) / columns;
-    final min = isDebtLookSection(section) ? 120.0 : 160.0;
-    if (raw < min) return maxWidth;
-    return raw.clamp(min, maxWidth);
   }
 
   bool _canAssign(PermissionService permissions) =>
@@ -1152,7 +1117,6 @@ class _AccountCard extends StatelessWidget {
               key: ValueKey('zero-review-${card.id}'),
               tooltip: AppStrings.zeroReview,
               style: IconButton.styleFrom(
-                foregroundColor: Colors.white,
                 minimumSize: const Size(28, 28),
                 padding: EdgeInsets.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
