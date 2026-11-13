@@ -100,6 +100,7 @@ class WebsiteAccountCardBody extends StatelessWidget {
     required this.movement,
     required this.ink,
     this.showAssignee = false,
+    this.wide = false,
     this.pin,
     this.zero,
     super.key,
@@ -111,20 +112,29 @@ class WebsiteAccountCardBody extends StatelessWidget {
   final String movement;
   final Color ink;
   final bool showAssignee;
+
+  /// One card across the row. Type is larger; nothing is ellipsized.
+  final bool wide;
   final Widget? pin;
   final Widget? zero;
 
   @override
   Widget build(BuildContext context) {
     final assignee = card.activeAssigneeName?.trim() ?? '';
+    final amountSize = wide ? 30.0 : 20.0;
     final amountStyle = context.textExtras.amountLarge.copyWith(
       color: Colors.white,
-      fontSize: 20,
+      fontSize: amountSize,
       fontWeight: FontWeight.w800,
     );
-    final small = cairo(10, 700, color: const Color(0xFFFFE7A8));
+    final small = cairo(wide ? 13 : 10, 700, color: const Color(0xFFFFE7A8));
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+      padding: EdgeInsets.fromLTRB(
+        wide ? 14 : 8,
+        wide ? 12 : 6,
+        wide ? 14 : 8,
+        wide ? 12 : 8,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
@@ -165,14 +175,15 @@ class WebsiteAccountCardBody extends StatelessWidget {
             status,
             key: Key('account-age-${card.id}'),
             textAlign: TextAlign.center,
-            style: cairo(11, 800, color: const Color(0xFFFFE2E9)),
+            softWrap: true,
+            style: cairo(wide ? 14 : 11, 800, color: const Color(0xFFFFE2E9)),
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: wide ? 6 : 2),
           Text(
             card.name,
             textAlign: TextAlign.center,
             softWrap: true,
-            style: cairo(15, 800, color: ink),
+            style: cairo(wide ? 20 : 15, 800, color: ink),
           ),
           const SizedBox(height: 2),
           if (amount == MoneyValue.invalidLabel)
@@ -211,7 +222,11 @@ class WebsiteAccountCardBody extends StatelessWidget {
                 key: Key('account-movement-${card.id}'),
                 textAlign: TextAlign.center,
                 softWrap: true,
-                style: cairo(10.5, 700, color: ink.withValues(alpha: 0.92)),
+                style: cairo(
+                  wide ? 13 : 10.5,
+                  700,
+                  color: ink.withValues(alpha: 0.92),
+                ),
               ),
             ),
           ),
