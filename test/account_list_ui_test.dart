@@ -135,9 +135,17 @@ void main() {
       final theme = Theme.of(tester.element(find.byType(HomeShell)));
       expect(theme.brightness, dark ? Brightness.dark : Brightness.light);
       _expectAmountCentered(tester, '320 د.ل');
-      expect(_cardGradient(tester).colors.first, const Color(0xFFBD3B47));
+      if (dark) {
+        expect(_cardGradient(tester).colors.first, const Color(0xFFBD3B47));
+      } else {
+        expect(_cardFill(tester), Colors.white);
+      }
       await go(tester, '/companies');
-      expect(_cardGradient(tester).colors.first, const Color(0xFFBD3B47));
+      if (dark) {
+        expect(_cardGradient(tester).colors.first, const Color(0xFFBD3B47));
+      } else {
+        expect(_cardFill(tester), Colors.white);
+      }
     }
   });
 
@@ -397,15 +405,20 @@ void _expectAmountCentered(WidgetTester tester, String amount) {
   expect((rightGap - leftGap).abs(), lessThan(24));
 }
 
-LinearGradient _cardGradient(WidgetTester tester) {
+BoxDecoration _cardDecoration(WidgetTester tester) {
   final ink = tester.widget<Ink>(
     find.descendant(
       of: find.byKey(const Key('account-card-c_55')),
       matching: find.byType(Ink),
     ),
   );
-  return (ink.decoration! as BoxDecoration).gradient! as LinearGradient;
+  return ink.decoration! as BoxDecoration;
 }
+
+LinearGradient _cardGradient(WidgetTester tester) =>
+    _cardDecoration(tester).gradient! as LinearGradient;
+
+Color _cardFill(WidgetTester tester) => _cardDecoration(tester).color!;
 
 Future<void> _expectActions(
   WidgetTester tester, {
