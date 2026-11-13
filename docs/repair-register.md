@@ -806,6 +806,13 @@
 - العنوان: VIB-FIX-072: Stack the collections rows at one height.
 - السلوك: صفوف الاستلامات تحت بعضها، كل صف أفقي بارتفاع واحد ويفصله خط. حُذفت الجمل التي كانت بين الصفوف.
 
+## VIB-FIX-072b
+
+- الالتزام: `da9d2c21326071ee3125b7225ee21393d252e6ed`
+- العنوان: VIB-FIX-072b: Restore the original collections row size.
+- السلوك: الصفوف تبقى تحت بعضها، والجمل التي كانت بينها تبقى محذوفة. الارتفاع والحشو والفراغ 6px عادا كما كانا قبل 072.
+- الدليل: `test/collections_layout_test.dart`.
+
 ## VIB-FIX-073
 
 - الالتزام: `f39cb8d05a6a7ad691db7bfdb6ea8ca05695bec2`
