@@ -13,7 +13,7 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers');
     expect(find.text(AppStrings.customersTotalDebt), findsOneWidget);
-    expect(find.text(AppStrings.activeShort), findsOneWidget);
+    expect(find.text('${AppStrings.activeShort} (10)'), findsOneWidget);
     expect(find.text(AppStrings.todayTab), findsNothing);
     expect(find.byKey(const Key('app-bar-theme')), findsOneWidget);
     final more = find.byKey(const Key('load-more-accounts'));
