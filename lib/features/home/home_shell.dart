@@ -41,6 +41,13 @@ class NavItem {
   final String path;
 }
 
+const _barButtonStyle = ButtonStyle(
+  padding: WidgetStatePropertyAll(EdgeInsets.zero),
+  minimumSize: WidgetStatePropertyAll(Size(32, 40)),
+  fixedSize: WidgetStatePropertyAll(Size(32, 40)),
+  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+);
+
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({required this.child, required this.location, super.key});
 
@@ -163,10 +170,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           : null,
       appBar: AppBar(
         leading: _leading(phone: phone, panel: panel),
-        title: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: AlignmentDirectional.centerStart,
-          child: Text(_title(widget.location)),
+        title: Transform.translate(
+          // The env badge hangs over the bottom of a crowded 320 bar.
+          offset: const Offset(0, -8),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(_title(widget.location)),
+          ),
         ),
         actions: [
           if (phone && _showBack)
@@ -174,14 +185,23 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               builder: (barContext) => IconButton(
                 key: HomeShell.menuKey,
                 tooltip: AppStrings.menu,
+                style: _barButtonStyle,
                 onPressed: () => Scaffold.of(barContext).openDrawer(),
                 icon: const Icon(Icons.menu),
               ),
             ),
           IconButton(
             tooltip: AppStrings.search,
+            style: _barButtonStyle,
             onPressed: () => context.go('/search'),
             icon: const Icon(Icons.search),
+          ),
+          IconButton(
+            key: const Key('app-bar-theme'),
+            tooltip: dark ? AppStrings.themeLight : AppStrings.themeDark,
+            style: _barButtonStyle,
+            onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
+            icon: Icon(dark ? Icons.light_mode : Icons.dark_mode),
           ),
           Icon(
             Icons.circle,
@@ -197,6 +217,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           IconButton(
             key: HomeShell.logoutKey,
             tooltip: AppStrings.logout,
+            style: _barButtonStyle,
             onPressed: () => requestLogout(context, ref),
             icon: const Icon(Icons.logout),
           ),
@@ -521,7 +542,6 @@ class _Rail extends ConsumerWidget {
             ),
           ),
           IconButton(
-            tooltip: dark ? AppStrings.themeLight : AppStrings.themeDark,
             style: IconButton.styleFrom(
               backgroundColor: dark
                   ? const Color(0xFFF5C542)
