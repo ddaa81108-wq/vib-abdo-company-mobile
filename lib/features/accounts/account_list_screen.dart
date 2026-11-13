@@ -460,8 +460,14 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     required bool canWrite,
     required PermissionService permissions,
   }) {
-    final card = (AccountCardDto item) =>
-        _accountCard(card: item, canWrite: canWrite, permissions: permissions);
+    Widget cardFor(AccountCardDto item) {
+      return _accountCard(
+        card: item,
+        canWrite: canWrite,
+        permissions: permissions,
+      );
+    }
+
     // Egyptian deposits, and the debt sections, are one full-width card.
     // A Wrap can still place two children side by side if the measured
     // width is short, so a single column is a vertical list.
@@ -472,7 +478,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
           for (final item in cards)
             Padding(
               padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
-              child: card(item),
+              child: cardFor(item),
             ),
         ],
       );
@@ -485,7 +491,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
           runSpacing: AppSpacing.md,
           children: [
             for (final item in cards)
-              SizedBox(width: cardWidth, child: card(item)),
+              SizedBox(width: cardWidth, child: cardFor(item)),
           ],
         );
       },
