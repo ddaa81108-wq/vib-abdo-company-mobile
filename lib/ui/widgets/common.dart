@@ -358,6 +358,7 @@ class GatedButton extends StatelessWidget {
     this.filled = true,
     this.glyph,
     this.leading,
+    this.fitLabel = false,
   });
 
   /// Shown instead of the label text (the label stays as the tooltip and
@@ -366,6 +367,9 @@ class GatedButton extends StatelessWidget {
 
   /// An icon before the label text (the label stays visible).
   final IconData? leading;
+
+  /// Shrink the label to the button instead of clipping it.
+  final bool fitLabel;
 
   final bool allowed;
   final String label;
@@ -399,6 +403,11 @@ class GatedButton extends StatelessWidget {
               const SizedBox(width: 6),
               Flexible(child: Text(label)),
             ],
+          )
+        : fitLabel
+        ? FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(label, maxLines: 1, softWrap: false),
           )
         : Text(label);
     if (!filled) {

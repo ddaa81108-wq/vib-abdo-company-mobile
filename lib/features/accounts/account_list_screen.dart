@@ -166,6 +166,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       allowed: permissions.canWrite(section.sectionKey),
       online: online,
       label: _addLabel,
+      fitLabel: debtLook,
       onPressed: () => _create(context),
     );
     final Widget assignButton = GatedButton(
@@ -174,6 +175,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       online: online,
       filled: false,
       label: AppStrings.assign,
+      fitLabel: debtLook,
       onPressed: () => setState(() {
         _assigning = !_assigning;
         _selected.clear();
@@ -281,7 +283,11 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                                     currency: section.currency,
                                     money: money,
                                   ),
-                                const SizedBox(height: AppSpacing.md),
+                                SizedBox(
+                                  height: debtLook
+                                      ? AppSpacing.xs
+                                      : AppSpacing.md,
+                                ),
                                 // Customers and companies: no filter chips (Ali, 2026-11-02).
                                 // Deposits: no filter chips (Ali, 2026-11-04).
                                 if (!debtLook && !deposits) ...[
@@ -1254,7 +1260,7 @@ class _DebtCompactHeader extends StatelessWidget {
     final look = _PairLook.of(context);
     return SizedBox(
       key: Key('$prefix-summary'),
-      height: 58 * scale.clamp(1.0, 1.6),
+      height: 34 + 12 * scale.clamp(1.0, 2.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1325,12 +1331,12 @@ class _PairLook {
     shadowColor: const Color(0x00000000),
     minimumSize: const Size(double.infinity, double.infinity),
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    padding: const EdgeInsetsDirectional.symmetric(horizontal: 8),
+    padding: const EdgeInsetsDirectional.symmetric(horizontal: 6),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(radius),
       side: BorderSide(color: edge, width: edgeWidth),
     ),
-    textStyle: cairo(14, 800),
+    textStyle: cairo(13, 800),
   );
 }
 
@@ -1355,26 +1361,29 @@ class _TotalFrame extends StatelessWidget {
       key: frameKey,
       decoration: look.decoration,
       child: Padding(
-        padding: const EdgeInsetsDirectional.symmetric(horizontal: 8),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: cairo(11, 700, color: look.muted),
-            ),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: MoneyText(
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: 6,
+          vertical: 2,
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                softWrap: false,
+                textAlign: TextAlign.center,
+                style: cairo(11, 700, color: look.muted),
+              ),
+              MoneyText(
                 amount,
                 key: amountKey,
-                style: cairo(18, 800, color: look.ink),
+                style: cairo(16, 800, color: look.ink),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1418,7 +1427,15 @@ class _ActiveWord extends ConsumerWidget {
       onPressed: () {
         ref.read(accountFilterProvider(section).notifier).state = null;
       },
-      child: Text(label, key: const Key('debt-active-count')),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          label,
+          key: const Key('debt-active-count'),
+          maxLines: 1,
+          softWrap: false,
+        ),
+      ),
     );
   }
 }
@@ -1440,8 +1457,9 @@ class _CustomersToolbar extends StatelessWidget {
   final Widget assign;
   final bool equalWidths;
 
-  /// One height for all three controls, grown with the text scale.
-  static double heightFor(double scale) => 24 + 28 * scale.clamp(1.0, 2.0);
+  /// One height for all three controls. Shorter than the 069 row, and it
+  /// still grows with the text scale.
+  static double heightFor(double scale) => 28 + 12 * scale.clamp(1.0, 2.0);
 
   @override
   Widget build(BuildContext context) {
@@ -1451,7 +1469,7 @@ class _CustomersToolbar extends StatelessWidget {
     final height = heightFor(scale);
     final radius = BorderRadius.circular(AppRadii.lg);
     final side = BorderSide(color: look.cardBorder);
-    const padding = EdgeInsetsDirectional.symmetric(horizontal: AppSpacing.lg);
+    const padding = EdgeInsetsDirectional.symmetric(horizontal: AppSpacing.sm);
     final outline = OutlineInputBorder(borderRadius: radius, borderSide: side);
     final themed = theme.copyWith(
       filledButtonTheme: FilledButtonThemeData(
@@ -1461,7 +1479,7 @@ class _CustomersToolbar extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: radius),
           backgroundColor: look.button,
           foregroundColor: look.onButton,
-          textStyle: cairo(15, 700),
+          textStyle: cairo(13, 700),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -1471,7 +1489,7 @@ class _CustomersToolbar extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: radius, side: side),
           foregroundColor: look.accent,
           backgroundColor: look.card,
-          textStyle: cairo(15, 700),
+          textStyle: cairo(13, 700),
         ),
       ),
       inputDecorationTheme: theme.inputDecorationTheme.copyWith(
@@ -1479,7 +1497,8 @@ class _CustomersToolbar extends StatelessWidget {
         filled: true,
         fillColor: look.card,
         contentPadding: const EdgeInsetsDirectional.symmetric(
-          horizontal: AppSpacing.md,
+          horizontal: AppSpacing.sm,
+          vertical: 0,
         ),
         border: outline,
         enabledBorder: outline,
