@@ -102,6 +102,7 @@ class NotificationOpener {
       return NotificationOpenResult.forbidden;
     }
 
+    var location = target.location;
     if (target.account != null) {
       try {
         await _ref
@@ -109,15 +110,16 @@ class NotificationOpener {
             .accounts
             .get(target.account!, target.accountId!);
       } on NotFoundException {
-        await _markRead(n.notificationId);
-        _go('/notifications');
-        return NotificationOpenResult.notFound;
+        // The row still names a section. Open that list, then mark it read.
+        location = '/${target.account!.path}';
       }
     }
 
+    _go(location);
     await _markRead(n.notificationId);
-    _go(target.location);
-    return NotificationOpenResult.opened;
+    return location == target.location
+        ? NotificationOpenResult.opened
+        : NotificationOpenResult.notFound;
   }
 
   Future<void> _markRead(String notificationId) async {
@@ -198,9 +200,43 @@ NotificationTarget? resolveNotificationTarget(NotificationRelatedRef? ref) {
     case 'collections':
     case 'receipt':
     case 'receipts':
+    case 'collection_submission':
       return NotificationTarget._(
         location: '/collections',
         section: SectionKey.collections,
+      );
+    case 'customer':
+      return _accountTarget(AccountSection.customers, id);
+    case 'company':
+      return _accountTarget(AccountSection.companies, id);
+    case 'libyan_deposit':
+    case 'libyan-deposit':
+      return _accountTarget(AccountSection.libyanDeposits, id);
+    case 'egyptian_deposit':
+    case 'egyptian-deposit':
+      return _accountTarget(AccountSection.egyptianDeposits, id);
+    case 'purchase':
+    case 'purchase_entry':
+    case 'purchases':
+      return NotificationTarget._(
+        location: '/purchases',
+        section: SectionKey.purchases,
+      );
+    case 'treasury':
+    case 'cash_entry':
+      return NotificationTarget._(
+        location: '/treasury',
+        section: SectionKey.treasury,
+      );
+    case 'masraweya':
+      return NotificationTarget._(
+        location: '/masraweya',
+        section: SectionKey.masraweya,
+      );
+    case 'reports':
+      return NotificationTarget._(
+        location: '/reports',
+        section: SectionKey.reports,
       );
     case 'account':
     case 'accounts':
@@ -232,6 +268,21 @@ SectionKey? _sectionFor(String type) {
     }
   }
   return null;
+}
+
+NotificationTarget _accountTarget(AccountSection account, String id) {
+  if (id.isEmpty) {
+    return NotificationTarget._(
+      location: '/${account.path}',
+      section: account.sectionKey,
+    );
+  }
+  return NotificationTarget._(
+    location: '/${account.path}/$id',
+    section: account.sectionKey,
+    account: account,
+    accountId: id,
+  );
 }
 
 AccountSection? _accountFor(SectionKey section) {

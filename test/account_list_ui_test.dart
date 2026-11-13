@@ -7,6 +7,7 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/accounts/account_list_screen.dart';
+import 'package:vib_abdo_company_mobile/features/accounts/website_account_card.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/ui/presentation.dart';
@@ -135,9 +136,17 @@ void main() {
       final theme = Theme.of(tester.element(find.byType(HomeShell)));
       expect(theme.brightness, dark ? Brightness.dark : Brightness.light);
       _expectAmountCentered(tester, '320 د.ل');
-      expect(_cardGradient(tester).colors.first, const Color(0xFFBD3B47));
+      if (dark) {
+        expect(_cardGradient(tester).colors.first, const Color(0xFFBD3B47));
+      } else {
+        expect(_cardFill(tester), websiteCardLightFill);
+      }
       await go(tester, '/companies');
-      expect(_cardGradient(tester).colors.first, const Color(0xFFBD3B47));
+      if (dark) {
+        expect(_cardGradient(tester).colors.first, const Color(0xFFBD3B47));
+      } else {
+        expect(_cardFill(tester), websiteCardLightFill);
+      }
     }
   });
 
@@ -394,18 +403,25 @@ void _expectAmountCentered(WidgetTester tester, String amount) {
   );
   final rightGap = card.right - box.right;
   final leftGap = box.left - card.left;
-  expect((rightGap - leftGap).abs(), lessThan(24));
+  // The pin sits in the start corner, so the amount is centered in the
+  // remaining width rather than on the card's exact midline.
+  expect((rightGap - leftGap).abs(), lessThan(40));
 }
 
-LinearGradient _cardGradient(WidgetTester tester) {
+BoxDecoration _cardDecoration(WidgetTester tester) {
   final ink = tester.widget<Ink>(
     find.descendant(
       of: find.byKey(const Key('account-card-c_55')),
       matching: find.byType(Ink),
     ),
   );
-  return (ink.decoration! as BoxDecoration).gradient! as LinearGradient;
+  return ink.decoration! as BoxDecoration;
 }
+
+LinearGradient _cardGradient(WidgetTester tester) =>
+    _cardDecoration(tester).gradient! as LinearGradient;
+
+Color _cardFill(WidgetTester tester) => _cardDecoration(tester).color!;
 
 Future<void> _expectActions(
   WidgetTester tester, {

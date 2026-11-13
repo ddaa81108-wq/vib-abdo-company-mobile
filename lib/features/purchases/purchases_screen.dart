@@ -1688,15 +1688,35 @@ class _PurchaseGrid extends ConsumerWidget {
   /// Website `page.nextBefore !== null`: older rows exist beyond this page.
   final bool historyContinues;
 
-  /// A draft row on the open day can be edited. A carried day
-  /// («مُرحّل») can be edited only after «تعديل اليوم» sets
-  /// `correctionOpen` on that day, which is the website's rule.
-  /// An open day shows a pencil on each saved row. A posted day shows the
-  /// check until «تعديل اليوم» reopens it.
+  /// A saved row on the open day is edited with the pencil and the trash.
+  /// A posted day («مُرحّل») keeps the check until «تعديل اليوم» reopens it.
+  /// Membership in the open day wins over a stale `finalized` stamp, so a
+  /// row just confirmed on the active day does not stay a check.
+  bool _onOpenDay(PurchaseEntryDto entry) {
+    final day = openDay;
+    if (day != null && entry.dayId != null && entry.dayId == day.id) {
+      return true;
+    }
+    return entry.dayStatus == 'draft';
+  }
+
+  bool _openDayEditable() {
+    final day = openDay;
+    if (day == null) return false;
+    return day.status == 'draft' || day.correctionOpen;
+  }
+
   bool _writable(PurchaseEntryDto entry) {
-    if (!canWrite || entry.dayVersion == null) return false;
-    if (entry.dayStatus == 'draft') return true;
+    if (!canWrite) return false;
+    if (entry.dayVersion == null && openDay?.version == null) return false;
+    if (_onOpenDay(entry) && _openDayEditable()) return true;
     return entry.dayStatus == 'finalized' && entry.correctionOpen;
+  }
+
+  bool _postedCheck(PurchaseEntryDto entry) {
+    if (_writable(entry)) return false;
+    if (_onOpenDay(entry) && _openDayEditable()) return false;
+    return entry.dayStatus == 'finalized' && !entry.correctionOpen;
   }
 
   @override
@@ -1951,8 +1971,7 @@ class _PurchaseGrid extends ConsumerWidget {
                                 ),
                               ],
                             )
-                          : entry.dayStatus == 'finalized' &&
-                                !entry.correctionOpen
+                          : _postedCheck(entry)
                           ? _SavedTick(
                               scale: scale,
                               markKey: Key('purchase-saved-mark-${entry.id}'),

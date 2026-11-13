@@ -62,6 +62,25 @@ LinearGradient websiteCardGradient(AccountSection section, int? units) {
   return customerOwns ? green : red;
 }
 
+/// Cream fill Ali picked from the 080 sheet («كريمي»).
+const websiteCardLightFill = Color(0xFFFFF8EE);
+
+/// Light-mode ink. دين is red, أمانة is green, zero is brown. The same
+/// sign rules as [websiteCardGradient], including the Egyptian swap.
+Color websiteCardNatureInk(AccountSection section, int? units) {
+  const debt = Color(0xFFB42318);
+  const trust = Color(0xFF0E7A45);
+  const zero = Color(0xFF6B4423);
+  if (units == null || units == 0) return zero;
+  final customerOwns = section == AccountSection.libyanDeposits
+      ? units > 0
+      : units < 0;
+  final amanah = section == AccountSection.egyptianDeposits
+      ? !customerOwns
+      : customerOwns;
+  return amanah ? trust : debt;
+}
+
 /// Absolute grouped digits, ar-LY style (`2.198`), then the currency.
 /// No minus. Invalid and missing stay the existing labels.
 String websiteCardAmount(MoneyFormatter money, AccountCardDto card) {
@@ -121,116 +140,140 @@ class WebsiteAccountCardBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final assignee = card.activeAssigneeName?.trim() ?? '';
-    final amountSize = wide ? 30.0 : 20.0;
+    final hasAssignee = showAssignee && assignee.isNotEmpty;
+    final onDark = ink == Colors.white;
+    final statusColor = onDark ? const Color(0xFFFFE2E9) : ink;
+    final amountColor = onDark ? Colors.white : ink;
+    final amountSize = wide ? 28.0 : 20.0;
     final amountStyle = context.textExtras.amountLarge.copyWith(
-      color: Colors.white,
+      color: amountColor,
       fontSize: amountSize,
       fontWeight: FontWeight.w800,
     );
-    final small = cairo(wide ? 13 : 10, 700, color: const Color(0xFFFFE7A8));
+    final small = cairo(
+      wide ? 13 : 10,
+      700,
+      color: onDark ? const Color(0xFFFFE7A8) : ink,
+    );
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (hasAssignee)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Container(
+              key: Key('account-assignee-${card.id}'),
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: onDark
+                    ? const Color(0xFF101214)
+                    : ink.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: onDark ? Colors.black : ink.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Text(
+                '${AppStrings.withEmployee}: $assignee',
+                textDirection: TextDirection.rtl,
+                softWrap: true,
+                style: cairo(12, 800, color: onDark ? Colors.white : ink),
+              ),
+            ),
+          ),
+        Text(
+          status,
+          key: Key('account-age-${card.id}'),
+          textAlign: TextAlign.center,
+          softWrap: true,
+          style: cairo(wide ? 14 : 11, 800, color: statusColor),
+        ),
+        SizedBox(height: wide ? 6 : 2),
+        Text(
+          card.name,
+          textAlign: TextAlign.center,
+          softWrap: true,
+          style: cairo(wide ? 20 : 15, 800, color: ink),
+        ),
+        const SizedBox(height: 2),
+        if (amount == MoneyValue.invalidLabel)
+          MoneyText(amount, align: TextAlign.center, style: amountStyle)
+        else
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: amount.contains(' ')
+                      ? amount.substring(0, amount.lastIndexOf(' '))
+                      : amount,
+                  style: amountStyle,
+                ),
+                if (amount.contains(' '))
+                  TextSpan(
+                    text: amount.substring(amount.lastIndexOf(' ')),
+                    style: small,
+                  ),
+              ],
+            ),
+            key: Key('account-amount-${card.id}'),
+            textAlign: TextAlign.center,
+          ),
+        const SizedBox(height: 6),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: ink.withValues(alpha: 0.28))),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              movement,
+              key: Key('account-movement-${card.id}'),
+              textAlign: TextAlign.center,
+              softWrap: true,
+              style: cairo(
+                wide ? 13 : 11,
+                700,
+                color: ink.withValues(alpha: 0.92),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
     return Padding(
       padding: EdgeInsets.fromLTRB(
         wide ? 14 : 8,
-        wide ? 12 : 6,
+        wide ? 8 : 6,
         wide ? 14 : 8,
-        wide ? 12 : 8,
+        wide ? 10 : 8,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            textDirection: TextDirection.ltr,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ?pin,
-              const Spacer(),
-              ?zero,
-              if (showAssignee && assignee.isNotEmpty)
-                Flexible(
-                  child: Container(
-                    key: Key('account-assignee-${card.id}'),
-                    margin: const EdgeInsets.only(left: 4),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF101214),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.black),
-                    ),
-                    child: Text(
-                      '${AppStrings.withEmployee}: $assignee',
-                      textDirection: TextDirection.rtl,
-                      softWrap: true,
-                      style: cairo(11, 800, color: Colors.white),
-                    ),
-                  ),
-                ),
-            ],
+      child: IconButtonTheme(
+        data: IconButtonThemeData(
+          style: IconButton.styleFrom(
+            foregroundColor: ink,
+            minimumSize: const Size(28, 28),
+            padding: EdgeInsets.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
           ),
-          const SizedBox(height: 4),
-          Text(
-            status,
-            key: Key('account-age-${card.id}'),
-            textAlign: TextAlign.center,
-            softWrap: true,
-            style: cairo(wide ? 14 : 11, 800, color: const Color(0xFFFFE2E9)),
-          ),
-          SizedBox(height: wide ? 6 : 2),
-          Text(
-            card.name,
-            textAlign: TextAlign.center,
-            softWrap: true,
-            style: cairo(wide ? 20 : 15, 800, color: ink),
-          ),
-          const SizedBox(height: 2),
-          if (amount == MoneyValue.invalidLabel)
-            MoneyText(amount, align: TextAlign.center, style: amountStyle)
-          else
-            Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: amount.contains(' ')
-                        ? amount.substring(0, amount.lastIndexOf(' '))
-                        : amount,
-                    style: amountStyle,
-                  ),
-                  if (amount.contains(' '))
-                    TextSpan(
-                      text: amount.substring(amount.lastIndexOf(' ')),
-                      style: small,
-                    ),
-                ],
+        ),
+        child: Stack(
+          children: [
+            Padding(
+              padding: EdgeInsetsDirectional.only(
+                start: pin != null ? 30 : 0,
+                end: zero != null ? 30 : 0,
               ),
-              key: Key('account-amount-${card.id}'),
-              textAlign: TextAlign.center,
+              child: body,
             ),
-          const SizedBox(height: 4),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(color: ink.withValues(alpha: 0.25)),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                movement,
-                key: Key('account-movement-${card.id}'),
-                textAlign: TextAlign.center,
-                softWrap: true,
-                style: cairo(
-                  wide ? 13 : 10.5,
-                  700,
-                  color: ink.withValues(alpha: 0.92),
-                ),
-              ),
-            ),
-          ),
-        ],
+            if (pin != null)
+              PositionedDirectional(top: 0, start: 0, child: pin!),
+            if (zero != null)
+              PositionedDirectional(top: 0, end: 0, child: zero!),
+          ],
+        ),
       ),
     );
   }

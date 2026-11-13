@@ -533,6 +533,7 @@ class _CashColumns {
 class _MovementsState extends ConsumerState<_Movements> {
   final _extra = <CashEntryDto>[];
   final _sideways = ScrollController();
+  final _rows = ScrollController();
   String? _cursor;
   String? _error;
   var _busy = false;
@@ -541,12 +542,23 @@ class _MovementsState extends ConsumerState<_Movements> {
   void initState() {
     super.initState();
     _cursor = widget.page.nextCursor;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showNewest());
   }
 
   @override
   void dispose() {
     _sideways.dispose();
+    _rows.dispose();
     super.dispose();
+  }
+
+  /// The ledger window opens on the newest row, which sits at the bottom.
+  void _showNewest() {
+    if (!mounted || !_rows.hasClients) return;
+    final position = _rows.position;
+    if (!position.hasContentDimensions) return;
+    if (position.maxScrollExtent <= 0) return;
+    position.jumpTo(position.maxScrollExtent);
   }
 
   @override
@@ -598,10 +610,17 @@ class _MovementsState extends ConsumerState<_Movements> {
   Widget build(BuildContext context) {
     final look = context.look;
     final scheme = Theme.of(context).colorScheme;
-    // Server order is newest first; the grid shows oldest at the top.
-    final newestFirst = [...widget.page.items, ..._extra];
+    // Server pages are newest first. The grid is oldest at the top and
+    // newest at the bottom, and the window opens on that newest row.
+    final chronological = [...widget.page.items, ..._extra]
+      ..sort((a, b) {
+        final byTime = (a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0))
+            .compareTo(b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0));
+        if (byTime != 0) return byTime;
+        return a.id.compareTo(b.id);
+      });
     final complete = _cursor == null;
-    final total = newestFirst.length;
+    final total = chronological.length;
     final canTap = widget.online && !_busy;
     final screen = MediaQuery.sizeOf(context);
     final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
@@ -640,7 +659,7 @@ class _MovementsState extends ConsumerState<_Movements> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           header,
-          if (newestFirst.isEmpty)
+          if (chronological.isEmpty)
             const Padding(
               padding: EdgeInsetsDirectional.all(AppSpacing.md),
               child: EmptyPane(
@@ -672,19 +691,9 @@ class _MovementsState extends ConsumerState<_Movements> {
                             height: body,
                             child: ListView(
                               key: const Key('treasury-rows'),
-                              reverse: true,
+                              controller: _rows,
                               padding: EdgeInsets.zero,
                               children: [
-                                for (var i = 0; i < total; i++)
-                                  _CashRow(
-                                    entry: newestFirst[i],
-                                    money: widget.money,
-                                    widths: widths,
-                                    height: rowHeight,
-                                    // A running number only once the whole
-                                    // history is here (row 1 = first).
-                                    sequence: complete ? '${total - i}' : null,
-                                  ),
                                 if (_cursor != null)
                                   SizedBox(
                                     height: 56,
@@ -713,6 +722,15 @@ class _MovementsState extends ConsumerState<_Movements> {
                                         ),
                                       ),
                                     ),
+                                  ),
+                                for (var i = 0; i < total; i++)
+                                  _CashRow(
+                                    entry: chronological[i],
+                                    money: widget.money,
+                                    widths: widths,
+                                    height: rowHeight,
+                                    // Row 1 is the oldest once every page is here.
+                                    sequence: complete ? '${i + 1}' : null,
                                   ),
                               ],
                             ),

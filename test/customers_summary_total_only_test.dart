@@ -71,6 +71,7 @@ void main() {
     expect(rects.every((r) => r.height > 80), isTrue);
     expect(rects[1].top, greaterThan(rects[0].bottom - 1));
     expect(find.byKey(const Key('pin-c_55')), findsOneWidget);
+    expect(find.textContaining(AppStrings.lastActivity), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 

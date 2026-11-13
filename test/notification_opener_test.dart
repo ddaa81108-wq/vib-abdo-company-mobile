@@ -270,7 +270,8 @@ void main() {
       ),
     );
     expect(notFound, NotificationOpenResult.notFound);
-    expect(pathOf(tester), '/notifications');
+    await tester.pumpAndSettle();
+    expect(pathOf(tester), '/customers');
   });
 
   testWidgets(
