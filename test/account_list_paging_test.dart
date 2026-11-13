@@ -21,7 +21,21 @@ void main() {
     await go(tester, '/libyan-deposits');
     expect(find.text('صفحة ثانية'), findsNothing);
 
-    await tester.ensureVisible(find.byKey(const Key('load-more-accounts')));
+    final depositsScroll = find
+        .descendant(
+          of: find.byKey(const Key('screen-libyan-deposits')),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                axisDirectionToAxis(widget.axisDirection) == Axis.vertical,
+          ),
+        )
+        .first;
+    final depositsPosition = tester
+        .state<ScrollableState>(depositsScroll)
+        .position;
+    depositsPosition.jumpTo(depositsPosition.maxScrollExtent);
+    await tester.pump();
     await tester.tap(find.byKey(const Key('load-more-accounts')));
     await tester.pumpAndSettle();
 

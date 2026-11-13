@@ -38,7 +38,11 @@ void main() {
               )
             : find.byKey(Key(key));
         final heights = {
-          for (final key in ['add-account', 'account-search', 'assign-mode'])
+          for (final key in [
+            'debt-active-filter',
+            'account-search',
+            'assign-mode',
+          ])
             tester.getSize(drawn(key)).height.roundToDouble(),
         };
         expect(heights, hasLength(1), reason: '$size x$scale $heights');

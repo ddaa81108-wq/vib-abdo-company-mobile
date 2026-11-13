@@ -224,11 +224,12 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers');
 
-    await tester.ensureVisible(find.byKey(const Key('load-more-accounts')));
+    await _revealLoadMore(tester);
     for (var i = 0; i < 3; i++) {
       await tester.tap(find.byKey(const Key('load-more-accounts')));
       await settle(tester);
     }
+    await _showListStart(tester);
 
     final page = await _flushed(
       tester,
@@ -266,7 +267,7 @@ void main() {
     ];
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers');
-    await tester.ensureVisible(find.byKey(const Key('load-more-accounts')));
+    await _revealLoadMore(tester);
     await tester.tap(find.byKey(const Key('load-more-accounts')));
     await settle(tester);
 
@@ -275,7 +276,9 @@ void main() {
       () => layer.accounts.list(AccountSection.customers),
     );
     final total = _fmt(money, page.summary.totalDebtUnits, Currency.lyd);
+    await _showListStart(tester);
     expect(_inside(const Key('screen-customers'), total), findsWidgets);
+    await _revealLoadMore(tester);
     expect(
       _inside(const Key('screen-customers'), '1.250.000.000 د.ل'),
       findsOneWidget,
@@ -321,13 +324,14 @@ void main() {
         );
       }
 
-      await tester.ensureVisible(find.byKey(const Key('load-more-accounts')));
+      await _revealLoadMore(tester);
       await tester.tap(find.byKey(const Key('load-more-accounts')));
       await settle(tester);
       expect(find.text('مبلغ غير صالح'), findsWidgets);
       expect(find.text('10 د.ل'), findsNothing);
       expect(find.text('1 د.ل'), findsNothing);
       expect(find.text('2 د.ل'), findsNothing);
+      await _showListStart(tester);
       expect(_inside(const Key('screen-customers'), shown), findsWidgets);
       expect(tester.takeException(), isNull);
     },
@@ -416,12 +420,13 @@ void main() {
     await go(tester, '/customers');
     final shown = money.format(10635, Currency.lyd);
     expect(_inside(const Key('screen-customers'), shown), findsWidgets);
-    await tester.ensureVisible(find.byKey(const Key('load-more-accounts')));
+    await _revealLoadMore(tester);
     await tester.tap(find.byKey(const Key('load-more-accounts')));
     await settle(tester);
     expect(find.text('مبلغ غير صالح'), findsWidgets);
     expect(find.text('2 د.ل'), findsNothing);
     expect(find.text('1 د.ل'), findsNothing);
+    await _showListStart(tester);
     expect(_inside(const Key('screen-customers'), shown), findsWidgets);
     final page = await _flushed(
       tester,
@@ -503,4 +508,38 @@ Future<T> _flushed<T>(WidgetTester tester, Future<T> Function() start) async {
     Error.throwWithStackTrace(error!, stack!);
   }
   return value as T;
+}
+
+Future<void> _revealLoadMore(WidgetTester tester) async {
+  final scrollable = find
+      .descendant(
+        of: find.byKey(const Key('screen-customers')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              axisDirectionToAxis(widget.axisDirection) == Axis.vertical,
+        ),
+      )
+      .first;
+  if (find.byKey(const Key('load-more-accounts')).evaluate().isNotEmpty) {
+    return;
+  }
+  final position = tester.state<ScrollableState>(scrollable).position;
+  position.jumpTo(position.maxScrollExtent);
+  await tester.pump();
+}
+
+Future<void> _showListStart(WidgetTester tester) async {
+  final scrollable = find
+      .descendant(
+        of: find.byKey(const Key('screen-customers')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              axisDirectionToAxis(widget.axisDirection) == Axis.vertical,
+        ),
+      )
+      .first;
+  tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+  await tester.pump();
 }
