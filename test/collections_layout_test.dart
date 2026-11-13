@@ -55,6 +55,21 @@ void main() {
         Key('collections-filter-batch'),
         Key('collections-filter-employee'),
       ]);
+      expect(find.text(CollectionsText.closeScopeNote), findsNothing);
+      expect(find.text(CollectionsText.summaryNote), findsNothing);
+      expect(find.textContaining('غير المربوط ضمن هذا العدد'), findsNothing);
+      expect(find.byKey(const Key('close-batch-review')), findsOneWidget);
+      expect(
+        find.textContaining(CollectionsText.cashNotReceived),
+        findsOneWidget,
+      );
+      final search = tester.getRect(
+        find.byKey(const Key('collections-search')),
+      );
+      final totals = tester.getRect(
+        find.byKey(const Key('employee-totals-toggle')),
+      );
+      expect((search.center.dy - totals.center.dy).abs(), lessThan(8));
 
       final approved = _plain(tester, const Key('metric-approved'));
       await tester.enterText(
