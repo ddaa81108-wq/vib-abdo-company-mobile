@@ -35,6 +35,11 @@ void main() {
         Key('metric-remaining'),
         Key('metric-pending'),
       ]);
+      // Pre-072 cards were compact. The stacked 48×text-scale bars are gone.
+      expect(
+        tester.getSize(find.byKey(const Key('metric-approved'))).height,
+        lessThan(48 * 1.3),
+      );
       _expectStacked(tester, const [
         Key('collections-tab-all'),
         Key('collections-tab-review'),
