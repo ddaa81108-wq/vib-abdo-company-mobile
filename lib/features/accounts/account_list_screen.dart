@@ -1192,7 +1192,7 @@ CustomerTone _companyTone(Gloss gloss) => CustomerTone(
   gloss: gloss,
 );
 
-/// Total and the section's add button on one compact row, split by a divider.
+/// Total and the add button as one pair: same frame, height, and corner.
 class _DebtCompactHeader extends StatelessWidget {
   const _DebtCompactHeader({
     required this.section,
@@ -1210,61 +1210,96 @@ class _DebtCompactHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final look = context.look;
     final isCustomers = section == AccountSection.customers;
     final prefix = isCustomers ? 'customers' : 'companies';
     final label = isCustomers
         ? AppStrings.customersTotalDebt
         : AppStrings.netDebt;
     final scale = MediaQuery.textScalerOf(context).scale(1);
-    return DecoratedBox(
+    final look = _PairLook.of(context);
+    return SizedBox(
       key: Key('$prefix-summary'),
-      decoration: BoxDecoration(
-        color: look.card,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(color: look.cardBorder),
-      ),
-      child: SizedBox(
-        height: 58 * scale.clamp(1.0, 1.6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: _TotalFrame(
-                frameKey: Key('$prefix-summary-frame'),
-                label: label,
-                amount: money.formatOrDash(summary.netBalanceUnits, currency),
-                amountKey: Key('$prefix-summary-amount'),
-              ),
+      height: 58 * scale.clamp(1.0, 1.6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _TotalFrame(
+              frameKey: Key('$prefix-summary-frame'),
+              label: label,
+              amount: money.formatOrDash(summary.netBalanceUnits, currency),
+              amountKey: Key('$prefix-summary-amount'),
             ),
-            VerticalDivider(width: 1, thickness: 1, color: look.cardBorder),
-            Expanded(
-              child: Center(
-                child: Theme(
-                  data: Theme.of(context).copyWith(
-                    filledButtonTheme: FilledButtonThemeData(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: look.button,
-                        foregroundColor: look.onButton,
-                        minimumSize: const Size(0, 36),
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        textStyle: cairo(13, 800),
-                      ),
-                    ),
-                  ),
-                  child: add,
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _AddFrame(look: look, child: add),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// Label and figure for one debt section, set in a small framed plaque.
+/// Shared plaque for the debt total and the add button.
+class _PairLook {
+  const _PairLook({
+    required this.fill,
+    required this.edge,
+    required this.ink,
+    required this.muted,
+  });
+
+  final Color fill;
+  final Color edge;
+  final Color ink;
+  final Color muted;
+
+  static const radius = 12.0;
+  static const edgeWidth = 1.2;
+
+  static _PairLook of(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return dark
+        ? const _PairLook(
+            fill: Color(0xFF1A2436),
+            edge: Color(0xFF8E7340),
+            ink: Color(0xFFF8F1DE),
+            muted: Color(0xFFCDB88A),
+          )
+        : const _PairLook(
+            fill: Color(0xFFF4F7FB),
+            edge: Color(0xFFC4A46A),
+            ink: Color(0xFF1A1308),
+            muted: Color(0xFF6B5428),
+          );
+  }
+
+  BoxDecoration get decoration => BoxDecoration(
+    color: fill,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: edge, width: edgeWidth),
+  );
+
+  ButtonStyle get buttonStyle => FilledButton.styleFrom(
+    backgroundColor: fill,
+    foregroundColor: ink,
+    disabledBackgroundColor: fill,
+    disabledForegroundColor: muted,
+    elevation: 0,
+    shadowColor: const Color(0x00000000),
+    minimumSize: const Size(double.infinity, double.infinity),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    padding: const EdgeInsetsDirectional.symmetric(horizontal: 8),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(radius),
+      side: BorderSide(color: edge, width: edgeWidth),
+    ),
+    textStyle: cairo(14, 800),
+  );
+}
+
+/// Label and figure for one debt section, in the shared plaque.
 class _TotalFrame extends StatelessWidget {
   const _TotalFrame({
     required this.frameKey,
@@ -1280,44 +1315,51 @@ class _TotalFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final fill = dark ? const Color(0xFF1A2436) : const Color(0xFFF4F7FB);
-    final edge = dark ? const Color(0xFF8E7340) : const Color(0xFFC4A46A);
-    final ink = dark ? const Color(0xFFF8F1DE) : const Color(0xFF1A1308);
-    final muted = dark ? const Color(0xFFCDB88A) : const Color(0xFF6B5428);
-    return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(6, 6, 4, 6),
-      child: DecoratedBox(
-        key: frameKey,
-        decoration: BoxDecoration(
-          color: fill,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: edge, width: 1.2),
-        ),
-        child: Padding(
-          padding: const EdgeInsetsDirectional.symmetric(horizontal: 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: cairo(11, 700, color: muted),
+    final look = _PairLook.of(context);
+    return DecoratedBox(
+      key: frameKey,
+      decoration: look.decoration,
+      child: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(horizontal: 8),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: cairo(11, 700, color: look.muted),
+            ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: MoneyText(
+                amount,
+                key: amountKey,
+                style: cairo(18, 800, color: look.ink),
               ),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: MoneyText(
-                  amount,
-                  key: amountKey,
-                  style: cairo(18, 800, color: ink),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+/// The add control, painted with the same plaque as the total.
+class _AddFrame extends StatelessWidget {
+  const _AddFrame({required this.look, required this.child});
+
+  final _PairLook look;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        filledButtonTheme: FilledButtonThemeData(style: look.buttonStyle),
+      ),
+      child: child,
     );
   }
 }

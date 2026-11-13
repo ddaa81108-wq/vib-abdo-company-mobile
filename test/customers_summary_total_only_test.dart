@@ -35,6 +35,7 @@ void main() {
     final addHalf = (box.left + box.center.dx) / 2;
     expect((add.center.dx - addHalf).abs(), lessThan(12));
     expect((add.center.dy - box.center.dy).abs(), lessThan(6));
+    _expectMatchedPair(tester, 'customers');
     expect(find.byKey(const Key('customers-summary-frame')), findsOneWidget);
     expect(find.text(AppStrings.oldDebtsTitle), findsNothing);
     // «النشطة», search, and «توجيه» share one row. No other filter words.
@@ -82,6 +83,12 @@ void main() {
     expect(find.text(AppStrings.companiesActiveCards), findsNothing);
     expect(find.text(AppStrings.customersTotalDebt), findsNothing);
     expect(find.byKey(const Key('companies-summary-frame')), findsOneWidget);
+    final box = tester.getRect(card);
+    final add = tester.getRect(find.byKey(const Key('add-account')));
+    final addHalf = (box.left + box.center.dx) / 2;
+    expect((add.center.dx - addHalf).abs(), lessThan(12));
+    expect((add.center.dy - box.center.dy).abs(), lessThan(6));
+    _expectMatchedPair(tester, 'companies');
     expect(find.text(AppStrings.oldDebtsTitle), findsNothing);
     expect(find.text('${AppStrings.activeShort} (10)'), findsOneWidget);
     expect(find.byKey(const ValueKey('account-filter-all')), findsNothing);
@@ -108,4 +115,22 @@ void main() {
     expect(find.byKey(const ValueKey('zero-review-c_co_04')), findsNothing);
     expect(tester.takeException(), isNull);
   });
+}
+
+void _expectMatchedPair(WidgetTester tester, String prefix) {
+  final frame = tester.getRect(find.byKey(Key('$prefix-summary-frame')));
+  final add = tester.getRect(find.byKey(const Key('add-account')));
+  expect((frame.height - add.height).abs(), lessThan(1));
+  expect((frame.width - add.width).abs(), lessThan(1));
+  final shape = Theme.of(tester.element(find.byKey(const Key('add-account'))))
+      .filledButtonTheme
+      .style!
+      .shape!
+      .resolve({});
+  expect(shape, isA<RoundedRectangleBorder>());
+  expect(
+    (shape! as RoundedRectangleBorder).borderRadius,
+    BorderRadius.circular(12),
+  );
+  expect(shape, isNot(isA<StadiumBorder>()));
 }
