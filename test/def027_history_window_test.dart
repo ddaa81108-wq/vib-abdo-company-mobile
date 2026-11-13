@@ -51,6 +51,7 @@ void main() {
     await _until(tester, const Key('load-more-accounts'));
 
     await _press(tester, const Key('load-more-accounts'), times: 3);
+    await _showCustomersStart(tester);
     final trimmed = HistoryWindowTrace.accountWindow;
     _expectNewestPrefix(trimmed, length: 120, dropped: 120);
     expect(_indexes(trimmed), contains(50));
@@ -64,6 +65,7 @@ void main() {
 
     await _refresh(tester, const Key('accounts-refresh'));
     await _until(tester, const Key('load-more-accounts'));
+    await _showCustomersStart(tester);
     final reset = HistoryWindowTrace.accountWindow;
     _expectNewestPrefix(reset, length: FakeLargeCatalog.pageSize, dropped: 50);
     expect(find.byKey(const Key('account-card-lc_00000')), findsOneWidget);
@@ -130,9 +132,18 @@ void _go(WidgetTester tester, String location) {
 
 Future<void> _until(WidgetTester tester, Key key) async {
   final finder = find.byKey(key);
-  for (var i = 0; i < 40; i++) {
+  for (var i = 0; i < 8; i++) {
     if (finder.evaluate().isNotEmpty) return;
     await tester.pump(const Duration(milliseconds: 50));
+  }
+  final scrollable = find.byWidgetPredicate(
+    (widget) =>
+        widget is Scrollable &&
+        axisDirectionToAxis(widget.axisDirection) == Axis.vertical,
+  );
+  if (scrollable.evaluate().isNotEmpty) {
+    await tester.scrollUntilVisible(finder, 500, scrollable: scrollable.last);
+    return;
   }
   fail('missing $key');
 }
@@ -142,8 +153,38 @@ Future<void> _until(WidgetTester tester, Key key) async {
 ///
 /// Fake latency is zero, which is still a timer. A positive [pump] has to run
 /// before the next press, or the in-flight page is dropped.
+Future<void> _showCustomersStart(WidgetTester tester) async {
+  final scrollable = find
+      .descendant(
+        of: find.byKey(const Key('screen-customers')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              axisDirectionToAxis(widget.axisDirection) == Axis.vertical,
+        ),
+      )
+      .first;
+  tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+  await tester.pump();
+}
+
 Future<void> _press(WidgetTester tester, Key key, {int times = 1}) async {
   for (var tap = 0; tap < times; tap++) {
+    if (key == const Key('load-more-accounts')) {
+      final scrollable = find
+          .descendant(
+            of: find.byKey(const Key('screen-customers')),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  axisDirectionToAxis(widget.axisDirection) == Axis.vertical,
+            ),
+          )
+          .first;
+      final position = tester.state<ScrollableState>(scrollable).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pump();
+    }
     final finder = find.byKey(key);
     expect(finder, findsOneWidget);
     await tester.ensureVisible(finder);

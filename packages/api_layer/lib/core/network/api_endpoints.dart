@@ -25,6 +25,9 @@ class ApiEndpoints {
   static String accounts(String section) => '/api/$section';
   static String accountSuggestions(String section) =>
       '/api/$section/suggestions';
+
+  /// Website unified search. Same route as `GlobalAccountSearch`.
+  static const accountSearch = '/api/account-search';
   static String account(String section, String id) => '/api/$section/$id';
   static String accountLedger(String section, String id) =>
       '/api/$section/$id/ledger';

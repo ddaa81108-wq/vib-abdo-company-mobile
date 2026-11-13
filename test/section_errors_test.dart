@@ -200,24 +200,21 @@ void main() {
     await go(tester, '/search');
 
     final gate = Completer<void>();
-    fake.pauseSuggestions = gate;
+    fake.pauseAccountSearch = gate;
     await tester.enterText(find.byKey(const Key('unified-search')), 'عميل');
-    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump(const Duration(milliseconds: 250));
     await tester.pump();
     expect(find.byKey(const Key('search-loading')), findsOneWidget);
     gate.complete();
-    fake.pauseSuggestions = null;
+    fake.pauseAccountSearch = null;
     await settle(tester);
+    expect(find.text('عميل تجريبي'), findsWidgets);
 
-    fake.failSuggestionsRemaining = 1;
-    await tester.tap(find.byKey(const Key('unified-search')));
-    await tester.pump();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
+    fake.failAccountSearchRemaining = 1;
+    await tester.enterText(find.byKey(const Key('unified-search')), 'عميل ٢');
+    await tester.pump(const Duration(milliseconds: 250));
     await settle(tester);
-    expect(find.byKey(const Key('search-retry')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('search-retry')));
-    await settle(tester);
-    expect(find.text(AppStrings.noResults), findsOneWidget);
+    expect(find.text(AppStrings.searchNoAccounts), findsOneWidget);
     expect(find.byKey(const Key('search-retry')), findsNothing);
   });
 

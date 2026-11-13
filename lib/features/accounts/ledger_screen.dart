@@ -115,19 +115,29 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   /// sideways just far enough that القيمة of the new row is fully on screen
   /// (focused, ✓ pinned beside it). Columns keep their order; التسلسل and the
   /// date may start off screen. Wide screens stay at the start.
-  void _toValueField([int frames = 12]) {
+  ///
+  /// Retries only while a controller is not laid out yet. Once the offset
+  /// matches, it stops. It does not schedule extra frames.
+  void _toValueField([int frames = 4]) {
     if (!mounted) return;
+    var waiting = false;
     for (final c in [_columnsScroll, _headerScroll, _composerScroll]) {
-      if (!c.hasClients) continue;
+      if (!c.hasClients) {
+        waiting = true;
+        continue;
+      }
       final position = c.position;
       final target = _LedgerColumns.valueOffset(position.viewportDimension)
           .clamp(position.minScrollExtent, position.maxScrollExtent);
-      if ((c.offset - target).abs() > 0.5) c.jumpTo(target);
+      if ((c.offset - target).abs() > 0.5) {
+        c.jumpTo(target);
+        waiting = true;
+      }
     }
-    if (frames > 0) {
-      WidgetsBinding.instance
-        ..addPostFrameCallback((_) => _toValueField(frames - 1))
-        ..scheduleFrame();
+    if (waiting && frames > 0) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _toValueField(frames - 1),
+      );
     }
   }
 
@@ -216,7 +226,9 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
       if (!mounted || _olderFor != key) return;
       final atBottom = _atBottom(_rows) && _atBottom(_innerRows);
       if (atBottom) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToEntry());
+        // Follow the new bottom only. The sideways alignment runs once,
+        // on the first open, so later pages do not shake the columns.
+        WidgetsBinding.instance.addPostFrameCallback((_) => _pinEntry());
       }
       setState(() {
         _olderPages.add(older);
@@ -300,12 +312,14 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               final glossyTotal =
                   section == AccountSection.customers ||
                   section == AccountSection.companies;
-              // Top: the owner's name in a pill, then small round buttons
-              // (jump, تعديل البيانات, ×). Nothing else above the table.
+              // One horizontal row, as before 060: name, تعديل البيانات, ✕.
+              // Ten extra dp under the status area so the row is not jammed
+              // against the top (the old padding was 8).
               final bar = DecoratedBox(
+                key: const Key('ledger-top-bar'),
                 decoration: const BoxDecoration(color: Color(0xFF111111)),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 10, 8),
+                  padding: const EdgeInsets.fromLTRB(8, 18, 10, 8),
                   child: Row(
                     children: [
                       Expanded(
@@ -398,33 +412,48 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       bar,
-                      jumps,
                       Expanded(
-                        child: KeptData<LedgerPage>(
-                          value: ledger,
-                          resetKey: '${section.path}/$id/ledger',
-                          expand: true,
-                          onRetry: () =>
-                              ref.invalidate(ledgerProvider((section, id))),
-                          messageOf: messageOf,
-                          failureOf: failureOf,
-                          loading: const _LedgerLoading(),
-                          builder: (page) => _ledgerBody(
-                            context,
-                            page: page,
-                            card: card,
-                            online: online,
-                            money: money,
-                            canWrite: canWrite,
-                            padding: padding,
-                          ),
+                        child: Stack(
+                          children: [
+                            KeptData<LedgerPage>(
+                              value: ledger,
+                              resetKey: '${section.path}/$id/ledger',
+                              expand: true,
+                              onRetry: () =>
+                                  ref.invalidate(ledgerProvider((section, id))),
+                              messageOf: messageOf,
+                              failureOf: failureOf,
+                              loading: const _LedgerLoading(),
+                              builder: (page) => _ledgerBody(
+                                context,
+                                page: page,
+                                card: card,
+                                online: online,
+                                money: money,
+                                canWrite: canWrite,
+                                padding: padding,
+                              ),
+                            ),
+                            // Over the rows, so showing the buttons does not
+                            // resize the list and shake the scroll.
+                            PositionedDirectional(
+                              top: 0,
+                              start: 0,
+                              child: jumps,
+                            ),
+                          ],
                         ),
                       ),
                       ConstrainedBox(
                         constraints: BoxConstraints(maxHeight: maxPinned),
                         child: SingleChildScrollView(
                           key: const Key('ledger-pinned'),
-                          child: total,
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              bottom: MediaQuery.viewPaddingOf(context).bottom,
+                            ),
+                            child: total,
+                          ),
                         ),
                       ),
                     ],
@@ -449,7 +478,10 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     required bool canWrite,
     required EdgeInsetsDirectional padding,
   }) {
-    final resetKey = '${section.path}/$id/${identityHashCode(page)}';
+    // The account and the older-page cursor. A new payload of the same
+    // window (a live refresh) must not throw away the rows already shown.
+    final accountKey = '${section.path}/$id';
+    final resetKey = '$accountKey/${page.page.nextCursor}';
     _syncOlder(resetKey, page);
     // The website's merge: older items first, then the newer page. A row
     // already seen is not repeated.
@@ -503,8 +535,9 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
       onEditDone: _closeInlineEdit,
       onCancel: (meta) => _cancel(context, ref, rows[index], meta),
     );
-    if (_openedAtBottomFor != resetKey) {
-      _openedAtBottomFor = resetKey;
+    // Once per account. A later payload keeps the scroll where the reader left it.
+    if (_openedAtBottomFor != accountKey) {
+      _openedAtBottomFor = accountKey;
       WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToEntry());
     }
     return LayoutBuilder(
@@ -613,6 +646,12 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
   void _jumpToEntry() {
     if (!mounted) return;
     _toValueField();
+    _pinEntry();
+  }
+
+  /// Keep the entry row in view while older pages arrive. No sideways jump.
+  void _pinEntry() {
+    if (!mounted) return;
     if (_innerRows.hasClients) {
       _innerRows.jumpTo(_innerRows.position.maxScrollExtent);
     }
@@ -2215,29 +2254,34 @@ class _EntryTile extends ConsumerWidget {
         ?.value
         .version;
     final cancel = canWrite && !reversed
-        ? _roundLedgerButton(
-            const Color(0xFFE11D48),
-            GuardedMutation(
-              buttonKey: Key('cancel-${entry.id}'),
-              inputs: 'cancel:${entry.id}:$cardVersion',
-              expectedVersion: cardVersion,
-              filled: false,
-              label: AppStrings.cancelMovement,
-              icon: Icons.close_rounded,
-              tooltip: AppStrings.cancelMovement,
-              confirmText: AppStrings.confirmCancel,
-              onSubmit: onCancel,
+        ? _ledgerActionSlot(
+            _roundLedgerButton(
+              const Color(0xFFE11D48),
+              GuardedMutation(
+                buttonKey: Key('cancel-${entry.id}'),
+                inputs: 'cancel:${entry.id}:$cardVersion',
+                expectedVersion: cardVersion,
+                filled: false,
+                label: AppStrings.cancelMovement,
+                icon: Icons.close_rounded,
+                tooltip: AppStrings.cancelMovement,
+                confirmText: AppStrings.confirmCancel,
+                reportErrorInline: false,
+                onSubmit: onCancel,
+              ),
             ),
           )
         : dash;
-    final correct = _roundLedgerButton(
-      const Color(0xFF15803D),
-      TransactionCorrectionLauncher(
-        section: section,
-        accountId: accountId,
-        entry: entry,
-        onOpen: onEdit,
-        compact: true,
+    final correct = _ledgerActionSlot(
+      _roundLedgerButton(
+        const Color(0xFF15803D),
+        TransactionCorrectionLauncher(
+          section: section,
+          accountId: accountId,
+          entry: entry,
+          onOpen: onEdit,
+          compact: true,
+        ),
       ),
     );
     final cells = <Widget>[
@@ -2829,6 +2873,11 @@ class _OwnerPill extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Same 32px box for the pencil and the cancel mark, so they share a line.
+Widget _ledgerActionSlot(Widget child) {
+  return SizedBox(width: 32, height: 32, child: Center(child: child));
 }
 
 /// Green pencil / red cancel, the website's round row buttons.

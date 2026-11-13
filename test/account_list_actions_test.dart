@@ -98,18 +98,13 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('assign-mode')));
     await tester.tap(find.byKey(const Key('assign-mode')));
     await settle(tester);
-    // Only cards with a positive debt get a checkbox (537 website rule).
-    expect(find.byType(Checkbox), findsNWidgets(3));
+    // Only a positive debt is a selection target. The whole card is the
+    // target; there is no inner checkbox.
+    expect(find.byType(Checkbox), findsNothing);
     for (final id in ['b', 'd', 'g']) {
       expect(find.byKey(ValueKey('assign-select-$id')), findsOneWidget);
     }
-    final systemCard = find
-        .ancestor(of: find.text('كارت النظام'), matching: find.byType(Material))
-        .first;
-    expect(
-      find.descendant(of: systemCard, matching: find.byType(Checkbox)),
-      findsNothing,
-    );
+    expect(find.byKey(const ValueKey('assign-select-sys')), findsNothing);
   });
 
   testWidgets('deposit lists show no filter chip row (Ali, 2026-11-04)', (
@@ -209,10 +204,7 @@ void main() {
         },
       ];
       await go(tester, '/companies');
-      expect(find.byType(ExpansionTile), findsOneWidget);
-      await tester.tap(find.text(AppStrings.oldDebtsTitle));
-      await settle(tester);
-      expect(find.byKey(const Key('show-all-debts')), findsOneWidget);
+      expect(find.text(AppStrings.oldDebtsTitle), findsNothing);
 
       await tester.enterText(find.byKey(const Key('account-search')), 'عميل');
       await tester.testTextInput.receiveAction(TextInputAction.search);
@@ -225,20 +217,22 @@ void main() {
           'pinned';
       await settle(tester);
 
-      // Ten cards make the phone list taller than the viewport, so opening
-      // the filter scrolls the bulletin away and its tile builds collapsed.
-      await tester.ensureVisible(
-        find.text(AppStrings.oldDebtsTitle, skipOffstage: false),
-      );
-      await settle(tester);
-      if (find.byKey(const Key('show-all-debts')).evaluate().isEmpty) {
-        await tester.tap(find.text(AppStrings.oldDebtsTitle));
-        await settle(tester);
-      }
+      final scrollable = find
+          .descendant(
+            of: find.byKey(const Key('screen-companies')),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  axisDirectionToAxis(widget.axisDirection) == Axis.vertical,
+            ),
+          )
+          .first;
+      final position = tester.state<ScrollableState>(scrollable).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pump();
 
       final before = fake.accountListQueries.length;
-      await tester.ensureVisible(find.byKey(const Key('show-all-debts')));
-      await tester.tap(find.byKey(const Key('show-all-debts')));
+      await tester.tap(find.byKey(const Key('load-more-accounts')));
       await settle(tester);
 
       expect(find.text('باقي الكروت'), findsOneWidget);

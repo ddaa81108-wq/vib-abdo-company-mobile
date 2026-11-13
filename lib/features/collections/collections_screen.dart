@@ -286,11 +286,6 @@ class _AdminViewState extends ConsumerState<_AdminView> {
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
-        Text(
-          CollectionsText.closeScopeNote,
-          style: cairo(12, 500, color: look.muted),
-        ),
-        const SizedBox(height: AppSpacing.xxs),
         Wrap(
           key: const Key('close-batch-note'),
           spacing: AppSpacing.lg,
@@ -349,15 +344,6 @@ class _AdminViewState extends ConsumerState<_AdminView> {
               edge: look.violet,
             ),
           ],
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          CollectionsText.unlinkedWithin(summary.unlinkedPendingCount),
-          style: cairo(11, 500, color: look.muted),
-        ),
-        Text(
-          CollectionsText.summaryNote,
-          style: cairo(11, 500, color: look.muted),
         ),
         const SizedBox(height: AppSpacing.sm),
         _PeerRow(

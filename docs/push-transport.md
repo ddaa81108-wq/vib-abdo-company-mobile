@@ -4,12 +4,14 @@ Phase 6 step 2. This is the device-token and delivery path in front of the
 notifications controller from PR #41. It does not change that model, the
 repository, the providers, or the merge rules.
 
-The server still has no mobile push. The default transport is a no-op.
+An empty `PUSH_TRANSPORT` tries Firebase and falls back to the no-op when
+`google-services.json` is absent, so SSE stays as it is. Production does not
+send until the draft server branch is deployed. That branch is not merged.
 
 ## Architecture
 
 ```text
-PushTransport (noop | fake | fcm stub)
+PushTransport (noop | fake | fcm)
         │  raw map
         ▼
 whitelist (allowed keys only)
@@ -28,7 +30,7 @@ load stays `announce: false`.
 
 | Piece | Role |
 |---|---|
-| `PushTransport` | `NoopPushTransport` (default), `FakePushTransport` (tests), `FcmPushTransport` (stub). Chosen by `pushTransportProvider`. |
+| `PushTransport` | `NoopPushTransport` when Firebase is absent, `FakePushTransport` (tests), `FcmPushTransport` when `initializeApp` succeeds. Chosen by `pushTransportProvider`. |
 | `NotificationIngress` | Whitelist, fail-closed recipient check, shared LRU, then his `ingest`. |
 | `DeviceTokenRegistrar` | Register after login. `forget` on logout, account switch, and the session wipe. |
 | `PushSessionGate` | The wipe from PR #38 calls `forget`. A thrown unregister cannot fail logout. |

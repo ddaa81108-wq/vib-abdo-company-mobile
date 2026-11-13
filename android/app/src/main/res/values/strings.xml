@@ -3,4 +3,8 @@
     <string name="notification_channel_id" translatable="false">vib_notices_sound_v1</string>
     <string name="notification_channel_name">تنبيهات VIB</string>
     <string name="notification_channel_description">تنبيهات عامة وتنبيهات التحصيل</string>
+    <string name="presence_channel_name">اتصال التنبيهات</string>
+    <string name="presence_channel_description">يبقي الاتصال حيًا والتطبيق في الخلفية. بلا صوت.</string>
+    <string name="presence_title">التنبيهات تعمل</string>
+    <string name="presence_text">الاتصال يبقى حيًا ليصل صوت التنبيه.</string>
 </resources>

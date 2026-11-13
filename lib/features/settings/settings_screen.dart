@@ -43,8 +43,8 @@ class SettingsText {
       'الوضع الليلي، صوت الإشعارات ونطقها، كلمة المرور، وتسجيل الخروج.';
   static const ledgerNote =
       'قراءة موحدة للقيود المالية من جميع الأقسام دون تعديل الأرصدة.';
-  static const themeTitle = 'الوضع الليلي';
-  static const themeNote = 'يُحفظ على هذا الجهاز فقط.';
+  static const themeTitle = 'المظهر';
+  static const themeNote = 'نهاري أو ليلي. يُحفظ على هذا الجهاز فقط.';
   static const aboutTitle = 'حول التطبيق';
   static const environment = 'بيئة الخادم';
   static const production = 'الخادم الرسمي';
@@ -134,10 +134,23 @@ class SettingsScreen extends ConsumerWidget {
             key: const Key('settings-theme'),
             icon: dark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
             title: SettingsText.themeTitle,
-            note: SettingsText.themeNote,
+            note: dark ? AppStrings.themeDark : AppStrings.themeLight,
             action: Switch(
               key: const Key('settings-theme-switch'),
               value: dark,
+              thumbColor: WidgetStateProperty.resolveWith((states) {
+                return states.contains(WidgetState.selected)
+                    ? const Color(0xFF0B1020)
+                    : const Color(0xFFFFFFFF);
+              }),
+              trackColor: WidgetStateProperty.resolveWith((states) {
+                return states.contains(WidgetState.selected)
+                    ? const Color(0xFFF5C542)
+                    : const Color(0xFF1E3A8A);
+              }),
+              trackOutlineColor: const WidgetStatePropertyAll(
+                Color(0xFF1E3A8A),
+              ),
               onChanged: (value) =>
                   ref.read(themeModeProvider.notifier).setDark(value),
             ),

@@ -50,12 +50,12 @@ void main() {
       await pumpFakeApp(tester, size: const Size(800, 2400));
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
 
-      // Home has no debt bulletin now; the customers list shows the age.
+      // Home has no debt bulletin. The customers list no longer has one either.
       expect(find.textContaining('مرّ عليه 3 أيام'), findsNothing);
 
       await go(tester, '/customers');
-      expect(find.text('مرّ عليه 3 أيام'), findsNothing);
-      expect(find.text('منذ 4 أيام'), findsWidgets);
+      expect(find.text('مرّ عليه 3 أيام'), findsWidgets);
+      expect(find.text('منذ 4 أيام'), findsNothing);
       expect(find.text('متبقي المصراوية تجريبي'), findsOneWidget);
 
       await go(tester, '/customers/c_masraweya_remainder');

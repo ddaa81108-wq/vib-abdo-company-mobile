@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_providers.dart';
 import '../error_handling/app_failure.dart';
 import '../error_handling/error_handler.dart';
+import '../notifications/speech_watermark.dart';
 import '../performance/history_window.dart';
 import '../ui/strings.dart';
 import 'notification_merge.dart';
@@ -82,6 +83,12 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
   var _extend = false;
   var _loadingOlder = false;
 
+  /// Foreground voice. The open and resume snapshot is silent.
+  final _speech = SpeechWatermark();
+
+  /// The next list is the backlog received while the app was away.
+  void holdSpeech() => _speech.hold();
+
   @override
   Future<NotificationsPage> build() async {
     _replay = false;
@@ -95,6 +102,7 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
     _allReadFlight = null;
     ref.read(apiLayerProvider).notifications.clearWriteCache();
     if (session is! SessionAuthenticated) {
+      _speech.reset();
       return const NotificationsPage(items: [], unreadCount: null);
     }
     final page = await ref.read(apiLayerProvider).notifications.list();
@@ -104,6 +112,8 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
       currentUserId: session.profile.id,
       source: NotificationSource.fetch,
     );
+    // Cold start and resume both load this page quietly. It is the backlog.
+    _speech.baseline(visible);
     return _page(visible, unreadCount: page.unreadCount, base: page);
   }
 
@@ -225,14 +235,12 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
         ),
       ),
     );
-    if (announce) {
-      final bus = ref.read(_foregroundBusProvider);
-      if (!bus.isClosed) {
-        for (final item in newlySeenUnread(before: previous, after: visible)) {
-          bus.add(item);
-        }
-      }
-    }
+    _announce(
+      before: previous,
+      after: visible,
+      announce: announce,
+      snapshot: true,
+    );
     final count = await _resolveUnread(listUnread: unread);
     if (count != null) _applyCount(count, pageUnread: unread);
   }
@@ -256,18 +264,45 @@ class NotificationsController extends AsyncNotifier<NotificationsPage> {
       source: source,
     );
     state = AsyncData(_page(merged, base: state.value));
-    final shouldAnnounce = announce || source == NotificationSource.push;
-    if (shouldAnnounce) {
-      final bus = ref.read(_foregroundBusProvider);
-      if (!bus.isClosed) {
-        for (final item in newlySeenUnread(before: current, after: merged)) {
-          bus.add(item);
-        }
-      }
-    }
+    _announce(
+      before: current,
+      after: merged,
+      announce: announce || source == NotificationSource.push,
+      snapshot: false,
+    );
     if (source == NotificationSource.push) {
       final count = await _resolveUnread();
       if (count != null) _applyCount(count);
+    }
+  }
+
+  /// Puts a newly seen unread row on the foreground bus when it is newer
+  /// than the open/resume watermark. A row already in that snapshot, or a
+  /// repeated id, is marked seen and stays silent.
+  void _announce({
+    required List<AppNotification> before,
+    required List<AppNotification> after,
+    required bool announce,
+    required bool snapshot,
+  }) {
+    if (_speech.holding) {
+      if (snapshot) {
+        // The open/resume list is the backlog. The voice may open after it.
+        _speech.baseline(after);
+      } else {
+        // A row that lands while the app is away stays silent, and the
+        // next one stays silent too.
+        for (final item in after) {
+          _speech.admit(item);
+        }
+      }
+      return;
+    }
+    if (!announce) return;
+    final bus = ref.read(_foregroundBusProvider);
+    if (bus.isClosed) return;
+    for (final item in newlySeenUnread(before: before, after: after)) {
+      if (_speech.admit(item)) bus.add(item);
     }
   }
 

@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 
 import '../../ui/widgets/common.dart';
@@ -12,6 +13,26 @@ enum MasraweyaDraftIssue {
 }
 
 enum MasraweyaSavePhase { saved, dirty, saving, error, conflict }
+
+/// A server day may replace the on-screen fields only when nothing is
+/// half-typed. Focus or a dirty/saving/error draft keeps the local text.
+bool masraweyaRemoteReplacesDraft({
+  required MasraweyaSavePhase phase,
+  required bool fieldFocused,
+}) {
+  return phase == MasraweyaSavePhase.saved && !fieldFocused;
+}
+
+/// Writes server digits into the controller that is already on screen.
+/// The field widget is not replaced, so the cursor and scroll stay put.
+bool masraweyaWriteDigits(TextEditingController controller, String digits) {
+  if (controller.text == digits) return false;
+  controller.value = TextEditingValue(
+    text: digits,
+    selection: TextSelection.collapsed(offset: digits.length),
+  );
+  return true;
+}
 
 /// One work row as typed. Empty rows are omitted. A half-filled row blocks.
 class MasraweyaRowDraft {

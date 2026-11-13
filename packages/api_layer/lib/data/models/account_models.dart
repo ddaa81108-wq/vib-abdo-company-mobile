@@ -437,6 +437,49 @@ class AccountTransactionRequest {
       };
 }
 
+/// GET /api/account-search?q — one row from the website's unified search.
+class GlobalAccountHit {
+  const GlobalAccountHit({
+    required this.section,
+    required this.id,
+    required this.name,
+    this.phone,
+    this.balanceUnits,
+    required this.currency,
+    this.activeAssignmentId,
+    this.activeAssigneeName,
+  });
+
+  final AccountSection section;
+  final String id;
+  final String name;
+  final String? phone;
+  final MoneyValue? balanceUnits;
+  final Currency currency;
+  final String? activeAssignmentId;
+  final String? activeAssigneeName;
+
+  static GlobalAccountHit? tryParse(Json j) {
+    final sectionName = strOrNull(j['section']);
+    AccountSection? section;
+    for (final candidate in AccountSection.values) {
+      if (candidate.path == sectionName) section = candidate;
+    }
+    final id = strOrNull(j['id']);
+    if (section == null || id == null || id.isEmpty) return null;
+    return GlobalAccountHit(
+      section: section,
+      id: id,
+      name: str(j['name']),
+      phone: strOrNull(j['phone']),
+      balanceUnits: unitsOrNull(j['balanceUnits']),
+      currency: Currency.fromCode(j['currency']) ?? section.currency,
+      activeAssignmentId: strOrNull(j['activeAssignmentId']),
+      activeAssigneeName: strOrNull(j['activeAssigneeName']),
+    );
+  }
+}
+
 /// GET /api/{section}/suggestions?q — duplicate-name hints before creation.
 class AccountSuggestionDto {
   const AccountSuggestionDto(

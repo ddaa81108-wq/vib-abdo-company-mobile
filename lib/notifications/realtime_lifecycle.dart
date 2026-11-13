@@ -9,6 +9,8 @@ import '../error_handling/error_handler.dart';
 import '../state/live_refresh.dart';
 import '../state/notification_providers.dart';
 import '../state/session_providers.dart';
+import 'background_sound_policy.dart';
+import 'notification_presence.dart';
 import 'notification_signal_bridge.dart';
 
 /// Starts realtime delivery while a session is open and the app is in front.
@@ -31,6 +33,7 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
   NotificationSignalBridge? _bridge;
   var _running = false;
   var _sawBackground = false;
+  var _holding = false;
 
   @override
   void initState() {
@@ -55,10 +58,13 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
       _sawBackground = true;
+      // Anything that arrives while away is backlog, not a voice replay.
+      ref.read(notificationsProvider.notifier).holdSpeech();
     }
     _sync();
     if (state == AppLifecycleState.resumed && _sawBackground) {
       _sawBackground = false;
+      ref.read(notificationsProvider.notifier).holdSpeech();
       refreshAllLiveSections(ref);
     }
   }
@@ -67,11 +73,19 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
     final session = ref.read(sessionStateProvider);
     final layer = ref.read(apiLayerProvider);
     final phase = WidgetsBinding.instance.lifecycleState;
-    final foreground =
-        phase != AppLifecycleState.paused &&
-        phase != AppLifecycleState.detached &&
-        phase != AppLifecycleState.hidden;
-    final shouldRun = session is SessionAuthenticated && foreground;
+    final signedIn = session is SessionAuthenticated;
+    final shouldRun = BackgroundSoundPolicy.keepRealtime(
+      signedIn: signedIn,
+      phase: phase,
+    );
+    final hold = BackgroundSoundPolicy.holdProcess(
+      signedIn: signedIn,
+      phase: phase,
+    );
+    if (hold != _holding) {
+      _holding = hold;
+      unawaited(ref.read(notificationPresenceProvider).setHolding(hold));
+    }
     if (shouldRun && !_running) {
       _running = true;
       _bridge ??= NotificationSignalBridge(

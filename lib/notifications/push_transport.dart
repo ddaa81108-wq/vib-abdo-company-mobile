@@ -2,11 +2,13 @@ import 'dart:async';
 
 /// Which push adapter the process uses.
 ///
-/// `--dart-define=PUSH_TRANSPORT=fcm` selects the stub. `fake` selects the
-/// in-memory adapter. Anything else, including empty, is [PushTransportKind.noop].
+/// `--dart-define=PUSH_TRANSPORT=fcm` keeps the Firebase adapter even when
+/// setup fails. `fake` selects the in-memory adapter. `noop` stays a no-op.
+/// An empty value is resolved in `resolveAppPushTransport`: try Firebase,
+/// then the no-op when the config is absent.
 enum PushTransportKind { noop, fake, fcm }
 
-/// Default is noop. The server has no device push (see the phase 6 contract).
+/// Empty unless the process was started with `PUSH_TRANSPORT`.
 const String kPushTransportName = String.fromEnvironment('PUSH_TRANSPORT');
 
 PushTransportKind parsePushTransport(String raw) => switch (raw.trim()) {
@@ -18,7 +20,8 @@ PushTransportKind parsePushTransport(String raw) => switch (raw.trim()) {
 PushTransportKind pushTransportKindFromEnvironment() =>
     parsePushTransport(kPushTransportName);
 
-/// Adapter the rest of the app talks to. Firebase is not linked.
+/// Adapter the rest of the app talks to. Firebase starts only after
+/// `prepare` succeeds.
 abstract interface class PushTransport {
   String get name;
 
@@ -45,7 +48,7 @@ abstract interface class PushTransport {
 final Stream<String> _silentTokenRefresh = Stream<String>.empty()
     .asBroadcastStream();
 
-/// Default. The server has no FCM or APNs registration.
+/// Used when Firebase is off or its config is missing. SSE is unchanged.
 class NoopPushTransport implements PushTransport {
   const NoopPushTransport();
 
@@ -119,14 +122,23 @@ class FakePushTransport implements PushTransport {
   }
 }
 
-/// Compile-time seam for FCM. `firebase_messaging` is not a dependency.
+/// FCM adapter. Firebase is contacted only by [prepare].
 ///
-/// The Android build of that plugin expects `google-services.json` and the
-/// Google Services Gradle plugin. This repo must not contain that file or any
-/// API key. Until a build can isolate the plugin without that file, this
-/// adapter yields no token, no token-refresh events, and no messages.
+/// Without `google-services.json`, [prepare] fails closed and [currentToken]
+/// stays null, so the registrar does not call the server. The Google Services
+/// plugin is applied only when that file is present, so CI builds without it.
 class FcmPushTransport implements PushTransport {
-  const FcmPushTransport();
+  FcmPushTransport({FcmRuntime? runtime}) : _runtime = runtime ?? fcmRuntime;
+
+  final FcmRuntime _runtime;
+  final _payloads = StreamController<Map<String, dynamic>>.broadcast();
+  final _tokens = StreamController<String>.broadcast();
+  var _probed = false;
+  var _ready = false;
+  String? _token;
+
+  /// True after a successful [prepare]. False when Firebase is not configured.
+  bool get configured => _ready;
 
   @override
   String get name => 'fcm';
@@ -134,22 +146,117 @@ class FcmPushTransport implements PushTransport {
   @override
   bool get registersDevices => true;
 
-  @override
-  Future<String?> currentToken() async => null;
+  /// Connects Firebase. Returns false when the native config is absent.
+  /// Never throws. Does not log a token.
+  Future<bool> prepare() async {
+    if (_probed) return _ready;
+    _probed = true;
+    try {
+      _ready = await _runtime.start(
+        onToken: (token) {
+          if (token.isEmpty || _tokens.isClosed) return;
+          _token = token;
+          _tokens.add(token);
+        },
+        onMessage: (payload) {
+          if (_payloads.isClosed) return;
+          final hasNotification = payload.remove('notificationPayload') == true;
+          if (!fcmShouldForwardToTray(
+            inForeground: _runtime.inForeground(),
+            hasNotificationPayload: hasNotification,
+          )) {
+            return;
+          }
+          _payloads.add(payload);
+        },
+      );
+      if (_ready) _token = await _runtime.token();
+    } catch (_) {
+      _ready = false;
+    }
+    return _ready;
+  }
 
   @override
-  Stream<Map<String, dynamic>> get payloads => const Stream.empty();
+  Future<String?> currentToken() async {
+    await prepare();
+    if (!_ready) return null;
+    final token = _token ?? await _runtime.token();
+    if (token == null || token.isEmpty) return null;
+    return token;
+  }
 
   @override
-  Stream<String> get onTokenRefresh => _silentTokenRefresh;
+  Stream<Map<String, dynamic>> get payloads => _payloads.stream;
+
+  @override
+  Stream<String> get onTokenRefresh => _tokens.stream;
+
+  @override
+  Future<void> deleteToken() async {
+    _token = null;
+    if (!_ready) return;
+    try {
+      await _runtime.deleteToken();
+    } catch (_) {}
+  }
+}
+
+/// Replaced in [main] with the Firebase plugin. Tests keep this no-op.
+FcmRuntime fcmRuntime = const UnavailableFcmRuntime();
+
+class UnavailableFcmRuntime implements FcmRuntime {
+  const UnavailableFcmRuntime();
+
+  @override
+  Future<bool> start({
+    required void Function(String token) onToken,
+    required void Function(Map<String, dynamic> payload) onMessage,
+  }) async => false;
+
+  @override
+  Future<String?> token() async => null;
 
   @override
   Future<void> deleteToken() async {}
+
+  @override
+  bool inForeground() => true;
+}
+
+/// Platform piece behind [FcmPushTransport]. Tests pass a fake.
+abstract interface class FcmRuntime {
+  Future<bool> start({
+    required void Function(String token) onToken,
+    required void Function(Map<String, dynamic> payload) onMessage,
+  });
+
+  Future<String?> token();
+
+  Future<void> deleteToken();
+
+  bool inForeground();
+}
+
+/// Foreground sound belongs to SSE. A notification payload is shown by
+/// Android itself when the process is not in front, so the app must not
+/// post a second alert. The speech watermark still drops an id SSE already spoke.
+bool fcmShouldForwardToTray({
+  required bool inForeground,
+  required bool hasNotificationPayload,
+}) => !inForeground && !hasNotificationPayload;
+
+bool fcmShouldPostLocalAlert({
+  required bool inForeground,
+  required bool hasNotificationPayload,
+}) {
+  if (inForeground) return false;
+  return !hasNotificationPayload;
 }
 
 PushTransport createPushTransport(String raw, {FakePushTransport? fake}) =>
     switch (parsePushTransport(raw)) {
-      PushTransportKind.fcm => const FcmPushTransport(),
+      PushTransportKind.fcm => FcmPushTransport(),
       PushTransportKind.fake => fake ?? FakePushTransport(),
       PushTransportKind.noop => const NoopPushTransport(),
     };

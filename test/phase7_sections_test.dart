@@ -70,7 +70,25 @@ void main() {
       _inside(const Key('purchase-total-debt'), '2,553 د.ل'),
       findsOneWidget,
     );
-    expect(find.text('553 د.ل'), findsWidgets);
+    expect(
+      tester
+          .widget<Text>(
+            find.byKey(const Key('purchase-balance-pe_1'), skipOffstage: false),
+          )
+          .data,
+      '2,553',
+    );
+    expect(
+      tester
+          .widget<Text>(
+            find.byKey(
+              const Key('purchase-balance-pe_old'),
+              skipOffstage: false,
+            ),
+          )
+          .data,
+      '2,000',
+    );
 
     await go(tester, '/treasury');
     expect(find.byKey(const Key('screen-treasury')), findsOneWidget);

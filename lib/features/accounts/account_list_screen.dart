@@ -10,7 +10,6 @@ import '../../error_handling/error_handler.dart';
 import '../../state/section_providers.dart';
 import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
-import '../../ui/presentation.dart';
 import '../../ui/section_labels.dart';
 import '../../ui/strings.dart';
 import '../../ui/theme.dart';
@@ -23,6 +22,7 @@ import 'zero_review_preview.dart';
 import 'account_name_suggestions.dart';
 import 'company_card_tone.dart';
 import 'customer_card_tone.dart';
+import 'website_account_card.dart';
 import 'website_ledger_tone.dart';
 
 /// Customers, companies, Libyan deposits, and Egyptian deposits share this
@@ -39,20 +39,63 @@ class AccountListScreen extends ConsumerStatefulWidget {
 
 class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   final _search = TextEditingController();
+  final _cardsScroll = ScrollController();
+  var _atEnd = false;
+  var _loadMoreSynced = false;
   var _assigning = false;
-  var _showAllDebts = false;
   var _paging = false;
   String? _moreError;
-  var _scrollArmed = true;
   final _selected = <String>{};
   String? _reply;
+
+  /// One tap can be delivered twice: the recognizer that went down, then the
+  /// recognizer created when that setState rebuilds the card. The second
+  /// delivery would undo the selection. Ignore a repeat of the same card
+  /// inside a short window.
+  String? _toggleId;
+  DateTime? _toggleAt;
+
+  void _toggleSelection(AccountCardDto card) {
+    if (!canSelectAccountForAssignment(card)) return;
+    final now = DateTime.now();
+    if (_toggleId == card.id &&
+        _toggleAt != null &&
+        now.difference(_toggleAt!) < const Duration(milliseconds: 250)) {
+      return;
+    }
+    _toggleId = card.id;
+    _toggleAt = now;
+    setState(() {
+      _selected.contains(card.id)
+          ? _selected.remove(card.id)
+          : _selected.add(card.id);
+    });
+  }
 
   AccountSection get section => widget.section;
 
   @override
+  void initState() {
+    super.initState();
+    _cardsScroll.addListener(_syncLoadMore);
+  }
+
+  @override
   void dispose() {
+    _cardsScroll.removeListener(_syncLoadMore);
+    _cardsScroll.dispose();
     _search.dispose();
     super.dispose();
+  }
+
+  void _syncLoadMore() {
+    if (!mounted || !_cardsScroll.hasClients) return;
+    if (_cardsScroll.positions.isEmpty) return;
+    final position = _cardsScroll.positions.first;
+    if (!position.hasContentDimensions) return;
+    final atEnd = position.maxScrollExtent <= 1 || position.extentAfter <= 72;
+    if (atEnd == _atEnd) return;
+    setState(() => _atEnd = atEnd);
   }
 
   @override
@@ -70,18 +113,17 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     final online = ref.watch(onlineProvider);
     final money = ref.watch(apiLayerProvider).money;
     final canWrite = permissions.canWrite(section.sectionKey);
-    final home = ref.watch(homeDashboardProvider);
     final width = MediaQuery.sizeOf(context).width;
     final gridColumns = accountListColumns(
       width,
       textScale: MediaQuery.textScalerOf(context).scale(1),
     );
-    // Customers and companies share the debt-card design (the website's
-    // `customers || companies` layout): two equal cards per row on every
-    // phone (Ali, 2026-11-02; companies 2026-11-03). Each keeps its own data.
+    // Customers and companies share the debt-card design. Ali, 2026-11-13:
+    // one card per row so the wider card can carry the status, name, amount
+    // and movement without clipping. Each section keeps its own data.
     final isCustomers = section == AccountSection.customers;
     final debtLook = isDebtLookSection(section);
-    final columns = gridColumns < 2 ? 2 : gridColumns;
+    final columns = debtLook ? 1 : (gridColumns < 2 ? 2 : gridColumns);
 
     final Widget searchField = TextField(
       key: const Key('account-search'),
@@ -124,6 +166,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       allowed: permissions.canWrite(section.sectionKey),
       online: online,
       label: _addLabel,
+      fitLabel: debtLook,
       onPressed: () => _create(context),
     );
     final Widget assignButton = GatedButton(
@@ -132,6 +175,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       online: online,
       filled: false,
       label: AppStrings.assign,
+      fitLabel: debtLook,
       onPressed: () => setState(() {
         _assigning = !_assigning;
         _selected.clear();
@@ -176,6 +220,15 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
         ];
         final cards = settledZeroReviewsLast(loaded);
         HistoryWindowTrace.accountWindow = [for (final card in cards) card.id];
+        if (!_loadMoreSynced) {
+          _loadMoreSynced = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _syncLoadMore();
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => _syncLoadMore(),
+            );
+          });
+        }
         return Column(
           children: [
             Expanded(
@@ -186,217 +239,182 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                   ref.invalidate(accountsProvider(section));
                   await ref.read(accountsProvider(section).future);
                 },
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: (notification) =>
-                      _onCardsScroll(notification, data.page.nextCursor),
-                  child: CustomScrollView(
-                    key: Key('screen-${section.path}'),
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverPadding(
-                        padding: pagePadding(width)
-                            .copyWith(bottom: pagePadding(width).bottom + 32),
-                        sliver: SliverMainAxisGroup(
-                          slivers: [
-                            SliverToBoxAdapter(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  // Customers and companies: no page title (Ali, 2026-11-02).
-                                  // Deposits: the toolbar already names the section (Ali, t348).
-                                  if (!debtLook && !deposits) ...[
-                                    ScreenTitle(
-                                      sectionLabel(section.sectionKey),
-                                    ),
-                                    const SizedBox(height: AppSpacing.md),
-                                  ],
-                                  if (_showTicker)
-                                    _ticker(
-                                      home,
-                                      money,
-                                      width,
-                                      cards,
-                                      data.page.nextCursor,
-                                      HistoryWindow.trimEnabled &&
-                                              data.page.items.length >
-                                                  HistoryWindow.eagerLimit
-                                          ? HistoryWindow.retainLimit
-                                          : null,
-                                    ),
-                                  // Deposits: الإجمالي, النشط, إضافة أمانة on one row, then a
-                                  // full-width search. The Egyptian rate stays under that search.
-                                  if (deposits)
-                                    _DepositTopRow(
-                                      summary: data.summary,
-                                      currency: section.currency,
-                                      money: money,
-                                      add: addButton,
-                                    )
-                                  else
-                                    _SummaryStrip(
-                                      section: section,
-                                      summary: data.summary,
-                                      currency: section.currency,
-                                      money: money,
-                                    ),
-                                  const SizedBox(height: AppSpacing.md),
-                                  // Customers and companies: no filter chips (Ali, 2026-11-02).
-                                  // Deposits: no filter chips (Ali, 2026-11-04).
-                                  if (!debtLook && !deposits) ...[
-                                    _Tabs(
-                                      section: section,
-                                      summary: data.summary,
-                                    ),
-                                    const SizedBox(height: AppSpacing.md),
-                                  ],
-                                  if (debtLook)
-                                    _CustomersToolbar(
-                                      toolbarKey: Key(
-                                        isCustomers
-                                            ? 'customers-toolbar'
-                                            : 'companies-toolbar',
-                                      ),
-                                      add: addButton,
-                                      search: searchField,
-                                      assign: assignButton,
-                                    )
-                                  else ...[
-                                    searchField,
-                                    if (section ==
-                                        AccountSection.egyptianDeposits)
-                                      const _RateCard(),
-                                    // Deposits: add sits in the top row.
-                                    if (!deposits) ...[
-                                      const SizedBox(height: AppSpacing.md),
-                                      Wrap(
-                                        spacing: AppSpacing.md,
-                                        runSpacing: AppSpacing.md,
-                                        children: [addButton, assignButton],
-                                      ),
-                                    ],
-                                  ],
-                                  if (_assigning)
-                                    _AssignSubmit(
-                                      section: section,
-                                      customerIds: assignmentTargetIds(
-                                        _selected,
-                                        cards,
-                                      ),
-                                      online: online,
-                                      onCancel: () => setState(() {
-                                        _assigning = false;
-                                        _selected.clear();
-                                      }),
-                                      onAssigned: (message) => setState(() {
-                                        _assigning = false;
-                                        _selected.clear();
-                                        _reply = message;
-                                      }),
-                                    ),
-                                  if (_reply != null) ...[
-                                    const SizedBox(height: AppSpacing.sm),
-                                    Text(
-                                      _reply!,
-                                      key: const Key('server-reply'),
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium,
-                                    ),
-                                  ],
+                child: CustomScrollView(
+                  key: Key('screen-${section.path}'),
+                  controller: _cardsScroll,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverPadding(
+                      padding: pagePadding(width)
+                          .copyWith(bottom: pagePadding(width).bottom + 32),
+                      sliver: SliverMainAxisGroup(
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Customers and companies: no page title (Ali, 2026-11-02).
+                                // Deposits: the toolbar already names the section (Ali, t348).
+                                if (!debtLook && !deposits) ...[
+                                  ScreenTitle(sectionLabel(section.sectionKey)),
                                   const SizedBox(height: AppSpacing.md),
                                 ],
+                                // Deposits: الإجمالي, النشط, إضافة أمانة on one row, then a
+                                // full-width search. The Egyptian rate stays under that search.
+                                if (deposits)
+                                  _DepositTopRow(
+                                    summary: data.summary,
+                                    currency: section.currency,
+                                    money: money,
+                                    add: addButton,
+                                  )
+                                else if (debtLook)
+                                  _DebtCompactHeader(
+                                    section: section,
+                                    summary: data.summary,
+                                    currency: section.currency,
+                                    money: money,
+                                    add: addButton,
+                                  )
+                                else
+                                  _SummaryStrip(
+                                    section: section,
+                                    summary: data.summary,
+                                    currency: section.currency,
+                                    money: money,
+                                  ),
+                                SizedBox(
+                                  height: debtLook
+                                      ? AppSpacing.xs
+                                      : AppSpacing.md,
+                                ),
+                                // Customers and companies: no filter chips (Ali, 2026-11-02).
+                                // Deposits: no filter chips (Ali, 2026-11-04).
+                                if (!debtLook && !deposits) ...[
+                                  _Tabs(
+                                    section: section,
+                                    summary: data.summary,
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                ],
+                                if (debtLook)
+                                  _CustomersToolbar(
+                                    toolbarKey: Key(
+                                      isCustomers
+                                          ? 'customers-toolbar'
+                                          : 'companies-toolbar',
+                                    ),
+                                    add: _ActiveWord(
+                                      section: section,
+                                      count: data.summary.activeCards,
+                                    ),
+                                    search: searchField,
+                                    assign: assignButton,
+                                    equalWidths: true,
+                                  )
+                                else ...[
+                                  searchField,
+                                  if (section ==
+                                      AccountSection.egyptianDeposits)
+                                    const _RateCard(),
+                                  // Deposits: add sits in the top row.
+                                  if (!deposits) ...[
+                                    const SizedBox(height: AppSpacing.md),
+                                    Wrap(
+                                      spacing: AppSpacing.md,
+                                      runSpacing: AppSpacing.md,
+                                      children: [addButton, assignButton],
+                                    ),
+                                  ],
+                                ],
+                                if (_assigning)
+                                  _AssignSubmit(
+                                    section: section,
+                                    customerIds: assignmentTargetIds(
+                                      _selected,
+                                      cards,
+                                    ),
+                                    online: online,
+                                    onCancel: () => setState(() {
+                                      _assigning = false;
+                                      _selected.clear();
+                                    }),
+                                    onAssigned: (message) => setState(() {
+                                      _assigning = false;
+                                      _selected.clear();
+                                      _reply = message;
+                                    }),
+                                  ),
+                                if (_reply != null) ...[
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Text(
+                                    _reply!,
+                                    key: const Key('server-reply'),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium,
+                                  ),
+                                ],
+                                const SizedBox(height: AppSpacing.md),
+                              ],
+                            ),
+                          ),
+                          if (cards.isEmpty)
+                            const SliverToBoxAdapter(
+                              child: EmptyPane(
+                                message: AppStrings.emptyAccounts,
+                              ),
+                            )
+                          else if (cards.length <= HistoryWindow.eagerLimit)
+                            SliverToBoxAdapter(
+                              child: _cardWrap(
+                                cards: cards,
+                                columns: columns,
+                                canWrite: canWrite,
+                                permissions: permissions,
+                              ),
+                            )
+                          else
+                            SliverList(
+                              key: const Key('account-cards-list'),
+                              delegate: SliverChildBuilderDelegate((
+                                context,
+                                index,
+                              ) {
+                                final card = cards[index];
+                                return Padding(
+                                  padding: const EdgeInsetsDirectional.only(
+                                    bottom: AppSpacing.md,
+                                  ),
+                                  child: _accountCard(
+                                    card: card,
+                                    canWrite: canWrite,
+                                    permissions: permissions,
+                                  ),
+                                );
+                              }, childCount: cards.length),
+                            ),
+                          if (_moreError != null)
+                            SliverToBoxAdapter(
+                              child: Text(
+                                _moreError!,
+                                key: const Key('load-more-accounts-error'),
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .error,
+                                    ),
                               ),
                             ),
-                            if (cards.isEmpty)
-                              const SliverToBoxAdapter(
-                                child: EmptyPane(
-                                  message: AppStrings.emptyAccounts,
-                                ),
-                              )
-                            else if (cards.length <= HistoryWindow.eagerLimit)
-                              SliverToBoxAdapter(
-                                child: _cardWrap(
-                                  cards: cards,
-                                  columns: columns,
-                                  canWrite: canWrite,
-                                  permissions: permissions,
-                                ),
-                              )
-                            else if (debtLook)
-                              SliverList(
-                                key: const Key('account-cards-list'),
-                                delegate: SliverChildBuilderDelegate(
-                                  (context, row) => Padding(
-                                    padding: const EdgeInsetsDirectional.only(
-                                      bottom: AppSpacing.md,
-                                    ),
-                                    child: SizedBox(
-                                      height: customerCardHeight(context),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          for (final i in [
-                                            row * 2,
-                                            row * 2 + 1,
-                                          ]) ...[
-                                            if (i == row * 2 + 1)
-                                              const SizedBox(
-                                                width: AppSpacing.md,
-                                              ),
-                                            Expanded(
-                                              child: i < cards.length
-                                                  ? _accountCard(
-                                                      card: cards[i],
-                                                      canWrite: canWrite,
-                                                      permissions: permissions,
-                                                    )
-                                                  : const SizedBox.shrink(),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  childCount: (cards.length + 1) ~/ 2,
-                                ),
-                              )
-                            else
-                              SliverList(
-                                key: const Key('account-cards-list'),
-                                delegate: SliverChildBuilderDelegate((
-                                  context,
-                                  index,
-                                ) {
-                                  final card = cards[index];
-                                  return Padding(
-                                    padding: const EdgeInsetsDirectional.only(
-                                      bottom: AppSpacing.md,
-                                    ),
-                                    child: _accountCard(
-                                      card: card,
-                                      canWrite: canWrite,
-                                      permissions: permissions,
-                                    ),
-                                  );
-                                }, childCount: cards.length),
-                              ),
-                          ],
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            if (_moreError != null)
-              Text(
-                _moreError!,
-                key: const Key('load-more-accounts-error'),
-                style: Theme.of(context).textTheme.bodyMedium
-                    ?.copyWith(color: Theme.of(context).colorScheme.error),
-              ),
-            if (_loadMoreCursor(data.page.nextCursor) != null)
+            if (_atEnd && _loadMoreCursor(data.page.nextCursor) != null)
               Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: TextButton(
@@ -451,9 +469,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
             for (final card in cards)
               SizedBox(
                 width: cardWidth,
-                height: isDebtLookSection(section)
-                    ? customerCardHeight(context)
-                    : null,
+                height: null,
                 child: _accountCard(
                   card: card,
                   canWrite: canWrite,
@@ -474,17 +490,13 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     return _AccountCard(
       section: section,
       card: card,
+      wide: isDebtLookSection(section),
       money: ref.watch(apiLayerProvider).money,
       canWrite: canWrite && !card.systemManaged,
       assigning: _assigning,
       selected: _selected.contains(card.id),
       onOpen: () => context.go('/${section.path}/${card.id}'),
-      onToggle: () => setState(() {
-        if (!canSelectAccountForAssignment(card)) return;
-        _selected.contains(card.id)
-            ? _selected.remove(card.id)
-            : _selected.add(card.id);
-      }),
+      onToggle: () => _toggleSelection(card),
       onPin: (meta) => _pin(card, meta),
       zeroOnline: ref.watch(onlineProvider),
       onZeroPreview:
@@ -506,10 +518,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     return raw.clamp(min, maxWidth);
   }
 
-  bool get _showTicker =>
-      section == AccountSection.customers ||
-      section == AccountSection.companies;
-
   bool _canAssign(PermissionService permissions) =>
       (section == AccountSection.customers ||
           section == AccountSection.companies) &&
@@ -521,108 +529,10 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     _ => AppStrings.addDeposit,
   };
 
-  Widget _ticker(
-    AsyncValue<HomeDto?> home,
-    MoneyFormatter money,
-    double width,
-    List<AccountCardDto> cards,
-    String? nextCursor,
-    int? retainLimit,
-  ) {
-    final debts = home.asData?.value?.oldDebts;
-    if (debts == null) return const SizedBox.shrink();
-    final rows = [
-      for (final debt in debts)
-        if (debt.section == section.sectionKey.key) debt,
-    ];
-    final body = rows.isEmpty
-        ? const Text(AppStrings.emptyTicker)
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < rows.length; i++) ...[
-                if (i > 0) const SizedBox(height: AppSpacing.sm),
-                _TickerLine(
-                  debt: rows[i],
-                  card: _cardFor(cards, rows[i].id),
-                  money: money,
-                ),
-              ],
-            ],
-          );
-    if (width <= AppBreakpoints.phone && !_showAllDebts) {
-      // Its own Material, so its ink stays visible under page transitions.
-      return Material(
-        type: MaterialType.transparency,
-        child: ExpansionTile(
-          tilePadding: const EdgeInsetsDirectional.symmetric(
-            horizontal: AppSpacing.sm,
-          ),
-          childrenPadding: const EdgeInsetsDirectional.only(
-            bottom: AppSpacing.sm,
-          ),
-          expandedCrossAxisAlignment: CrossAxisAlignment.start,
-          title: const Text(AppStrings.oldDebtsTitle),
-          children: [
-            body,
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: TextButton(
-                key: const Key('show-all-debts'),
-                onPressed: () => _showAll(nextCursor, retainLimit: retainLimit),
-                child: const Text(AppStrings.showAll),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          AppStrings.oldDebtsTitle,
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        body,
-        const SizedBox(height: AppSpacing.md),
-      ],
-    );
-  }
-
-  AccountCardDto? _cardFor(List<AccountCardDto> cards, String id) {
-    for (final card in cards) {
-      if (card.id == id) return card;
-    }
-    return null;
-  }
-
   AppFailure _failure(Object error) =>
       ref.read(errorHandlerProvider).toFailure(error);
 
   String _message(Object error) => failureText(_failure(error));
-
-  bool _onCardsScroll(ScrollNotification notification, String? firstCursor) {
-    if (notification is! ScrollUpdateNotification) return false;
-    final metrics = notification.metrics;
-    if (metrics.maxScrollExtent > 0 &&
-        metrics.pixels < metrics.maxScrollExtent - 24) {
-      _scrollArmed = true;
-      return false;
-    }
-    if (!historyDraggedToEnd(notification)) return false;
-    final cursor = _loadMoreCursor(firstCursor);
-    if (!_scrollArmed || cursor == null || _paging) return false;
-    _scrollArmed = false;
-    _more(cursor, retainLimit: _accountRetainLimit(_firstPageItems()));
-    return false;
-  }
-
-  List<AccountCardDto> _firstPageItems() {
-    final page = ref.read(accountsProvider(section)).asData?.value;
-    return page?.page.items ?? const [];
-  }
 
   Future<void> _more(String cursor, {int? retainLimit}) async {
     if (_paging || !ref.read(onlineProvider)) return;
@@ -656,34 +566,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     } finally {
       _paging = false;
     }
-  }
-
-  /// Phone «عرض الكل»: keep the bulletin's existing flag, and load every
-  /// remaining account page for the filter and search that are active now.
-  void _showAll(String? firstPageCursor, {int? retainLimit}) {
-    setState(() => _showAllDebts = true);
-    if (!ref.read(onlineProvider)) return;
-    final query = ref.read(accountQueryProvider(section)).trim();
-    final filter = ref.read(accountFilterProvider(section));
-    ref
-        .read(accountExtraCardsProvider(section).notifier)
-        .loadRemaining(
-          firstPageCursor: firstPageCursor,
-          retainLimit: retainLimit,
-          fetch: (cursor) => ref
-              .read(apiLayerProvider)
-              .accounts
-              .list(
-                section,
-                cursor: cursor,
-                q: query.isEmpty ? null : query,
-                filter: filter,
-              ),
-          stillCurrent: () =>
-              mounted &&
-              ref.read(accountQueryProvider(section)).trim() == query &&
-              ref.read(accountFilterProvider(section)) == filter,
-        );
   }
 
   Future<void> _create(BuildContext context) async {
@@ -1164,10 +1046,12 @@ class _AccountCard extends StatelessWidget {
     required this.onPin,
     required this.onZeroPreview,
     required this.zeroOnline,
+    this.wide = false,
   });
 
   final AccountSection section;
   final AccountCardDto card;
+  final bool wide;
   final MoneyFormatter money;
   final bool canWrite;
   final bool assigning;
@@ -1178,148 +1062,12 @@ class _AccountCard extends StatelessWidget {
   final VoidCallback? onZeroPreview;
   final bool zeroOnline;
 
-  /// Customers: name, value under it, the assigned employee if any, and the
-  /// existing zero-review action as a check button (Ali, 2026-11-02).
-  Widget _customerBody(
-    BuildContext context, {
-    required CustomerTone tone,
-    required bool showAssign,
-    required bool showZero,
-  }) {
-    final word = section == AccountSection.companies
-        ? companyCardWord(companyCardKind(card.balanceUnits))
-        : switch (customerBalanceKind(card.balanceUnits)) {
-            CustomerBalanceKind.debt => AppStrings.customerDebtWord,
-            CustomerBalanceKind.credit => AppStrings.customerCreditWord,
-            _ => null,
-          };
-    final body = Padding(
-      padding: const EdgeInsetsDirectional.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // The facts clip instead of overflowing when text is large.
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const NeverScrollableScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          card.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: cairo(16, 800, color: tone.ink),
-                        ),
-                      ),
-                      if (card.systemManaged)
-                        Tooltip(
-                          message: AppStrings.systemCard,
-                          child: Icon(
-                            Icons.lock_outline,
-                            size: 16,
-                            color: tone.ink,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  if (word != null)
-                    Text(
-                      word,
-                      key: Key('account-kind-${card.id}'),
-                      style: cairo(12, 800, color: tone.amount),
-                    ),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: AlignmentDirectional.centerStart,
-                      child: MoneyText(
-                        money.formatOrDash(card.balanceUnits, card.currency),
-                        style: context.textExtras.amountLarge.copyWith(
-                          color: tone.amount,
-                          fontSize: 22,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (card.activeAssigneeName != null)
-                    Text(
-                      '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
-                      key: Key('account-assignee-${card.id}'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: cairo(
-                        12,
-                        700,
-                        color: tone.ink.withValues(alpha: 0.75),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          if (showAssign || showZero)
-            Row(
-              children: [
-                if (showAssign)
-                  SizedBox.square(
-                    dimension: 32,
-                    child: Checkbox(
-                      key: ValueKey('assign-select-${card.id}'),
-                      value: selected,
-                      onChanged: (_) => onToggle(),
-                    ),
-                  ),
-                const Spacer(),
-                if (showZero)
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: IconButton(
-                      key: ValueKey('zero-review-${card.id}'),
-                      tooltip: AppStrings.zeroReview,
-                      style: IconButton.styleFrom(
-                        minimumSize: const Size(48, 48),
-                      ),
-                      onPressed: zeroOnline ? onZeroPreview : null,
-                      icon: const Icon(Icons.check_circle_outline),
-                    ),
-                  ),
-              ],
-            ),
-        ],
-      ),
-    );
-    // Icons on the glossy card (lock, zero review) take the card ink.
-    final theme = Theme.of(context);
-    return Theme(
-      data: theme.copyWith(
-        iconTheme: theme.iconTheme.copyWith(color: tone.ink),
-        iconButtonTheme: IconButtonThemeData(
-          style: IconButton.styleFrom(
-            minimumSize: const Size(48, 48),
-            foregroundColor: tone.ink,
-          ),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(foregroundColor: tone.ink),
-        ),
-      ),
-      child: body,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final showPin = canWrite;
-    final showZero = onZeroPreview != null && !card.systemManaged;
-    final showAssign = assigning && canSelectAccountForAssignment(card);
+    final showPin = canWrite && !assigning;
+    final showZero = onZeroPreview != null && !card.systemManaged && !assigning;
+    final selectable = assigning && canSelectAccountForAssignment(card);
+    final blocked = assigning && !selectable;
     // Customers: debt / credit / zero tone from the balance sign (Ali,
     // 2026-11-02) instead of the age gradient.
     final CustomerTone tone = switch (section) {
@@ -1339,215 +1087,142 @@ class _AccountCard extends StatelessWidget {
     // Every list card is glossy from its tone (customers, companies,
     // deposits).
     final Gloss gloss = tone.gloss ?? context.look.glossGrey;
-    final radius = BorderRadius.circular(AppRadii.card);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: gloss.glowShadow,
-      ),
-      child: Material(
-        key: Key('account-card-${card.id}'),
-        color: tone.background,
-        borderRadius: radius,
-        clipBehavior: Clip.antiAlias,
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: gloss.fill,
-            borderRadius: radius,
-            border: Border.all(
-              color: isDebtLookSection(section)
-                  ? tone.border
-                  : const Color(0xFFE7AE12),
-              width: isDebtLookSection(section) ? 1 : 1.6,
-            ),
-          ),
-          child: InkWell(
-            onTap: onOpen,
-            child: GlossSheen(
-              gloss: gloss,
-              radius: radius,
-              child: isDebtLookSection(section)
-                  ? _customerBody(
-                      context,
-                      tone: tone,
-                      showAssign: showAssign,
-                      showZero: showZero,
-                    )
-                  : _depositBody(
-                      context,
-                      tone: tone,
-                      age: depositCardLabel(section, card.balanceUnits?.asInt),
-                      showAssign: showAssign,
-                      showPin: showPin,
-                      showZero: showZero,
-                    ),
-            ),
-          ),
-        ),
-      ),
+    final radius = BorderRadius.circular(16);
+    final units = card.balanceUnits?.asInt;
+    final fill = websiteCardGradient(section, units);
+    final amount = websiteCardAmount(money, card);
+    final cardBody = WebsiteAccountCardBody(
+      card: card,
+      status: websiteCardStatus(section, card),
+      amount: amount,
+      movement: websiteCardMovement(card.lastActivityAt),
+      ink: Colors.white,
+      wide: wide,
+      showAssignee:
+          section == AccountSection.customers ||
+          section == AccountSection.companies,
+      pin: showPin
+          ? GuardedMutation(
+              buttonKey: Key('pin-${card.id}'),
+              inputs: 'pin:${card.id}:${card.pinned}:${card.version}',
+              expectedVersion: card.version,
+              label: card.pinned ? AppStrings.unpin : AppStrings.pin,
+              tooltip: card.pinned ? AppStrings.unpin : AppStrings.pin,
+              icon: card.pinned ? Icons.push_pin : Icons.push_pin_outlined,
+              onSubmit: (meta) => onPin(meta),
+            )
+          : null,
+      zero: showZero
+          ? IconButton(
+              key: ValueKey('zero-review-${card.id}'),
+              tooltip: AppStrings.zeroReview,
+              style: IconButton.styleFrom(
+                foregroundColor: Colors.white,
+                minimumSize: const Size(28, 28),
+                padding: EdgeInsets.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: zeroOnline ? onZeroPreview : null,
+              icon: const Icon(Icons.check_circle_outline, size: 18),
+            )
+          : null,
     );
-  }
-}
-
-extension on _AccountCard {
-  /// Deposit card (Ali's device shots): pin at the corner, status label,
-  /// name, amount, then «آخر حركة» under a thin line. Server values only.
-  Widget _depositBody(
-    BuildContext context, {
-    required CustomerTone tone,
-    required String? age,
-    required bool showAssign,
-    required bool showPin,
-    required bool showZero,
-  }) {
-    final ink = tone.ink;
-    String depositAmount(MoneyFormatter money) {
-      final units = card.balanceUnits?.asInt;
-      if (units == null) {
-        return money.formatOrDash(card.balanceUnits, card.currency);
-      }
-      return money.format(units.abs(), card.currency);
-    }
-
-    final gold = const Color(0xFFFBBF24);
-    final last = card.lastActivityAt;
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 150),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(10, 8, 10, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    age ?? '',
-                    key: Key('account-age-${card.id}'),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: cairo(11, 800, color: ink.withValues(alpha: 0.9)),
-                  ),
+    return _SearchReveal(
+      id: card.id,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          boxShadow: gloss.glowShadow,
+        ),
+        child: Material(
+          key: Key('account-card-${card.id}'),
+          color: tone.background,
+          borderRadius: radius,
+          clipBehavior: Clip.antiAlias,
+          child: Opacity(
+            opacity: blocked ? 0.68 : 1,
+            child: Ink(
+              decoration: BoxDecoration(
+                gradient: fill,
+                borderRadius: radius,
+                border: Border.all(
+                  color: selected
+                      ? const Color(0xFF6DD7BC)
+                      : const Color(0xFFEAC04A),
+                  width: selected ? 3 : 1.4,
                 ),
-                if (showPin)
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF1A1300).withValues(alpha: 0.7),
-                      border: Border.all(color: gold.withValues(alpha: 0.8)),
+              ),
+              child: InkWell(
+                key: selectable ? ValueKey('assign-select-${card.id}') : null,
+                onTap: assigning ? (selectable ? onToggle : null) : onOpen,
+                onLongPress: null,
+                child: Stack(
+                  children: [
+                    GlossSheen(
+                      gloss: gloss,
+                      radius: radius,
+                      child: IgnorePointer(
+                        ignoring: assigning,
+                        child: cardBody,
+                      ),
                     ),
-                    child: IconTheme.merge(
-                      data: IconThemeData(color: gold, size: 18),
-                      child: SizedBox(
-                        width: 34,
-                        height: 34,
-                        child: FittedBox(
-                          child: GuardedMutation(
-                            buttonKey: Key('pin-${card.id}'),
-                            inputs:
-                                'pin:${card.id}:${card.pinned}:${card.version}',
-                            expectedVersion: card.version,
-                            label: card.pinned
-                                ? AppStrings.unpin
-                                : AppStrings.pin,
-                            tooltip: card.pinned
-                                ? AppStrings.unpin
-                                : AppStrings.pin,
-                            icon: card.pinned
-                                ? Icons.push_pin
-                                : Icons.push_pin_outlined,
-                            onSubmit: (meta) => onPin(meta),
+                    if (selected)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            key: ValueKey('assign-check-${card.id}'),
+                            decoration: BoxDecoration(
+                              color: const Color(0x6630C48A),
+                              borderRadius: radius,
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.check_circle,
+                                color: Colors.white,
+                                size: 36,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-              ],
-            ),
-            Text(
-              card.name,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: cairo(16, 800, color: ink),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: MoneyText(
-                  depositAmount(money),
-                  style: context.textExtras.amountLarge.copyWith(
-                    color: tone.amount,
-                  ),
+                  ],
                 ),
               ),
             ),
-            if (card.systemManaged)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.lock_outline, size: 14, color: ink),
-                  const SizedBox(width: AppSpacing.xxs),
-                  Flexible(
-                    child: Text(
-                      AppStrings.systemCard,
-                      style: cairo(10.5, 800, color: ink),
-                    ),
-                  ),
-                ],
-              ),
-            const SizedBox(height: AppSpacing.xs),
-            Divider(height: 1, color: ink.withValues(alpha: 0.25)),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              '${AppStrings.lastActivity}: ${formatIsoDate(last)}'
-              '${last == null ? '' : '، ${_clockText(last)}'}',
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: cairo(10.5, 700, color: ink.withValues(alpha: 0.9)),
-            ),
-            if (card.activeAssigneeName != null)
-              Text(
-                '${AppStrings.withEmployee}: ${card.activeAssigneeName}',
-                textAlign: TextAlign.center,
-                style: cairo(10.5, 600, color: ink.withValues(alpha: 0.85)),
-              ),
-            if (showAssign || showZero)
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: AppSpacing.xs,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (showAssign)
-                    Checkbox(
-                      key: ValueKey('assign-select-${card.id}'),
-                      value: selected,
-                      onChanged: (_) => onToggle(),
-                    ),
-                  if (showZero)
-                    IconButton(
-                      key: ValueKey('zero-review-${card.id}'),
-                      tooltip: AppStrings.zeroReview,
-                      onPressed: zeroOnline ? onZeroPreview : null,
-                      icon: const Icon(Icons.check_circle_outline),
-                    ),
-                ],
-              ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-String _clockText(DateTime value) {
-  final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
-  final minute = value.minute.toString().padLeft(2, '0');
-  return '$hour:$minute ${value.hour < 12 ? 'ص' : 'م'}';
+/// Scrolls a card into view when unified search opened it with `?card=`.
+class _SearchReveal extends StatefulWidget {
+  const _SearchReveal({required this.id, required this.child});
+
+  final String id;
+  final Widget child;
+
+  @override
+  State<_SearchReveal> createState() => _SearchRevealState();
+}
+
+class _SearchRevealState extends State<_SearchReveal> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+  }
+
+  void _reveal() {
+    if (!mounted) return;
+    final wanted = GoRouterState.of(context).uri.queryParameters['card'];
+    if (wanted != widget.id) return;
+    Scrollable.ensureVisible(context, alignment: 0.15);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 CustomerTone _companyTone(Gloss gloss) => CustomerTone(
@@ -1558,13 +1233,214 @@ CustomerTone _companyTone(Gloss gloss) => CustomerTone(
   gloss: gloss,
 );
 
-/// One height for every customer card, grown with the text scale.
-double customerCardHeight(BuildContext context) {
-  final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
-  return 128 * scale;
+/// Total and the add button as one pair: same frame, height, and corner.
+class _DebtCompactHeader extends StatelessWidget {
+  const _DebtCompactHeader({
+    required this.section,
+    required this.summary,
+    required this.currency,
+    required this.money,
+    required this.add,
+  });
+
+  final AccountSection section;
+  final AccountsSummaryDto summary;
+  final Currency currency;
+  final MoneyFormatter money;
+  final Widget add;
+
+  @override
+  Widget build(BuildContext context) {
+    final isCustomers = section == AccountSection.customers;
+    final prefix = isCustomers ? 'customers' : 'companies';
+    final label = isCustomers
+        ? AppStrings.customersTotalDebt
+        : AppStrings.netDebt;
+    final scale = MediaQuery.textScalerOf(context).scale(1);
+    final look = _PairLook.of(context);
+    return SizedBox(
+      key: Key('$prefix-summary'),
+      height: 34 + 12 * scale.clamp(1.0, 2.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _TotalFrame(
+              frameKey: Key('$prefix-summary-frame'),
+              label: label,
+              amount: money.formatOrDash(summary.netBalanceUnits, currency),
+              amountKey: Key('$prefix-summary-amount'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _AddFrame(look: look, child: add),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-/// Customers: add on the right, search in the middle, assign on the left.
+/// Shared plaque for the debt total and the add button.
+class _PairLook {
+  const _PairLook({
+    required this.fill,
+    required this.edge,
+    required this.ink,
+    required this.muted,
+  });
+
+  final Color fill;
+  final Color edge;
+  final Color ink;
+  final Color muted;
+
+  static const radius = 12.0;
+  static const edgeWidth = 1.2;
+
+  static _PairLook of(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return dark
+        ? const _PairLook(
+            fill: Color(0xFF1A2436),
+            edge: Color(0xFF8E7340),
+            ink: Color(0xFFF8F1DE),
+            muted: Color(0xFFCDB88A),
+          )
+        : const _PairLook(
+            fill: Color(0xFFF4F7FB),
+            edge: Color(0xFFC4A46A),
+            ink: Color(0xFF1A1308),
+            muted: Color(0xFF6B5428),
+          );
+  }
+
+  BoxDecoration get decoration => BoxDecoration(
+    color: fill,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: edge, width: edgeWidth),
+  );
+
+  ButtonStyle get buttonStyle => FilledButton.styleFrom(
+    backgroundColor: fill,
+    foregroundColor: ink,
+    disabledBackgroundColor: fill,
+    disabledForegroundColor: muted,
+    elevation: 0,
+    shadowColor: const Color(0x00000000),
+    minimumSize: const Size(double.infinity, double.infinity),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    padding: const EdgeInsetsDirectional.symmetric(horizontal: 6),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(radius),
+      side: BorderSide(color: edge, width: edgeWidth),
+    ),
+    textStyle: cairo(13, 800),
+  );
+}
+
+/// Label and figure for one debt section, in the shared plaque.
+class _TotalFrame extends StatelessWidget {
+  const _TotalFrame({
+    required this.frameKey,
+    required this.label,
+    required this.amount,
+    required this.amountKey,
+  });
+
+  final Key frameKey;
+  final String label;
+  final String amount;
+  final Key amountKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = _PairLook.of(context);
+    return DecoratedBox(
+      key: frameKey,
+      decoration: look.decoration,
+      child: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: 6,
+          vertical: 2,
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                softWrap: false,
+                textAlign: TextAlign.center,
+                style: cairo(11, 700, color: look.muted),
+              ),
+              MoneyText(
+                amount,
+                key: amountKey,
+                style: cairo(16, 800, color: look.ink),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The add control, painted with the same plaque as the total.
+class _AddFrame extends StatelessWidget {
+  const _AddFrame({required this.look, required this.child});
+
+  final _PairLook look;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        filledButtonTheme: FilledButtonThemeData(style: look.buttonStyle),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// The only filter word on the debt lists. Same face as «توجيه».
+class _ActiveWord extends ConsumerWidget {
+  const _ActiveWord({required this.section, required this.count});
+
+  final AccountSection section;
+
+  /// Server `summary.activeCards`. Null stays unlabeled; no count is invented.
+  final int? count;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final label = count == null
+        ? AppStrings.activeShort
+        : '${AppStrings.activeShort} ($count)';
+    return TextButton(
+      key: const Key('debt-active-filter'),
+      onPressed: () {
+        ref.read(accountFilterProvider(section).notifier).state = null;
+      },
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          label,
+          key: const Key('debt-active-count'),
+          maxLines: 1,
+          softWrap: false,
+        ),
+      ),
+    );
+  }
+}
+
+/// «النشطة», search, and «توجيه» share one height. Narrow screens still wrap.
 /// Very narrow or large-text screens put the buttons above the search.
 class _CustomersToolbar extends StatelessWidget {
   const _CustomersToolbar({
@@ -1572,15 +1448,18 @@ class _CustomersToolbar extends StatelessWidget {
     required this.add,
     required this.search,
     required this.assign,
+    this.equalWidths = false,
   });
 
   final Key toolbarKey;
   final Widget add;
   final Widget search;
   final Widget assign;
+  final bool equalWidths;
 
-  /// One height for all three controls, grown with the text scale.
-  static double heightFor(double scale) => 24 + 28 * scale.clamp(1.0, 2.0);
+  /// One height for all three controls. Shorter than the 069 row, and it
+  /// still grows with the text scale.
+  static double heightFor(double scale) => 28 + 12 * scale.clamp(1.0, 2.0);
 
   @override
   Widget build(BuildContext context) {
@@ -1590,7 +1469,7 @@ class _CustomersToolbar extends StatelessWidget {
     final height = heightFor(scale);
     final radius = BorderRadius.circular(AppRadii.lg);
     final side = BorderSide(color: look.cardBorder);
-    const padding = EdgeInsetsDirectional.symmetric(horizontal: AppSpacing.lg);
+    const padding = EdgeInsetsDirectional.symmetric(horizontal: AppSpacing.sm);
     final outline = OutlineInputBorder(borderRadius: radius, borderSide: side);
     final themed = theme.copyWith(
       filledButtonTheme: FilledButtonThemeData(
@@ -1600,7 +1479,7 @@ class _CustomersToolbar extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: radius),
           backgroundColor: look.button,
           foregroundColor: look.onButton,
-          textStyle: cairo(15, 700),
+          textStyle: cairo(13, 700),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -1610,7 +1489,7 @@ class _CustomersToolbar extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: radius, side: side),
           foregroundColor: look.accent,
           backgroundColor: look.card,
-          textStyle: cairo(15, 700),
+          textStyle: cairo(13, 700),
         ),
       ),
       inputDecorationTheme: theme.inputDecorationTheme.copyWith(
@@ -1618,7 +1497,8 @@ class _CustomersToolbar extends StatelessWidget {
         filled: true,
         fillColor: look.card,
         contentPadding: const EdgeInsetsDirectional.symmetric(
-          horizontal: AppSpacing.md,
+          horizontal: AppSpacing.sm,
+          vertical: 0,
         ),
         border: outline,
         enabledBorder: outline,
@@ -1634,13 +1514,19 @@ class _CustomersToolbar extends StatelessWidget {
         key: toolbarKey,
         builder: (context, constraints) {
           if (constraints.maxWidth / scale >= 330) {
+            final searchSlot = equalWidths
+                ? Expanded(child: sized(search))
+                : Expanded(child: sized(search));
+            final sideSlot = equalWidths
+                ? (Widget child) => Expanded(child: sized(child))
+                : (Widget child) => sized(child);
             return Row(
               children: [
-                sized(add),
+                sideSlot(add),
                 const SizedBox(width: AppSpacing.sm),
-                Expanded(child: sized(search)),
+                searchSlot,
                 const SizedBox(width: AppSpacing.sm),
-                sized(assign),
+                sideSlot(assign),
               ],
             );
           }
@@ -2147,67 +2033,6 @@ class _Metric extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           MoneyText(value, style: amountStyle),
         ],
-      ),
-    );
-  }
-}
-
-class _TickerLine extends StatelessWidget {
-  const _TickerLine({
-    required this.debt,
-    required this.card,
-    required this.money,
-  });
-
-  final OldDebtDto debt;
-  final AccountCardDto? card;
-  final MoneyFormatter money;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-    final age = singleAgeText(
-      serverLabel: debt.ageStatusLabel,
-      ageStatus: debt.ageStatus,
-      debtAgeDays: debt.debtAgeDays,
-    );
-    final currency = card?.currency ?? debt.currency;
-    final units = card?.balanceUnits ?? debt.balanceUnits;
-    final amount = currency == null
-        ? (units != null && units.isInvalid
-              ? MoneyValue.invalidLabel
-              : AppStrings.dash)
-        : money.formatOrDash(units, currency);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(AppRadii.md),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            RichText(
-              textDirection: Directionality.of(context),
-              textAlign: TextAlign.start,
-              text: TextSpan(
-                text: debt.name,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: scheme.onSurface,
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            MoneyText(amount, style: context.textExtras.amount),
-            if (age != null) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Text(age, key: Key('ticker-age-${debt.id}')),
-            ],
-          ],
-        ),
       ),
     );
   }

@@ -1,10 +1,10 @@
 import 'package:flutter_api_layer/core/network/api_client.dart';
 import 'package:flutter_api_layer/core/network/api_endpoints.dart';
 
-/// 🔶 `POST /api/mobile-push/devices` is proposed. The server does not
-/// implement it. The body fields `token`, `platform`, and `unregister` are
-/// not confirmed. This client sends them only when the transport is not the
-/// noop adapter.
+/// `POST /api/mobile-push/devices`. Body: `token`, `platform: android`,
+/// and `unregister: true` to drop this session's row. The registrar
+/// swallows a missing route, so logout still finishes when the server
+/// has not enabled the endpoint.
 abstract interface class DeviceRegistrationClient {
   Future<void> register({required String token});
   Future<void> unregister({required String token});

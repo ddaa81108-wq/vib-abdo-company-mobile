@@ -14,16 +14,19 @@ import 'notifications/android_notification_setup.dart';
 import 'notifications/app_push_service.dart';
 import 'notifications/device_token_registrar.dart';
 import 'notifications/device_token_store.dart';
+import 'notifications/firebase_messaging_runtime.dart';
 import 'notifications/push_providers.dart';
+import 'notifications/push_transport.dart';
 import 'security/android_capture_gate.dart';
 import 'secure_storage/app_secure_stores.dart';
 
-void main() {
+Future<void> main() async {
   // Compile-time rejection of USE_FAKE_API=true in release. Debug ignores it.
   const ReleaseFakeApiGuard();
   rejectFakeApiInRelease(kUseFakeApiFromEnvironment);
 
   WidgetsFlutterBinding.ensureInitialized();
+  final pushTransport = await resolveAppPushTransport();
   const errors = ErrorHandler();
   FlutterError.onError = (details) {
     errors.report(details.exception, details.stack);
@@ -34,8 +37,8 @@ void main() {
     return true;
   };
 
-  // Channel only, after the activity exists. The runtime permission request
-  // lives in another change.
+  // Channel only, after the activity exists. POST_NOTIFICATIONS is asked
+  // later, and only when Firebase actually started.
   WidgetsBinding.instance.addPostFrameCallback((_) {
     unawaited(AndroidNotificationSetup.start(onError: errors.report));
   });
@@ -55,6 +58,9 @@ void main() {
       layer: layer,
       pushGate: pushGate,
       tokenStore: SecureDeviceTokenStore(),
+      overrides: [pushTransportProvider.overrideWithValue(pushTransport)],
+      askNotificationPermission:
+          pushTransport is FcmPushTransport && pushTransport.configured,
     ),
   );
 }
@@ -70,6 +76,7 @@ ProviderScope buildAppRoot({
   required DeviceTokenStore tokenStore,
   List<Override> overrides = const [],
   Widget child = const CompanyApp(),
+  bool askNotificationPermission = false,
 }) {
   return ProviderScope(
     // A dead session is not fetched again. A 403 is not retried.
@@ -82,7 +89,7 @@ ProviderScope buildAppRoot({
       apiLayerProvider.overrideWithValue(layer),
       pushSessionGateProvider.overrideWithValue(pushGate),
       deviceTokenStoreProvider.overrideWithValue(tokenStore),
-      notificationPermissionRegistrarOverride(),
+      notificationPermissionRegistrarOverride(ask: askNotificationPermission),
       ...overrides,
     ],
     child: child,

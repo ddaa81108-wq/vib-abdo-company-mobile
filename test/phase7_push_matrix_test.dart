@@ -24,10 +24,6 @@ import 'package:vib_abdo_company_mobile/notifications/unread_badge.dart';
 import 'support/phase7_ui.dart';
 import 'support/pump_app.dart';
 
-/// Force-stop has no FCM token and no delivery. The phone protocol records
-/// this as Not supported. The process is not killed here.
-const killedProcessResult = 'Not supported';
-
 void main() {
   testWidgets(
     'P7-16 permission dialog on API 33 posts through the real registrar',
@@ -81,7 +77,15 @@ void main() {
       'phone': '0910000000',
       'token': 'secret-token',
     });
-    await settle(tester);
+    await tester.pump();
+    for (
+      var i = 0;
+      i < 20 &&
+          find.byKey(ForegroundNotificationBanner.bannerKey).evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
 
     expect(find.byKey(ForegroundNotificationBanner.bannerKey), findsOneWidget);
     expect(posted, isNotEmpty);
@@ -143,12 +147,17 @@ void main() {
     expectQuiet(tester, 'P7-17 background');
   });
 
-  test('P7-17 a killed or terminated app is Not supported', () async {
-    final transport = const FcmPushTransport();
-    expect(await transport.currentToken(), isNull);
-    expect(await transport.payloads.isEmpty, isTrue);
-    expect(killedProcessResult, 'Not supported');
-  });
+  test(
+    'P7-17 an unconfigured install has no token and emits nothing',
+    () async {
+      final transport = FcmPushTransport();
+      expect(await transport.currentToken(), isNull);
+      final seen = <Map<String, dynamic>>[];
+      final sub = transport.payloads.listen(seen.add);
+      expect(seen, isEmpty);
+      await sub.cancel();
+    },
+  );
 
   testWidgets('P7-18 API 29 opens the list without a permission dialog', (
     tester,

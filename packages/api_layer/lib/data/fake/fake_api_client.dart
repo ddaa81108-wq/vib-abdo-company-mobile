@@ -271,6 +271,17 @@ class FakeApiClient implements ApiClient {
   /// When non-null, suggestion reads return these items instead of `[]` (tests).
   List<Map<String, dynamic>>? suggestionItems;
 
+  /// Pauses `GET /api/account-search` (tests).
+  Completer<void>? pauseAccountSearch;
+
+  /// When set, unified search returns these rows instead of the catalog.
+  List<Map<String, dynamic>>? accountSearchItems;
+
+  /// Queries seen by `GET /api/account-search`, including ones still paused.
+  final List<String> accountSearchQueries = [];
+
+  int failAccountSearchRemaining = 0;
+
   /// Headers of the latest request, as the fake server saw them (tests).
   Map<String, String> lastRequestHeaders = const {};
 
@@ -663,6 +674,8 @@ class FakeApiClient implements ApiClient {
         return;
       case 'financial-ledger':
         _requireFinancialLedger();
+        return;
+      case 'account-search':
         return;
       case 'account-requests':
       case 'users':
@@ -1448,6 +1461,8 @@ class FakeApiClient implements ApiClient {
   ) async {
     _authorize(method, seg, head, query);
     switch (head) {
+      case 'account-search':
+        return _accountSearchResponse(query);
       case 'home': // 🔶 proposed endpoint, fake only
         if (failHomeRemaining > 0) {
           failHomeRemaining--;
@@ -1756,6 +1771,69 @@ class FakeApiClient implements ApiClient {
       _fail(409, 'VERSION_CONFLICT', 'تم تعديل البيانات من مستخدم آخر');
     }
     return _ok({'id': 'tx_new', 'version': 5});
+  }
+
+  Future<ApiResponse> _accountSearchResponse(
+    Map<String, dynamic>? query,
+  ) async {
+    final q = _queryText(query, 'q') ?? '';
+    accountSearchQueries.add(q);
+    final snapshot = accountSearchItems;
+    final paused = pauseAccountSearch;
+    if (paused != null) await paused.future;
+    if (failAccountSearchRemaining > 0) {
+      failAccountSearchRemaining--;
+      _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر البحث.');
+    }
+    if (snapshot != null) return _ok({'items': snapshot});
+    return _ok({'items': _unifiedSearch(q)});
+  }
+
+  /// Same rules as the website route: under 2 characters is empty, each
+  /// readable section contributes at most 8, and the reply is capped at 12.
+  List<Map<String, dynamic>> _unifiedSearch(String raw) {
+    final query = raw.trim();
+    if (query.length < 2) return const [];
+    final tokens = query
+        .split(RegExp(r'\s+'))
+        .where((token) => token.length >= 2)
+        .take(6)
+        .toList();
+    if (tokens.isEmpty) return const [];
+    const sections = [
+      'customers',
+      'companies',
+      'libyan-deposits',
+      'egyptian-deposits',
+    ];
+    final out = <Map<String, dynamic>>[];
+    for (final section in sections) {
+      if (!_mayReadSection(section)) continue;
+      final items = _sectionPage(section)['items'];
+      if (items is! List) continue;
+      var kept = 0;
+      for (final rawItem in items) {
+        if (rawItem is! Map) continue;
+        final name = '${rawItem['name'] ?? ''}';
+        final phone = '${rawItem['phone'] ?? ''}';
+        final haystack = '$name $phone';
+        if (!tokens.any(haystack.contains)) continue;
+        out.add({
+          'id': rawItem['id'],
+          'name': rawItem['name'],
+          'phone': rawItem['phone'],
+          'balanceUnits': rawItem['balanceUnits'],
+          'currency': section == 'egyptian-deposits' ? 'EGP' : 'LYD',
+          'section': section,
+          'activeAssignmentId': rawItem['activeAssignmentId'],
+          'activeAssigneeName': rawItem['activeAssigneeName'],
+        });
+        kept++;
+        if (kept == 8) break;
+      }
+    }
+    if (out.length <= 12) return out;
+    return out.sublist(0, 12);
   }
 
   Future<ApiResponse> _collections(

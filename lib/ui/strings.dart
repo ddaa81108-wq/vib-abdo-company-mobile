@@ -60,6 +60,13 @@ abstract final class AppStrings {
   static const menu = 'القائمة';
   static const searchHint = 'بحث موحد في كل الحسابات…';
   static const search = 'بحث';
+  static const searchBusy = 'جارٍ البحث…';
+  static const searchNoAccounts = 'لا توجد حسابات مشابهة.';
+  static const searchOpenFailed = 'تعذر فتح الحساب. حاول مرة أخرى.';
+  static const searchClear = 'مسح البحث';
+  static const searchShowCard = 'عرض الكارت';
+  static const searchUnassigned = 'غير موجّه';
+  static const searchAssigneeFallback = 'موظف التحصيل';
   static const noResults = 'لا توجد نتائج';
   static const themeLight = 'المظهر النهاري';
   static const themeDark = 'المظهر الليلي';

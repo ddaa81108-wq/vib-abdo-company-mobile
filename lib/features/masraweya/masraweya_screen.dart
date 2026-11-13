@@ -237,9 +237,98 @@ class _DayViewState extends ConsumerState<_DayView> {
       _bind(data);
       return;
     }
-    if (_autosave.phase == MasraweyaSavePhase.saved) {
-      _autosave.noteServerTotals(data);
+    // A remote edit (the website, or another phone) replaces the fields
+    // only when this screen is not holding an unsaved row.
+    if (masraweyaRemoteReplacesDraft(
+          phase: _autosave.phase,
+          fieldFocused: _fieldFocused(),
+        ) &&
+        !_matchesServer(data)) {
+      _adoptRemote(data);
+      return;
     }
+    _autosave.noteServerTotals(data);
+  }
+
+  /// A remote day updates the controllers already on screen. Replacing them
+  /// would flash the table and drop the scroll position.
+  void _adoptRemote(MasraweyaDayDto day) {
+    if (_purchases == null) {
+      _bind(day);
+      return;
+    }
+    _binding = true;
+    masraweyaWriteDigits(_purchases!, _digits(day.purchasesUnits));
+    final previous = _previous;
+    if (previous != null) {
+      masraweyaWriteDigits(previous, _digits(day.previousValueUnits));
+    }
+    final shared = _rows.length < day.entries.length
+        ? _rows.length
+        : day.entries.length;
+    for (var i = 0; i < shared; i++) {
+      masraweyaWriteDigits(_rows[i].value, _digits(day.entries[i].valueUnits));
+      masraweyaWriteDigits(
+        _rows[i].commission,
+        _digits(day.entries[i].commissionUnits),
+      );
+    }
+    if (day.entries.length > _rows.length) {
+      for (var i = _rows.length; i < day.entries.length; i++) {
+        _rows.add(
+          _listenedRow(
+            _EntryFields(
+              value: day.entries[i].valueUnits,
+              commission: day.entries[i].commissionUnits,
+            ),
+          ),
+        );
+        _foci.add(FocusNode()..addListener(_scheduleLeaveCheck));
+        _foci.add(FocusNode()..addListener(_scheduleLeaveCheck));
+      }
+    } else if (day.entries.length < _rows.length) {
+      for (var i = _rows.length - 1; i >= day.entries.length; i--) {
+        final row = _rows.removeAt(i);
+        row.value.removeListener(_onRowText);
+        row.commission.removeListener(_onRowText);
+        row.dispose();
+        final second = _foci.removeAt(i * 2 + 1);
+        final first = _foci.removeAt(i * 2);
+        second.removeListener(_scheduleLeaveCheck);
+        first.removeListener(_scheduleLeaveCheck);
+        second.dispose();
+        first.dispose();
+      }
+    }
+    _autosave.authoritative = day;
+    _binding = false;
+    _autosave.noteServerTotals(day);
+  }
+
+  bool _matchesServer(MasraweyaDayDto day) {
+    if ((_purchases?.text ?? '') != _digits(day.purchasesUnits)) return false;
+    if (_previous != null &&
+        _previous!.text != _digits(day.previousValueUnits)) {
+      return false;
+    }
+    if (day.entries.length != _rows.length) return false;
+    for (var i = 0; i < _rows.length; i++) {
+      if (_rows[i].value.text != _digits(day.entries[i].valueUnits)) {
+        return false;
+      }
+      if (_rows[i].commission.text != _digits(day.entries[i].commissionUnits)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _fieldFocused() {
+    if (_previousFocus.hasFocus || _purchasesFocus.hasFocus) return true;
+    for (final node in _foci) {
+      if (node.hasFocus) return true;
+    }
+    return false;
   }
 
   void _bind(MasraweyaDayDto day) {
@@ -1346,7 +1435,9 @@ class _WorkTable extends StatelessWidget {
   final String footerValue;
   final String? empty;
 
-  static const _flex = [2, 4, 4, 4];
+  /// التسلسل stays narrow. القيمة is wide enough for a long integer.
+  /// العمولة is narrower. The row total keeps a middle share.
+  static const _flex = [2, 8, 2, 3];
 
   @override
   Widget build(BuildContext context) {
@@ -1359,7 +1450,7 @@ class _WorkTable extends StatelessWidget {
         decoration: BoxDecoration(
           border: i == headers.length - 1 ? null : Border(left: line),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 6),
         alignment: Alignment.center,
         child: child,
       ),

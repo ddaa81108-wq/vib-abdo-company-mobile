@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
+import 'package:vib_abdo_company_mobile/features/notifications/foreground_notification_banner.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/features/splash/splash_screen.dart';
 import 'package:vib_abdo_company_mobile/state/session_providers.dart';
@@ -140,6 +141,38 @@ Future<void> saveShot(WidgetTester tester, String name) async {
         (render.size.width - view.width).abs() < 2 &&
         (render.size.height - view.height).abs() < 2;
     if (close) match = render;
+  }
+  final banner = find.byKey(ForegroundNotificationBanner.bannerKey);
+  if (banner.evaluate().isNotEmpty) {
+    final view = tester.binding.renderViews.single;
+    // The banner is painted above the page, so the page boundary misses it.
+    // ignore: invalid_use_of_protected_member
+    final layer = view.layer;
+    if (layer is OffsetLayer) {
+      final captured = await tester.runAsync(() async {
+        final image = await layer.toImage(
+          Offset.zero & view.size,
+          pixelRatio: 1,
+        );
+        final width = image.width;
+        final height = image.height;
+        final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+        image.dispose();
+        return (width, height, data!.buffer.asUint8List());
+      });
+      final png = _pngFromRgba(captured!.$3, captured.$1, captured.$2);
+      Directory('build/screenshots').createSync(recursive: true);
+      File('build/screenshots/$name.png').writeAsBytesSync(png);
+      try {
+        Directory('/opt/cursor/artifacts/screenshots')
+            .createSync(recursive: true);
+        File('/opt/cursor/artifacts/screenshots/$name.png')
+            .writeAsBytesSync(png);
+      } on FileSystemException {
+        // The artifact directory exists for this agent, not in CI.
+      }
+      return;
+    }
   }
   final boundary = match ?? best;
   expect(boundary, isNotNull, reason: 'no boundary for $name');
