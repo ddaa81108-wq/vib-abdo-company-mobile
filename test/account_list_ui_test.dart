@@ -101,14 +101,8 @@ void main() {
           .data,
       'مرّ عليه 3 أيام',
     );
-    expect(
-      tester.widget<Text>(find.byKey(const Key('ticker-age-c_55'))).data,
-      singleAgeText(
-        serverLabel: tickerDebt.ageStatusLabel,
-        ageStatus: tickerDebt.ageStatus,
-        debtAgeDays: tickerDebt.debtAgeDays,
-      ),
-    );
+    expect(find.text(AppStrings.oldDebtsTitle), findsNothing);
+    expect(find.byKey(const Key('ticker-age-c_55')), findsNothing);
 
     await go(tester, '/companies');
     expect(

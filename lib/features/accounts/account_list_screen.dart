@@ -10,7 +10,6 @@ import '../../error_handling/error_handler.dart';
 import '../../state/section_providers.dart';
 import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
-import '../../ui/presentation.dart';
 import '../../ui/section_labels.dart';
 import '../../ui/strings.dart';
 import '../../ui/theme.dart';
@@ -44,7 +43,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   var _atEnd = false;
   var _loadMoreSynced = false;
   var _assigning = false;
-  var _showAllDebts = false;
   var _paging = false;
   String? _moreError;
   final _selected = <String>{};
@@ -115,7 +113,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     final online = ref.watch(onlineProvider);
     final money = ref.watch(apiLayerProvider).money;
     final canWrite = permissions.canWrite(section.sectionKey);
-    final home = ref.watch(homeDashboardProvider);
     final width = MediaQuery.sizeOf(context).width;
     final gridColumns = accountListColumns(
       width,
@@ -260,19 +257,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                                   ScreenTitle(sectionLabel(section.sectionKey)),
                                   const SizedBox(height: AppSpacing.md),
                                 ],
-                                if (_showTicker)
-                                  _ticker(
-                                    home,
-                                    money,
-                                    width,
-                                    cards,
-                                    data.page.nextCursor,
-                                    HistoryWindow.trimEnabled &&
-                                            data.page.items.length >
-                                                HistoryWindow.eagerLimit
-                                        ? HistoryWindow.retainLimit
-                                        : null,
-                                  ),
                                 // Deposits: الإجمالي, النشط, إضافة أمانة on one row, then a
                                 // full-width search. The Egyptian rate stays under that search.
                                 if (deposits)
@@ -314,7 +298,10 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                                           ? 'customers-toolbar'
                                           : 'companies-toolbar',
                                     ),
-                                    add: _ActiveWord(section: section),
+                                    add: _ActiveWord(
+                                      section: section,
+                                      count: data.summary.activeCards,
+                                    ),
                                     search: searchField,
                                     assign: assignButton,
                                     equalWidths: true,
@@ -525,10 +512,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     return raw.clamp(min, maxWidth);
   }
 
-  bool get _showTicker =>
-      section == AccountSection.customers ||
-      section == AccountSection.companies;
-
   bool _canAssign(PermissionService permissions) =>
       (section == AccountSection.customers ||
           section == AccountSection.companies) &&
@@ -539,83 +522,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     AccountSection.companies => AppStrings.addCompany,
     _ => AppStrings.addDeposit,
   };
-
-  Widget _ticker(
-    AsyncValue<HomeDto?> home,
-    MoneyFormatter money,
-    double width,
-    List<AccountCardDto> cards,
-    String? nextCursor,
-    int? retainLimit,
-  ) {
-    final debts = home.asData?.value?.oldDebts;
-    if (debts == null) return const SizedBox.shrink();
-    final rows = [
-      for (final debt in debts)
-        if (debt.section == section.sectionKey.key) debt,
-    ];
-    final body = rows.isEmpty
-        ? const Text(AppStrings.emptyTicker)
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < rows.length; i++) ...[
-                if (i > 0) const SizedBox(height: AppSpacing.sm),
-                _TickerLine(
-                  debt: rows[i],
-                  card: _cardFor(cards, rows[i].id),
-                  money: money,
-                ),
-              ],
-            ],
-          );
-    if (width <= AppBreakpoints.phone && !_showAllDebts) {
-      // Its own Material, so its ink stays visible under page transitions.
-      return Material(
-        type: MaterialType.transparency,
-        child: ExpansionTile(
-          tilePadding: const EdgeInsetsDirectional.symmetric(
-            horizontal: AppSpacing.sm,
-          ),
-          childrenPadding: const EdgeInsetsDirectional.only(
-            bottom: AppSpacing.sm,
-          ),
-          expandedCrossAxisAlignment: CrossAxisAlignment.start,
-          title: const Text(AppStrings.oldDebtsTitle),
-          children: [
-            body,
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: TextButton(
-                key: const Key('show-all-debts'),
-                onPressed: () => _showAll(nextCursor, retainLimit: retainLimit),
-                child: const Text(AppStrings.showAll),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          AppStrings.oldDebtsTitle,
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        body,
-        const SizedBox(height: AppSpacing.md),
-      ],
-    );
-  }
-
-  AccountCardDto? _cardFor(List<AccountCardDto> cards, String id) {
-    for (final card in cards) {
-      if (card.id == id) return card;
-    }
-    return null;
-  }
 
   AppFailure _failure(Object error) =>
       ref.read(errorHandlerProvider).toFailure(error);
@@ -654,34 +560,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     } finally {
       _paging = false;
     }
-  }
-
-  /// Phone «عرض الكل»: keep the bulletin's existing flag, and load every
-  /// remaining account page for the filter and search that are active now.
-  void _showAll(String? firstPageCursor, {int? retainLimit}) {
-    setState(() => _showAllDebts = true);
-    if (!ref.read(onlineProvider)) return;
-    final query = ref.read(accountQueryProvider(section)).trim();
-    final filter = ref.read(accountFilterProvider(section));
-    ref
-        .read(accountExtraCardsProvider(section).notifier)
-        .loadRemaining(
-          firstPageCursor: firstPageCursor,
-          retainLimit: retainLimit,
-          fetch: (cursor) => ref
-              .read(apiLayerProvider)
-              .accounts
-              .list(
-                section,
-                cursor: cursor,
-                q: query.isEmpty ? null : query,
-                filter: filter,
-              ),
-          stillCurrent: () =>
-              mounted &&
-              ref.read(accountQueryProvider(section)).trim() == query &&
-              ref.read(accountFilterProvider(section)) == filter,
-        );
   }
 
   Future<void> _create(BuildContext context) async {
@@ -1347,56 +1225,35 @@ class _DebtCompactHeader extends StatelessWidget {
         border: Border.all(color: look.cardBorder),
       ),
       child: SizedBox(
-        height: 46 * scale.clamp(1.0, 1.6),
+        height: 58 * scale.clamp(1.0, 1.6),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: Padding(
-                padding: const EdgeInsetsDirectional.symmetric(horizontal: 10),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: cairo(11, 700, color: look.muted),
-                    ),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: AlignmentDirectional.centerStart,
-                      child: MoneyText(
-                        money.formatOrDash(summary.netBalanceUnits, currency),
-                        key: Key('$prefix-summary-amount'),
-                        style: cairo(16, 800, color: look.ink),
-                      ),
-                    ),
-                  ],
-                ),
+              child: _TotalFrame(
+                frameKey: Key('$prefix-summary-frame'),
+                label: label,
+                amount: money.formatOrDash(summary.netBalanceUnits, currency),
+                amountKey: Key('$prefix-summary-amount'),
               ),
             ),
             VerticalDivider(width: 1, thickness: 1, color: look.cardBorder),
-            Flexible(
-              child: Padding(
-                padding: const EdgeInsetsDirectional.symmetric(horizontal: 6),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Theme(
-                    data: Theme.of(context).copyWith(
-                      filledButtonTheme: FilledButtonThemeData(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: look.button,
-                          foregroundColor: look.onButton,
-                          minimumSize: const Size(0, 36),
-                          visualDensity: VisualDensity.compact,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          textStyle: cairo(13, 800),
-                        ),
+            Expanded(
+              child: Center(
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    filledButtonTheme: FilledButtonThemeData(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: look.button,
+                        foregroundColor: look.onButton,
+                        minimumSize: const Size(0, 36),
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        textStyle: cairo(13, 800),
                       ),
                     ),
-                    child: add,
                   ),
+                  child: add,
                 ),
               ),
             ),
@@ -1407,20 +1264,84 @@ class _DebtCompactHeader extends StatelessWidget {
   }
 }
 
+/// Label and figure for one debt section, set in a small framed plaque.
+class _TotalFrame extends StatelessWidget {
+  const _TotalFrame({
+    required this.frameKey,
+    required this.label,
+    required this.amount,
+    required this.amountKey,
+  });
+
+  final Key frameKey;
+  final String label;
+  final String amount;
+  final Key amountKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final fill = dark ? const Color(0xFF1A2436) : const Color(0xFFF4F7FB);
+    final edge = dark ? const Color(0xFF8E7340) : const Color(0xFFC4A46A);
+    final ink = dark ? const Color(0xFFF8F1DE) : const Color(0xFF1A1308);
+    final muted = dark ? const Color(0xFFCDB88A) : const Color(0xFF6B5428);
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(6, 6, 4, 6),
+      child: DecoratedBox(
+        key: frameKey,
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: edge, width: 1.2),
+        ),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.symmetric(horizontal: 8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: cairo(11, 700, color: muted),
+              ),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: MoneyText(
+                  amount,
+                  key: amountKey,
+                  style: cairo(18, 800, color: ink),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// The only filter word on the debt lists. Same face as «توجيه».
 class _ActiveWord extends ConsumerWidget {
-  const _ActiveWord({required this.section});
+  const _ActiveWord({required this.section, required this.count});
 
   final AccountSection section;
 
+  /// Server `summary.activeCards`. Null stays unlabeled; no count is invented.
+  final int? count;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final label = count == null
+        ? AppStrings.activeShort
+        : '${AppStrings.activeShort} ($count)';
     return TextButton(
       key: const Key('debt-active-filter'),
       onPressed: () {
         ref.read(accountFilterProvider(section).notifier).state = null;
       },
-      child: const Text(AppStrings.activeShort),
+      child: Text(label, key: const Key('debt-active-count')),
     );
   }
 }
@@ -2016,67 +1937,6 @@ class _Metric extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           MoneyText(value, style: amountStyle),
         ],
-      ),
-    );
-  }
-}
-
-class _TickerLine extends StatelessWidget {
-  const _TickerLine({
-    required this.debt,
-    required this.card,
-    required this.money,
-  });
-
-  final OldDebtDto debt;
-  final AccountCardDto? card;
-  final MoneyFormatter money;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-    final age = singleAgeText(
-      serverLabel: debt.ageStatusLabel,
-      ageStatus: debt.ageStatus,
-      debtAgeDays: debt.debtAgeDays,
-    );
-    final currency = card?.currency ?? debt.currency;
-    final units = card?.balanceUnits ?? debt.balanceUnits;
-    final amount = currency == null
-        ? (units != null && units.isInvalid
-              ? MoneyValue.invalidLabel
-              : AppStrings.dash)
-        : money.formatOrDash(units, currency);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(AppRadii.md),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            RichText(
-              textDirection: Directionality.of(context),
-              textAlign: TextAlign.start,
-              text: TextSpan(
-                text: debt.name,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: scheme.onSurface,
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            MoneyText(amount, style: context.textExtras.amount),
-            if (age != null) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Text(age, key: Key('ticker-age-${debt.id}')),
-            ],
-          ],
-        ),
       ),
     );
   }

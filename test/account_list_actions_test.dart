@@ -204,10 +204,7 @@ void main() {
         },
       ];
       await go(tester, '/companies');
-      expect(find.byType(ExpansionTile), findsOneWidget);
-      await tester.tap(find.text(AppStrings.oldDebtsTitle));
-      await settle(tester);
-      expect(find.byKey(const Key('show-all-debts')), findsOneWidget);
+      expect(find.text(AppStrings.oldDebtsTitle), findsNothing);
 
       await tester.enterText(find.byKey(const Key('account-search')), 'عميل');
       await tester.testTextInput.receiveAction(TextInputAction.search);
@@ -220,20 +217,22 @@ void main() {
           'pinned';
       await settle(tester);
 
-      // Ten cards make the phone list taller than the viewport, so opening
-      // the filter scrolls the bulletin away and its tile builds collapsed.
-      await tester.ensureVisible(
-        find.text(AppStrings.oldDebtsTitle, skipOffstage: false),
-      );
-      await settle(tester);
-      if (find.byKey(const Key('show-all-debts')).evaluate().isEmpty) {
-        await tester.tap(find.text(AppStrings.oldDebtsTitle));
-        await settle(tester);
-      }
+      final scrollable = find
+          .descendant(
+            of: find.byKey(const Key('screen-companies')),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  axisDirectionToAxis(widget.axisDirection) == Axis.vertical,
+            ),
+          )
+          .first;
+      final position = tester.state<ScrollableState>(scrollable).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pump();
 
       final before = fake.accountListQueries.length;
-      await tester.ensureVisible(find.byKey(const Key('show-all-debts')));
-      await tester.tap(find.byKey(const Key('show-all-debts')));
+      await tester.tap(find.byKey(const Key('load-more-accounts')));
       await settle(tester);
 
       expect(find.text('باقي الكروت'), findsOneWidget);

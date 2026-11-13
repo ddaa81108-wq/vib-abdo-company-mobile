@@ -31,11 +31,16 @@ void main() {
     );
     final add = tester.getRect(find.byKey(const Key('add-account')));
     expect(box.right - amount.right, lessThan(amount.left - box.left));
-    expect(add.center.dx, lessThan(amount.center.dx));
-    expect((add.center.dy - box.center.dy).abs(), lessThan(8));
+    // The add control is centered in the half beside the divider.
+    final addHalf = (box.left + box.center.dx) / 2;
+    expect((add.center.dx - addHalf).abs(), lessThan(12));
+    expect((add.center.dy - box.center.dy).abs(), lessThan(6));
+    expect(find.byKey(const Key('customers-summary-frame')), findsOneWidget);
+    expect(find.text(AppStrings.oldDebtsTitle), findsNothing);
     // «النشطة», search, and «توجيه» share one row. No other filter words.
     expect(find.byKey(const ValueKey('account-filter-all')), findsNothing);
     expect(find.text(AppStrings.todayTab), findsNothing);
+    expect(find.text('${AppStrings.activeShort} (10)'), findsOneWidget);
     final active = tester.getCenter(
       find.byKey(const Key('debt-active-filter')),
     );
@@ -76,6 +81,9 @@ void main() {
     );
     expect(find.text(AppStrings.companiesActiveCards), findsNothing);
     expect(find.text(AppStrings.customersTotalDebt), findsNothing);
+    expect(find.byKey(const Key('companies-summary-frame')), findsOneWidget);
+    expect(find.text(AppStrings.oldDebtsTitle), findsNothing);
+    expect(find.text('${AppStrings.activeShort} (10)'), findsOneWidget);
     expect(find.byKey(const ValueKey('account-filter-all')), findsNothing);
     expect(find.byKey(const Key('companies-toolbar')), findsOneWidget);
     final active = tester.getCenter(
