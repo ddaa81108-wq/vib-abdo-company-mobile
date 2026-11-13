@@ -930,7 +930,7 @@ class _ReceiptRow extends StatelessWidget {
 
 // --------------------------------------------------------------- layout
 
-/// The same compact cells as before, stacked with the old 6px gap.
+/// Equal full-width rows, one under the other, split by a hairline.
 class _NumberRow extends StatelessWidget {
   const _NumberRow({required this.children, super.key});
 
@@ -938,12 +938,14 @@ class _NumberRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final line = context.look.cardBorder;
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (var i = 0; i < children.length; i++) ...[
-          if (i > 0) const SizedBox(height: 6),
-          children[i],
+          if (i > 0) Divider(height: 1, thickness: 1, color: line),
+          SizedBox(height: 48 * scale, child: children[i]),
         ],
       ],
     );
@@ -991,12 +993,17 @@ class _ActionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final tones = this.tones;
     if (tones != null && tones.length == children.length) {
+      final line = context.look.cardBorder;
+      final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const SizedBox(height: 6),
-            _solidButton(context, tones[i], children[i]),
+            if (i > 0) Divider(height: 1, thickness: 1, color: line),
+            SizedBox(
+              height: 48 * scale,
+              child: _solidButton(context, tones[i], children[i]),
+            ),
           ],
         ],
       );
@@ -1401,27 +1408,26 @@ class _SummaryCard extends StatelessWidget {
             border: BorderDirectional(start: BorderSide(color: edge, width: 6)),
           ),
           child: Padding(
-            padding: const EdgeInsetsDirectional.all(AppSpacing.xs),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
+            padding: const EdgeInsetsDirectional.symmetric(horizontal: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
                     title,
-                    textAlign: TextAlign.center,
-                    style: cairo(11, 700, color: look.ink),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: cairo(13, 700, color: look.ink),
                   ),
-                  const SizedBox(height: 2),
-                  money
-                      ? MoneyText(value, style: figure.copyWith(fontSize: 15))
-                      : Text(
-                          value,
-                          textDirection: TextDirection.ltr,
-                          style: figure.copyWith(fontSize: 15),
-                        ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                money
+                    ? MoneyText(value, style: figure.copyWith(fontSize: 15))
+                    : Text(
+                        value,
+                        textDirection: TextDirection.ltr,
+                        style: figure.copyWith(fontSize: 15),
+                      ),
+              ],
             ),
           ),
         ),
