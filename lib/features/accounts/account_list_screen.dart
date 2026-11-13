@@ -123,7 +123,8 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     // and movement without clipping. Each section keeps its own data.
     final isCustomers = section == AccountSection.customers;
     final debtLook = isDebtLookSection(section);
-    final columns = debtLook ? 1 : (gridColumns < 2 ? 2 : gridColumns);
+    final oneRow = debtLook || section == AccountSection.egyptianDeposits;
+    final columns = oneRow ? 1 : (gridColumns < 2 ? 2 : gridColumns);
 
     final Widget searchField = TextField(
       key: const Key('account-search'),
@@ -490,7 +491,9 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     return _AccountCard(
       section: section,
       card: card,
-      wide: isDebtLookSection(section),
+      wide:
+          isDebtLookSection(section) ||
+          section == AccountSection.egyptianDeposits,
       money: ref.watch(apiLayerProvider).money,
       canWrite: canWrite && !card.systemManaged,
       assigning: _assigning,
@@ -1089,6 +1092,8 @@ class _AccountCard extends StatelessWidget {
     final Gloss gloss = tone.gloss ?? context.look.glossGrey;
     final radius = BorderRadius.circular(16);
     final units = card.balanceUnits?.asInt;
+    final light = Theme.of(context).brightness == Brightness.light;
+    final nature = websiteCardNatureInk(section, units);
     final fill = websiteCardGradient(section, units);
     final amount = websiteCardAmount(money, card);
     final cardBody = WebsiteAccountCardBody(
@@ -1096,7 +1101,7 @@ class _AccountCard extends StatelessWidget {
       status: websiteCardStatus(section, card),
       amount: amount,
       movement: websiteCardMovement(card.lastActivityAt),
-      ink: Colors.white,
+      ink: light ? nature : Colors.white,
       wide: wide,
       showAssignee:
           section == AccountSection.customers ||
@@ -1143,11 +1148,14 @@ class _AccountCard extends StatelessWidget {
             opacity: blocked ? 0.68 : 1,
             child: Ink(
               decoration: BoxDecoration(
-                gradient: fill,
+                color: light ? Colors.white : null,
+                gradient: light ? null : fill,
                 borderRadius: radius,
                 border: Border.all(
                   color: selected
                       ? const Color(0xFF6DD7BC)
+                      : light
+                      ? nature
                       : const Color(0xFFEAC04A),
                   width: selected ? 3 : 1.4,
                 ),
