@@ -1542,6 +1542,9 @@ class FakeApiClient implements ApiClient {
           return _ok({'entryId': seg[3], 'eventSequences': const []});
         }
         // Production create answers `{entryId, sequence, eventSequences}`.
+        if (method == 'POST' && seg.length == 2) {
+          _rememberPurchaseEntry(seg[1], b);
+        }
         return _ok({
           'entryId': 'pe_new',
           'sequence': 99,
@@ -2518,8 +2521,12 @@ class FakeApiClient implements ApiClient {
     }
     final entries = body['entries'];
     if (day != null && entries is List) {
+      final remembered = [
+        for (final raw in _createdPurchaseEntries)
+          if ('${raw['book']}' == book) Map<String, dynamic>.from(raw),
+      ];
       body['entries'] = [
-        for (final raw in entries)
+        for (final raw in [...entries, ...remembered])
           if (raw is Map) _entryOnThisPage(Map<String, dynamic>.from(raw), day),
       ];
     }
@@ -2527,6 +2534,41 @@ class FakeApiClient implements ApiClient {
       body['nextBefore'] = purchaseFirstNextBefore;
     }
     return body;
+  }
+
+  /// Rows created in this session. The next purchases read paints them on
+  /// the open day, with that day's draft status, so a confirmed row shows
+  /// the pencil and the trash.
+  final List<Map<String, dynamic>> _createdPurchaseEntries = [];
+
+  void _rememberPurchaseEntry(String book, Map b) {
+    final day = _openPurchaseDay(book);
+    if (day == null) return;
+    _createdPurchaseEntries.add({
+      'book': book,
+      'id': 'pe_new',
+      'dayId': day['id'],
+      'sequence': 99,
+      'dayNumber': day['dayNumber'],
+      'businessDate': day['businessDate'],
+      'dayStatus': day['status'],
+      'dayClosingDebtUnits': day['totalDebtUnits'],
+      'itemCode': b['itemCode'],
+      'itemLabel': b['itemLabel'] ?? 'معاملة جديدة',
+      'egpValueUnits': b['egpValueUnits'] ?? 0,
+      'calculationMode': b['calculationMode'] ?? 'divide',
+      'exchangeRate': b['exchangeRate'] ?? '1',
+      'resultUnits': 0,
+      'paidUnits': b['paidUnits'] ?? 0,
+      'remainingUnits': 0,
+      'vodafoneConsumedUnits': b['vodafoneConsumedUnits'] ?? 0,
+      'actorName': 'مدير تجريبي',
+      'actorIsOwner': true,
+      'version': 1,
+      'dayVersion': day['version'],
+      'correctionOpen': day['correctionOpen'] == true,
+      'createdAt': '2026-10-19T12:00:00+02:00',
+    });
   }
 
   /// The open day's rows take that day's id and version. A row from another
