@@ -62,6 +62,9 @@ LinearGradient websiteCardGradient(AccountSection section, int? units) {
   return customerOwns ? green : red;
 }
 
+/// Cream fill Ali picked from the 080 sheet («كريمي»).
+const websiteCardLightFill = Color(0xFFFFF8EE);
+
 /// Light-mode ink. دين is red, أمانة is green, zero is brown. The same
 /// sign rules as [websiteCardGradient], including the Egyptian swap.
 Color websiteCardNatureInk(AccountSection section, int? units) {

@@ -162,12 +162,15 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
         ref.read(accountQueryProvider(section).notifier).state = value;
       },
     );
+    final deposits =
+        section == AccountSection.libyanDeposits ||
+        section == AccountSection.egyptianDeposits;
     final Widget addButton = GatedButton(
       buttonKey: const Key('add-account'),
       allowed: permissions.canWrite(section.sectionKey),
       online: online,
       label: _addLabel,
-      fitLabel: debtLook,
+      fitLabel: debtLook || deposits,
       onPressed: () => _create(context),
     );
     final Widget assignButton = GatedButton(
@@ -183,9 +186,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       }),
     );
 
-    final deposits =
-        section == AccountSection.libyanDeposits ||
-        section == AccountSection.egyptianDeposits;
     final Widget body = KeptData<AccountsPage>(
       value: page,
       resetKey: section,
@@ -460,6 +460,23 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     required bool canWrite,
     required PermissionService permissions,
   }) {
+    final card = (AccountCardDto item) =>
+        _accountCard(card: item, canWrite: canWrite, permissions: permissions);
+    // Egyptian deposits, and the debt sections, are one full-width card.
+    // A Wrap can still place two children side by side if the measured
+    // width is short, so a single column is a vertical list.
+    if (columns <= 1 || section == AccountSection.egyptianDeposits) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final item in cards)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(bottom: AppSpacing.md),
+              child: card(item),
+            ),
+        ],
+      );
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final cardWidth = _cardWidth(constraints.maxWidth, columns);
@@ -467,16 +484,8 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
           spacing: AppSpacing.md,
           runSpacing: AppSpacing.md,
           children: [
-            for (final card in cards)
-              SizedBox(
-                width: cardWidth,
-                height: null,
-                child: _accountCard(
-                  card: card,
-                  canWrite: canWrite,
-                  permissions: permissions,
-                ),
-              ),
+            for (final item in cards)
+              SizedBox(width: cardWidth, child: card(item)),
           ],
         );
       },
@@ -883,8 +892,8 @@ class _SummaryStrip extends StatelessWidget {
   }
 }
 
-/// One row: الإجمالي (section net), النشط (active cards), إضافة أمانة.
-/// Server figures only. The three stay side by side, including at text 1.3.
+/// One row: الإجمالي, النشط, and إضافة أمانة as three equal rounded
+/// rectangles. Same frame as the debt header, a little shorter.
 class _DepositTopRow extends StatelessWidget {
   const _DepositTopRow({
     required this.summary,
@@ -900,96 +909,111 @@ class _DepositTopRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final look = context.look;
-    final gold = sectionGold(context);
-    final on = onSectionGold(context);
-    final count = summary.activeCards;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final fill = dark ? const Color(0xFF1A2436) : const Color(0xFFF4F7FB);
+    final edge = dark ? const Color(0xFF8E7340) : const Color(0xFFC4A46A);
+    final ink = dark ? const Color(0xFFF8F1DE) : const Color(0xFF1A1308);
+    final muted = dark ? const Color(0xFFCDB88A) : const Color(0xFF6B5428);
     final scale = MediaQuery.textScalerOf(context).scale(1);
-    final total = DecoratedBox(
-      key: const Key('deposit-total-pill'),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color.lerp(gold, Colors.white, 0.25)!, gold],
-        ),
-        border: Border.all(color: Color.lerp(gold, Colors.white, 0.4)!),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.symmetric(
-          horizontal: 8,
-          vertical: 4,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              AppStrings.depositTotalCompact,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: cairo(11, 700, color: on),
-            ),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: MoneyText(
-                money.formatOrDash(summary.netBalanceUnits, currency),
-                key: const Key('deposit-total'),
-                style: context.textExtras.amount.copyWith(
-                  color: on,
-                  fontSize: 15,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    final count = summary.activeCards;
+    final radius = BorderRadius.circular(12);
+    final frame = BoxDecoration(
+      color: fill,
+      borderRadius: radius,
+      border: Border.all(color: edge, width: 1.2),
     );
-    final active = DecoratedBox(
-      key: const Key('deposit-active-pill'),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        color: look.card,
-        border: Border.all(color: gold, width: 1.5),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.symmetric(
-          horizontal: 8,
-          vertical: 4,
+    Widget plaque({required Key key, required Widget child}) {
+      return DecoratedBox(
+        key: key,
+        decoration: frame,
+        child: Padding(
+          padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: 6,
+            vertical: 2,
+          ),
+          child: FittedBox(fit: BoxFit.scaleDown, child: child),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              AppStrings.depositActiveCompact,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: cairo(11, 700, color: look.muted),
-            ),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                count == null ? AppStrings.dash : '$count',
-                key: const Key('deposit-active-count'),
-                textDirection: TextDirection.ltr,
-                style: cairo(15, 800, color: look.ink),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+      );
+    }
+
     return SizedBox(
-      height: 58 * scale.clamp(1.0, 1.45),
+      height: 34 + 12 * scale.clamp(1.0, 2.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(child: total),
-          const SizedBox(width: 6),
-          Expanded(child: active),
+          Expanded(
+            child: plaque(
+              key: const Key('deposit-total-pill'),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    AppStrings.depositTotalCompact,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: cairo(11, 700, color: muted),
+                  ),
+                  MoneyText(
+                    money.formatOrDash(summary.netBalanceUnits, currency),
+                    key: const Key('deposit-total'),
+                    style: context.textExtras.amount.copyWith(
+                      color: ink,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(width: 6),
           Expanded(
-            child: FittedBox(fit: BoxFit.scaleDown, child: add),
+            child: plaque(
+              key: const Key('deposit-active-pill'),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    AppStrings.depositActiveCompact,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: cairo(11, 700, color: muted),
+                  ),
+                  Text(
+                    count == null ? AppStrings.dash : '$count',
+                    key: const Key('deposit-active-count'),
+                    textDirection: TextDirection.ltr,
+                    style: cairo(15, 800, color: ink),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                filledButtonTheme: FilledButtonThemeData(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: fill,
+                    foregroundColor: ink,
+                    disabledBackgroundColor: fill,
+                    disabledForegroundColor: muted,
+                    elevation: 0,
+                    minimumSize: const Size(double.infinity, double.infinity),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: const EdgeInsetsDirectional.symmetric(
+                      horizontal: 6,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: radius,
+                      side: BorderSide(color: edge, width: 1.2),
+                    ),
+                    textStyle: cairo(13, 800),
+                  ),
+                ),
+              ),
+              child: add,
+            ),
           ),
         ],
       ),
@@ -1148,7 +1172,7 @@ class _AccountCard extends StatelessWidget {
             opacity: blocked ? 0.68 : 1,
             child: Ink(
               decoration: BoxDecoration(
-                color: light ? Colors.white : null,
+                color: light ? websiteCardLightFill : null,
                 gradient: light ? null : fill,
                 borderRadius: radius,
                 border: Border.all(

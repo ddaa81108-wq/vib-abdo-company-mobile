@@ -7,6 +7,7 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/accounts/account_list_screen.dart';
+import 'package:vib_abdo_company_mobile/features/accounts/website_account_card.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
 import 'package:vib_abdo_company_mobile/ui/presentation.dart';
@@ -138,13 +139,13 @@ void main() {
       if (dark) {
         expect(_cardGradient(tester).colors.first, const Color(0xFFBD3B47));
       } else {
-        expect(_cardFill(tester), Colors.white);
+        expect(_cardFill(tester), websiteCardLightFill);
       }
       await go(tester, '/companies');
       if (dark) {
         expect(_cardGradient(tester).colors.first, const Color(0xFFBD3B47));
       } else {
-        expect(_cardFill(tester), Colors.white);
+        expect(_cardFill(tester), websiteCardLightFill);
       }
     }
   });
