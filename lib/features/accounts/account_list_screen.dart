@@ -1121,60 +1121,66 @@ class _AccountCard extends StatelessWidget {
             )
           : null,
     );
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: gloss.glowShadow,
-      ),
-      child: Material(
-        key: Key('account-card-${card.id}'),
-        color: tone.background,
-        borderRadius: radius,
-        clipBehavior: Clip.antiAlias,
-        child: Opacity(
-          opacity: blocked ? 0.68 : 1,
-          child: Ink(
-            decoration: BoxDecoration(
-              gradient: fill,
-              borderRadius: radius,
-              border: Border.all(
-                color: selected
-                    ? const Color(0xFF6DD7BC)
-                    : const Color(0xFFEAC04A),
-                width: selected ? 3 : 1.4,
+    return _SearchReveal(
+      id: card.id,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          boxShadow: gloss.glowShadow,
+        ),
+        child: Material(
+          key: Key('account-card-${card.id}'),
+          color: tone.background,
+          borderRadius: radius,
+          clipBehavior: Clip.antiAlias,
+          child: Opacity(
+            opacity: blocked ? 0.68 : 1,
+            child: Ink(
+              decoration: BoxDecoration(
+                gradient: fill,
+                borderRadius: radius,
+                border: Border.all(
+                  color: selected
+                      ? const Color(0xFF6DD7BC)
+                      : const Color(0xFFEAC04A),
+                  width: selected ? 3 : 1.4,
+                ),
               ),
-            ),
-            child: InkWell(
-              key: selectable ? ValueKey('assign-select-${card.id}') : null,
-              onTap: assigning ? (selectable ? onToggle : null) : onOpen,
-              onLongPress: null,
-              child: Stack(
-                children: [
-                  GlossSheen(
-                    gloss: gloss,
-                    radius: radius,
-                    child: IgnorePointer(ignoring: assigning, child: cardBody),
-                  ),
-                  if (selected)
-                    Positioned.fill(
+              child: InkWell(
+                key: selectable ? ValueKey('assign-select-${card.id}') : null,
+                onTap: assigning ? (selectable ? onToggle : null) : onOpen,
+                onLongPress: null,
+                child: Stack(
+                  children: [
+                    GlossSheen(
+                      gloss: gloss,
+                      radius: radius,
                       child: IgnorePointer(
-                        child: DecoratedBox(
-                          key: ValueKey('assign-check-${card.id}'),
-                          decoration: BoxDecoration(
-                            color: const Color(0x6630C48A),
-                            borderRadius: radius,
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.check_circle,
-                              color: Colors.white,
-                              size: 36,
+                        ignoring: assigning,
+                        child: cardBody,
+                      ),
+                    ),
+                    if (selected)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            key: ValueKey('assign-check-${card.id}'),
+                            decoration: BoxDecoration(
+                              color: const Color(0x6630C48A),
+                              borderRadius: radius,
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.check_circle,
+                                color: Colors.white,
+                                size: 36,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1182,6 +1188,35 @@ class _AccountCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Scrolls a card into view when unified search opened it with `?card=`.
+class _SearchReveal extends StatefulWidget {
+  const _SearchReveal({required this.id, required this.child});
+
+  final String id;
+  final Widget child;
+
+  @override
+  State<_SearchReveal> createState() => _SearchRevealState();
+}
+
+class _SearchRevealState extends State<_SearchReveal> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+  }
+
+  void _reveal() {
+    if (!mounted) return;
+    final wanted = GoRouterState.of(context).uri.queryParameters['card'];
+    if (wanted != widget.id) return;
+    Scrollable.ensureVisible(context, alignment: 0.15);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 CustomerTone _companyTone(Gloss gloss) => CustomerTone(

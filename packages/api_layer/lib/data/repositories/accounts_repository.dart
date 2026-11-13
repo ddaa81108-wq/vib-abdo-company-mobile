@@ -10,6 +10,9 @@ abstract interface class AccountsRepository {
   Future<AccountsPage> list(AccountSection s,
       {String? cursor, int limit = 100, String? q, String? filter});
   Future<List<AccountSuggestionDto>> suggestions(AccountSection s, String q);
+
+  /// GET /api/account-search?q=. The website's unified search. Not a new route.
+  Future<List<GlobalAccountHit>> search(String q);
   Future<MutationAck> create(
       AccountSection s, CreateAccountRequest r, MutationMeta meta);
   Future<AccountCardDto> get(AccountSection s, String id);
@@ -67,6 +70,15 @@ class RemoteAccountsRepository implements AccountsRepository {
     final res = await _api
         .get(ApiEndpoints.accountSuggestions(s.path), query: {'q': q});
     return Paged.fromData(res.data, AccountSuggestionDto.fromJson).items;
+  }
+
+  @override
+  Future<List<GlobalAccountHit>> search(String q) async {
+    final res = await _api.get(ApiEndpoints.accountSearch, query: {'q': q});
+    return [
+      for (final row in asJsonList(asJson(res.data)['items']))
+        if (GlobalAccountHit.tryParse(row) case final hit?) hit,
+    ];
   }
 
   @override
