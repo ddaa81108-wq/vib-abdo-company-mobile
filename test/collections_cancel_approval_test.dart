@@ -20,7 +20,19 @@ void main() {
     await pumpFakeApp(tester, size: const Size(390, 1600));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
-    await tester.ensureVisible(find.byKey(const Key('cancel-approval-sb_2')));
+    final collectionsScroll = find
+        .descendant(
+          of: find.byKey(const Key('screen-collections')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('cancel-approval-sb_2')),
+      300,
+      scrollable: collectionsScroll,
+    );
+    await tester.drag(collectionsScroll, const Offset(0, -80));
+    await tester.pump();
     expect(find.byKey(const Key('cash-sb_2')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('cancel-approval-sb_2')));
