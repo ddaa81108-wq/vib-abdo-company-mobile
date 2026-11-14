@@ -14,6 +14,7 @@ import 'package:vib_abdo_company_mobile/features/notifications/foreground_notifi
 import 'package:vib_abdo_company_mobile/features/notifications/notification_open_seam.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notification_permission.dart';
 import 'package:vib_abdo_company_mobile/notifications/background_poll.dart';
+import 'package:vib_abdo_company_mobile/notifications/device_registration_client.dart';
 import 'package:vib_abdo_company_mobile/notifications/device_token_registrar.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_providers.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_transport.dart';
@@ -175,9 +176,7 @@ void main() {
     );
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
     _expectRealRegistrar(tester);
-    expect(log.devicePosts, [
-      {'token': token, 'platform': 'android'},
-    ]);
+    expect(log.devicePosts, [deviceRegistrationBody(token: token)]);
 
     await go(tester, '/notifications');
 
@@ -187,9 +186,7 @@ void main() {
     );
     expect(permission.requested, isFalse);
     expect(find.byKey(const Key('screen-notifications')), findsOneWidget);
-    expect(log.devicePosts, [
-      {'token': token, 'platform': 'android'},
-    ]);
+    expect(log.devicePosts, [deviceRegistrationBody(token: token)]);
     expectQuiet(tester, 'P7-18 API 29');
   });
 
@@ -239,9 +236,7 @@ Future<void> _agreePostsOnce(
   await settle(tester);
 
   expect(permission.requested, isTrue);
-  expect(log.devicePosts, [
-    {'token': token, 'platform': 'android'},
-  ]);
+  expect(log.devicePosts, [deviceRegistrationBody(token: token)]);
   expect(
     find.byKey(const Key('notification-permission-explain')),
     findsNothing,
