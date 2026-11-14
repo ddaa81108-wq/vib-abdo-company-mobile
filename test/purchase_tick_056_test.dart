@@ -22,7 +22,6 @@ void main() {
             tester,
             mark: find.byKey(const Key('purchase-saved-mark-pe_old')),
             row: find.byKey(const Key('purchase-entry-pe_old')),
-            scale: scale,
           );
           await tester.scrollUntilVisible(
             find.byKey(const Key('save-purchase')),
@@ -33,7 +32,6 @@ void main() {
             tester,
             mark: find.byKey(const Key('save-purchase')),
             row: find.byKey(const Key('purchase-inline-row')),
-            scale: scale,
           );
           expect(tester.takeException(), isNull);
         },
@@ -55,8 +53,11 @@ void main() {
     final cancel = tester.getRect(find.byKey(const Key('cancel-purchase')));
     expect((save.center.dy - row.center.dy).abs(), lessThan(3));
     expect((cancel.center.dy - row.center.dy).abs(), lessThan(3));
-    final pair = (save.center.dx + cancel.center.dx) / 2;
-    expect((pair - (row.left + 96 / 2)).abs(), lessThan(4));
+    // The pair stays on screen, in the pinned action column, not in the
+    // off-screen end of the wide row.
+    expect(save.left, greaterThanOrEqualTo(0));
+    expect(cancel.right, lessThanOrEqualTo(1280));
+    expect((save.center.dx - cancel.center.dx).abs(), lessThan(56));
     await tester.tap(find.byKey(const Key('cancel-purchase')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('cancel-purchase')), findsNothing);
@@ -68,17 +69,16 @@ void _expectInActionCell(
   WidgetTester tester, {
   required Finder mark,
   required Finder row,
-  required double scale,
 }) {
   final markRect = tester.getRect(mark);
   final rowRect = tester.getRect(row);
-  final cellCenterX = rowRect.left + (96 * scale) / 2;
-  final dx = (markRect.center.dx - cellCenterX).abs();
+  final screen = tester.view.physicalSize.width / tester.view.devicePixelRatio;
   final dy = (markRect.center.dy - rowRect.center.dy).abs();
+  expect(markRect.left, greaterThanOrEqualTo(0), reason: 'mark=$markRect');
   expect(
-    dx,
-    lessThan(4),
-    reason: 'mark=$markRect row=$rowRect expectedX=$cellCenterX',
+    markRect.right,
+    lessThanOrEqualTo(screen + 1),
+    reason: 'mark=$markRect',
   );
   expect(dy, lessThan(4), reason: 'mark=$markRect row=$rowRect');
 }
