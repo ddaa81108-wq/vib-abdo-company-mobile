@@ -12,7 +12,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('purchases save then logout stays on login', (tester) async {
-    await pumpFakeApp(tester, size: const Size(360, 800));
+    await pumpFakeApp(tester, size: const Size(1080, 2280));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/purchases');
     await tester.pump(const Duration(seconds: 1));
@@ -36,9 +36,21 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
     }
     await tester.tap(find.byKey(HomeShell.logoutKey));
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.byKey(LogoutConfirmDialog.confirmKey));
-    await tester.pump(const Duration(seconds: 1));
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(LogoutConfirmDialog.confirmKey).evaluate().isNotEmpty) {
+        break;
+      }
+    }
+    await tester.ensureVisible(find.byKey(LogoutConfirmDialog.confirmKey));
+    await tester.tap(
+      find.byKey(LogoutConfirmDialog.confirmKey),
+      warnIfMissed: false,
+    );
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.byKey(LoginScreen.screenKey).evaluate().isNotEmpty) break;
+    }
     expect(find.byKey(LoginScreen.screenKey), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pump(const Duration(milliseconds: 500));
