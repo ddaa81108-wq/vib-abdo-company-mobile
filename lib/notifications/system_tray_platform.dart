@@ -102,6 +102,10 @@ Future<bool> showPrivateWithPlugin(TrayNotification notification) async {
         visibility: NotificationVisibility.private,
         tag: notification.tag,
         channelShowBadge: true,
+        styleInformation: BigTextStyleInformation(
+          notification.body,
+          contentTitle: notification.title,
+        ),
       ),
     ),
   );

@@ -65,6 +65,74 @@ Map<String, dynamic>? _pair(Map<dynamic, dynamic> ref) {
   return {'type': ?type, 'id': ?id};
 }
 
+/// Fields the server already stores on `notifications.details_json` or the
+/// actor row. A push `data` map may carry them as strings. Anything else,
+/// including phones and tokens, is ignored.
+const shadeDetailKeys = <String>{
+  'subjectName',
+  'subjectSection',
+  'amountUnits',
+  'paidUnits',
+  'remainingUnits',
+  'vodafoneConsumedUnits',
+  'paymentMode',
+  'mode',
+  'currency',
+  'payrollKind',
+  'employeeName',
+  'reason',
+};
+
+/// A shade row from push `data` plus the FCM notification title/body.
+/// Missing keys stay empty. This does not invent amounts or names.
+AppNotification notificationFromShadeData(
+  Map<String, dynamic> raw, {
+  String? serverTitle,
+  String? serverBody,
+}) {
+  final details = <String, dynamic>{};
+  for (final key in shadeDetailKeys) {
+    final value = _shadeValue(raw[key]);
+    if (value != null) details[key] = value;
+  }
+  final employee = details['employeeName'];
+  final actor = _shadeText(raw['actorName']);
+  final created =
+      DateTime.tryParse('${raw['createdAt'] ?? ''}') ?? DateTime.utc(1970);
+  final action =
+      _shadeText(raw['operationType']) ?? _shadeText(raw['action']) ?? '';
+  final id = _shadeText(raw['notificationId']) ?? _shadeText(raw['id']) ?? '';
+  final system = _shadeText(raw['systemName']) ?? _shadeText(serverTitle) ?? '';
+  return AppNotification(
+    notificationId: id,
+    systemName: system,
+    employeeName: employee is String ? employee : null,
+    operationType: NotificationOperationType.parse(action),
+    operationTypeRaw: action,
+    relatedRef: null,
+    createdAt: created,
+    readAt: null,
+    recipientUserId: _shadeText(raw['recipientUserId']),
+    actorName: actor ?? '',
+    actorRole: _shadeText(raw['actorRole']),
+    details: details,
+    body: _shadeText(serverBody) ?? _shadeText(raw['fcmBody']),
+  );
+}
+
+Object? _shadeValue(Object? value) {
+  final text = _shadeText(value);
+  if (text == null) return null;
+  return int.tryParse(text) ?? text;
+}
+
+String? _shadeText(Object? value) {
+  if (value == null) return null;
+  final text = '$value'.trim();
+  if (text.isEmpty) return null;
+  return text;
+}
+
 /// Fixed operation label. The raw operation string is never copied.
 String operationLabel(NotificationOperationType type) {
   return switch (type) {
