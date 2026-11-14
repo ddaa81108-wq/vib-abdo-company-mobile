@@ -1712,6 +1712,9 @@ class _PurchaseGrid extends ConsumerWidget {
 
   bool _writable(PurchaseEntryDto entry) {
     if (!canWrite) return false;
+    // A write needs the day's version. The open day supplies it when the
+    // row only carried the id.
+    if (_dayVersionOf(entry) == null) return false;
     if (_draftRow(entry)) return true;
     return entry.dayStatus == 'finalized' && entry.correctionOpen;
   }
