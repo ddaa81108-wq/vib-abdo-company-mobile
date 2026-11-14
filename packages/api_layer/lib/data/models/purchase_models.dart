@@ -313,18 +313,42 @@ class PurchasesPage {
       );
     }
     final raw = asJson(data);
+    final dayMap = raw['entryDays'] is Map
+        ? asJson(raw['entryDays'])
+        : const <String, dynamic>{};
     return PurchasesPage(
       merchant: PurchaseMerchantDto.fromJsonOrNull(raw['merchant']),
       day: PurchaseDayDto.fromJsonOrNull(raw['day']),
-      entries: asJsonList(raw['entries'])
-          .map(PurchaseEntryDto.fromJson)
-          .toList(growable: false),
+      entries: [
+        for (final row in asJsonList(raw['entries']))
+          PurchaseEntryDto.fromJson(_purchaseEntryWithDay(row, dayMap)),
+      ],
       nextBefore: _nextBefore(raw['nextBefore']),
       registerTotals: PurchasesRegisterTotalsDto.fromJsonOrNull(
         raw['registerTotals'],
       ),
     );
   }
+}
+
+/// The website copies `entryDays[dayId]` onto each row after a tagged reload
+/// (`usePurchasesPage`). Those four fields are the day's, not the row's, and
+/// a later payload may send them only on `entryDays`.
+Json _purchaseEntryWithDay(Json entry, Json dayMap) {
+  final dayId = entry['dayId'] ?? entry['day_id'];
+  if (dayId == null) return entry;
+  final day = dayMap['$dayId'];
+  if (day is! Map) return entry;
+  final overlay = asJson(day);
+  return {
+    ...entry,
+    if (overlay.containsKey('dayStatus')) 'dayStatus': overlay['dayStatus'],
+    if (overlay.containsKey('dayVersion')) 'dayVersion': overlay['dayVersion'],
+    if (overlay.containsKey('dayClosingDebtUnits'))
+      'dayClosingDebtUnits': overlay['dayClosingDebtUnits'],
+    if (overlay.containsKey('correctionOpen'))
+      'correctionOpen': overlay['correctionOpen'],
+  };
 }
 
 /// `nextBefore` is an integer or null. Anything else is a broken cursor, not
