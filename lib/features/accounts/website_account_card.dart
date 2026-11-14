@@ -65,13 +65,20 @@ LinearGradient websiteCardGradient(AccountSection section, int? units) {
 /// Cream fill Ali picked from the 080 sheet («كريمي»).
 const websiteCardLightFill = Color(0xFFFFF8EE);
 
-/// Light-mode ink. دين is red, أمانة is green, zero is brown. The same
+/// أسمر for حساب صفر. Darker and less orange than the previous `#6B4423`.
+/// Dark cards use the lighter tan so the same tone stays readable.
+const websiteCardZeroLight = Color(0xFF4A3728);
+const websiteCardZeroDark = Color(0xFFD7C4A8);
+
+Color websiteCardZeroInk({required bool light}) =>
+    light ? websiteCardZeroLight : websiteCardZeroDark;
+
+/// Light-mode ink. دين is red, أمانة is green, zero is أسمر. The same
 /// sign rules as [websiteCardGradient], including the Egyptian swap.
 Color websiteCardNatureInk(AccountSection section, int? units) {
   const debt = Color(0xFFB42318);
   const trust = Color(0xFF0E7A45);
-  const zero = Color(0xFF6B4423);
-  if (units == null || units == 0) return zero;
+  if (units == null || units == 0) return websiteCardZeroLight;
   final customerOwns = section == AccountSection.libyanDeposits
       ? units > 0
       : units < 0;

@@ -1088,15 +1088,19 @@ class _AccountCard extends StatelessWidget {
     final radius = BorderRadius.circular(16);
     final units = card.balanceUnits?.asInt;
     final light = Theme.of(context).brightness == Brightness.light;
+    final zeroCard = units == null || units == 0;
     final nature = websiteCardNatureInk(section, units);
     final fill = websiteCardGradient(section, units);
     final amount = websiteCardAmount(money, card);
+    final ink = zeroCard
+        ? websiteCardZeroInk(light: light)
+        : (light ? nature : Colors.white);
     final cardBody = WebsiteAccountCardBody(
       card: card,
       status: websiteCardStatus(section, card),
       amount: amount,
       movement: websiteCardMovement(card.lastActivityAt),
-      ink: light ? nature : Colors.white,
+      ink: ink,
       wide: wide,
       showAssignee:
           section == AccountSection.customers ||
@@ -1149,7 +1153,7 @@ class _AccountCard extends StatelessWidget {
                   color: selected
                       ? const Color(0xFF6DD7BC)
                       : light
-                      ? nature
+                      ? ink
                       : const Color(0xFFEAC04A),
                   width: selected ? 3 : 1.4,
                 ),
