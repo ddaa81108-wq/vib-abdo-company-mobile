@@ -563,12 +563,12 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
 
   Future<String?> _pin(AccountCardDto card, MutationMeta meta) async {
     try {
-      final ack = await ref
+      await ref
           .read(apiLayerProvider)
           .accounts
           .setPinned(section, card.id, !card.pinned, meta);
       if (!mounted) return null;
-      setState(() => _reply = _ack(ack));
+      setState(() => _reply = AppStrings.saved);
       ref.invalidate(accountsProvider(section));
       return null;
     } catch (error) {
@@ -689,15 +689,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     final review = ack.reviews[card.id];
     if (review == null) return card;
     return cardWithServerZeroReview(card, review);
-  }
-
-  String _ack(MutationAck ack) {
-    final bits = <String>[
-      AppStrings.serverReply,
-      if (ack.id != null) ack.id!,
-      if (ack.version != null) '${ack.version}',
-    ];
-    return bits.join(' · ');
   }
 }
 
@@ -1088,15 +1079,19 @@ class _AccountCard extends StatelessWidget {
     final radius = BorderRadius.circular(16);
     final units = card.balanceUnits?.asInt;
     final light = Theme.of(context).brightness == Brightness.light;
+    final zeroCard = units == null || units == 0;
     final nature = websiteCardNatureInk(section, units);
     final fill = websiteCardGradient(section, units);
     final amount = websiteCardAmount(money, card);
+    final ink = zeroCard
+        ? websiteCardZeroInk(light: light)
+        : (light ? nature : Colors.white);
     final cardBody = WebsiteAccountCardBody(
       card: card,
       status: websiteCardStatus(section, card),
       amount: amount,
       movement: websiteCardMovement(card.lastActivityAt),
-      ink: light ? nature : Colors.white,
+      ink: ink,
       wide: wide,
       showAssignee:
           section == AccountSection.customers ||
@@ -1149,7 +1144,7 @@ class _AccountCard extends StatelessWidget {
                   color: selected
                       ? const Color(0xFF6DD7BC)
                       : light
-                      ? nature
+                      ? ink
                       : const Color(0xFFEAC04A),
                   width: selected ? 3 : 1.4,
                 ),
@@ -1690,17 +1685,14 @@ class _RateCardState extends ConsumerState<_RateCard> {
     final parsed = DecimalString.tryParse(_rate.text);
     if (parsed == null) return AppStrings.rateInvalid;
     try {
-      final next = await ref
+      await ref
           .read(apiLayerProvider)
           .accounts
           .updateExchangeRate(parsed, meta);
       ref.invalidate(exchangeRateProvider);
       ref.invalidate(treasuryProvider);
       if (!mounted) return null;
-      setState(
-        () => _message =
-            '${AppStrings.serverReply} ${next.egpPerLyd?.value ?? AppStrings.dash}',
-      );
+      setState(() => _message = AppStrings.saved);
       return null;
     } catch (error) {
       final message = failureText(
@@ -1803,7 +1795,7 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
     if (message != null) return message;
     final opening = openingBalanceOrNull(_opening.text);
     try {
-      final ack = await ref
+      await ref
           .read(apiLayerProvider)
           .accounts
           .create(
@@ -1816,9 +1808,7 @@ class _CreateFormState extends ConsumerState<_CreateForm> {
             meta,
           );
       if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
+      showSavedSnackBar(context);
       Navigator.of(context).pop(true);
       return null;
     } catch (error) {

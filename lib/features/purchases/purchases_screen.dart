@@ -737,15 +737,8 @@ class _DayCard extends ConsumerWidget {
     MutationMeta meta,
   ) async {
     try {
-      final ack = await ref
-          .read(apiLayerProvider)
-          .purchases
-          .finalizeDay(book, meta);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-        );
-      }
+      await ref.read(apiLayerProvider).purchases.finalizeDay(book, meta);
+      if (context.mounted) showSavedSnackBar(context);
       ref.invalidate(purchasesProvider);
       return null;
     } catch (error) {
@@ -759,15 +752,11 @@ class _DayCard extends ConsumerWidget {
     MutationMeta meta, {
     required bool open,
   }) async {
-    final ack = await ref
+    await ref
         .read(apiLayerProvider)
         .purchases
         .setDayCorrection(book, day.id, open: open, meta: meta);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
-    }
+    if (context.mounted) showSavedSnackBar(context);
     ref.invalidate(purchasesProvider);
     return null;
   }
@@ -1413,19 +1402,19 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
     try {
       final purchases = ref.read(apiLayerProvider).purchases;
       final existing = widget.entry;
-      final ack = existing == null
-          ? await purchases.create(widget.book, request, meta)
-          : await purchases.update(
-              widget.book,
-              existing.id,
-              request,
-              meta,
-              entryVersion: existing.version,
-            );
+      if (existing == null) {
+        await purchases.create(widget.book, request, meta);
+      } else {
+        await purchases.update(
+          widget.book,
+          existing.id,
+          request,
+          meta,
+          entryVersion: existing.version,
+        );
+      }
       if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
+      showSavedSnackBar(context);
       ref.read(_ledgerDraftProvider.notifier).state = null;
       ref.invalidate(purchasesProvider);
       return null;
@@ -1688,34 +1677,39 @@ class _PurchaseGrid extends ConsumerWidget {
   /// Website `page.nextBefore !== null`: older rows exist beyond this page.
   final bool historyContinues;
 
-  /// A saved row on the open day is edited with the pencil and the trash.
-  /// A posted day («مُرحّل») keeps the check until «تعديل اليوم» reopens it.
-  /// Membership in the open day wins over a stale `finalized` stamp, so a
-  /// row just confirmed on the active day does not stay a check.
-  bool _onOpenDay(PurchaseEntryDto entry) {
-    final day = openDay;
-    if (day != null && entry.dayId != null && entry.dayId == day.id) {
-      return true;
-    }
-    return entry.dayStatus == 'draft';
-  }
-
+  /// Website `PurchaseEntryGroup`: pencil and delete on every `draft` row.
+  /// A row on the open editable day is draft even when its own stamp was
+  /// omitted or left as `finalized` by a tagged reload. A posted day keeps
+  /// the check until «تعديل اليوم».
   bool _openDayEditable() {
     final day = openDay;
     if (day == null) return false;
     return day.status == 'draft' || day.correctionOpen;
   }
 
+  bool _onOpenEditableDay(PurchaseEntryDto entry) {
+    final day = openDay;
+    if (!_openDayEditable() || day == null) return false;
+    return entry.dayId != null && entry.dayId == day.id;
+  }
+
+  bool _draftRow(PurchaseEntryDto entry) =>
+      entry.dayStatus == 'draft' || _onOpenEditableDay(entry);
+
+  int? _dayVersionOf(PurchaseEntryDto entry) =>
+      entry.dayVersion ?? (_onOpenEditableDay(entry) ? openDay?.version : null);
+
   bool _writable(PurchaseEntryDto entry) {
     if (!canWrite) return false;
-    if (entry.dayVersion == null && openDay?.version == null) return false;
-    if (_onOpenDay(entry) && _openDayEditable()) return true;
+    // A write needs the day's version. The open day supplies it when the
+    // row only carried the id.
+    if (_dayVersionOf(entry) == null) return false;
+    if (_draftRow(entry)) return true;
     return entry.dayStatus == 'finalized' && entry.correctionOpen;
   }
 
   bool _postedCheck(PurchaseEntryDto entry) {
-    if (_writable(entry)) return false;
-    if (_onOpenDay(entry) && _openDayEditable()) return false;
+    if (_writable(entry) || _draftRow(entry)) return false;
     return entry.dayStatus == 'finalized' && !entry.correctionOpen;
   }
 
@@ -1914,7 +1908,7 @@ class _PurchaseGrid extends ConsumerWidget {
                   ? _InlineLedgerRow(
                       key: ValueKey('edit-${entry.id}'),
                       book: book,
-                      version: entry.dayVersion,
+                      version: _dayVersionOf(entry),
                       money: money,
                       scale: scale,
                       actionWidth: actionW,
@@ -1956,15 +1950,15 @@ class _PurchaseGrid extends ConsumerWidget {
                                 SizedBox(width: 4 * scale),
                                 _RowIconButton(
                                   buttonKey: Key('delete-${entry.id}'),
-                                  icon: Icons.delete_outline,
+                                  icon: Icons.close,
                                   tooltip: AppStrings.delete,
                                   fill: const Color(0xFFBD152C),
                                   border: const Color(0xFFFF9BAD),
                                   scale: scale,
                                   mutation: true,
                                   inputs:
-                                      'delete:${entry.id}:${entry.dayVersion}:${entry.version}',
-                                  expectedVersion: entry.dayVersion,
+                                      'delete:${entry.id}:${_dayVersionOf(entry)}:${entry.version}',
+                                  expectedVersion: _dayVersionOf(entry),
                                   confirmText: AppStrings.confirmDelete,
                                   onSubmit: (meta) =>
                                       _deleteEntry(context, ref, entry, meta),
@@ -2231,17 +2225,11 @@ Widget _correctionButton(
       reportErrorInline: false,
       onVersionConflict: () => ref.invalidate(purchasesProvider),
       onSubmit: (meta) async {
-        final ack = await ref
+        await ref
             .read(apiLayerProvider)
             .purchases
             .setDayCorrection(book, dayId, open: !correctionOpen, meta: meta);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${AppStrings.serverReply} ${ack.id ?? ''}'),
-            ),
-          );
-        }
+        if (context.mounted) showSavedSnackBar(context);
         ref.invalidate(purchasesProvider);
         return null;
       },
@@ -2573,15 +2561,11 @@ Future<String?> _deleteEntry(
 ) async {
   final book = ref.read(purchaseBookProvider);
   try {
-    final ack = await ref
+    await ref
         .read(apiLayerProvider)
         .purchases
         .delete(book, entry.id, meta, entryVersion: entry.version);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
-    }
+    if (context.mounted) showSavedSnackBar(context);
     ref.invalidate(purchasesProvider);
     return null;
   } catch (error) {

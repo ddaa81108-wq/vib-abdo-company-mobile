@@ -2546,7 +2546,7 @@ class FakeApiClient implements ApiClient {
     if (day == null) return;
     _createdPurchaseEntries.add({
       'book': book,
-      'id': 'pe_new',
+      'id': 'pe_new_${_createdPurchaseEntries.length + 1}',
       'dayId': day['id'],
       'sequence': 99,
       'dayNumber': day['dayNumber'],

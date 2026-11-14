@@ -106,7 +106,7 @@ abstract final class AppStrings {
   static const systemCard = 'نظامي';
   static const rateTitle = 'كم جنيه لكل دينار';
   static const rateMissing = 'يلزم سعر تحويل معتمد';
-  static const serverReply = 'رد الخادم';
+  static const saved = 'تم الحفظ';
   static const passwordCurrent = 'كلمة المرور الحالية';
   static const passwordNew = 'كلمة المرور الجديدة';
   static const passwordConfirm = 'تأكيد كلمة المرور';

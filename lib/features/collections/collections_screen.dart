@@ -1272,9 +1272,7 @@ class _CloseBatchDialogState extends ConsumerState<_CloseBatchDialog> {
       if (ack.raw['closed'] == false) {
         setState(() {
           _busy = false;
-          _error = failureText(
-            ref.read(errorHandlerProvider).toFailure(StateError('${ack.raw}')),
-          );
+          _error = AppStrings.genericError;
         });
         return;
       }
@@ -1287,7 +1285,7 @@ class _CloseBatchDialogState extends ConsumerState<_CloseBatchDialog> {
       setState(() {
         _busy = false;
         _changed = changed;
-        _error = failure.message;
+        _error = failureText(failure);
       });
     }
   }

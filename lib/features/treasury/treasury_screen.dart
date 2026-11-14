@@ -238,7 +238,7 @@ class _CashFormState extends ConsumerState<_CashForm> {
     final units = parseUnits(_amount.text);
     if (units == null) return AppStrings.integerOnly;
     try {
-      final ack = await ref
+      await ref
           .read(apiLayerProvider)
           .treasury
           .addCashEntry(
@@ -251,9 +251,7 @@ class _CashFormState extends ConsumerState<_CashForm> {
           );
       _refreshCashViews();
       if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
+      showSavedSnackBar(context);
       Navigator.of(context).pop();
       return null;
     } catch (error) {

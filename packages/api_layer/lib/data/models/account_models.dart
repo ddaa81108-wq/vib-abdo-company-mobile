@@ -83,8 +83,15 @@ class AccountCardDto {
         ),
         currency: currencyOr(j['currency'], s.currency),
         activeAssigneeName: strOrNull(j['activeAssigneeName']),
-        lastActivityAt:
-            dateOrNull(j['lastActivityAt'] ?? j['lastTransactionAt']),
+        // The list payloads on vip2100.com do not send lastActivityAt.
+        // The website paints آخر حركة from updatedAt, then createdAt
+        // (DebtAccountsView). A dedicated field still wins when present.
+        lastActivityAt: dateOrNull(
+          j['lastActivityAt'] ??
+              j['lastTransactionAt'] ??
+              j['updatedAt'] ??
+              j['createdAt'],
+        ),
         pinned: boolOf(j['pinned'] ?? j['isPinned']),
         version: intOrNull(j['version']),
         nextSequence: intOrNull(j['nextSequence']),

@@ -708,7 +708,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
       return AppStrings.invalidAmount;
     }
     try {
-      final ack = await ref
+      await ref
           .read(apiLayerProvider)
           .accounts
           .addTransaction(
@@ -718,11 +718,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
             AccountTransactionRequest.fullPayment(),
             meta,
           );
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-        );
-      }
+      if (context.mounted) showSavedSnackBar(context);
       ref.invalidate(ledgerProvider((section, id)));
       ref.invalidate(accountCardProvider((section, id)));
       ref.invalidate(accountsProvider(section));
@@ -740,15 +736,11 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     MutationMeta meta,
   ) async {
     try {
-      final ack = await ref
+      await ref
           .read(apiLayerProvider)
           .accounts
           .cancelTransaction(section, id, entry.id, meta);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-        );
-      }
+      if (context.mounted) showSavedSnackBar(context);
       ref.invalidate(ledgerProvider((section, id)));
       ref.invalidate(accountCardProvider((section, id)));
       ref.invalidate(accountsProvider(section));
@@ -1271,9 +1263,7 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
           .accounts
           .addTransaction(widget.section, widget.id, request, meta);
       if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
+      showSavedSnackBar(context);
       final posted = PostedMovement(balanceUnits: ack.balanceUnits);
       final onSaved = widget.onSaved;
       if (onSaved != null) {

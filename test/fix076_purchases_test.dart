@@ -30,9 +30,9 @@ void main() {
     await tester.tap(find.byKey(const Key('save-purchase')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('edit-pe_new')), findsOneWidget);
-    expect(find.byKey(const Key('delete-pe_new')), findsOneWidget);
-    expect(find.byKey(const Key('purchase-saved-mark-pe_new')), findsNothing);
+    expect(find.byKey(const Key('edit-pe_new_1')), findsOneWidget);
+    expect(find.byKey(const Key('delete-pe_new_1')), findsOneWidget);
+    expect(find.byKey(const Key('purchase-saved-mark-pe_new_1')), findsNothing);
     expect(find.byKey(const Key('purchase-saved-mark-pe_old')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

@@ -356,14 +356,12 @@ class _EditAccountCardFormState extends ConsumerState<_EditAccountCardForm> {
       phone: _phone.text,
     );
     try {
-      final ack = await ref
+      await ref
           .read(apiLayerProvider)
           .accounts
           .update(widget.section, widget.card.id, request, meta);
       if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
+      showSavedSnackBar(context);
       _refresh();
       context.go('/${widget.section.path}/${widget.card.id}');
       return null;

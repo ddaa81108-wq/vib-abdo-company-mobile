@@ -55,7 +55,8 @@ class ErrorHandler {
 
   void report(Object error, [StackTrace? stackTrace]) {
     // [stackTrace] is accepted so callers can pass it, and intentionally not
-    // printed: frames can capture field values.
+    // printed: frames can capture field values. Release builds stay silent.
+    if (!kDebugMode) return;
     debugPrint('api_error ${toFailure(error).diagnostic}');
   }
 }
