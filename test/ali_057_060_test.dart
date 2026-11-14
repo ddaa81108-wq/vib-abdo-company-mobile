@@ -123,7 +123,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('masraweya القيمة stays wider than العمولة for a long number', (
+  testWidgets('masraweya money columns share one width for a long number', (
     tester,
   ) async {
     await pumpFakeApp(tester, size: const Size(360, 800));
@@ -131,7 +131,9 @@ void main() {
     await go(tester, '/masraweya');
     final value = _columnWidth(tester, 'القيمة');
     final commission = _columnWidth(tester, 'العمولة');
-    expect(value, greaterThan(commission * 2));
+    final total = _columnWidth(tester, 'الإجمالي');
+    expect((value - commission).abs(), lessThan(1));
+    expect((value - total).abs(), lessThan(1));
     await tester.enterText(
       find.byKey(const Key('masraweya-entry-value-field-0')),
       '999999999999',
