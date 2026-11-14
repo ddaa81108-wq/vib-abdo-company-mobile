@@ -30,6 +30,7 @@ import '../features/settings/security_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/splash/splash_screen.dart';
 import '../security/capture_harness.dart';
+import 'session_providers.dart';
 import '../security/capture_harness_screen.dart'
     if (dart.vm.product) '../security/capture_harness_screen_stub.dart';
 import '../features/treasury/treasury_screen.dart';
@@ -162,6 +163,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+  // Redirect alone can leave the previous page under the login route, so
+  // Android back would reopen the signed-in shell. `go` replaces that stack.
+  ref.listen(sessionStateProvider, (previous, next) {
+    if (next is SessionUnauthenticated &&
+        previous is! SessionUnauthenticated &&
+        previous != null) {
+      router.go('/login');
+    }
+  });
   ref.onDispose(router.dispose);
   return router;
 });
