@@ -1718,8 +1718,7 @@ class _PurchaseGrid extends ConsumerWidget {
     // Website: `canWrite && dayStatus === 'draft'`. The open day supplies
     // the status and the version when the row itself omits them. A day with
     // no version at all cannot be written, so the buttons stay hidden.
-    final draftDay =
-        entry.dayStatus == 'draft' || _onOpenEditableDay(entry);
+    final draftDay = entry.dayStatus == 'draft' || _onOpenEditableDay(entry);
     return draftDay && _dayVersionOf(entry) != null;
   }
 

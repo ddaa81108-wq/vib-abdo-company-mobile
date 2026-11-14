@@ -24,8 +24,14 @@ void main() {
         find.byKey(const Key('purchase-field-value')),
         amount,
       );
-      await tester.enterText(find.byKey(const Key('purchase-field-rate')), '10');
-      await tester.enterText(find.byKey(const Key('purchase-field-paid')), '10');
+      await tester.enterText(
+        find.byKey(const Key('purchase-field-rate')),
+        '10',
+      );
+      await tester.enterText(
+        find.byKey(const Key('purchase-field-paid')),
+        '10',
+      );
       await tester.ensureVisible(find.byKey(const Key('save-purchase')));
       await tester.tap(find.byKey(const Key('save-purchase')));
       await tester.pumpAndSettle();
