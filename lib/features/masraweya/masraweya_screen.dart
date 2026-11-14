@@ -1069,9 +1069,8 @@ class _DayViewState extends ConsumerState<_DayView> {
                   else
                     KeyedSubtree(
                       key: Key('masraweya-entry-$i'),
-                      child: _moneyCell(
-                        context,
-                        _egp(day.entries[i].valueUnits),
+                      child: _readOnlyFrame(
+                        value: _egp(day.entries[i].valueUnits),
                       ),
                     ),
                   if (editing)
@@ -1086,14 +1085,13 @@ class _DayViewState extends ConsumerState<_DayView> {
                   else
                     KeyedSubtree(
                       key: Key('masraweya-entry-commission-$i'),
-                      child: _moneyCell(
-                        context,
-                        _egp(day.entries[i].commissionUnits),
+                      child: _readOnlyFrame(
+                        value: _egp(day.entries[i].commissionUnits),
                       ),
                     ),
                   KeyedSubtree(
                     key: Key('masraweya-entry-total-$i'),
-                    child: _moneyCell(context, _rowTotalLabel(i, editing)),
+                    child: _readOnlyFrame(value: _rowTotalLabel(i, editing)),
                   ),
                 ],
             ],
@@ -1384,37 +1382,29 @@ class _DayViewState extends ConsumerState<_DayView> {
     child: Text(n, style: cairo(14, 800, color: context.look.ink)),
   );
 
-  Widget _moneyCell(BuildContext context, String value) => Center(
-    child: FittedBox(
+  Widget _readOnlyFrame({required String value}) {
+    return FittedBox(
       fit: BoxFit.scaleDown,
       child: MoneyText(value, style: cairo(13, 700, color: context.look.ink)),
-    ),
-  );
+    );
+  }
 
   Widget _inputCell({
     required Key fieldKey,
     required TextEditingController controller,
     required FocusNode focusNode,
   }) {
-    final look = context.look;
-    return Container(
-      decoration: BoxDecoration(
-        color: look.card,
-        borderRadius: BorderRadius.circular(AppRadii.md),
-        border: Border.all(color: _frameGold(context), width: 1.4),
-      ),
-      padding: const EdgeInsetsDirectional.symmetric(horizontal: 2),
-      child: UnitsField(
-        key: fieldKey,
-        controller: controller,
-        label: '',
-        showHint: false,
-        dense: true,
-        focusNode: focusNode,
-        textInputAction: TextInputAction.next,
-        scrollPadding: _fieldScroll,
-        onSubmitted: (_) => _focusNext(focusNode),
-      ),
+    return UnitsField(
+      key: fieldKey,
+      controller: controller,
+      label: '',
+      showHint: false,
+      dense: true,
+      bare: true,
+      focusNode: focusNode,
+      textInputAction: TextInputAction.next,
+      scrollPadding: _fieldScroll,
+      onSubmitted: (_) => _focusNext(focusNode),
     );
   }
 }
@@ -1435,16 +1425,21 @@ class _WorkTable extends StatelessWidget {
   final String footerValue;
   final String? empty;
 
-  /// التسلسل stays narrow. القيمة is wide enough for a long integer.
-  /// العمولة is narrower. The row total keeps a middle share.
-  static const _flex = [2, 8, 2, 3];
+  /// التسلسل stays narrow. القيمة, العمولة, and الإجمالي share one width.
+  static const _flex = [2, 5, 5, 5];
 
   @override
   Widget build(BuildContext context) {
     final look = context.look;
     final gold = _frameGold(context);
     final line = BorderSide(color: gold.withValues(alpha: 0.55));
-    Widget cell(int i, Widget child) => Expanded(
+    Key? frameKey(Widget child) {
+      final key = child.key;
+      if (key is ValueKey<String>) return ValueKey('frame-${key.value}');
+      return null;
+    }
+
+    Widget headerCell(int i, Widget child) => Expanded(
       flex: _flex[i],
       child: Container(
         decoration: BoxDecoration(
@@ -1452,6 +1447,25 @@ class _WorkTable extends StatelessWidget {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 6),
         alignment: Alignment.center,
+        child: child,
+      ),
+    );
+
+    /// القيمة, العمولة, and الإجمالي share this frame. التسلسل stays plain.
+    Widget bodyCell(int i, Widget child) => Expanded(
+      flex: _flex[i],
+      child: Container(
+        key: i == 0 ? null : frameKey(child),
+        margin: EdgeInsets.symmetric(horizontal: i == 0 ? 0 : 2, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        alignment: Alignment.center,
+        decoration: i == 0
+            ? null
+            : BoxDecoration(
+                color: look.card,
+                borderRadius: BorderRadius.circular(AppRadii.md),
+                border: Border.all(color: gold, width: 1.4),
+              ),
         child: child,
       ),
     );
@@ -1470,12 +1484,16 @@ class _WorkTable extends StatelessWidget {
               child: Row(
                 children: [
                   for (var i = 0; i < headers.length; i++)
-                    cell(
+                    headerCell(
                       i,
-                      Text(
-                        headers[i],
-                        textAlign: TextAlign.center,
-                        style: cairo(12, 800, color: Colors.white),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          headers[i],
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
+                          style: cairo(12, 800, color: Colors.white),
+                        ),
                       ),
                     ),
                 ],
@@ -1497,7 +1515,8 @@ class _WorkTable extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        for (var i = 0; i < row.length; i++) cell(i, row[i]),
+                        for (var i = 0; i < row.length; i++)
+                          bodyCell(i, row[i]),
                       ],
                     ),
                   ),
@@ -1514,9 +1533,14 @@ class _WorkTable extends StatelessWidget {
                         horizontal: 8,
                         vertical: 10,
                       ),
-                      child: Text(
-                        footerLabel,
-                        style: cairo(12.5, 800, color: Colors.white),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(
+                          footerLabel,
+                          maxLines: 1,
+                          style: cairo(12.5, 800, color: Colors.white),
+                        ),
                       ),
                     ),
                   ),

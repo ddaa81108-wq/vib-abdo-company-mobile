@@ -898,6 +898,7 @@ class UnitsField extends StatelessWidget {
     required this.label,
     super.key,
     this.dense,
+    this.bare = false,
     this.showHint = true,
     this.labelStyle,
     this.autofocus = false,
@@ -921,6 +922,9 @@ class UnitsField extends StatelessWidget {
 
   /// Overrides the theme density. Null keeps the theme value.
   final bool? dense;
+
+  /// No fill and no outline. The parent draws the shared cell frame.
+  final bool bare;
 
   final TextInputAction? textInputAction;
   final VoidCallback? onEditingComplete;
@@ -949,6 +953,16 @@ class UnitsField extends StatelessWidget {
         helperText: showHint ? AppStrings.unitsHint : null,
         helperMaxLines: 12,
         isDense: dense,
+        filled: bare ? false : null,
+        border: bare ? InputBorder.none : null,
+        enabledBorder: bare ? InputBorder.none : null,
+        focusedBorder: bare ? InputBorder.none : null,
+        disabledBorder: bare ? InputBorder.none : null,
+        errorBorder: bare ? InputBorder.none : null,
+        focusedErrorBorder: bare ? InputBorder.none : null,
+        contentPadding: bare
+            ? const EdgeInsets.symmetric(horizontal: 4, vertical: 10)
+            : null,
       ),
     );
   }
