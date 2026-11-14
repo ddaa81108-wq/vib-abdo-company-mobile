@@ -96,8 +96,9 @@ String websiteCardAmount(MoneyFormatter money, AccountCardDto card) {
   return '$grouped ${card.currency.symbol}';
 }
 
-/// «آخر حركة: yyyy/mm/dd, h:mm ص/م». A missing `lastActivityAt` is a dash.
-/// The API card has no separate `updatedAt`; this uses `lastActivityAt`.
+/// «آخر حركة: yyyy/mm/dd, h:mm ص/م». A missing instant is a dash.
+/// [AccountCardDto.lastActivityAt] is the list field the website uses:
+/// `updatedAt`, then `createdAt`, unless the server sent a dedicated time.
 String websiteCardMovement(DateTime? value) {
   if (value == null) return '${AppStrings.lastActivity}: ${AppStrings.dash}';
   final local = value.toLocal();
