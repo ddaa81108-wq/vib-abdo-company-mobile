@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_api_layer/api_layer.dart';
@@ -1159,206 +1161,212 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
       ),
     );
     final tick = widget.scale;
+    final tableWidth =
+        width.fold<double>(0, (sum, item) => sum + item) + widget.actionWidth;
     return Theme(
       data: quietFields,
-      child: IntrinsicHeight(
-        child: Row(
-          key: const Key('purchase-inline-row'),
-          textDirection: TextDirection.rtl,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: SizedBox(
+        width: tableWidth,
+        child: Stack(
           children: [
-            cell(
-              index: 0,
-              child: Center(
-                child: Text(
-                  existing?.sequence?.toString() ?? '—',
-                  style: cairo(14, 800, color: context.look.ink),
-                ),
-              ),
-            ),
-            cell(
-              index: 1,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+            IntrinsicHeight(
+              child: Row(
+                key: const Key('purchase-inline-row'),
+                textDirection: TextDirection.rtl,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  SizedBox(
-                    height: 48,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          for (final kind in _kinds)
-                            Padding(
-                              padding: const EdgeInsetsDirectional.only(end: 4),
-                              child: ChoiceChip(
-                                key: Key('purchase-kind-${kind.$1}'),
-                                label: Text(kind.$2),
-                                selected: _itemCode == kind.$1,
-                                onSelected: (_) =>
-                                    setState(() => _itemCode = kind.$1),
-                              ),
+                  cell(
+                    index: 0,
+                    child: Center(
+                      child: Text(
+                        existing?.sequence?.toString() ?? '—',
+                        style: cairo(14, 800, color: context.look.ink),
+                      ),
+                    ),
+                  ),
+                  cell(
+                    index: 1,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          height: 48,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (final kind in _kinds)
+                                  Padding(
+                                    padding: const EdgeInsetsDirectional.only(
+                                      end: 4,
+                                    ),
+                                    child: ChoiceChip(
+                                      key: Key('purchase-kind-${kind.$1}'),
+                                      label: Text(kind.$2),
+                                      selected: _itemCode == kind.$1,
+                                      onSelected: (_) =>
+                                          setState(() => _itemCode = kind.$1),
+                                    ),
+                                  ),
+                              ],
                             ),
-                        ],
-                      ),
+                          ),
+                        ),
+                        if (custom)
+                          TextField(
+                            key: const Key('purchase-custom-label'),
+                            controller: _customLabel,
+                            decoration: const InputDecoration(
+                              labelText: AppStrings.customItemName,
+                              isDense: true,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  if (custom)
-                    TextField(
-                      key: const Key('purchase-custom-label'),
-                      controller: _customLabel,
-                      decoration: const InputDecoration(
-                        labelText: AppStrings.customItemName,
-                        isDense: true,
-                      ),
+                  cell(
+                    index: 2,
+                    focused: _valueFocus.hasFocus,
+                    child: UnitsField(
+                      key: const Key('purchase-field-value'),
+                      controller: _egp,
+                      focusNode: _valueFocus,
+                      label: '',
+                      showHint: false,
+                      dense: true,
+                      scrollPadding: fieldPad,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () => _next(_rateFocus),
+                      onSubmitted: (_) => _next(_rateFocus),
                     ),
-                ],
-              ),
-            ),
-            cell(
-              index: 2,
-              focused: _valueFocus.hasFocus,
-              child: UnitsField(
-                key: const Key('purchase-field-value'),
-                controller: _egp,
-                focusNode: _valueFocus,
-                label: '',
-                showHint: false,
-                dense: true,
-                scrollPadding: fieldPad,
-                textInputAction: TextInputAction.next,
-                onEditingComplete: () => _next(_rateFocus),
-                onSubmitted: (_) => _next(_rateFocus),
-              ),
-            ),
-            cell(
-              index: 3,
-              focused: _opFocus.hasFocus,
-              child: DropdownButton<CalculationMode>(
-                focusNode: _opFocus,
-                value: _mode,
-                isExpanded: true,
-                items: const [
-                  DropdownMenuItem(
-                    value: CalculationMode.divide,
-                    child: CalculationMark(CalculationMode.divide),
                   ),
-                  DropdownMenuItem(
-                    value: CalculationMode.multiply,
-                    child: CalculationMark(CalculationMode.multiply),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() => _mode = value ?? CalculationMode.divide);
-                  _next(_rateFocus);
-                },
-              ),
-            ),
-            cell(
-              index: 4,
-              focused: _rateFocus.hasFocus,
-              child: TextField(
-                key: const Key('purchase-field-rate'),
-                controller: _rate,
-                focusNode: _rateFocus,
-                textDirection: TextDirection.ltr,
-                textInputAction: TextInputAction.next,
-                scrollPadding: fieldPad,
-                decoration: const InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                ),
-                onEditingComplete: () => _next(_paidFocus),
-                onSubmitted: (_) => _next(_paidFocus),
-              ),
-            ),
-            cell(
-              index: 5,
-              child: Center(
-                child: Text(
-                  result,
-                  key: const Key('purchase-preview-result'),
-                  textAlign: TextAlign.center,
-                  style: cairo(12, 700, color: context.look.muted),
-                ),
-              ),
-            ),
-            cell(
-              index: 6,
-              focused: _paidFocus.hasFocus,
-              child: UnitsField(
-                key: const Key('purchase-field-paid'),
-                controller: _paid,
-                focusNode: _paidFocus,
-                label: '',
-                showHint: false,
-                dense: true,
-                scrollPadding: fieldPad,
-                textInputAction: TextInputAction.next,
-                onEditingComplete: () => _next(_vodafoneFocus),
-                onSubmitted: (_) => _next(_vodafoneFocus),
-              ),
-            ),
-            cell(
-              index: 7,
-              child: Center(
-                child: Text(
-                  remaining,
-                  key: const Key('purchase-preview-balance'),
-                  textAlign: TextAlign.center,
-                  style: cairo(12, 900, color: const Color(0xFF211A08)),
-                ),
-              ),
-            ),
-            cell(
-              index: 8,
-              focused: _vodafoneFocus.hasFocus,
-              child: UnitsField(
-                key: const Key('purchase-field-vodafone'),
-                controller: _vodafone,
-                focusNode: _vodafoneFocus,
-                label: '',
-                showHint: false,
-                dense: true,
-                scrollPadding: fieldPad,
-                textInputAction: TextInputAction.done,
-              ),
-            ),
-            DecoratedBox(
-              key: const Key('purchase-action-edit'),
-              decoration: BoxDecoration(
-                color: sectionButtonGold.withValues(alpha: 0.14),
-                border: Border.all(color: line),
-              ),
-              child: SizedBox(
-                width: widget.actionWidth,
-                child: Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _TickButton(
-                        buttonKey: const Key('save-purchase'),
-                        icon: Icons.check,
-                        label: AppStrings.save,
-                        scale: tick,
-                        fill: const Color(0xFF008851),
-                        border: const Color(0xFF8AEFBF),
-                        inputs:
-                            '$_itemCode|${_customLabel.text}|$_mode|${_egp.text}|${_rate.text}|${_paid.text}|${_vodafone.text}',
-                        expectedVersion: widget.version,
-                        onSubmit: _submit,
-                      ),
-                      if (existing != null) ...[
-                        SizedBox(width: 4 * tick),
-                        _CancelTick(
-                          scale: tick,
-                          onPressed: () =>
-                              ref.read(_ledgerDraftProvider.notifier).state =
-                                  null,
+                  cell(
+                    index: 3,
+                    focused: _opFocus.hasFocus,
+                    child: DropdownButton<CalculationMode>(
+                      focusNode: _opFocus,
+                      value: _mode,
+                      isExpanded: true,
+                      items: const [
+                        DropdownMenuItem(
+                          value: CalculationMode.divide,
+                          child: CalculationMark(CalculationMode.divide),
+                        ),
+                        DropdownMenuItem(
+                          value: CalculationMode.multiply,
+                          child: CalculationMark(CalculationMode.multiply),
                         ),
                       ],
-                    ],
+                      onChanged: (value) {
+                        setState(() => _mode = value ?? CalculationMode.divide);
+                        _next(_rateFocus);
+                      },
+                    ),
                   ),
-                ),
+                  cell(
+                    index: 4,
+                    focused: _rateFocus.hasFocus,
+                    child: TextField(
+                      key: const Key('purchase-field-rate'),
+                      controller: _rate,
+                      focusNode: _rateFocus,
+                      textDirection: TextDirection.ltr,
+                      textInputAction: TextInputAction.next,
+                      scrollPadding: fieldPad,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                      ),
+                      onEditingComplete: () => _next(_paidFocus),
+                      onSubmitted: (_) => _next(_paidFocus),
+                    ),
+                  ),
+                  cell(
+                    index: 5,
+                    child: Center(
+                      child: Text(
+                        result,
+                        key: const Key('purchase-preview-result'),
+                        textAlign: TextAlign.center,
+                        style: cairo(12, 700, color: context.look.muted),
+                      ),
+                    ),
+                  ),
+                  cell(
+                    index: 6,
+                    focused: _paidFocus.hasFocus,
+                    child: UnitsField(
+                      key: const Key('purchase-field-paid'),
+                      controller: _paid,
+                      focusNode: _paidFocus,
+                      label: '',
+                      showHint: false,
+                      dense: true,
+                      scrollPadding: fieldPad,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () => _next(_vodafoneFocus),
+                      onSubmitted: (_) => _next(_vodafoneFocus),
+                    ),
+                  ),
+                  cell(
+                    index: 7,
+                    child: Center(
+                      child: Text(
+                        remaining,
+                        key: const Key('purchase-preview-balance'),
+                        textAlign: TextAlign.center,
+                        style: cairo(12, 900, color: const Color(0xFF211A08)),
+                      ),
+                    ),
+                  ),
+                  cell(
+                    index: 8,
+                    focused: _vodafoneFocus.hasFocus,
+                    child: UnitsField(
+                      key: const Key('purchase-field-vodafone'),
+                      controller: _vodafone,
+                      focusNode: _vodafoneFocus,
+                      label: '',
+                      showHint: false,
+                      dense: true,
+                      scrollPadding: fieldPad,
+                      textInputAction: TextInputAction.done,
+                    ),
+                  ),
+                  SizedBox(width: widget.actionWidth),
+                ],
+              ),
+            ),
+            _PinnedLedgerAction(
+              tableWidth: tableWidth,
+              width: widget.actionWidth,
+              color: sectionButtonGold.withValues(alpha: 0.14),
+              lineColor: line,
+              child: Row(
+                key: const Key('purchase-action-edit'),
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _TickButton(
+                    buttonKey: const Key('save-purchase'),
+                    icon: Icons.check,
+                    label: AppStrings.save,
+                    scale: tick,
+                    fill: const Color(0xFF008851),
+                    border: const Color(0xFF8AEFBF),
+                    inputs:
+                        '$_itemCode|${_customLabel.text}|$_mode|${_egp.text}|${_rate.text}|${_vodafone.text}',
+                    expectedVersion: widget.version,
+                    onSubmit: _submit,
+                  ),
+                  if (existing != null) ...[
+                    SizedBox(width: 4 * tick),
+                    _CancelTick(
+                      scale: tick,
+                      onPressed: () =>
+                          ref.read(_ledgerDraftProvider.notifier).state = null,
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
@@ -1693,23 +1701,30 @@ class _PurchaseGrid extends ConsumerWidget {
     return entry.dayId != null && entry.dayId == day.id;
   }
 
-  bool _draftRow(PurchaseEntryDto entry) =>
-      entry.dayStatus == 'draft' || _onOpenEditableDay(entry);
-
   int? _dayVersionOf(PurchaseEntryDto entry) =>
       entry.dayVersion ?? (_onOpenEditableDay(entry) ? openDay?.version : null);
 
+  /// Website `PurchaseEntryGroup`: pencil and delete when
+  /// `canWrite && entry.dayStatus === 'draft'`. A finalized day shows the
+  /// check until `correctionOpen`. Showing the buttons does not require
+  /// `dayVersion`; that field is only sent when the write happens.
+  /// A row on the open day with no `dayStatus` still counts as draft, because
+  /// the server's day object is the same status the join would have stamped.
   bool _writable(PurchaseEntryDto entry) {
     if (!canWrite) return false;
-    // A write needs the day's version. The open day supplies it when the
-    // row only carried the id.
-    if (_dayVersionOf(entry) == null) return false;
-    if (_draftRow(entry)) return true;
-    return entry.dayStatus == 'finalized' && entry.correctionOpen;
+    if (entry.dayStatus == 'finalized') {
+      return entry.correctionOpen && _dayVersionOf(entry) != null;
+    }
+    // Website: `canWrite && dayStatus === 'draft'`. The open day supplies
+    // the status and the version when the row itself omits them. A day with
+    // no version at all cannot be written, so the buttons stay hidden.
+    final draftDay =
+        entry.dayStatus == 'draft' || _onOpenEditableDay(entry);
+    return draftDay && _dayVersionOf(entry) != null;
   }
 
   bool _postedCheck(PurchaseEntryDto entry) {
-    if (_writable(entry) || _draftRow(entry)) return false;
+    if (_writable(entry)) return false;
     return entry.dayStatus == 'finalized' && !entry.correctionOpen;
   }
 
@@ -1794,40 +1809,47 @@ class _PurchaseGrid extends ConsumerWidget {
       Key? cellKey,
       bool goldBalance = false,
     }) {
-      return ColoredBox(
-        color: color,
-        child: Row(
-          textDirection: TextDirection.rtl,
-          crossAxisAlignment: CrossAxisAlignment.center,
+      final tableWidth =
+          _ledgerCols.fold<double>(0, (sum, col) => sum + col.$2 * scale) +
+          actionW;
+      return SizedBox(
+        width: tableWidth,
+        height: height,
+        child: Stack(
           children: [
-            for (var i = 0; i < _ledgerCols.length; i++)
-              DecoratedBox(
-                key: i == 0 && cellKey != null ? cellKey : null,
-                decoration: BoxDecoration(
-                  color: goldBalance && i == 7 ? balanceFill : null,
-                  border: Border.all(color: lineColor, width: 1),
-                ),
-                child: SizedBox(
-                  width: _ledgerCols[i].$2 * scale,
-                  height: height,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: FittedBox(fit: BoxFit.scaleDown, child: cells[i]),
+            Row(
+              textDirection: TextDirection.rtl,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                for (var i = 0; i < _ledgerCols.length; i++)
+                  DecoratedBox(
+                    key: i == 0 && cellKey != null ? cellKey : null,
+                    decoration: BoxDecoration(
+                      color: goldBalance && i == 7 ? balanceFill : null,
+                      border: Border.all(color: lineColor, width: 1),
+                    ),
+                    child: SizedBox(
+                      width: _ledgerCols[i].$2 * scale,
+                      height: height,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: cells[i],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border.all(color: lineColor, width: 1),
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minWidth: actionW,
-                  maxWidth: actionW,
-                  minHeight: height,
-                ),
-                child: Center(child: tail ?? const SizedBox.shrink()),
-              ),
+                SizedBox(width: actionW, height: height),
+              ],
+            ),
+            _PinnedLedgerAction(
+              tableWidth: tableWidth,
+              width: actionW,
+              height: height,
+              color: color,
+              lineColor: lineColor,
+              child: tail ?? const SizedBox.shrink(),
             ),
           ],
         ),
@@ -2025,6 +2047,54 @@ class _LedgerHScroll extends ChangeNotifier {
     this.offset = offset;
     this.viewport = viewport;
     notifyListeners();
+  }
+}
+
+/// Keeps the save column on the visible edge. The column is the last cell
+/// of an RTL row, so a phone's horizontal offset 0 leaves it off-screen.
+class _PinnedLedgerAction extends StatelessWidget {
+  const _PinnedLedgerAction({
+    required this.tableWidth,
+    required this.width,
+    this.height,
+    required this.color,
+    required this.lineColor,
+    required this.child,
+  });
+
+  final double tableWidth;
+  final double width;
+
+  /// Null stretches to the stack's height (the inline editor is taller).
+  final double? height;
+  final Color color;
+  final Color lineColor;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scroll = _LedgerHScrollScope.maybeOf(context);
+    final measured = scroll?.viewport ?? 0;
+    final viewport = measured > 1 ? measured : MediaQuery.sizeOf(context).width;
+    final offset = scroll?.offset ?? 0;
+    final maxLeft = math.max(0.0, tableWidth - width);
+    final left = (tableWidth - viewport - offset).clamp(0.0, maxLeft);
+    return Positioned(
+      left: left,
+      width: width,
+      top: 0,
+      height: height,
+      bottom: height == null ? 0 : null,
+      child: ColoredBox(
+        color: color,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(color: lineColor, width: 1),
+          ),
+          child: Center(child: child),
+        ),
+      ),
+    );
   }
 }
 
@@ -2467,59 +2537,59 @@ class _LedgerScrollerState extends State<_LedgerScroller> {
 
   @override
   Widget build(BuildContext context) {
-    return SliverMainAxisGroup(
-      slivers: [
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _FixedHead(
-            height: widget.headerHeight,
-            gold: widget.gold,
-            child: DecoratedBox(
-              key: const Key('purchase-ledger'),
-              decoration: BoxDecoration(
-                color: const Color(0xFF111111),
-                border: Border(
-                  top: BorderSide(color: widget.gold, width: 1.4),
-                  left: BorderSide(color: widget.gold, width: 1.4),
-                  right: BorderSide(color: widget.gold, width: 1.4),
+    return _LedgerHScrollScope(
+      notifier: _metrics,
+      child: SliverMainAxisGroup(
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _FixedHead(
+              height: widget.headerHeight,
+              gold: widget.gold,
+              child: DecoratedBox(
+                key: const Key('purchase-ledger'),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF111111),
+                  border: Border(
+                    top: BorderSide(color: widget.gold, width: 1.4),
+                    left: BorderSide(color: widget.gold, width: 1.4),
+                    right: BorderSide(color: widget.gold, width: 1.4),
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  controller: _head,
+                  scrollDirection: Axis.horizontal,
+                  child: widget.header,
                 ),
               ),
-              child: SingleChildScrollView(
-                controller: _head,
-                scrollDirection: Axis.horizontal,
-                child: widget.header,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(color: widget.gold, width: 1.4),
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  if ((width - _viewport).abs() > 0.5) {
+                    _viewport = width;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) _publish();
+                    });
+                  }
+                  return SingleChildScrollView(
+                    key: const Key('purchase-ledger-scroll'),
+                    controller: _body,
+                    scrollDirection: Axis.horizontal,
+                    child: widget.rows,
+                  );
+                },
               ),
             ),
           ),
-        ),
-        SliverToBoxAdapter(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              border: Border.all(color: widget.gold, width: 1.4),
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth;
-                if ((width - _viewport).abs() > 0.5) {
-                  _viewport = width;
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) _publish();
-                  });
-                }
-                return SingleChildScrollView(
-                  key: const Key('purchase-ledger-scroll'),
-                  controller: _body,
-                  scrollDirection: Axis.horizontal,
-                  child: _LedgerHScrollScope(
-                    notifier: _metrics,
-                    child: widget.rows,
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
