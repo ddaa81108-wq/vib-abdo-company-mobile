@@ -54,182 +54,195 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final cream = const Color(0xFFF8F4EC);
     final field = const Color(0xFFF1EBE0);
     final hint = const Color(0xFF4E463C);
-    return Scaffold(
-      key: LoginScreen.screenKey,
-      backgroundColor: const Color(0xFF07111C),
-      resizeToAvoidBottomInset: true,
-      body: Stack(
-        children: [
-          const Positioned.fill(
-            child: CustomPaint(painter: LoginWavePainter()),
-          ),
-          SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 20),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight - 28,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _DesignCard(
-                          cream: cream,
-                          child: AutofillGroup(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  'VIB',
-                                  textAlign: TextAlign.left,
-                                  style: previewType(
-                                    22,
-                                    700,
-                                    color: const Color(0xFF071525),
-                                    height: 1,
+    // Android back on a signed-out login route must not finish the activity.
+    // `router.go('/login')` already drops the shell, and this keeps that
+    // screen in front when the system back button arrives.
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        key: LoginScreen.screenKey,
+        backgroundColor: const Color(0xFF07111C),
+        resizeToAvoidBottomInset: true,
+        body: Stack(
+          children: [
+            const Positioned.fill(
+              child: CustomPaint(painter: LoginWavePainter()),
+            ),
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 20),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight - 28,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _DesignCard(
+                            cream: cream,
+                            child: AutofillGroup(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    'VIB',
+                                    textAlign: TextAlign.left,
+                                    style: previewType(
+                                      22,
+                                      700,
+                                      color: const Color(0xFF071525),
+                                      height: 1,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'أهلًا بك',
-                                  style: previewType(
-                                    26,
-                                    700,
-                                    color: ink,
-                                    height: 1,
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'أهلًا بك',
+                                    style: previewType(
+                                      26,
+                                      700,
+                                      color: ink,
+                                      height: 1,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 14),
-                                TextField(
-                                  key: LoginScreen.usernameKey,
-                                  controller: _username,
-                                  enabled: !busy && online,
-                                  keyboardType: TextInputType.emailAddress,
-                                  textDirection: TextDirection.ltr,
-                                  textAlign: TextAlign.right,
-                                  textInputAction: TextInputAction.next,
-                                  autofillHints: const [AutofillHints.username],
-                                  style: previewType(15, 600, color: ink),
-                                  decoration: _fieldDecoration(
-                                    'اسم المستخدم',
-                                    fill: field,
-                                    hintColor: hint,
+                                  const SizedBox(height: 14),
+                                  TextField(
+                                    key: LoginScreen.usernameKey,
+                                    controller: _username,
+                                    enabled: !busy && online,
+                                    keyboardType: TextInputType.emailAddress,
+                                    textDirection: TextDirection.ltr,
+                                    textAlign: TextAlign.right,
+                                    textInputAction: TextInputAction.next,
+                                    autofillHints: const [
+                                      AutofillHints.username,
+                                    ],
+                                    style: previewType(15, 600, color: ink),
+                                    decoration: _fieldDecoration(
+                                      'اسم المستخدم',
+                                      fill: field,
+                                      hintColor: hint,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextField(
-                                        key: LoginScreen.passwordKey,
-                                        controller: _password,
-                                        enabled: !busy && online,
-                                        obscureText: _obscure,
-                                        textDirection: TextDirection.ltr,
-                                        textAlign: TextAlign.right,
-                                        autofillHints: const [
-                                          AutofillHints.password,
-                                        ],
-                                        onSubmitted: (_) => _submit(),
-                                        style: previewType(15, 600, color: ink),
-                                        decoration: _fieldDecoration(
-                                          AppStrings.password,
-                                          fill: field,
-                                          hintColor: hint,
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          key: LoginScreen.passwordKey,
+                                          controller: _password,
+                                          enabled: !busy && online,
+                                          obscureText: _obscure,
+                                          textDirection: TextDirection.ltr,
+                                          textAlign: TextAlign.right,
+                                          autofillHints: const [
+                                            AutofillHints.password,
+                                          ],
+                                          onSubmitted: (_) => _submit(),
+                                          style: previewType(
+                                            15,
+                                            600,
+                                            color: ink,
+                                          ),
+                                          decoration: _fieldDecoration(
+                                            AppStrings.password,
+                                            fill: field,
+                                            hintColor: hint,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    IconButton(
-                                      tooltip: _obscure
-                                          ? AppStrings.showPassword
-                                          : AppStrings.hidePassword,
-                                      onPressed: busy
-                                          ? null
-                                          : () => setState(
-                                              () => _obscure = !_obscure,
-                                            ),
-                                      icon: Icon(
-                                        _obscure
-                                            ? Icons.visibility_outlined
-                                            : Icons.visibility_off_outlined,
-                                        color: ink,
-                                        size: 20,
+                                      IconButton(
+                                        tooltip: _obscure
+                                            ? AppStrings.showPassword
+                                            : AppStrings.hidePassword,
+                                        onPressed: busy
+                                            ? null
+                                            : () => setState(
+                                                () => _obscure = !_obscure,
+                                              ),
+                                        icon: Icon(
+                                          _obscure
+                                              ? Icons.visibility_outlined
+                                              : Icons.visibility_off_outlined,
+                                          color: ink,
+                                          size: 20,
+                                        ),
                                       ),
+                                    ],
+                                  ),
+                                  if (notice != null) ...[
+                                    const SizedBox(height: 12),
+                                    SessionExpiredNotice(message: notice),
+                                  ],
+                                  if (message != null) ...[
+                                    const SizedBox(height: 12),
+                                    _LoginError(
+                                      message: message,
+                                      noticeKey: LoginScreen.errorKey,
                                     ),
                                   ],
-                                ),
-                                if (notice != null) ...[
-                                  const SizedBox(height: 12),
-                                  SessionExpiredNotice(message: notice),
-                                ],
-                                if (message != null) ...[
-                                  const SizedBox(height: 12),
-                                  _LoginError(
-                                    message: message,
-                                    noticeKey: LoginScreen.errorKey,
+                                  if (!online) ...[
+                                    const SizedBox(height: 12),
+                                    _LoginError(message: AppStrings.offline),
+                                  ],
+                                  const SizedBox(height: 14),
+                                  FilledButton(
+                                    key: LoginScreen.submitKey,
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFF071525),
+                                      foregroundColor: const Color(0xFFF6E7A8),
+                                      disabledBackgroundColor: const Color(
+                                        0xFF243044,
+                                      ),
+                                      disabledForegroundColor: const Color(
+                                        0xFFD9C89A,
+                                      ),
+                                      minimumSize: const Size.fromHeight(52),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(18),
+                                      ),
+                                      textStyle: previewType(16, 700),
+                                    ),
+                                    onPressed: busy || !online ? null : _submit,
+                                    child: busy
+                                        ? const SizedBox(
+                                            width: 22,
+                                            height: 22,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Color(0xFFF6E7A8),
+                                            ),
+                                          )
+                                        : const Text(AppStrings.signIn),
                                   ),
                                 ],
-                                if (!online) ...[
-                                  const SizedBox(height: 12),
-                                  _LoginError(message: AppStrings.offline),
-                                ],
-                                const SizedBox(height: 14),
-                                FilledButton(
-                                  key: LoginScreen.submitKey,
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: const Color(0xFF071525),
-                                    foregroundColor: const Color(0xFFF6E7A8),
-                                    disabledBackgroundColor: const Color(
-                                      0xFF243044,
-                                    ),
-                                    disabledForegroundColor: const Color(
-                                      0xFFD9C89A,
-                                    ),
-                                    minimumSize: const Size.fromHeight(52),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(18),
-                                    ),
-                                    textStyle: previewType(16, 700),
-                                  ),
-                                  onPressed: busy || !online ? null : _submit,
-                                  child: busy
-                                      ? const SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Color(0xFFF6E7A8),
-                                          ),
-                                        )
-                                      : const Text(AppStrings.signIn),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
-          PositionedDirectional(
-            top: 4,
-            start: 4,
-            child: SafeArea(
-              child: IconButton(
-                key: LoginScreen.themeKey,
-                tooltip: dark ? AppStrings.themeLight : AppStrings.themeDark,
-                color: const Color(0xFFF6E7A8),
-                onPressed: () => ref.read(themeModeProvider.notifier).toggle(),
-                icon: Icon(dark ? Icons.light_mode : Icons.dark_mode),
+                  );
+                },
               ),
             ),
-          ),
-        ],
+            PositionedDirectional(
+              top: 4,
+              start: 4,
+              child: SafeArea(
+                child: IconButton(
+                  key: LoginScreen.themeKey,
+                  tooltip: dark ? AppStrings.themeLight : AppStrings.themeDark,
+                  color: const Color(0xFFF6E7A8),
+                  onPressed: () =>
+                      ref.read(themeModeProvider.notifier).toggle(),
+                  icon: Icon(dark ? Icons.light_mode : Icons.dark_mode),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

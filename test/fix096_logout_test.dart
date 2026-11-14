@@ -86,6 +86,13 @@ Future<void> _expectLoggedOut(WidgetTester tester, ApiLayer layer) async {
   expect((layer.session.state as SessionUnauthenticated).reason, 'logout');
   final router = GoRouter.of(tester.element(find.byType(LoginScreen)));
   expect(router.canPop(), isFalse);
+  // The system back button finishes the activity when the route agrees to
+  // pop. Login must refuse, or Android leaves the app for the launcher.
+  expect(
+    ModalRoute.of(tester.element(find.byKey(LoginScreen.screenKey)))
+        ?.popDisposition,
+    RoutePopDisposition.doNotPop,
+  );
   await tester.binding.handlePopRoute();
   await tester.pump();
   expect(find.byKey(LoginScreen.screenKey), findsOneWidget);
