@@ -129,14 +129,14 @@ class PurchaseEntryDto {
         unitsOrNull(j[key], fieldPath: key, rowId: rowId);
     return PurchaseEntryDto(
       id: str(j['id']),
-      dayId: strOrNull(j['dayId']),
+      dayId: strOrNull(j['dayId'] ?? j['day_id']),
       sequence: intOrNull(j['sequence']),
-      dayNumber: intOrNull(j['dayNumber']),
-      businessDate: strOrNull(j['businessDate']),
-      dayStatus: strOrNull(j['dayStatus']),
+      dayNumber: intOrNull(j['dayNumber'] ?? j['day_number']),
+      businessDate: strOrNull(j['businessDate'] ?? j['business_date']),
+      dayStatus: strOrNull(j['dayStatus'] ?? j['day_status']),
       dayClosingDebtUnits: money('dayClosingDebtUnits'),
-      dayVersion: intOrNull(j['dayVersion']),
-      correctionOpen: boolOf(j['correctionOpen']),
+      dayVersion: intOrNull(j['dayVersion'] ?? j['day_version']),
+      correctionOpen: boolOf(j['correctionOpen'] ?? j['correction_open']),
       itemCode: strOrNull(j['itemCode']),
       itemLabel: strOrNull(j['itemLabel']),
       egpValueUnits: money('egpValueUnits'),
@@ -149,8 +149,40 @@ class PurchaseEntryDto {
       actorName: strOrNull(j['actorName']),
       actorIsOwner: boolOf(j['actorIsOwner']),
       version: intOrNull(j['version']),
-      createdAt: strOrNull(j['createdAt']),
-      updatedAt: strOrNull(j['updatedAt']),
+      createdAt: strOrNull(j['createdAt'] ?? j['created_at']),
+      updatedAt: strOrNull(j['updatedAt'] ?? j['updated_at']),
+    );
+  }
+
+  /// The list join stamps [dayStatus] from the day row. When a payload only
+  /// sends that status on the open [day], a matching row still inherits it.
+  PurchaseEntryDto inheritOpenDay(PurchaseDayDto? day) {
+    if (day == null || dayId == null || dayId != day.id) return this;
+    if (dayStatus != null && dayVersion != null) return this;
+    return PurchaseEntryDto(
+      id: id,
+      dayId: dayId,
+      sequence: sequence,
+      dayNumber: dayNumber ?? day.dayNumber,
+      businessDate: businessDate ?? day.businessDate,
+      dayStatus: dayStatus ?? day.status,
+      dayClosingDebtUnits: dayClosingDebtUnits ?? day.totalDebtUnits,
+      dayVersion: dayVersion ?? day.version,
+      correctionOpen: correctionOpen || day.correctionOpen,
+      itemCode: itemCode,
+      itemLabel: itemLabel,
+      egpValueUnits: egpValueUnits,
+      calculationMode: calculationMode,
+      exchangeRate: exchangeRate,
+      resultUnits: resultUnits,
+      paidUnits: paidUnits,
+      remainingUnits: remainingUnits,
+      vodafoneConsumedUnits: vodafoneConsumedUnits,
+      actorName: actorName,
+      actorIsOwner: actorIsOwner,
+      version: version,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 }
@@ -316,12 +348,15 @@ class PurchasesPage {
     final dayMap = raw['entryDays'] is Map
         ? asJson(raw['entryDays'])
         : const <String, dynamic>{};
+    final day = PurchaseDayDto.fromJsonOrNull(raw['day']);
     return PurchasesPage(
       merchant: PurchaseMerchantDto.fromJsonOrNull(raw['merchant']),
-      day: PurchaseDayDto.fromJsonOrNull(raw['day']),
+      day: day,
       entries: [
         for (final row in asJsonList(raw['entries']))
-          PurchaseEntryDto.fromJson(_purchaseEntryWithDay(row, dayMap)),
+          PurchaseEntryDto.fromJson(
+            _purchaseEntryWithDay(row, dayMap),
+          ).inheritOpenDay(day),
       ],
       nextBefore: _nextBefore(raw['nextBefore']),
       registerTotals: PurchasesRegisterTotalsDto.fromJsonOrNull(
