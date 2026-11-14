@@ -123,6 +123,9 @@ class FakeApiClient implements ApiClient {
   /// The next N older-page reads (`before`) fail (tests).
   int failOlderRemaining = 0;
 
+  /// The next logout request fails. The app must still wipe the session.
+  bool failLogout = false;
+
   /// The next N account-list reads that carry `cursor` fail (tests).
   int failNextAccountPageRemaining = 0;
 
@@ -1122,6 +1125,10 @@ class FakeApiClient implements ApiClient {
       }
     }
     if (path == '/api/auth/logout') {
+      if (failLogout) {
+        failLogout = false;
+        _fail(503, 'NETWORK_UNAVAILABLE', 'تعذر الاتصال.');
+      }
       final id = _presentedSessionId(options);
       if (id != null) _sessions.remove(id);
       if (_jarId == id) _jarId = null;
@@ -1539,11 +1546,15 @@ class FakeApiClient implements ApiClient {
               'إصدار المعاملة يجب أن يكون رقمًا صحيحًا بدون كسور.',
             );
           }
-          return _ok({'entryId': seg[3], 'eventSequences': const []});
+          if (method == 'DELETE') {
+            return _deletePurchaseEntry(seg[1], seg[3], b);
+          }
+          return _updatePurchaseEntry(seg[1], seg[3], b);
         }
         // Production create answers `{entryId, sequence, eventSequences}`.
         if (method == 'POST' && seg.length == 2) {
           _rememberPurchaseEntry(seg[1], b);
+          _recalculatePurchaseDay(seg[1]);
         }
         return _ok({
           'entryId': 'pe_new',
@@ -2521,14 +2532,7 @@ class FakeApiClient implements ApiClient {
     }
     final entries = body['entries'];
     if (day != null && entries is List) {
-      final remembered = [
-        for (final raw in _createdPurchaseEntries)
-          if ('${raw['book']}' == book) Map<String, dynamic>.from(raw),
-      ];
-      body['entries'] = [
-        for (final raw in [...entries, ...remembered])
-          if (raw is Map) _entryOnThisPage(Map<String, dynamic>.from(raw), day),
-      ];
+      body['entries'] = _purchaseRows(book, entries, day);
     }
     if (purchaseFirstNextBefore != null) {
       body['nextBefore'] = purchaseFirstNextBefore;
@@ -2541,9 +2545,16 @@ class FakeApiClient implements ApiClient {
   /// the pencil and the trash.
   final List<Map<String, dynamic>> _createdPurchaseEntries = [];
 
+  /// Edits applied to a fixture row or a created row. The next read uses them.
+  final Map<String, Map<String, dynamic>> _purchaseEntryEdits = {};
+
+  final Set<String> _deletedPurchaseIds = {};
+
   void _rememberPurchaseEntry(String book, Map b) {
     final day = _openPurchaseDay(book);
     if (day == null) return;
+    _requireVersion(b['expectedDayVersion'], day['version']);
+    final amounts = _purchaseAmounts(b);
     _createdPurchaseEntries.add({
       'book': book,
       'id': 'pe_new_${_createdPurchaseEntries.length + 1}',
@@ -2555,13 +2566,13 @@ class FakeApiClient implements ApiClient {
       'dayClosingDebtUnits': day['totalDebtUnits'],
       'itemCode': b['itemCode'],
       'itemLabel': b['itemLabel'] ?? 'معاملة جديدة',
-      'egpValueUnits': b['egpValueUnits'] ?? 0,
-      'calculationMode': b['calculationMode'] ?? 'divide',
-      'exchangeRate': b['exchangeRate'] ?? '1',
-      'resultUnits': 0,
-      'paidUnits': b['paidUnits'] ?? 0,
-      'remainingUnits': 0,
-      'vodafoneConsumedUnits': b['vodafoneConsumedUnits'] ?? 0,
+      'egpValueUnits': amounts.value,
+      'calculationMode': amounts.mode,
+      'exchangeRate': amounts.rate,
+      'resultUnits': amounts.result,
+      'paidUnits': amounts.paid,
+      'remainingUnits': amounts.remaining,
+      'vodafoneConsumedUnits': amounts.consumed,
       'actorName': 'مدير تجريبي',
       'actorIsOwner': true,
       'version': 1,
@@ -2569,6 +2580,177 @@ class FakeApiClient implements ApiClient {
       'correctionOpen': day['correctionOpen'] == true,
       'createdAt': '2026-10-19T12:00:00+02:00',
     });
+  }
+
+  ApiResponse _updatePurchaseEntry(String book, String id, Map b) {
+    final current = _purchaseRow(book, id);
+    // Contract samples address an id the fixture does not store. The wire
+    // body is what those tests check, so an unknown row stays a no-op.
+    if (current == null) {
+      return _ok({'entryId': id, 'eventSequences': const []});
+    }
+    final day = _openPurchaseDay(book);
+    if (day == null) _fail(404, 'NOT_FOUND', 'اليوم غير موجود');
+    _requireVersion(b['expectedDayVersion'], day['version']);
+    _requireVersion(b['expectedVersion'], current['version']);
+    final amounts = _purchaseAmounts(b);
+    final next = Map<String, dynamic>.from(current);
+    next['itemCode'] = b['itemCode'] ?? current['itemCode'];
+    next['itemLabel'] = b['itemLabel'] ?? current['itemLabel'];
+    next['egpValueUnits'] = amounts.value;
+    next['calculationMode'] = amounts.mode;
+    next['exchangeRate'] = amounts.rate;
+    next['resultUnits'] = amounts.result;
+    next['paidUnits'] = amounts.paid;
+    next['remainingUnits'] = amounts.remaining;
+    next['vodafoneConsumedUnits'] = amounts.consumed;
+    next['version'] = (current['version'] as int? ?? 1) + 1;
+    _purchaseEntryEdits[id] = next;
+    _recalculatePurchaseDay(book);
+    return _ok({'entryId': id, 'eventSequences': const []});
+  }
+
+  ApiResponse _deletePurchaseEntry(String book, String id, Map b) {
+    final current = _purchaseRow(book, id);
+    if (current == null) {
+      return _ok({'entryId': id, 'eventSequences': const []});
+    }
+    final day = _openPurchaseDay(book);
+    if (day == null) _fail(404, 'NOT_FOUND', 'اليوم غير موجود');
+    _requireVersion(b['expectedDayVersion'], day['version']);
+    _requireVersion(b['expectedVersion'], current['version']);
+    _deletedPurchaseIds.add(id);
+    _purchaseEntryEdits.remove(id);
+    _recalculatePurchaseDay(book);
+    return _ok({'entryId': id, 'eventSequences': const []});
+  }
+
+  Map<String, dynamic>? _purchaseRow(String book, String id) {
+    if (_deletedPurchaseIds.contains(id)) return null;
+    final edited = _purchaseEntryEdits[id];
+    if (edited != null && '${edited['book'] ?? book}' == book) {
+      return Map<String, dynamic>.from(edited);
+    }
+    for (final raw in _createdPurchaseEntries) {
+      if ('${raw['book']}' == book && '${raw['id']}' == id) {
+        return Map<String, dynamic>.from(raw);
+      }
+    }
+    final entries = _copy(FakeFixtures.purchases())['entries'];
+    if (entries is! List) return null;
+    for (final raw in entries) {
+      if (raw is Map && '${raw['id']}' == id) {
+        return Map<String, dynamic>.from(raw);
+      }
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>> _purchaseRows(
+    String book,
+    List<dynamic> fixtureEntries,
+    Map<String, dynamic> day,
+  ) {
+    final remembered = [
+      for (final raw in _createdPurchaseEntries)
+        if ('${raw['book']}' == book) Map<String, dynamic>.from(raw),
+    ];
+    return [
+      for (final raw in [...fixtureEntries, ...remembered])
+        if (raw is Map && !_deletedPurchaseIds.contains('${raw['id']}'))
+          _entryOnThisPage(
+            _withPurchaseEdit(Map<String, dynamic>.from(raw)),
+            day,
+          ),
+    ];
+  }
+
+  Map<String, dynamic> _withPurchaseEdit(Map<String, dynamic> entry) {
+    final edit = _purchaseEntryEdits['${entry['id']}'];
+    if (edit == null) return entry;
+    return {...entry, ...edit};
+  }
+
+  void _recalculatePurchaseDay(String book) {
+    final day = _openPurchaseDay(book);
+    if (day == null) return;
+    final entries = _purchaseRows(
+      book,
+      (_copy(FakeFixtures.purchases())['entries'] as List?) ?? const [],
+      day,
+    );
+    var result = 0;
+    var paid = 0;
+    var vodafone = 0;
+    var consumed = 0;
+    for (final entry in entries) {
+      if ('${entry['dayId']}' != '${day['id']}') continue;
+      result += _asInt(entry['resultUnits']);
+      paid += _asInt(entry['paidUnits']);
+      if (entry['itemCode'] == 'vodafone_cash') {
+        vodafone += _asInt(entry['egpValueUnits']);
+      }
+      consumed += _asInt(entry['vodafoneConsumedUnits']);
+    }
+    final debt = _asInt(day['previousDebtUnits']) + result - paid;
+    final remainingVodafone =
+        _asInt(day['previousVodafoneUnits']) + vodafone - consumed;
+    final version = _asInt(day['version']) + 1;
+    _purchaseDays['$book|${day['id']}'] = {
+      ...?_purchaseDays['$book|${day['id']}'],
+      'todayResultUnits': result,
+      'todayPaidUnits': paid,
+      'totalDebtUnits': debt,
+      'vodafoneRemainingUnits': remainingVodafone,
+      'version': version,
+    };
+  }
+
+  int _asInt(Object? raw) {
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse('$raw') ?? 0;
+  }
+
+  ({
+    int value,
+    int paid,
+    int consumed,
+    int result,
+    int remaining,
+    String mode,
+    String rate,
+  }) _purchaseAmounts(Map b) {
+    final value = _asInt(b['egpValueUnits']);
+    final paid = _asInt(b['paidUnits']);
+    final consumed = _asInt(b['vodafoneConsumedUnits']);
+    final mode = '${b['calculationMode'] ?? 'divide'}';
+    final rate = '${b['exchangeRate'] ?? '1'}';
+    final result = _purchaseResultUnits(value, rate, mode == 'multiply');
+    return (
+      value: value,
+      paid: paid,
+      consumed: consumed,
+      result: result,
+      remaining: result - paid,
+      mode: mode,
+      rate: rate,
+    );
+  }
+
+  /// Same nearest-integer conversion as the server `roundedResult`.
+  int _purchaseResultUnits(int value, String rateText, bool multiply) {
+    final text = rateText.trim();
+    final match = RegExp(r'^(\d{1,7})(?:\.(\d{1,6}))?$').firstMatch(text);
+    if (match == null || value < 0) return 0;
+    final fraction = (match.group(2) ?? '').padRight(6, '0');
+    final micros = BigInt.parse(match.group(1)!) * BigInt.from(1000000) +
+        BigInt.parse(fraction.isEmpty ? '0' : fraction);
+    if (micros <= BigInt.zero) return 0;
+    final numerator =
+        BigInt.from(value) * (multiply ? micros : BigInt.from(1000000));
+    final denominator = multiply ? BigInt.from(1000000) : micros;
+    return ((numerator + denominator ~/ BigInt.two) ~/ denominator).toInt();
   }
 
   /// The open day's rows take that day's id and version. A row from another

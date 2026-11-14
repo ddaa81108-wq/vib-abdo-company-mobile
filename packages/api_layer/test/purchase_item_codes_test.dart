@@ -44,7 +44,7 @@ void main() {
 
     final typed = await api.post('/api/purchases/al_bayan', body: {
       'requestId': 'r-custom',
-      'expectedDayVersion': 1,
+      'expectedDayVersion': 3,
       'itemCode': PurchaseItemCodes.custom,
       'itemLabel': 'صنف خاص',
     });
@@ -54,7 +54,7 @@ void main() {
 
     final known = await api.post('/api/purchases/al_bayan', body: {
       'requestId': 'r-known',
-      'expectedDayVersion': 1,
+      'expectedDayVersion': 4,
       'itemCode': PurchaseItemCodes.vodafoneCash,
     });
     expect(known.dataMap['entryId'], 'pe_new');

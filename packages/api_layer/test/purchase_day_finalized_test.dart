@@ -27,7 +27,8 @@ void main() {
 
   String fingerprint(PurchasesPage page) {
     final day = page.day!;
-    final row = page.entries.firstWhere((entry) => entry.id == 'pe_1');
+    final row = page.entries.where((entry) => entry.id == 'pe_1').firstOrNull ??
+        page.entries.first;
     Object? units(MoneyValue? value) => value?.asInt;
     return [
       day.numberLabel,
@@ -176,11 +177,11 @@ void main() {
         requestId: 'create-once',
       );
       final updateMeta = MutationMeta(
-        expectedVersion: 3,
+        expectedVersion: 4,
         requestId: 'update-once',
       );
       final deleteMeta = MutationMeta(
-        expectedVersion: 3,
+        expectedVersion: 5,
         requestId: 'delete-once',
       );
 
@@ -196,7 +197,7 @@ void main() {
         book,
         'pe_1',
         deleteMeta,
-        entryVersion: 1,
+        entryVersion: 2,
       );
       expect(created.id, 'pe_new');
       // Edit and delete answer with the row's own `entryId`.
@@ -214,7 +215,7 @@ void main() {
 
       await api.purchases.finalizeDay(
         book,
-        MutationMeta(expectedVersion: 3, requestId: 'finalize-after-write'),
+        MutationMeta(expectedVersion: 6, requestId: 'finalize-after-write'),
       );
       final frozen = fingerprint(await api.purchases.list(book));
       expect(frozen, contains('finalized'));
@@ -249,7 +250,7 @@ void main() {
         book,
         '12',
         open: true,
-        meta: MutationMeta(expectedVersion: 4, requestId: 'open-correction'),
+        meta: MutationMeta(expectedVersion: 7, requestId: 'open-correction'),
       );
       final afterOpen = await api.purchases.create(book, entry, createMeta);
       expect(afterOpen.id, created.id);
@@ -257,11 +258,12 @@ void main() {
       final reopened = await api.purchases.list(book);
       expect(reopened.day!.status, 'finalized');
       expect(reopened.day!.correctionOpen, isTrue);
+      expect(reopened.entries.where((entry) => entry.id == 'pe_1'), isEmpty);
       expect(
-        reopened.entries.firstWhere((entry) => entry.id == 'pe_1').id,
-        'pe_1',
+        reopened.entries.any((entry) => entry.id == 'pe_new_1'),
+        isTrue,
       );
-      expect(reopened.day!.version, 4);
+      expect(reopened.day!.version, 7);
     },
   );
 
@@ -304,22 +306,22 @@ void main() {
     expect(created.id, 'pe_new');
     final page = await api.purchases.list(book);
     expect(page.day!.status, 'draft');
-    expect(page.day!.version, 3);
+    expect(page.day!.version, 4);
 
     await api.purchases.finalizeDay(
       book,
-      MutationMeta(expectedVersion: 3, requestId: 'finalize-for-opening'),
+      MutationMeta(expectedVersion: 4, requestId: 'finalize-for-opening'),
     );
     final opening = await api.purchases.setOpening(
       book,
       previousDebtUnits: 10,
       previousVodafoneUnits: 20,
-      meta: MutationMeta(expectedVersion: 4, requestId: 'opening-after'),
+      meta: MutationMeta(expectedVersion: 5, requestId: 'opening-after'),
     );
     expect(opening.id, 'opening');
     final after = await api.purchases.list(book);
     expect(after.day!.status, 'finalized');
-    expect(after.day!.version, 4);
+    expect(after.day!.version, 5);
     expect(after.day!.previousDebtUnits?.asInt, 10);
     expect(after.day!.previousVodafoneUnits?.asInt, 20);
     expect(after.entries.firstWhere((entry) => entry.id == 'pe_1').id, 'pe_1');
