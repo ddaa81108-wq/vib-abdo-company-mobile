@@ -737,15 +737,8 @@ class _DayCard extends ConsumerWidget {
     MutationMeta meta,
   ) async {
     try {
-      final ack = await ref
-          .read(apiLayerProvider)
-          .purchases
-          .finalizeDay(book, meta);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-        );
-      }
+      await ref.read(apiLayerProvider).purchases.finalizeDay(book, meta);
+      if (context.mounted) showSavedSnackBar(context);
       ref.invalidate(purchasesProvider);
       return null;
     } catch (error) {
@@ -759,15 +752,11 @@ class _DayCard extends ConsumerWidget {
     MutationMeta meta, {
     required bool open,
   }) async {
-    final ack = await ref
+    await ref
         .read(apiLayerProvider)
         .purchases
         .setDayCorrection(book, day.id, open: open, meta: meta);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
-    }
+    if (context.mounted) showSavedSnackBar(context);
     ref.invalidate(purchasesProvider);
     return null;
   }
@@ -1413,19 +1402,19 @@ class _InlineLedgerRowState extends ConsumerState<_InlineLedgerRow> {
     try {
       final purchases = ref.read(apiLayerProvider).purchases;
       final existing = widget.entry;
-      final ack = existing == null
-          ? await purchases.create(widget.book, request, meta)
-          : await purchases.update(
-              widget.book,
-              existing.id,
-              request,
-              meta,
-              entryVersion: existing.version,
-            );
+      if (existing == null) {
+        await purchases.create(widget.book, request, meta);
+      } else {
+        await purchases.update(
+          widget.book,
+          existing.id,
+          request,
+          meta,
+          entryVersion: existing.version,
+        );
+      }
       if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
+      showSavedSnackBar(context);
       ref.read(_ledgerDraftProvider.notifier).state = null;
       ref.invalidate(purchasesProvider);
       return null;
@@ -2236,17 +2225,11 @@ Widget _correctionButton(
       reportErrorInline: false,
       onVersionConflict: () => ref.invalidate(purchasesProvider),
       onSubmit: (meta) async {
-        final ack = await ref
+        await ref
             .read(apiLayerProvider)
             .purchases
             .setDayCorrection(book, dayId, open: !correctionOpen, meta: meta);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${AppStrings.serverReply} ${ack.id ?? ''}'),
-            ),
-          );
-        }
+        if (context.mounted) showSavedSnackBar(context);
         ref.invalidate(purchasesProvider);
         return null;
       },
@@ -2578,15 +2561,11 @@ Future<String?> _deleteEntry(
 ) async {
   final book = ref.read(purchaseBookProvider);
   try {
-    final ack = await ref
+    await ref
         .read(apiLayerProvider)
         .purchases
         .delete(book, entry.id, meta, entryVersion: entry.version);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
-    }
+    if (context.mounted) showSavedSnackBar(context);
     ref.invalidate(purchasesProvider);
     return null;
   } catch (error) {

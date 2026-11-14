@@ -286,11 +286,12 @@ class _GuardedMutationState extends ConsumerState<GuardedMutation> {
     if (failure.isForbidden) return AppStrings.forbidden;
     if (failure.code == 'SUBMISSION_ALREADY_DECIDED' ||
         failure.code == 'SUBMISSION_NOT_APPROVED') {
-      _announce(failure.message);
+      final message = failureText(failure);
+      _announce(message);
       widget.onVersionConflict?.call();
-      return failure.message;
+      return message;
     }
-    if (failure.code != 'VERSION_CONFLICT') return failure.message;
+    if (failure.code != 'VERSION_CONFLICT') return failureText(failure);
     _announce(AppStrings.versionConflict);
     widget.onVersionConflict?.call();
     return AppStrings.versionConflict;

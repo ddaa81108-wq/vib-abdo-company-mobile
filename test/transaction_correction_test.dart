@@ -207,10 +207,7 @@ void main() {
     expect(sent['expectedVersion'], 4);
     expect(sent['inputValue'], 100);
     expect(find.byKey(const Key('correction-form')), findsNothing);
-    expect(
-      find.textContaining('${AppStrings.serverReply} tx_new'),
-      findsOneWidget,
-    );
+    expect(find.text(AppStrings.saved), findsOneWidget);
     expect(ledgerReads, greaterThan(ledgerBefore));
     expect(cardReads, greaterThan(cardBefore));
     // The corrected line stays in place in the table.
@@ -269,10 +266,7 @@ void main() {
     final resent = jsonDecode(fake.mutationBodies[1]) as Map;
     expect(resent['expectedVersion'], 4);
     expect(find.byKey(const Key('correction-form')), findsNothing);
-    expect(
-      find.textContaining('${AppStrings.serverReply} tx_new'),
-      findsOneWidget,
-    );
+    expect(find.text(AppStrings.saved), findsOneWidget);
   });
 
   testWidgets('multiply and divide prefill the rate without grouping', (

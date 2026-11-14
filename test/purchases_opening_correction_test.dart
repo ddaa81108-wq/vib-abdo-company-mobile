@@ -344,7 +344,9 @@ void main() {
     final body = jsonDecode(fake.mutationBodies.single) as Map<String, dynamic>;
     expect(body['expectedVersion'], 1, reason: 'entry version');
     expect(body['expectedDayVersion'], 3, reason: 'day version');
-    expect(find.textContaining('${AppStrings.serverReply} pe_1'), findsWidgets);
+    expect(find.text(AppStrings.saved), findsWidgets);
+    expect(find.textContaining('رد الخادم'), findsNothing);
+    expect(find.textContaining('pe_1'), findsNothing);
   });
 
   testWidgets('deleting a purchase sends the entry and day versions', (
@@ -365,7 +367,9 @@ void main() {
     final body = jsonDecode(fake.mutationBodies.single) as Map<String, dynamic>;
     expect(body['expectedVersion'], 1, reason: 'entry version');
     expect(body['expectedDayVersion'], 3, reason: 'day version');
-    expect(find.textContaining('${AppStrings.serverReply} pe_1'), findsWidgets);
+    expect(find.text(AppStrings.saved), findsWidgets);
+    expect(find.textContaining('رد الخادم'), findsNothing);
+    expect(find.textContaining('pe_1'), findsNothing);
   });
 }
 

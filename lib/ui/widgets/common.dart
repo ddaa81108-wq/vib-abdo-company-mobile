@@ -294,9 +294,69 @@ class ForbiddenPane extends StatelessWidget {
   }
 }
 
-/// Copy the UI may show. An HTTP 403 never keeps the raw server sentence.
-String failureText(AppFailure failure) =>
-    failure.isForbidden ? AppStrings.forbidden : failure.message;
+final _rawCode = RegExp(r'^[A-Z][A-Z0-9_]+$');
+
+/// Copy the UI may show. A 403 uses the shared notice. A message that is only
+/// an error code is replaced with Arabic; anything else stays the sentence.
+String failureText(AppFailure failure) {
+  if (failure.isForbidden) return AppStrings.forbidden;
+  final message = failure.message.trim();
+  if (message.isEmpty || message == failure.code || _technicalToken(message)) {
+    return friendlyErrorCode(failure.code);
+  }
+  return message;
+}
+
+/// A code, an id, or any other single token with no Arabic. Sentences stay.
+bool _technicalToken(String message) {
+  if (_rawCode.hasMatch(message)) return true;
+  if (message.contains(' ')) return false;
+  return !RegExp(r'[\u0600-\u06FF]').hasMatch(message);
+}
+
+/// Arabic for a known code. An unknown code uses the generic sentence.
+String friendlyErrorCode(String code) => switch (code) {
+  'VERSION_CONFLICT' => AppStrings.versionConflict,
+  'NETWORK_UNAVAILABLE' => 'تعذر تنفيذ الطلب. تحقق من الاتصال.',
+  'TIMEOUT' => 'انتهت مهلة الاتصال',
+  'INVALID_SERVER_RESPONSE' => 'استجابة الخادم غير صالحة',
+  'CSRF_REJECTED' || 'CSRF_INVALID' => 'رمز حماية الطلب غير صالح',
+  'MFA_REQUIRED' => 'أدخل رمز التحقق',
+  'MFA_INVALID' => 'رمز التحقق غير صحيح',
+  'INVALID_CURRENT_PASSWORD' => 'كلمة المرور الحالية غير صحيحة',
+  'CLIENT_VERSION_MISMATCH' => 'إصدار التطبيق غير متوافق. حدّث التطبيق.',
+  'PENDING_SUBMISSION_EXISTS' => 'يوجد إرسال معلّق',
+  'FULL_AMOUNT_CHANGED' => 'تغيّر المبلغ. أعد المحاولة.',
+  'NO_POSITIVE_DEBT' => 'لا يوجد دين للتحصيل',
+  'DUPLICATE_SAME_WORKDAY' => 'هذه العملية مكررة في نفس اليوم',
+  'REQUEST_ID_REUSED' => 'أُعيد استخدام الطلب. أعد المحاولة.',
+  'AUTH_REQUIRED' => 'يجب تسجيل الدخول أولًا.',
+  'NOT_FOUND' => 'العنصر غير موجود',
+  'VALIDATION_ERROR' ||
+  'INVALID_PURCHASE_VALUE' => 'البيانات المدخلة غير صحيحة',
+  'RATE_LIMITED' => 'طلبات كثيرة، حاول لاحقاً',
+  'SERVER_ERROR' => 'خطأ في الخادم، حاول لاحقاً',
+  'DAY_FINALIZED' => 'اليوم مرحّل. لا يمكن إضافة أو تعديل أو حذف بند.',
+  'SUBMISSION_ALREADY_DECIDED' => 'تم البت في هذا الإرسال',
+  'SUBMISSION_NOT_APPROVED' => 'الإرسال غير معتمد',
+  'COLLECTION_CASH_CHANGED' =>
+    'تغيّر النقد المعلّق. راجع اليوم ثم أعد الإغلاق.',
+  _ => AppStrings.genericError,
+};
+
+/// Brief confirmation after a successful write. No id, code, or server text.
+void showSavedSnackBar(BuildContext context) {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  if (messenger == null) return;
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      const SnackBar(
+        duration: Duration(seconds: 2),
+        content: Text(AppStrings.saved, key: Key('saved-snackbar')),
+      ),
+    );
+}
 
 /// Section failure. 403 is [ForbiddenPane]; every other code stays [ErrorPane].
 Widget presentFailure(
@@ -337,10 +397,7 @@ class ServerReplyText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (ack == null) return const SizedBox.shrink();
-    final id = ack!.id;
-    final version = ack!.version;
-    final parts = <String>[AppStrings.serverReply, ?id, ?version?.toString()];
-    return Text(parts.join(' · '), key: const Key('server-reply'));
+    return const Text(AppStrings.saved, key: Key('saved-snackbar'));
   }
 }
 

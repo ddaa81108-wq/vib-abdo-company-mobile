@@ -101,19 +101,15 @@ class UnlinkedReceiptActions extends ConsumerWidget {
     Future<MutationAck> Function() send,
   ) async {
     try {
-      final ack = await send();
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-        );
-      }
+      await send();
+      if (context.mounted) showSavedSnackBar(context);
       ref.invalidate(collectionsProvider);
       return null;
     } catch (error) {
       final failure = ref.read(errorHandlerProvider).toFailure(error);
       final message = failure.code == 'VERSION_CONFLICT'
           ? AppStrings.versionConflict
-          : failure.message;
+          : failureText(failure);
       final refresh =
           failure.code == 'VERSION_CONFLICT' ||
           failure.code == 'SUBMISSION_ALREADY_DECIDED' ||

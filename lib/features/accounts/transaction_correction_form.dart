@@ -366,7 +366,7 @@ class _TransactionCorrectionFormState
             );
     }
     try {
-      final ack = await ref
+      await ref
           .read(apiLayerProvider)
           .accounts
           .correctTransaction(
@@ -377,12 +377,9 @@ class _TransactionCorrectionFormState
             meta,
           );
       if (!mounted) return null;
-      final messenger = ScaffoldMessenger.of(context);
       final navigator = Navigator.of(context);
       final route = ModalRoute.of(context);
-      messenger.showSnackBar(
-        SnackBar(content: Text('${AppStrings.serverReply} ${ack.id ?? ''}')),
-      );
+      showSavedSnackBar(context);
       // The confirm dialog is the top route while this callback runs. Popping
       // here would dismiss that dialog and leave the form open. Close the form
       // on the next frame, after GuardedMutation has popped the dialog.
