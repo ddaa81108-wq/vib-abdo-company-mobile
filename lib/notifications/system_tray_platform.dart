@@ -102,12 +102,17 @@ Future<bool> showPrivateWithPlugin(TrayNotification notification) async {
         visibility: NotificationVisibility.private,
         tag: notification.tag,
         channelShowBadge: true,
-        styleInformation: BigTextStyleInformation(
-          notification.body,
-          contentTitle: notification.title,
-        ),
+        styleInformation: androidShadeStyle(notification),
       ),
     ),
   );
   return true;
+}
+
+/// Expanded shade. The private body is the full operation sentence.
+BigTextStyleInformation androidShadeStyle(TrayNotification notification) {
+  return BigTextStyleInformation(
+    notification.body,
+    contentTitle: notification.title,
+  );
 }

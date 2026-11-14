@@ -8,10 +8,10 @@ import 'push_transport.dart';
 import 'system_tray_platform.dart';
 import 'tray_notification.dart';
 
-/// Background isolate entry. The server sends a notification payload on
-/// [NotificationChannels.collectionsId], so Android plays that channel
-/// even when this process is dead. This handler does not post a second
-/// alert. A data-only message is not the send path.
+/// Background and terminated entry. A message that already has an FCM
+/// `notification` block was shown by Android, so this handler does not
+/// post a second alert. A data-only message is the shade path: this
+/// process posts one expanded BigText notification.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
@@ -19,22 +19,39 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   } catch (_) {
     return;
   }
-  if (!fcmShouldPostLocalAlert(
-    inForeground: false,
+  final tray = backgroundDataOnlyShade(
     hasNotificationPayload: message.notification != null,
-  )) {
-    return;
-  }
-  final note = notificationFromShadeData(
-    message.data,
+    data: message.data,
     serverTitle: message.notification?.title,
     serverBody: message.notification?.body,
   );
-  if (note.notificationId.isEmpty) return;
+  if (tray == null) return;
   WidgetsFlutterBinding.ensureInitialized();
-  await showPrivateWithPlugin(
-    trayForServer(note, serverBody: message.notification?.body),
+  await showPrivateWithPlugin(tray);
+}
+
+/// The tray a background or terminated data-only message posts.
+/// Null when Android already displayed a `notification` block, or when
+/// the data map has no notification id.
+TrayNotification? backgroundDataOnlyShade({
+  required bool hasNotificationPayload,
+  required Map<String, dynamic> data,
+  String? serverTitle,
+  String? serverBody,
+}) {
+  if (!fcmShouldPostLocalAlert(
+    inForeground: false,
+    hasNotificationPayload: hasNotificationPayload,
+  )) {
+    return null;
+  }
+  final note = notificationFromShadeData(
+    data,
+    serverTitle: serverTitle,
+    serverBody: serverBody,
   );
+  if (note.notificationId.isEmpty) return null;
+  return trayForServer(note, serverBody: serverBody);
 }
 
 /// Live Firebase Messaging. [start] returns false when the native config

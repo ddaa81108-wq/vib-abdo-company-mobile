@@ -1,10 +1,26 @@
 import 'package:flutter_api_layer/core/network/api_client.dart';
 import 'package:flutter_api_layer/core/network/api_endpoints.dart';
 
+/// Sent only by this build. Older installs omit it, and the server then
+/// keeps the legacy FCM `notification` block.
+const shadePushCapability = 'shade_v1';
+
 /// `POST /api/mobile-push/devices`. Body: `token`, `platform: android`,
-/// and `unregister: true` to drop this session's row. The registrar
-/// swallows a missing route, so logout still finishes when the server
-/// has not enabled the endpoint.
+/// `pushCapabilities`, and `unregister: true` to drop this session's row.
+/// The registrar swallows a missing route, so logout still finishes when
+/// the server has not enabled the endpoint.
+Map<String, Object> deviceRegistrationBody({
+  required String token,
+  bool unregister = false,
+}) {
+  return {
+    'token': token,
+    'platform': 'android',
+    'pushCapabilities': const [shadePushCapability],
+    if (unregister) 'unregister': true,
+  };
+}
+
 abstract interface class DeviceRegistrationClient {
   Future<void> register({required String token});
   Future<void> unregister({required String token});
@@ -19,7 +35,7 @@ class HttpDeviceRegistrationClient implements DeviceRegistrationClient {
   Future<void> register({required String token}) {
     return _client.post(
       ApiEndpoints.proposedMobilePushDevices,
-      body: {'token': token, 'platform': 'android'},
+      body: deviceRegistrationBody(token: token),
     );
   }
 
@@ -27,7 +43,7 @@ class HttpDeviceRegistrationClient implements DeviceRegistrationClient {
   Future<void> unregister({required String token}) {
     return _client.post(
       ApiEndpoints.proposedMobilePushDevices,
-      body: {'token': token, 'platform': 'android', 'unregister': true},
+      body: deviceRegistrationBody(token: token, unregister: true),
     );
   }
 }

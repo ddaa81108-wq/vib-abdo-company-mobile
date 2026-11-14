@@ -13,6 +13,7 @@ import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/features/login/login_screen.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/foreground_notification_banner.dart';
 import 'package:vib_abdo_company_mobile/features/notifications/notification_permission.dart';
+import 'package:vib_abdo_company_mobile/notifications/device_registration_client.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_providers.dart';
 import 'package:vib_abdo_company_mobile/notifications/push_transport.dart';
 import 'package:vib_abdo_company_mobile/notifications/unread_badge.dart';
@@ -206,15 +207,11 @@ void main() {
       fake.bindGateway(_ObservingGateway(fake.boundGateway!, log));
 
       await signIn(tester, username: 'employee.demo', password: 'demo-only');
-      expect(log.devicePosts, [
-        {'token': token, 'platform': 'android'},
-      ]);
+      expect(log.devicePosts, [deviceRegistrationBody(token: token)]);
 
       await go(tester, '/notifications');
 
-      expect(log.devicePosts, [
-        {'token': token, 'platform': 'android'},
-      ]);
+      expect(log.devicePosts, [deviceRegistrationBody(token: token)]);
     },
   );
 

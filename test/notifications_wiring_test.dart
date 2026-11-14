@@ -296,9 +296,7 @@ void main() {
     await tester.tap(find.byKey(const Key('notification-permission-agree')));
     await settle(tester);
 
-    expect(log.devicePosts, [
-      {'token': token, 'platform': 'android'},
-    ]);
+    expect(log.devicePosts, [deviceRegistrationBody(token: token)]);
     expect(tester.takeException(), isNull);
   });
 
@@ -317,9 +315,7 @@ void main() {
 
     await resume(tester);
 
-    expect(log.devicePosts, [
-      {'token': token, 'platform': 'android'},
-    ]);
+    expect(log.devicePosts, [deviceRegistrationBody(token: token)]);
     expect(tester.takeException(), isNull);
   });
 
@@ -331,9 +327,7 @@ void main() {
     );
     final log = await _pumpDevicePost(tester, permission, token, sdk: 29);
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
-    expect(log.devicePosts, [
-      {'token': token, 'platform': 'android'},
-    ]);
+    expect(log.devicePosts, [deviceRegistrationBody(token: token)]);
 
     await go(tester, '/notifications');
     await resume(tester);
@@ -343,9 +337,7 @@ void main() {
       findsNothing,
     );
     expect(permission.requested, isFalse);
-    expect(log.devicePosts, [
-      {'token': token, 'platform': 'android'},
-    ]);
+    expect(log.devicePosts, [deviceRegistrationBody(token: token)]);
     expect(tester.takeException(), isNull);
   });
 
@@ -370,9 +362,7 @@ void main() {
     await settle(tester);
 
     expect(permission.requested, isTrue);
-    expect(log.devicePosts, [
-      {'token': token, 'platform': 'android'},
-    ]);
+    expect(log.devicePosts, [deviceRegistrationBody(token: token)]);
     expect(tester.takeException(), isNull);
   });
 }
