@@ -6,44 +6,53 @@ import 'package:vib_abdo_company_mobile/notifications/notification_channels.dart
 import 'package:vib_abdo_company_mobile/notifications/push_transport.dart';
 
 void main() {
-  test('foreground FCM does not post a second tray sound', () {
-    expect(
-      fcmShouldForwardToTray(inForeground: true, hasNotificationPayload: true),
-      isFalse,
-    );
-    expect(
-      fcmShouldForwardToTray(inForeground: false, hasNotificationPayload: true),
-      isFalse,
-    );
-    expect(
-      fcmShouldForwardToTray(
-        inForeground: false,
-        hasNotificationPayload: false,
-      ),
-      isTrue,
-    );
-    expect(
-      fcmShouldPostLocalAlert(
-        inForeground: false,
-        hasNotificationPayload: true,
-      ),
-      isFalse,
-    );
-    expect(
-      fcmShouldPostLocalAlert(
-        inForeground: true,
-        hasNotificationPayload: false,
-      ),
-      isFalse,
-    );
-    expect(
-      fcmShouldPostLocalAlert(
-        inForeground: false,
-        hasNotificationPayload: false,
-      ),
-      isTrue,
-    );
-  });
+  test(
+    'foreground FCM posts the local shade; background does not duplicate',
+    () {
+      expect(
+        fcmShouldForwardToTray(
+          inForeground: true,
+          hasNotificationPayload: true,
+        ),
+        isTrue,
+      );
+      expect(
+        fcmShouldForwardToTray(
+          inForeground: false,
+          hasNotificationPayload: true,
+        ),
+        isFalse,
+      );
+      expect(
+        fcmShouldForwardToTray(
+          inForeground: false,
+          hasNotificationPayload: false,
+        ),
+        isTrue,
+      );
+      expect(
+        fcmShouldPostLocalAlert(
+          inForeground: false,
+          hasNotificationPayload: true,
+        ),
+        isFalse,
+      );
+      expect(
+        fcmShouldPostLocalAlert(
+          inForeground: true,
+          hasNotificationPayload: false,
+        ),
+        isFalse,
+      );
+      expect(
+        fcmShouldPostLocalAlert(
+          inForeground: false,
+          hasNotificationPayload: false,
+        ),
+        isTrue,
+      );
+    },
+  );
 
   test('absent Firebase config keeps the no-op transport', () async {
     final transport = await resolveAppPushTransport(

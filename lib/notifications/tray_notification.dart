@@ -57,19 +57,14 @@ int stableAndroidNotificationId(String notificationId) {
   return hash;
 }
 
-/// Private body is the operation label, plus the server employee name when
-/// that row has one. Title is [AppNotification.systemName]. The public
-/// version is the system name plus [lockScreenNotificationText].
-///
-/// Title, body, the raw operation, the related id, amounts, phones, and
-/// tokens on the row are not copied. [employeeName] is the only personal
-/// field, and only in the private body.
-TrayNotification trayForServer(AppNotification notification) {
-  final sentence = notificationSentence(notification);
-  final label = operationLabel(notification.operationType);
-  final name = notification.employeeName?.trim();
-  final body =
-      sentence ?? ((name == null || name.isEmpty) ? label : '$label · $name');
+/// Private body is the Arabic operation sentence (section, name, amount,
+/// currency, actor) plus the time, when the server row has those fields.
+/// The public lock-screen line stays [lockScreenNotificationText].
+TrayNotification trayForServer(
+  AppNotification notification, {
+  String? serverBody,
+}) {
+  final body = shadeBody(notification, serverBody: serverBody);
   final system = _systemName(notification.systemName);
   return TrayNotification(
     androidId: stableAndroidNotificationId(notification.notificationId),
@@ -80,6 +75,37 @@ TrayNotification trayForServer(AppNotification notification) {
     publicBody: lockScreenNotificationText,
     payload: notification.notificationId,
   );
+}
+
+/// Expanded shade text. Uses only fields [AppNotification] already parsed
+/// from `GET /api/notifications` or from a push `data` map. A push stub with
+/// no actor and no details keeps the short operation label.
+String shadeBody(AppNotification notification, {String? serverBody}) {
+  final sentence = notificationSentence(notification);
+  // [AppNotification.body] is not the shade. A list row can carry a number
+  // there; only an explicit FCM notification body is display text.
+  final stored = serverBody?.trim();
+  final label = operationLabel(notification.operationType);
+  final name = notification.employeeName?.trim();
+  final headline = (sentence != null && sentence.isNotEmpty)
+      ? sentence
+      : (stored != null && stored.isNotEmpty)
+      ? stored
+      : ((name == null || name.isEmpty) ? label : '$label · $name');
+  final when = shadeTime(notification.createdAt);
+  if (when == null || headline.contains(when)) return headline;
+  return '$headline\n$when';
+}
+
+/// Local clock time. Epoch and unparsed dates are omitted.
+String? shadeTime(DateTime createdAt) {
+  final local = createdAt.toLocal();
+  if (local.year < 2000) return null;
+  final month = local.month.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '${local.year}/$month/$day $hour:$minute';
 }
 
 String _systemName(String systemName) {

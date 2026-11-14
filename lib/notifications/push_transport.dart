@@ -238,13 +238,18 @@ abstract interface class FcmRuntime {
   bool inForeground();
 }
 
-/// Foreground sound belongs to SSE. A notification payload is shown by
-/// Android itself when the process is not in front, so the app must not
-/// post a second alert. The speech watermark still drops an id SSE already spoke.
+/// Foreground: Android does not show the FCM `notification` block, so the
+/// app posts one local alert. Background with that block: the system already
+/// shows it, and a second post would duplicate it. A data-only message is
+/// posted by this process in every state except the foreground sound path
+/// is the local alert itself.
 bool fcmShouldForwardToTray({
   required bool inForeground,
   required bool hasNotificationPayload,
-}) => !inForeground && !hasNotificationPayload;
+}) {
+  if (inForeground) return true;
+  return !hasNotificationPayload;
+}
 
 bool fcmShouldPostLocalAlert({
   required bool inForeground,

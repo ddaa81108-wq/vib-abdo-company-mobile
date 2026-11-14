@@ -256,6 +256,7 @@ class MainActivity : FlutterActivity() {
             .setSmallIcon(icon)
             .setContentTitle(title)
             .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body).setBigContentTitle(title))
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setPublicVersion(publicVersion)
             .setContentIntent(pending)
