@@ -76,7 +76,7 @@ class SystemTrayPresenter {
       if (userId() != started) return TrayDelivery.accountChanged;
       if (_isNotFound(error)) return TrayDelivery.notFound;
       if (!accepted) return TrayDelivery.dropped;
-      await _post(_nameless(raw));
+      await _post(_nameless(raw), serverBody: _serverShade(raw));
       return TrayDelivery.nameless;
     }
   }
@@ -104,29 +104,24 @@ class SystemTrayPresenter {
     return posted == 0 ? TrayDelivery.idle : TrayDelivery.posted;
   }
 
-  Future<void> _post(AppNotification notification) async {
+  Future<void> _post(AppNotification notification, {String? serverBody}) async {
     if (notification.notificationId.isEmpty) return;
     if (await shown.contains(notification.notificationId)) return;
     await shown.add(notification.notificationId);
-    await poster.showTray(trayForServer(notification));
+    await poster.showTray(trayForServer(notification, serverBody: serverBody));
   }
 
   AppNotification _nameless(Map<String, dynamic> raw) {
-    final clean = whitelistPushPayload(raw);
-    final parsed = AppNotification.fromPushPayload(clean);
-    final system = clean['systemName'];
-    return AppNotification(
-      notificationId: parsed.notificationId,
-      systemName: system is String ? system : '',
-      employeeName: null,
-      operationType: parsed.operationType,
-      operationTypeRaw: parsed.operationTypeRaw,
-      relatedRef: parsed.relatedRef,
-      createdAt: parsed.createdAt,
-      readAt: null,
-      recipientUserId: parsed.recipientUserId,
-    );
+    return notificationFromShadeData(raw);
   }
+}
+
+String? _serverShade(Map<String, dynamic> raw) {
+  final body = raw['fcmBody'];
+  if (body is! String) return null;
+  final text = body.trim();
+  if (text.isEmpty) return null;
+  return text;
 }
 
 String _notificationId(Map<String, dynamic> raw) {

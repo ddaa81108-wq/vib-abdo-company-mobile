@@ -89,6 +89,10 @@ class FlutterLocalNotificationsAdapter implements NotificationPlatform {
           icon: request.icon,
           channelShowBadge: request.channel.showBadge,
           number: request.badgeCount,
+          styleInformation: BigTextStyleInformation(
+            request.body,
+            contentTitle: request.title,
+          ),
         ),
       ),
     );

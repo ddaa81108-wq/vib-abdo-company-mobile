@@ -3,7 +3,10 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 
 import 'notification_channels.dart';
+import 'push_payload.dart';
 import 'push_transport.dart';
+import 'system_tray_platform.dart';
+import 'tray_notification.dart';
 
 /// Background isolate entry. The server sends a notification payload on
 /// [NotificationChannels.collectionsId], so Android plays that channel
@@ -22,6 +25,16 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   )) {
     return;
   }
+  final note = notificationFromShadeData(
+    message.data,
+    serverTitle: message.notification?.title,
+    serverBody: message.notification?.body,
+  );
+  if (note.notificationId.isEmpty) return;
+  WidgetsFlutterBinding.ensureInitialized();
+  await showPrivateWithPlugin(
+    trayForServer(note, serverBody: message.notification?.body),
+  );
 }
 
 /// Live Firebase Messaging. [start] returns false when the native config
@@ -93,6 +106,10 @@ class PluginFcmRuntime implements FcmRuntime {
 Map<String, dynamic> _data(RemoteMessage message) {
   final data = Map<String, dynamic>.from(message.data);
   data.putIfAbsent('channelId', () => NotificationChannels.collectionsId);
+  final title = message.notification?.title;
+  final body = message.notification?.body;
+  if (title != null && title.trim().isNotEmpty) data['fcmTitle'] = title;
+  if (body != null && body.trim().isNotEmpty) data['fcmBody'] = body;
   return data;
 }
 
