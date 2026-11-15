@@ -66,13 +66,13 @@ class SessionManager {
     SessionCaptureGate? captureGate,
     SessionCleanup? clearStoredTokens,
     List<SessionCleanup> cleanups = const [],
-  }) : _strategy = authStrategy,
-       _auth = authRepository,
-       _profile = profileRepository,
-       _permissions = permissionService,
-       _captureGate = captureGate,
-       _clearStoredTokens = clearStoredTokens,
-       _cleanups = cleanups;
+  })  : _strategy = authStrategy,
+        _auth = authRepository,
+        _profile = profileRepository,
+        _permissions = permissionService,
+        _captureGate = captureGate,
+        _clearStoredTokens = clearStoredTokens,
+        _cleanups = cleanups;
 
   final AuthStrategy _strategy;
   final AuthRepository _auth;
@@ -113,9 +113,9 @@ class SessionManager {
   ValueListenable<SessionState> get listenable => _listenable;
   SessionState get state => _listenable.value;
   UserProfile? get currentUser => switch (state) {
-    SessionAuthenticated(:final profile) => profile,
-    _ => null,
-  };
+        SessionAuthenticated(:final profile) => profile,
+        _ => null,
+      };
 
   /// App start: resume a persisted cookie session if any.
   Future<void> restore() async {
@@ -192,8 +192,7 @@ class SessionManager {
     final ticket = _mfaTicket;
     try {
       final result = await _auth.verifyMfa(code: code);
-      final stale =
-          ticket != _mfaTicket ||
+      final stale = ticket != _mfaTicket ||
           epoch != _transitionEpoch ||
           state is! SessionOtpRequired;
       if (stale) {
