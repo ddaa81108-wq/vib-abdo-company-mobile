@@ -136,6 +136,19 @@ bash tool/build-production.sh 22
 النسخة المتحقق منها وSHA-256 توضعان داخل `build/releases/`.
 لا ينقل السكربت المفتاح أو كلمات المرور إلى GitHub.
 
+على Windows، افتح PowerShell داخل مجلد التطبيق الموجود على جهاز التوقيع:
+
+```powershell
+$ErrorActionPreference = 'Stop'
+git pull --ff-only origin main
+if ($LASTEXITCODE) { throw 'Git pull failed' }
+& '.\tool\build-production.ps1' -BuildNumber 22
+```
+
+يلزم Flutter وAndroid build-tools 36.0.0 وPython 3 على جهاز البناء. يقرأ السكربت
+`android/key.properties` أو المسار الموجود في `ANDROID_KEY_PROPERTIES`، ويتطلب
+ملف Firebase المحلي `android/app/google-services.json`. لا تُكتب كلمات المرور في الأمر.
+
 التنسيق الأبيض والذهبي لاستلامات الديون مفعّل افتراضيًا. علم البناء
 `--dart-define=COLLECTIONS_WHITE_GOLD=false` متاح لمراجعة الشكل السابق.
 تحديث التطبيق يتطلب تثبيت APK الجديد؛ لا يتطلب هذان التعديلان نشرًا على خادم الموقع.
