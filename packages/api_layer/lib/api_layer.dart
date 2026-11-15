@@ -126,6 +126,7 @@ class ApiLayer {
       onForcedLogout: (reason) async {
         await sessionRef?.forceLogout(reason);
       },
+      sessionEpoch: () => sessionRef?.transitionEpoch ?? 0,
       cookieStore: cookieStore,
       tokenStorage: tokenStorage,
       fakeLatency: fakeLatency,

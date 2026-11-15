@@ -30,6 +30,7 @@ class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required AuthStrategy strategy,
     required Future<void> Function(String reason) onForcedLogout,
+    this.sessionEpoch,
     ErrorMapper errorMapper = const ErrorMapper(),
   })  : _strategy = strategy,
         _onForcedLogout = onForcedLogout,
@@ -38,6 +39,11 @@ class AuthInterceptor extends Interceptor {
   final AuthStrategy _strategy;
   final Future<void> Function(String reason) _onForcedLogout;
   final ErrorMapper _mapper;
+
+  /// Generation of the signed-in session. A 401 from a request that started
+  /// on an older generation must not sign out the session that replaced it
+  /// (a late logout response, or any call still in flight across login).
+  int Function()? sessionEpoch;
 
   /// The main Dio, used to replay a request after recovery.
   late Dio retryDio;
@@ -70,6 +76,7 @@ class AuthInterceptor extends Interceptor {
   @override
   Future<void> onRequest(
       RequestOptions options, RequestInterceptorHandler handler) async {
+    options.extra['sessionEpoch'] = sessionEpoch?.call();
     try {
       final adopted = await _strategy.adoptCsrfGet(options);
       if (adopted != null) {
@@ -89,6 +96,7 @@ class AuthInterceptor extends Interceptor {
       }
       await _strategy.acquireWrite(options);
       await _strategy.attach(options, authenticated: _authenticated(options));
+      options.extra['sessionEpoch'] = sessionEpoch?.call();
       handler.next(options);
     } on DioException catch (error) {
       if (_isCsrfGet(options) && error.response?.statusCode == 401) {
@@ -155,6 +163,15 @@ class AuthInterceptor extends Interceptor {
           // Logout's own 401 must not announce session_expired. SessionManager
           // .logout() still wipes with reason 'logout'. The turn is released
           // before that wipe so its cleanup post can take the mutex.
+          // A 401 that started before the current generation belongs to the
+          // previous session. Wiping here would sign out the login that
+          // replaced it.
+          final started = req.extra['sessionEpoch'];
+          final current = sessionEpoch?.call();
+          if (started is int && current is int && started != current) {
+            handler.next(err);
+            return;
+          }
           await _releaseAndWipe(req);
           handler.next(err);
           return;

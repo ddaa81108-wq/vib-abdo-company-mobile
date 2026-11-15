@@ -35,6 +35,7 @@ class ApiStack {
     Duration? fakeLatency,
     HttpClientAdapter? httpClientAdapter,
     String? fakeDataset,
+    int Function()? sessionEpoch,
   }) {
     if (config.useFakeApi) {
       rejectFakeApiInRelease(true);
@@ -90,6 +91,7 @@ class ApiStack {
     final auth = AuthInterceptor(
       strategy: strategy,
       onForcedLogout: onForcedLogout,
+      sessionEpoch: sessionEpoch,
     )..retryDio = dio;
     final retry = GetRetryInterceptor()..retryDio = dio;
     dio.interceptors.addAll([
