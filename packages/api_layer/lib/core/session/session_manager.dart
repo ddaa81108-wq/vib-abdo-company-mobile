@@ -64,19 +64,22 @@ class SessionManager {
     required ProfileRepository profileRepository,
     required PermissionService permissionService,
     SessionCaptureGate? captureGate,
+    SessionCleanup? clearStoredTokens,
     List<SessionCleanup> cleanups = const [],
-  })  : _strategy = authStrategy,
-        _auth = authRepository,
-        _profile = profileRepository,
-        _permissions = permissionService,
-        _captureGate = captureGate,
-        _cleanups = cleanups;
+  }) : _strategy = authStrategy,
+       _auth = authRepository,
+       _profile = profileRepository,
+       _permissions = permissionService,
+       _captureGate = captureGate,
+       _clearStoredTokens = clearStoredTokens,
+       _cleanups = cleanups;
 
   final AuthStrategy _strategy;
   final AuthRepository _auth;
   final ProfileRepository _profile;
   final PermissionService _permissions;
   final SessionCaptureGate? _captureGate;
+  final SessionCleanup? _clearStoredTokens;
   final List<SessionCleanup> _cleanups;
 
   /// True from the start of [logout] until the wipe finishes.
@@ -92,14 +95,16 @@ class SessionManager {
   int _reloadSerial = 0;
 
   final _controller = StreamController<SessionState>.broadcast();
-  final ValueNotifier<SessionState> _listenable =
-      ValueNotifier<SessionState>(const SessionUnknown());
+  final ValueNotifier<SessionState> _listenable = ValueNotifier<SessionState>(
+    const SessionUnknown(),
+  );
   bool _loggingOut = false;
 
   /// Set for the whole of [logout] so a 401 from that call, or from other
   /// requests finishing at the same time, still ends as reason `logout`.
   bool _logoutRequested = false;
   Future<void>? _wipeInFlight;
+  Future<void>? _logoutInFlight;
   String? _wipeReason;
 
   Stream<SessionState> get states => _controller.stream;
@@ -108,9 +113,9 @@ class SessionManager {
   ValueListenable<SessionState> get listenable => _listenable;
   SessionState get state => _listenable.value;
   UserProfile? get currentUser => switch (state) {
-        SessionAuthenticated(:final profile) => profile,
-        _ => null
-      };
+    SessionAuthenticated(:final profile) => profile,
+    _ => null,
+  };
 
   /// App start: resume a persisted cookie session if any.
   Future<void> restore() async {
@@ -137,8 +142,16 @@ class SessionManager {
     }
   }
 
-  Future<void> login(
-      {required String username, required String password}) async {
+  Future<void> login({
+    required String username,
+    required String password,
+  }) async {
+    // A new login must not write cookies while the previous session is
+    // deleting them, or publish while _reloadCurrent still rejects reads.
+    final logout = _logoutInFlight;
+    if (logout != null) await logout;
+    final wipe = _wipeInFlight;
+    if (wipe != null) await wipe;
     final switching =
         state is SessionAuthenticated || state is SessionOtpRequired;
     if (switching) {
@@ -179,7 +192,8 @@ class SessionManager {
     final ticket = _mfaTicket;
     try {
       final result = await _auth.verifyMfa(code: code);
-      final stale = ticket != _mfaTicket ||
+      final stale =
+          ticket != _mfaTicket ||
           epoch != _transitionEpoch ||
           state is! SessionOtpRequired;
       if (stale) {
@@ -226,10 +240,14 @@ class SessionManager {
     await _strategy.clear();
   }
 
-  Future<void> changePassword(
-      {required String currentPassword, required String newPassword}) async {
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
     await _auth.changePassword(
-        currentPassword: currentPassword, newPassword: newPassword);
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
     await reloadProfileAndPermissions(); // server clears mustChangePassword
   }
 
@@ -260,7 +278,23 @@ class SessionManager {
   /// Calls the REAL logout endpoint first (needs cookie + CSRF), then wipes locally
   /// even if the call failed. The reason is `logout`, not `session_expired`,
   /// so the login screen does not show the expiry notice.
-  Future<void> logout() async {
+  Future<void> logout() {
+    final existing = _logoutInFlight;
+    if (existing != null) return existing;
+    final run = _logout();
+    _logoutInFlight = run;
+    return run;
+  }
+
+  Future<void> _logout() async {
+    try {
+      await _performLogout();
+    } finally {
+      _logoutInFlight = null;
+    }
+  }
+
+  Future<void> _performLogout() async {
     _logoutRequested = true;
     _transitionEpoch++;
     _mfaTicket++;
@@ -281,8 +315,12 @@ class SessionManager {
   ///
   /// Many requests can 401 together. They share one wipe. An explicit
   /// [logout] that overlaps those 401s keeps reason `logout`.
-  Future<void> forceLogout(String reason) =>
-      _wipe(reason: _logoutRequested ? 'logout' : reason);
+  Future<void> forceLogout(String reason) {
+    // A cleanup (for example push unregister) may itself receive a 401.
+    // Awaiting the current wipe here would make it await its own cleanup.
+    if (_loggingOut) return Future<void>.value();
+    return _wipe(reason: _logoutRequested ? 'logout' : reason);
+  }
 
   Future<void> _wipe({required String reason}) {
     if (reason == 'logout') _wipeReason = 'logout';
@@ -305,23 +343,19 @@ class SessionManager {
     final epoch = _transitionEpoch;
     try {
       await _secureNow(epoch);
-      // Signed-out first, then the empty permission set. A frame during the
-      // awaits below must already be unauthenticated so the router sends
-      // /login and section guards do not announce a denial.
-      final reason = _wipeReason ?? 'session_expired';
-      // No await between these two. A frame must not observe an empty
-      // grant set on a session that is still authenticated.
-      _announceSignedOut(reason);
-      _permissions.clear();
       await _strategy.clear(); // cookies + CSRF (or tokens)
+      // Credential deletion is required, unlike best-effort cache/push cleanup.
+      await _clearStoredTokens?.call();
       for (final c in _cleanups) {
         try {
           await c();
         } catch (_) {}
       }
-      // A logout that started while this wipe was already running upgrades
-      // session_expired to logout. Never downgrade an explicit logout.
-      _announceSignedOut(_wipeReason ?? reason);
+      // Show login only after storage and session cleanups have completed.
+      // Keep these synchronous and in this order so permission listeners
+      // never see an authenticated session with an empty permission set.
+      _announceSignedOut(_wipeReason ?? 'session_expired');
+      _permissions.clear();
       await _applyCapture(epoch);
     } finally {
       _loggingOut = false;

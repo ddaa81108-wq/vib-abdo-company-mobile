@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../state/session_providers.dart';
+import '../../error_handling/error_handler.dart';
 import '../strings.dart';
 import '../tokens.dart';
 
@@ -12,7 +13,15 @@ Future<void> requestLogout(BuildContext context, WidgetRef ref) async {
     builder: (context) => const LogoutConfirmDialog(),
   );
   if (confirmed != true || !context.mounted) return;
-  await ref.read(sessionStateProvider.notifier).logout();
+  final errors = ref.read(errorHandlerProvider);
+  try {
+    await ref.read(sessionStateProvider.notifier).logout();
+  } catch (error, stack) {
+    errors.report(error, stack);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text(AppStrings.logoutFailed)));
+  }
 }
 
 class LogoutConfirmDialog extends StatelessWidget {

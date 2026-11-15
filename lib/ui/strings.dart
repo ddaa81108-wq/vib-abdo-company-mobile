@@ -19,6 +19,7 @@ abstract final class AppStrings {
   static const homeTitle = 'الرئيسية';
   static const logout = 'تسجيل الخروج';
   static const logoutConfirm = 'هل تريد تسجيل الخروج؟';
+  static const logoutFailed = 'تعذر إكمال تسجيل الخروج. أعد المحاولة.';
   static const signedInAs = 'الحساب';
   static const roleAdmin = 'مدير النظام';
   static const roleEmployee = 'موظف';
