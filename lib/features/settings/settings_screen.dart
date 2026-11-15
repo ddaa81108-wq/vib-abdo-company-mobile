@@ -7,7 +7,6 @@ import '../../state/section_gate.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
-import '../../ui/widgets/common.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/soft_tile.dart';
