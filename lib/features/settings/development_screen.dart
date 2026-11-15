@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../state/section_gate.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/theme.dart';
@@ -29,10 +30,14 @@ class DevelopmentScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!permissionsOf(ref).canDo(ManagementAction.settingsManage) &&
-        !permissionsOf(ref).canViewFinancialLedger) {
-      return const ForbiddenPane();
-    }
+    final permissions = permissionsOf(ref);
+    final held = sectionGate(
+      ref,
+      allowed:
+          permissions.canDo(ManagementAction.settingsManage) ||
+          permissions.canViewFinancialLedger,
+    );
+    if (held != null) return held;
     final health = ref.watch(serverHealthProvider);
     final layer = ref.watch(apiLayerProvider);
     return SectionTheme(

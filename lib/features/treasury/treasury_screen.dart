@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../state/section_gate.dart';
 import '../../state/section_providers.dart';
 import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
@@ -23,7 +24,11 @@ class TreasuryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final permissions = permissionsOf(ref);
-    if (!permissions.canRead(SectionKey.treasury)) return const ForbiddenPane();
+    final held = sectionGate(
+      ref,
+      allowed: permissions.canRead(SectionKey.treasury),
+    );
+    if (held != null) return held;
     final summary = ref.watch(treasuryProvider);
     final ledger = ref.watch(cashLedgerProvider);
     final money = ref.watch(apiLayerProvider).money;

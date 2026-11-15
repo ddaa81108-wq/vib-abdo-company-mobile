@@ -258,7 +258,12 @@ class SessionManager {
     _logoutRequested = true;
     _transitionEpoch++;
     _mfaTicket++;
+    _wipeReason = 'logout';
     await _secureNow(_transitionEpoch);
+    // Publish signed-out before the logout request and before permissions
+    // are cleared. A 401/403 on another in-flight call, or an empty
+    // permission set, must not be able to paint the section-denied page.
+    _announceSignedOut('logout');
     try {
       await _auth.logout();
     } catch (_) {
@@ -295,6 +300,11 @@ class SessionManager {
     final epoch = _transitionEpoch;
     try {
       await _secureNow(epoch);
+      // Signed-out first, then the empty permission set. A frame during the
+      // awaits below must already be unauthenticated so the router sends
+      // /login and section guards do not announce a denial.
+      final reason = _wipeReason ?? 'session_expired';
+      _announceSignedOut(reason);
       await _strategy.clear(); // cookies + CSRF (or tokens)
       _permissions.clear();
       for (final c in _cleanups) {
@@ -302,9 +312,9 @@ class SessionManager {
           await c();
         } catch (_) {}
       }
-      // Read the reason after the awaits so a logout that started while this
-      // wipe was already running can upgrade session_expired to logout.
-      _emit(SessionUnauthenticated(reason: _wipeReason ?? 'session_expired'));
+      // A logout that started while this wipe was already running upgrades
+      // session_expired to logout. Never downgrade an explicit logout.
+      _announceSignedOut(_wipeReason ?? reason);
       await _applyCapture(epoch);
     } finally {
       _loggingOut = false;
@@ -312,6 +322,15 @@ class SessionManager {
       _wipeReason = null;
       _logoutRequested = false;
     }
+  }
+
+  /// Publishes [reason] without dropping a logout that is already announced.
+  void _announceSignedOut(String reason) {
+    final current = state;
+    if (current is SessionUnauthenticated) {
+      if (current.reason == reason || current.reason == 'logout') return;
+    }
+    _emit(SessionUnauthenticated(reason: reason));
   }
 
   bool _reloadCurrent(int serial, int epoch) =>

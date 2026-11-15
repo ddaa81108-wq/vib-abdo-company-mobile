@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../state/section_gate.dart';
 import '../../state/theme_controller.dart';
 import '../../state/session_providers.dart';
 import '../../ui/strings.dart';
@@ -19,9 +20,11 @@ class SecurityScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!permissionsOf(ref).canDo(ManagementAction.settingsManage)) {
-      return const ForbiddenPane();
-    }
+    final held = sectionGate(
+      ref,
+      allowed: permissionsOf(ref).canDo(ManagementAction.settingsManage),
+    );
+    if (held != null) return held;
     final session = ref.watch(sessionStateProvider);
     final profile = session is SessionAuthenticated ? session.profile : null;
     return SectionTheme(

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../state/section_gate.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/presentation.dart';
@@ -146,7 +147,11 @@ class EditAccountCardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final permissions = permissionsOf(ref);
-    if (!permissions.canRead(section.sectionKey)) return const ForbiddenPane();
+    final held = sectionGate(
+      ref,
+      allowed: permissions.canRead(section.sectionKey),
+    );
+    if (held != null) return held;
     final card = ref.watch(accountCardProvider((section, id)));
     String messageOf(Object error) =>
         failureText(ref.read(errorHandlerProvider).toFailure(error));

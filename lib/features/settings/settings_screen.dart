@@ -3,6 +3,7 @@ import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../state/section_gate.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
 import '../../ui/tokens.dart';
@@ -63,7 +64,8 @@ class SettingsScreen extends ConsumerWidget {
     final permissions = permissionsOf(ref);
     final manage = permissions.canDo(ManagementAction.settingsManage);
     final ledger = permissions.canViewFinancialLedger;
-    if (!manage && !ledger) return const ForbiddenPane();
+    final held = sectionGate(ref, allowed: manage || ledger);
+    if (held != null) return held;
     final width = MediaQuery.sizeOf(context).width;
     final summary = ref.watch(homeSummaryProvider);
     final dark = ref.watch(themeModeProvider) == ThemeMode.dark;

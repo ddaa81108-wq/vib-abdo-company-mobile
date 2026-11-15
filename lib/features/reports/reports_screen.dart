@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../state/section_gate.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
@@ -23,7 +24,11 @@ class ReportsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final permissions = permissionsOf(ref);
-    if (!permissions.canRead(SectionKey.reports)) return const ForbiddenPane();
+    final held = sectionGate(
+      ref,
+      allowed: permissions.canRead(SectionKey.reports),
+    );
+    if (held != null) return held;
     final reports = ref.watch(reportsProvider);
     final money = ref.watch(apiLayerProvider).money;
     final width = MediaQuery.sizeOf(context).width;

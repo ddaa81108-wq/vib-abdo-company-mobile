@@ -7,6 +7,7 @@ import '../../api/api_providers.dart';
 import '../../performance/history_window.dart';
 import '../../error_handling/app_failure.dart';
 import '../../error_handling/error_handler.dart';
+import '../../state/section_gate.dart';
 import '../../state/section_providers.dart';
 import '../../state/session_providers.dart';
 import '../../state/theme_controller.dart';
@@ -105,9 +106,11 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       ref.read(accountExtraCardsProvider(section).notifier).clear();
     });
     final permissions = permissionsOf(ref);
-    if (!permissions.canRead(section.sectionKey)) {
-      return const ForbiddenPane();
-    }
+    final held = sectionGate(
+      ref,
+      allowed: permissions.canRead(section.sectionKey),
+    );
+    if (held != null) return held;
     final page = ref.watch(accountsProvider(section));
     final extra = ref.watch(accountExtraCardsProvider(section));
     final online = ref.watch(onlineProvider);

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../state/section_gate.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../state/session_providers.dart';
@@ -44,9 +45,11 @@ class LoginAccountsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!permissionsOf(ref).canDo(ManagementAction.settingsManage)) {
-      return const ForbiddenPane();
-    }
+    final held = sectionGate(
+      ref,
+      allowed: permissionsOf(ref).canDo(ManagementAction.settingsManage),
+    );
+    if (held != null) return held;
     final owner = _primaryOwner(ref);
     final accounts = ref.watch(loginAccountsProvider);
     final requests = ref.watch(accountRequestsProvider);
@@ -317,9 +320,11 @@ class _LoginAccountEditorScreenState
 
   @override
   Widget build(BuildContext context) {
-    if (!permissionsOf(ref).canDo(ManagementAction.settingsManage)) {
-      return const ForbiddenPane();
-    }
+    final held = sectionGate(
+      ref,
+      allowed: permissionsOf(ref).canDo(ManagementAction.settingsManage),
+    );
+    if (held != null) return held;
     final accounts = ref.watch(loginAccountsProvider);
     return accounts.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -417,10 +422,14 @@ class _LoginAccountCreateScreenState
 
   @override
   Widget build(BuildContext context) {
-    if (!_primaryOwner(ref) ||
-        !permissionsOf(ref).canDo(ManagementAction.settingsManage)) {
-      return const ForbiddenPane(key: Key('login-account-create-forbidden'));
-    }
+    final held = sectionGate(
+      ref,
+      allowed:
+          _primaryOwner(ref) &&
+          permissionsOf(ref).canDo(ManagementAction.settingsManage),
+      denied: const ForbiddenPane(key: Key('login-account-create-forbidden')),
+    );
+    if (held != null) return held;
     final accounts = ref.watch(loginAccountsProvider);
     return accounts.when(
       loading: () => const Center(child: CircularProgressIndicator()),
