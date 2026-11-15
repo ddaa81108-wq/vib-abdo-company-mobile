@@ -118,3 +118,24 @@ $BT/apksigner sign --ks /workspace/phase9/secrets/vib-release.p12 --ks-type PKCS
 2. تحقق من أن السجلات لا تحوي كلمة المرور، دون طباعة أي تطابق:
    `grep -rlF -f /workspace/phase9/secrets/store.pass /workspace/phase9 --exclude-dir=secrets | wc -l` يجب أن يكون `0`.
 3. `git status --porcelain` فارغ، و`git ls-files | grep -Ei 'p12|jks|keystore|key.properties$'` فارغ.
+
+## بناء الإنتاج مع التحقق من التوقيع
+
+على جهاز البناء الذي يحتفظ أصلًا بالمفتاح وملف Firebase:
+
+```bash
+source /workspace/phase9/env.sh
+cd /workspace/phase9/repo
+git pull --ff-only origin main
+bash tool/build-production.sh 22
+```
+
+الرقم `22` مثال لترقية نسخة `21`؛ يجب اختيار رقم أعلى من آخر نسخة موزّعة.
+السكربت يفرض التوقيع الأصلي، ويطلب Firebase، ويبني مقابل `https://vip2100.com`،
+ويتحقق من الحزمة ورقم الإصدار وبصمة الشهادة المذكورة أعلاه ومن غياب بيانات الديمو.
+النسخة المتحقق منها وSHA-256 توضعان داخل `build/releases/`.
+لا ينقل السكربت المفتاح أو كلمات المرور إلى GitHub.
+
+التنسيق الأبيض والذهبي لاستلامات الديون مفعّل افتراضيًا. علم البناء
+`--dart-define=COLLECTIONS_WHITE_GOLD=false` متاح لمراجعة الشكل السابق.
+تحديث التطبيق يتطلب تثبيت APK الجديد؛ لا يتطلب هذان التعديلان نشرًا على خادم الموقع.

@@ -86,6 +86,8 @@ void main() {
       expect(find.text('موظف استلام تجريبي'), findsWidgets);
       expect(find.text('موظف آخر تجريبي'), findsWidgets);
 
+      await tester.ensureVisible(find.byKey(const Key('collections-payroll')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('collections-payroll')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('collections-payroll-back')), findsOneWidget);
@@ -164,8 +166,21 @@ void _expectSameRow(WidgetTester tester, List<Key> keys) {
   final rects = [for (final key in keys) tester.getRect(find.byKey(key))];
   final top = rects.first.top;
   final width = rects.first.width;
-  for (final rect in rects) {
-    expect((rect.top - top).abs(), lessThan(2));
+  const whiteGold = bool.fromEnvironment(
+    'COLLECTIONS_WHITE_GOLD',
+    defaultValue: true,
+  );
+  final adaptive =
+      whiteGold &&
+      (keys.first.toString().contains('metric-') ||
+          keys.first.toString().contains('collections-tab-'));
+  if (adaptive && rects.length > 2) {
+    expect(rects[2].top, greaterThanOrEqualTo(rects[0].bottom));
+  }
+  for (var i = 0; i < rects.length; i++) {
+    final rect = rects[i];
+    final expectedTop = adaptive ? rects[(i ~/ 2) * 2].top : top;
+    expect((rect.top - expectedTop).abs(), lessThan(2));
     expect((rect.width - width).abs(), lessThan(8));
     expect(rect.height, greaterThan(24));
   }
