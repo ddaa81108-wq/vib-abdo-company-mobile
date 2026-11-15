@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../api/api_providers.dart';
 import '../ui/widgets/common.dart';
 import 'session_providers.dart';
 
@@ -21,7 +22,8 @@ Widget? sectionGate(
   Widget denied = const ForbiddenPane(),
 }) {
   final session = ref.watch(sessionStateProvider);
-  if (session is! SessionAuthenticated) {
+  final signingOut = ref.read(apiLayerProvider).session.signingOut;
+  if (signingOut || session is! SessionAuthenticated) {
     return const SizedBox.shrink(key: Key('signed-out-section'));
   }
   if (!allowed) return denied;

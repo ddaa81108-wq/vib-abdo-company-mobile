@@ -79,6 +79,12 @@ class SessionManager {
   final SessionCaptureGate? _captureGate;
   final List<SessionCleanup> _cleanups;
 
+  /// True from the start of [logout] until the wipe finishes.
+  /// Section guards use this so a 401/403 during the logout request does
+  /// not paint the permission-denied page while the window is still locked
+  /// on the old session.
+  bool get signingOut => _logoutRequested;
+
   /// Bumped before logout, expiry, and account switch. An in-flight profile
   /// read keeps the generation it started with and cannot publish after it.
   int _transitionEpoch = 0;
@@ -260,10 +266,9 @@ class SessionManager {
     _mfaTicket++;
     _wipeReason = 'logout';
     await _secureNow(_transitionEpoch);
-    // Publish signed-out before the logout request and before permissions
-    // are cleared. A 401/403 on another in-flight call, or an empty
-    // permission set, must not be able to paint the section-denied page.
-    _announceSignedOut('logout');
+    // The window is locked while this session is still the signed-in one.
+    // The signed-out publication happens in the wipe, before permissions
+    // are cleared, so the logout request itself still sees the old session.
     try {
       await _auth.logout();
     } catch (_) {
@@ -304,9 +309,11 @@ class SessionManager {
       // awaits below must already be unauthenticated so the router sends
       // /login and section guards do not announce a denial.
       final reason = _wipeReason ?? 'session_expired';
+      // No await between these two. A frame must not observe an empty
+      // grant set on a session that is still authenticated.
       _announceSignedOut(reason);
-      await _strategy.clear(); // cookies + CSRF (or tokens)
       _permissions.clear();
+      await _strategy.clear(); // cookies + CSRF (or tokens)
       for (final c in _cleanups) {
         try {
           await c();
