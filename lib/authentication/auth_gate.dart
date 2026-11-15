@@ -14,7 +14,9 @@ const forbiddenLocation = '/forbidden';
 /// When [permissions] is set, a signed-in user who opens a section they cannot
 /// read is sent to [forbiddenLocation]. Search, notifications, the account
 /// screen, and [forbiddenLocation] itself stay open. An unauthenticated
-/// session is sent to `/login` before that permission decision.
+/// session is sent to `/login` before that permission decision, including
+/// when logout has already cleared the grant set. An empty permission set
+/// is not a denial unless the session is still authenticated.
 String? authRedirect(
   SessionState session,
   String location, {

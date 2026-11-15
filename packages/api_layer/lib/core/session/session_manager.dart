@@ -79,6 +79,12 @@ class SessionManager {
   final SessionCaptureGate? _captureGate;
   final List<SessionCleanup> _cleanups;
 
+  /// True from the start of [logout] until the wipe finishes.
+  /// Section guards use this so a 401/403 during the logout request does
+  /// not paint the permission-denied page while the window is still locked
+  /// on the old session.
+  bool get signingOut => _logoutRequested;
+
   /// Bumped before logout, expiry, and account switch. An in-flight profile
   /// read keeps the generation it started with and cannot publish after it.
   int _transitionEpoch = 0;
@@ -258,7 +264,11 @@ class SessionManager {
     _logoutRequested = true;
     _transitionEpoch++;
     _mfaTicket++;
+    _wipeReason = 'logout';
     await _secureNow(_transitionEpoch);
+    // The window is locked while this session is still the signed-in one.
+    // The signed-out publication happens in the wipe, before permissions
+    // are cleared, so the logout request itself still sees the old session.
     try {
       await _auth.logout();
     } catch (_) {
@@ -295,16 +305,23 @@ class SessionManager {
     final epoch = _transitionEpoch;
     try {
       await _secureNow(epoch);
-      await _strategy.clear(); // cookies + CSRF (or tokens)
+      // Signed-out first, then the empty permission set. A frame during the
+      // awaits below must already be unauthenticated so the router sends
+      // /login and section guards do not announce a denial.
+      final reason = _wipeReason ?? 'session_expired';
+      // No await between these two. A frame must not observe an empty
+      // grant set on a session that is still authenticated.
+      _announceSignedOut(reason);
       _permissions.clear();
+      await _strategy.clear(); // cookies + CSRF (or tokens)
       for (final c in _cleanups) {
         try {
           await c();
         } catch (_) {}
       }
-      // Read the reason after the awaits so a logout that started while this
-      // wipe was already running can upgrade session_expired to logout.
-      _emit(SessionUnauthenticated(reason: _wipeReason ?? 'session_expired'));
+      // A logout that started while this wipe was already running upgrades
+      // session_expired to logout. Never downgrade an explicit logout.
+      _announceSignedOut(_wipeReason ?? reason);
       await _applyCapture(epoch);
     } finally {
       _loggingOut = false;
@@ -312,6 +329,15 @@ class SessionManager {
       _wipeReason = null;
       _logoutRequested = false;
     }
+  }
+
+  /// Publishes [reason] without dropping a logout that is already announced.
+  void _announceSignedOut(String reason) {
+    final current = state;
+    if (current is SessionUnauthenticated) {
+      if (current.reason == reason || current.reason == 'logout') return;
+    }
+    _emit(SessionUnauthenticated(reason: reason));
   }
 
   bool _reloadCurrent(int serial, int epoch) =>

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/legacy.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../state/section_gate.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/presentation.dart';
@@ -95,9 +96,11 @@ class PurchasesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final permissions = permissionsOf(ref);
-    if (!permissions.canRead(SectionKey.purchases)) {
-      return const ForbiddenPane();
-    }
+    final held = sectionGate(
+      ref,
+      allowed: permissions.canRead(SectionKey.purchases),
+    );
+    if (held != null) return held;
     final book = ref.watch(purchaseBookProvider);
     final page = ref.watch(purchasesProvider);
     final money = ref.watch(apiLayerProvider).money;

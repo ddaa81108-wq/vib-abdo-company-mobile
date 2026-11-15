@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../state/section_gate.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/strings.dart';
@@ -141,9 +142,11 @@ class _FinancialLedgerScreenState extends ConsumerState<FinancialLedgerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!permissionsOf(ref).canViewFinancialLedger) {
-      return const ForbiddenPane();
-    }
+    final held = sectionGate(
+      ref,
+      allowed: permissionsOf(ref).canViewFinancialLedger,
+    );
+    if (held != null) return held;
     final page = ref.watch(ledgerPageProvider(_query));
     final money = ref.watch(apiLayerProvider).money;
     return SectionTheme(

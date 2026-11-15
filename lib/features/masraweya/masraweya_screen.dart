@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_providers.dart';
 import '../../error_handling/error_handler.dart';
+import '../../state/section_gate.dart';
 import '../../state/section_providers.dart';
 import '../../state/theme_controller.dart';
 import '../../ui/presentation.dart';
@@ -31,9 +32,11 @@ class MasraweyaScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final permissions = permissionsOf(ref);
-    if (!permissions.canRead(SectionKey.masraweya)) {
-      return const ForbiddenPane();
-    }
+    final held = sectionGate(
+      ref,
+      allowed: permissions.canRead(SectionKey.masraweya),
+    );
+    if (held != null) return held;
     final day = ref.watch(masraweyaProvider);
     final money = ref.watch(apiLayerProvider).money;
     final canWrite = permissions.canWrite(SectionKey.masraweya);
