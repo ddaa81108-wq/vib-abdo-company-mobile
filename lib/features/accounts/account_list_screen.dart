@@ -19,7 +19,6 @@ import '../../ui/widgets/common.dart';
 import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/mutation_form.dart';
 import 'account_list_logic.dart';
-import 'zero_review_preview.dart';
 import 'account_name_suggestions.dart';
 import 'company_card_tone.dart';
 import 'customer_card_tone.dart';
@@ -48,6 +47,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   String? _moreError;
   final _selected = <String>{};
   String? _reply;
+  final _zeroLocks = <String, SubmissionLock>{};
 
   /// One tap can be delivered twice: the recognizer that went down, then the
   /// recognizer created when that setState rebuilds the card. The second
@@ -493,13 +493,14 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       onToggle: () => _toggleSelection(card),
       onPin: (meta) => _pin(card, meta),
       zeroOnline: ref.watch(onlineProvider),
-      onZeroPreview:
+      zeroBusy: _zeroLocks[card.id]?.busy ?? false,
+      onZeroReview:
           showCustomerZeroReview(
             permissions: permissions,
             section: section,
             card: card,
           )
-          ? () => _openZeroPreview(card)
+          ? () => _reviewZero(card)
           : null,
     );
   }
@@ -586,39 +587,50 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     }
   }
 
-  Future<void> _openZeroPreview(AccountCardDto card) async {
-    final financial = zeroReviewFinancialVersion(card);
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => ZeroReviewPreview(
-        name: card.name,
-        balance: ref
-            .read(apiLayerProvider)
-            .money
-            .formatOrDash(card.balanceUnits, card.currency),
-        financialVersion: financial,
-        onConfirm: financial == null
-            ? null
-            : () => _confirmZeroPreview(card.id, financial),
-      ),
-    );
-  }
-
-  Future<String?> _confirmZeroPreview(String id, int financial) async {
-    final latest = _financialVersionNow(id);
-    if (latest != financial) {
-      return 'تغيرت بيانات الكارت. أعد فتح المعاينة.';
+  Future<void> _reviewZero(AccountCardDto displayed) async {
+    if (!ref.read(onlineProvider)) return;
+    final current = _cardNow(displayed.id);
+    if (current == null ||
+        !showCustomerZeroReview(
+          permissions: ref.read(apiLayerProvider).permissions,
+          section: section,
+          card: current,
+        )) {
+      return;
     }
-    final current = _cardNow(id);
-    if (current == null) return 'الكارت لم يعد في القائمة.';
-    final message = await _zero(
-      current,
-      MutationMeta(expectedVersion: financial),
+    final financial = zeroReviewFinancialVersion(current);
+    if (financial != zeroReviewFinancialVersion(displayed)) {
+      setState(
+        () =>
+            _reply = 'تغيرت بيانات الكارت. راجع أحدث بياناته ثم أعد المحاولة.',
+      );
+      return;
+    }
+    if (financial == null) {
+      setState(
+        () =>
+            _reply = 'لا يوجد إصدار مالي على الكارت. لم تُرسل مراجعة التصفير.',
+      );
+      return;
+    }
+    final lock = _zeroLocks.putIfAbsent(current.id, SubmissionLock.new);
+    if (lock.busy) return;
+    lock.expectedVersion = financial;
+    final userId = _signedInId();
+    final meta = lock.metaFor(
+      'zero:${section.name}:${current.id}:${userId ?? ''}:$financial',
     );
-    // The open preview owns the error. The list banner stays clear so the
-    // same sentence is not painted twice behind the dialog.
-    if (message != null && mounted) setState(() => _reply = null);
-    return message;
+    setState(() {
+      lock.busy = true;
+      _reply = null;
+    });
+    try {
+      final message = await _zero(current, meta);
+      if (message == null) lock.succeed();
+    } finally {
+      lock.busy = false;
+      if (mounted && _signedInId() == userId) setState(() {});
+    }
   }
 
   AccountCardDto? _cardNow(String id) {
@@ -628,11 +640,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       if (card.id == id) return card;
     }
     return null;
-  }
-
-  int? _financialVersionNow(String id) {
-    final card = _cardNow(id);
-    return card == null ? null : zeroReviewFinancialVersion(card);
   }
 
   Future<String?> _zero(AccountCardDto card, MutationMeta meta) async {
@@ -1036,8 +1043,9 @@ class _AccountCard extends StatelessWidget {
     required this.onOpen,
     required this.onToggle,
     required this.onPin,
-    required this.onZeroPreview,
+    required this.onZeroReview,
     required this.zeroOnline,
+    required this.zeroBusy,
     this.wide = false,
   });
 
@@ -1051,13 +1059,14 @@ class _AccountCard extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback onToggle;
   final Future<String?> Function(MutationMeta meta) onPin;
-  final VoidCallback? onZeroPreview;
+  final VoidCallback? onZeroReview;
   final bool zeroOnline;
+  final bool zeroBusy;
 
   @override
   Widget build(BuildContext context) {
     final showPin = canWrite && !assigning;
-    final showZero = onZeroPreview != null && !card.systemManaged && !assigning;
+    final showZero = onZeroReview != null && !card.systemManaged && !assigning;
     final selectable = assigning && canSelectAccountForAssignment(card);
     final blocked = assigning && !selectable;
     // Customers: debt / credit / zero tone from the balance sign (Ali,
@@ -1115,12 +1124,26 @@ class _AccountCard extends StatelessWidget {
               key: ValueKey('zero-review-${card.id}'),
               tooltip: AppStrings.zeroReview,
               style: IconButton.styleFrom(
-                minimumSize: const Size(28, 28),
+                minimumSize: const Size(48, 48),
+                fixedSize: const Size(48, 48),
+                visualDensity: VisualDensity.standard,
+                foregroundColor: ink,
+                backgroundColor: ink.withValues(alpha: 0.10),
+                side: BorderSide(color: ink.withValues(alpha: 0.45)),
                 padding: EdgeInsets.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              onPressed: zeroOnline ? onZeroPreview : null,
-              icon: const Icon(Icons.check_circle_outline, size: 18),
+              onPressed: zeroOnline && !zeroBusy ? onZeroReview : null,
+              icon: zeroBusy
+                  ? SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: ink,
+                      ),
+                    )
+                  : const Icon(Icons.check_circle_outline, size: 32),
             )
           : null,
     );

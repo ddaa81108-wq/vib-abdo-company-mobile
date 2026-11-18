@@ -119,7 +119,7 @@ void main() {
     expect(find.byKey(const Key('correction-form')), findsOneWidget);
     expect(find.byKey(const Key('correction-payment-mode')), findsNothing);
     expect(find.text(AppStrings.fullPayment), findsNothing);
-    expect(find.text(AppStrings.noPreview), findsWidgets);
+    expect(find.text(AppStrings.noPreview), findsNothing);
   });
 
   testWidgets('confirmation keeps one request id and sends the card version', (
@@ -531,9 +531,9 @@ void main() {
       expectRtl(tester);
 
       await openCorrection(tester, 'customers');
-      expect(find.text(AppStrings.correctTransaction), findsWidgets);
-      expect(find.text(AppStrings.noPreview), findsWidgets);
-      expect(find.text(AppStrings.currentServerAmount), findsOneWidget);
+      expect(find.byKey(const Key('save-correction')), findsOneWidget);
+      expect(find.text(AppStrings.noPreview), findsNothing);
+      expect(find.byKey(const Key('ledger-amount-tx_1')), findsOneWidget);
       expectRtl(tester);
       expect(
         Theme.of(tester.element(find.byKey(const Key('correction-form'))))
@@ -632,9 +632,14 @@ Future<void> closeCorrection(WidgetTester tester, String id) async {
 }
 
 Future<void> openConfirm(WidgetTester tester) async {
-  await tester.ensureVisible(find.byKey(const Key('save-correction')));
-  await tester.pump(const Duration(milliseconds: 300));
-  await tester.tap(find.byKey(const Key('save-correction')));
+  FocusManager.instance.primaryFocus?.unfocus();
+  await settle(tester);
+  final save = find.byKey(const Key('save-correction'));
+  await tester.ensureVisible(save);
+  await settle(tester);
+  expect(save.hitTestable(), findsOneWidget);
+  await tester.tap(save);
+  // The guarded button stays busy while its confirmation dialog is open.
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
 }

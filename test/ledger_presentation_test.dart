@@ -47,9 +47,12 @@ void main() {
         Brightness.dark,
       );
       expectRtl(tester);
-      // Customer and company rows stay cream in both themes, so the status
-      // ink stays the light-theme red and green (readable on white).
-      _expectMovementColors(tester, AppStatusColors.light);
+      if (path.startsWith('/customers/') || path.startsWith('/companies/')) {
+        expect(_styleColor(tester, 'tx_1'), const Color(0xFFFFB6BC));
+        expect(_styleColor(tester, 'tx_2'), const Color(0xFF8FF0BD));
+      } else {
+        _expectMovementColors(tester, AppStatusColors.light);
+      }
       expect(tester.takeException(), isNull);
     }
   });
@@ -63,12 +66,12 @@ void main() {
     // instead (Ali, 2026-11-03); the deposit ledgers keep the age gradient.
     await go(tester, '/libyan-deposits/c_55');
 
-    _expectHeaderGradient(tester, websiteLedgerGold.fill);
+    _expectHeaderGradient(tester, depositCardGreen.fill);
     // The total card shows only the total (Ali, 2026-11-04): no age line.
     expect(find.text('منذ 4 أيام'), findsNothing);
 
     await _toggleDark(tester);
-    _expectHeaderGradient(tester, websiteLedgerGold.fill);
+    _expectHeaderGradient(tester, depositCardGreen.fill);
     expectRtl(tester);
   });
 
@@ -93,7 +96,7 @@ void main() {
     // Customers and companies show the glossy دين/أمانة/صفر total card
     // instead (Ali, 2026-11-03); the deposit ledgers keep the age gradient.
     await go(tester, '/libyan-deposits/c_55');
-    _expectHeaderGradient(tester, websiteLedgerGold.fill);
+    _expectHeaderGradient(tester, depositCardGreen.fill);
     expect(tester.takeException(), isNull);
   });
 
@@ -120,7 +123,7 @@ void main() {
         matching: find.byType(Ink),
       ),
     );
-    expect((ink.decoration! as BoxDecoration).gradient, websiteLedgerGold.fill);
+    expect((ink.decoration! as BoxDecoration).gradient, depositCardGreen.fill);
     expect(tester.takeException(), isNull);
   });
 

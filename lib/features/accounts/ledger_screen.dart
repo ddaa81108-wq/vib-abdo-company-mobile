@@ -60,6 +60,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
 
   /// The row whose correction form is open in place, if any.
   String? _editingId;
+  final _editingAnchor = GlobalKey();
 
   /// The page the screen last opened at the entry buttons for.
   String? _openedAtBottomFor;
@@ -128,7 +129,8 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
         continue;
       }
       final position = c.position;
-      final target = _LedgerColumns.valueOffset(position.viewportDimension)
+      final target = _LedgerColumns(showBalance: false, section: section)
+          .valueOffset(position.viewportDimension)
           .clamp(position.minScrollExtent, position.maxScrollExtent);
       if ((c.offset - target).abs() > 0.5) {
         c.jumpTo(target);
@@ -278,194 +280,289 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
         ? messageOf(card.error!)
         : null;
 
-    return Scaffold(
-      key: Key('screen-ledger-${section.path}'),
-      backgroundColor: const Color(0xFF140E06),
-      body: Padding(
-        padding: const EdgeInsets.all(6),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFFFFF8EC), Color(0xFFF6E2A8)],
+    final website = _usesWebsiteLedger(section);
+    final night = Theme.of(context).brightness == Brightness.dark;
+    return _WebsiteLedgerSkin(
+      enabled: website,
+      child: Scaffold(
+        key: Key('screen-ledger-${section.path}'),
+        backgroundColor: const Color(0xFF140E06),
+        body: Padding(
+          padding: const EdgeInsets.all(6),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: website && night
+                    ? const [
+                        Color(0xFF17140D),
+                        Color(0xFF070707),
+                        Color(0xFF211A0E),
+                      ]
+                    : const [Color(0xFFFFF8EC), Color(0xFFF6E2A8)],
+              ),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0xFFE7AE12), width: 2.4),
             ),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFE7AE12), width: 2.4),
-          ),
-          child: KeptData<AccountCardDto>(
-            value: card,
-            resetKey: '${section.path}/$id',
-            expand: true,
-            onRetry: () {
-              ref.invalidate(accountCardProvider((section, id)));
-              ref.invalidate(ledgerProvider((section, id)));
-            },
-            messageOf: messageOf,
-            failureOf: failureOf,
-            loading: const _LedgerLoading(),
-            builder: (loadedCard) {
-              // Writes stay hidden until the card has loaded and is not system-managed.
-              final canWrite =
-                  !loadedCard.systemManaged &&
-                  permissions.canWrite(section.sectionKey);
-              final padding = pagePadding(MediaQuery.sizeOf(context).width);
-              // The total card stays on top while the table scrolls (Ali,
-              // 2026-11-03).
-              // Customers and companies share the total card design; each
-              // section reads its own balance rule (Ali, 2026-11-03).
-              final glossyTotal =
-                  section == AccountSection.customers ||
-                  section == AccountSection.companies;
-              // One horizontal row, as before 060: name, تعديل البيانات, ✕.
-              // Ten extra dp under the status area so the row is not jammed
-              // against the top (the old padding was 8).
-              final bar = DecoratedBox(
-                key: const Key('ledger-top-bar'),
-                decoration: const BoxDecoration(color: Color(0xFF111111)),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 18, 10, 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: _OwnerPill(
-                            name: loadedCard.name,
-                            section: _ledgerTitle(section),
+            child: KeptData<AccountCardDto>(
+              value: card,
+              resetKey: '${section.path}/$id',
+              expand: true,
+              onRetry: () {
+                ref.invalidate(accountCardProvider((section, id)));
+                ref.invalidate(ledgerProvider((section, id)));
+              },
+              messageOf: messageOf,
+              failureOf: failureOf,
+              loading: const _LedgerLoading(),
+              builder: (loadedCard) {
+                // Writes stay hidden until the card has loaded and is not system-managed.
+                final canWrite =
+                    !loadedCard.systemManaged &&
+                    permissions.canWrite(section.sectionKey);
+                final padding = website
+                    ? const EdgeInsetsDirectional.symmetric(horizontal: 8)
+                    : pagePadding(MediaQuery.sizeOf(context).width);
+                // The total card stays on top while the table scrolls (Ali,
+                // 2026-11-03).
+                // Customers and companies share the total card design; each
+                // section reads its own balance rule (Ali, 2026-11-03).
+                final glossyTotal =
+                    section == AccountSection.customers ||
+                    section == AccountSection.companies;
+                // One horizontal row, as before 060: name, تعديل البيانات, ✕.
+                // Ten extra dp under the status area so the row is not jammed
+                // against the top (the old padding was 8).
+                final bar = website
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 10, 8, 2),
+                        child: DecoratedBox(
+                          key: const Key('ledger-top-bar'),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF514939),
+                                Color(0xFF090909),
+                                Color(0xFF403319),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: const Color(0xFFF3CF63)),
                           ),
-                        ),
-                      ),
-                      Flexible(
-                        child: EditAccountCardButton(
-                          section: section,
-                          card: loadedCard,
-                          compact: true,
-                        ),
-                      ),
-                      Expanded(
-                        child: Align(
-                          alignment: AlignmentDirectional.centerEnd,
-                          child: IconButton(
-                            key: const Key('ledger-close'),
-                            tooltip: AppStrings.back,
-                            style: IconButton.styleFrom(
-                              backgroundColor: const Color(0xFF211600),
-                              foregroundColor: const Color(0xFFF6E7A8),
-                              side: const BorderSide(
-                                color: Color(0xFFE7AE12),
-                                width: 1.4,
-                              ),
-                              minimumSize: const Size(36, 36),
-                              fixedSize: const Size(36, 36),
-                            ),
-                            onPressed: () => context.canPop()
-                                ? context.pop()
-                                : context.go('/${section.path}'),
-                            icon: const Icon(Icons.close_rounded, size: 18),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-              final jumps = Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: _JumpButtons(
-                  showTop: _showJumpTop,
-                  showBottom: _showJumpBottom,
-                  onTop: _jumpToTop,
-                  onBottom: _jumpToEntry,
-                ),
-              );
-              // The total card is always under the ledger, pinned at the bottom
-              // (Ali, 2026-11-04). Same card and colour rules as before.
-              final total = Padding(
-                padding: padding.copyWith(
-                  top: AppSpacing.xs,
-                  bottom: AppSpacing.xs,
-                ),
-                child: glossyTotal
-                    ? _TotalCard(
-                        section: section,
-                        card: loadedCard,
-                        money: money,
-                        awaitingServerBalance: _balanceAwaitingReload,
-                        ackBalance: _ackBalance,
-                        reloadError: reloadError,
-                      )
-                    : _Header(
-                        section: section,
-                        card: loadedCard,
-                        money: money,
-                        title: _ledgerTitle(section),
-                        awaitingServerBalance: _balanceAwaitingReload,
-                        ackBalance: _ackBalance,
-                        reloadError: reloadError,
-                        showTitle: false,
-                      ),
-              );
-              // At large text the total card may be taller than a small
-              // screen. It then scrolls inside its own band.
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final maxPinned = constraints.maxHeight.isFinite
-                      ? constraints.maxHeight * 0.34
-                      : MediaQuery.sizeOf(context).height * 0.34;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      bar,
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            KeptData<LedgerPage>(
-                              value: ledger,
-                              resetKey: '${section.path}/$id/ledger',
-                              expand: true,
-                              onRetry: () =>
-                                  ref.invalidate(ledgerProvider((section, id))),
-                              messageOf: messageOf,
-                              failureOf: failureOf,
-                              loading: const _LedgerLoading(),
-                              builder: (page) => _ledgerBody(
-                                context,
-                                page: page,
-                                card: card,
-                                online: online,
-                                money: money,
-                                canWrite: canWrite,
-                                padding: padding,
-                              ),
-                            ),
-                            // Over the rows, so showing the buttons does not
-                            // resize the list and shake the scroll.
-                            PositionedDirectional(
-                              top: 0,
-                              start: 0,
-                              child: jumps,
-                            ),
-                          ],
-                        ),
-                      ),
-                      ConstrainedBox(
-                        constraints: BoxConstraints(maxHeight: maxPinned),
-                        child: SingleChildScrollView(
-                          key: const Key('ledger-pinned'),
                           child: Padding(
-                            padding: EdgeInsets.only(
-                              bottom: MediaQuery.viewPaddingOf(context).bottom,
+                            padding: const EdgeInsets.all(5),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: _OwnerPill(
+                                    name: loadedCard.name,
+                                    section: _ledgerTitle(section),
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                EditAccountCardButton(
+                                  section: section,
+                                  card: loadedCard,
+                                  compact: true,
+                                  iconOnly: true,
+                                ),
+                                const SizedBox(width: 5),
+                                IconButton(
+                                  key: const Key('ledger-close'),
+                                  tooltip: AppStrings.back,
+                                  style: IconButton.styleFrom(
+                                    foregroundColor: const Color(0xFFFFF4CB),
+                                    backgroundColor: const Color(0xFF111111),
+                                    side: const BorderSide(
+                                      color: Color(0xFFF4CF60),
+                                    ),
+                                    minimumSize: const Size(40, 40),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                  onPressed: () => context.canPop()
+                                      ? context.pop()
+                                      : context.go('/${section.path}'),
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    size: 22,
+                                  ),
+                                ),
+                              ],
                             ),
-                            child: total,
                           ),
                         ),
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
+                      )
+                    : DecoratedBox(
+                        key: const Key('ledger-top-bar'),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF111111),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 18, 10, 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Align(
+                                  alignment: AlignmentDirectional.centerStart,
+                                  child: _OwnerPill(
+                                    name: loadedCard.name,
+                                    section: _ledgerTitle(section),
+                                  ),
+                                ),
+                              ),
+                              Flexible(
+                                child: EditAccountCardButton(
+                                  section: section,
+                                  card: loadedCard,
+                                  compact: true,
+                                ),
+                              ),
+                              Expanded(
+                                child: Align(
+                                  alignment: AlignmentDirectional.centerEnd,
+                                  child: IconButton(
+                                    key: const Key('ledger-close'),
+                                    tooltip: AppStrings.back,
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: const Color(0xFF211600),
+                                      foregroundColor: const Color(0xFFF6E7A8),
+                                      side: const BorderSide(
+                                        color: Color(0xFFE7AE12),
+                                        width: 1.4,
+                                      ),
+                                      minimumSize: const Size(36, 36),
+                                      fixedSize: const Size(36, 36),
+                                    ),
+                                    onPressed: () => context.canPop()
+                                        ? context.pop()
+                                        : context.go('/${section.path}'),
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                final jumps = Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: _JumpButtons(
+                    showTop: _showJumpTop,
+                    showBottom: _showJumpBottom,
+                    onTop: _jumpToTop,
+                    onBottom: _jumpToEntry,
+                  ),
+                );
+                // The total card is always under the ledger, pinned at the bottom
+                // (Ali, 2026-11-04). Same card and colour rules as before.
+                final total = Padding(
+                  padding: padding.copyWith(
+                    top: AppSpacing.xs,
+                    bottom: AppSpacing.xs,
+                  ),
+                  child: glossyTotal
+                      ? Align(
+                          alignment: website
+                              ? Alignment.centerLeft
+                              : Alignment.center,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: website ? 230 : double.infinity,
+                            ),
+                            child: _TotalCard(
+                              section: section,
+                              card: loadedCard,
+                              money: money,
+                              awaitingServerBalance: _balanceAwaitingReload,
+                              ackBalance: _ackBalance,
+                              reloadError: reloadError,
+                            ),
+                          ),
+                        )
+                      : Align(
+                          alignment: Alignment.centerLeft,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 230),
+                            child: _Header(
+                              section: section,
+                              card: loadedCard,
+                              money: money,
+                              title: _ledgerTitle(section),
+                              awaitingServerBalance: _balanceAwaitingReload,
+                              ackBalance: _ackBalance,
+                              reloadError: reloadError,
+                              showTitle: false,
+                            ),
+                          ),
+                        ),
+                );
+                // At large text the total card may be taller than a small
+                // screen. It then scrolls inside its own band.
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final maxPinned = constraints.maxHeight.isFinite
+                        ? constraints.maxHeight * 0.34
+                        : MediaQuery.sizeOf(context).height * 0.34;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        bar,
+                        Expanded(
+                          child: Stack(
+                            children: [
+                              KeptData<LedgerPage>(
+                                value: ledger,
+                                resetKey: '${section.path}/$id/ledger',
+                                expand: true,
+                                onRetry: () => ref.invalidate(
+                                  ledgerProvider((section, id)),
+                                ),
+                                messageOf: messageOf,
+                                failureOf: failureOf,
+                                loading: const _LedgerLoading(),
+                                builder: (page) => _ledgerBody(
+                                  context,
+                                  page: page,
+                                  card: card,
+                                  online: online,
+                                  money: money,
+                                  canWrite: canWrite,
+                                  padding: padding,
+                                ),
+                              ),
+                              // Over the rows, so showing the buttons does not
+                              // resize the list and shake the scroll.
+                              PositionedDirectional(
+                                top: 0,
+                                start: 0,
+                                child: jumps,
+                              ),
+                            ],
+                          ),
+                        ),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(maxHeight: maxPinned),
+                          child: SingleChildScrollView(
+                            key: const Key('ledger-pinned'),
+                            child: Padding(
+                              padding: EdgeInsets.only(
+                                bottom: MediaQuery.viewPaddingOf(context)
+                                    .bottom,
+                              ),
+                              child: total,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -536,6 +633,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
       columns: columns,
       canWrite: canWrite,
       editing: _editingId == rows[index].id,
+      editAnchor: _editingId == rows[index].id ? _editingAnchor : null,
       onEdit: () => _openInlineEdit(rows[index].id),
       onEditDone: _closeInlineEdit,
       onCancel: (meta) => _cancel(context, ref, rows[index], meta),
@@ -667,6 +765,24 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
 
   void _openInlineEdit(String entryId) {
     setState(() => _editingId = entryId);
+    if (_usesWebsiteLedger(section)) {
+      // Wait for the selected form to be laid out, then reveal it in both
+      // the horizontal table and the outer/long-history vertical viewports.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _editingId != entryId) return;
+        final anchor = _editingAnchor.currentContext;
+        if (anchor == null) return;
+        unawaited(
+          Scrollable.ensureVisible(
+            anchor,
+            alignment: 0,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+          ),
+        );
+      });
+      return;
+    }
     // The form sits at the start of the row, where the table starts.
     if (_columnsScroll.hasClients) {
       _columnsScroll.animateTo(
@@ -927,11 +1043,23 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
     final look = context.look;
     final columns = widget.columns!;
     final full = widget.type == 'full';
-    final small = cairo(10.5, 500, color: const Color(0xFF4E463C));
+    final small = cairo(
+      10.5,
+      500,
+      color: _WebsiteLedgerSkin.night(context)
+          ? const Color(0xFFE8DFC8)
+          : const Color(0xFF4E463C),
+    );
     final dash = Text(AppStrings.dash, style: small);
     InputDecoration field(String label, {Widget? prefix}) => InputDecoration(
       hintText: label,
-      hintStyle: cairo(11.5, 600, color: const Color(0xFF4E463C)),
+      hintStyle: cairo(
+        11.5,
+        600,
+        color: _WebsiteLedgerSkin.night(context)
+            ? const Color(0xFFD8D0BD)
+            : const Color(0xFF4E463C),
+      ),
       isDense: true,
       prefixIcon: prefix,
       prefixIconConstraints: const BoxConstraints(minWidth: 26),
@@ -944,14 +1072,24 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       key: const Key('movement-note'),
       controller: _note,
       enabled: !full,
-      style: cairo(12, 600),
+      style: cairo(
+        12,
+        600,
+        color: _WebsiteLedgerSkin.night(context) ? Colors.white : null,
+      ),
       decoration: field(AppStrings.ledgerColNote),
     );
     final amount = UnitsField(
       key: const Key('movement-amount'),
       controller: _amount,
       label: AppStrings.ledgerColValue,
-      labelStyle: cairo(11.5, 600, color: const Color(0xFF4E463C)),
+      labelStyle: cairo(
+        11.5,
+        600,
+        color: _WebsiteLedgerSkin.night(context)
+            ? const Color(0xFFD8D0BD)
+            : const Color(0xFF4E463C),
+      ),
       dense: true,
       showHint: false,
       // Ready to type on entry and after each save (Ali, 2026-11-03).
@@ -962,7 +1100,11 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       controller: _factor,
       enabled: !full && _mode != CalculationMode.direct,
       textDirection: TextDirection.ltr,
-      style: cairo(12, 600),
+      style: cairo(
+        12,
+        600,
+        color: _WebsiteLedgerSkin.night(context) ? Colors.white : null,
+      ),
       decoration: field(AppStrings.ledgerColRate),
     );
     final date = TextField(
@@ -1085,9 +1227,11 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DecoratedBox(
-          decoration: const BoxDecoration(
-            color: Color(0xFFFFF8E8),
-            border: Border(
+          decoration: BoxDecoration(
+            color: _WebsiteLedgerSkin.night(context)
+                ? const Color(0xFF302B1D)
+                : const Color(0xFFFFF8E8),
+            border: const Border(
               top: BorderSide(color: Color(0xFFE7AE12), width: 1.2),
               bottom: BorderSide(color: Color(0xFFE7C56A)),
             ),
@@ -1102,10 +1246,10 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const _Cell(_LedgerColumns.seq, SizedBox.shrink()),
-                      _Cell(_LedgerColumns.when, date),
+                      _Cell(columns.seqWidth, const SizedBox.shrink()),
+                      _Cell(columns.whenWidth, date),
                       _Cell(
-                        _LedgerColumns.type,
+                        columns.typeWidth,
                         widget.typeCell == null
                             ? dash
                             : FittedBox(
@@ -1113,21 +1257,21 @@ class _MovementFormState extends ConsumerState<_MovementForm> {
                                 child: widget.typeCell,
                               ),
                       ),
-                      _Cell(_LedgerColumns.note, note),
-                      _Cell(_LedgerColumns.value, full ? dash : amount),
+                      _Cell(columns.noteWidth, note),
+                      _Cell(columns.valueWidth, full ? dash : amount),
                       _Cell(
-                        _LedgerColumns.operation,
+                        columns.operationWidth,
                         FittedBox(fit: BoxFit.scaleDown, child: modes),
                       ),
-                      _Cell(_LedgerColumns.rate, rate),
+                      _Cell(columns.rateWidth, rate),
                       // No preview on the phone: figures come from the server.
-                      _Cell(_LedgerColumns.debt, dash),
-                      _Cell(_LedgerColumns.paid, dash),
+                      _Cell(columns.debtWidth, dash),
+                      _Cell(columns.paidWidth, dash),
                       if (columns.showBalance)
-                        _Cell(_LedgerColumns.balance, dash),
-                      _Cell(_LedgerColumns.edit, saveCell),
+                        _Cell(columns.balanceWidth, dash),
+                      _Cell(columns.editWidth, saveCell),
                       _Cell(
-                        _LedgerColumns.cancel,
+                        columns.cancelWidth,
                         IconButton(
                           key: const Key('clear-movement'),
                           tooltip: AppStrings.cancel,
@@ -1402,8 +1546,10 @@ class _Header extends StatelessWidget {
     if (section == AccountSection.libyanDeposits ||
         section == AccountSection.egyptianDeposits) {
       final units = shownBalance?.asInt;
-      final gloss = websiteLedgerGloss(section, units);
-      final radius = BorderRadius.circular(AppRadii.card);
+      final gloss = section == AccountSection.libyanDeposits && units != null
+          ? depositCardGloss(units)
+          : websiteLedgerGloss(section, units);
+      final radius = BorderRadius.circular(999);
       final text = units == null
           ? money.formatOrDash(shownBalance, value.currency)
           : money.format(units.abs(), value.currency);
@@ -1430,11 +1576,15 @@ class _Header extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: cairo(13, 800, color: gloss.ink),
                   ),
-                  MoneyText(
-                    text,
-                    key: const Key('ledger-header-balance'),
-                    style: context.textExtras.amountLarge.copyWith(
-                      color: gloss.amount,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: MoneyText(
+                      text,
+                      key: const Key('ledger-header-balance'),
+                      style: context.textExtras.amountLarge.copyWith(
+                        color: gloss.amount,
+                        fontSize: 22,
+                      ),
                     ),
                   ),
                   if (units == 0)
@@ -1603,9 +1753,12 @@ class _TotalCard extends StatelessWidget {
     final bool credit;
     if (section == AccountSection.companies) {
       final kind = companyLedgerKind(shown);
-      // Customers, companies, and Libyan deposits share the website's gold
-      // total. The word still follows the balance sign.
-      gloss = websiteLedgerGold;
+      gloss = switch (kind) {
+        CompanyLedgerKind.debt => depositCardRed,
+        CompanyLedgerKind.credit => depositCardGreen,
+        CompanyLedgerKind.zero => depositCardZero,
+        CompanyLedgerKind.unknown => websiteLedgerGold,
+      };
       word = switch (kind) {
         CompanyLedgerKind.debt => AppStrings.customerDebtWord,
         CompanyLedgerKind.credit => AppStrings.customerCreditWord,
@@ -1616,7 +1769,12 @@ class _TotalCard extends StatelessWidget {
       credit = kind == CompanyLedgerKind.credit;
     } else {
       final kind = customerBalanceKind(shown);
-      gloss = websiteLedgerGold;
+      gloss = switch (kind) {
+        CustomerBalanceKind.debt => depositCardRed,
+        CustomerBalanceKind.credit => depositCardGreen,
+        CustomerBalanceKind.zero => depositCardZero,
+        CustomerBalanceKind.unknown => websiteLedgerGold,
+      };
       word = switch (kind) {
         CustomerBalanceKind.debt => AppStrings.customerDebtWord,
         CustomerBalanceKind.credit => AppStrings.customerCreditWord,
@@ -1630,7 +1788,9 @@ class _TotalCard extends StatelessWidget {
     final text = credit && units != null
         ? money.format(-units, card.currency)
         : money.formatOrDash(shown, card.currency);
-    final radius = BorderRadius.circular(AppRadii.card);
+    final radius = BorderRadius.circular(
+      _usesWebsiteLedger(section) ? 999 : AppRadii.card,
+    );
     return Material(
       key: const Key('ledger-header'),
       type: MaterialType.transparency,
@@ -1669,6 +1829,7 @@ class _TotalCard extends StatelessWidget {
                           key: const Key('ledger-header-balance'),
                           style: context.textExtras.amountLarge.copyWith(
                             color: gloss.amount,
+                            fontSize: _usesWebsiteLedger(section) ? 22 : null,
                           ),
                         ),
                       ),
@@ -1820,11 +1981,23 @@ class _LedgerColumns {
   final bool showBalance;
   final AccountSection section;
 
+  bool get website => _usesWebsiteLedger(section);
+  double get seqWidth => website ? 44.0 : seq;
+  double get whenWidth => website ? 360.0 : when;
+  double get typeWidth => website ? 206.0 : type;
+  double get noteWidth => website ? 100.0 : note;
+  double get valueWidth => website ? 86.0 : value;
+  double get operationWidth => website ? 166.0 : operation;
+  double get rateWidth => website ? 78.0 : rate;
+  double get debtWidth => website ? 86.0 : debt;
+  double get paidWidth => website ? 86.0 : paid;
+  double get balanceWidth => website ? 90.0 : balance;
+  double get editWidth => website ? 48.0 : edit;
+  double get cancelWidth => website ? 48.0 : cancel;
+
   static const seq = 56.0;
   static const when = 128.0;
 
-  /// The website has no بواسطة column. The name sits under the date.
-  static const by = 0.0;
   static const type = 150.0;
   static const note = 100.0;
   static const value = 84.0;
@@ -1836,15 +2009,16 @@ class _LedgerColumns {
   static const edit = 52.0;
   static const cancel = 52.0;
 
-  /// Where القيمة ends, from the RTL start of the row.
-  static const valueEnd = seq + when + by + type + note + value;
+  /// Share the geometry with header, rows and composer; no separate scroll widths.
+  double get valueEnd =>
+      seqWidth + whenWidth + typeWidth + noteWidth + valueWidth;
 
   /// Blank strip on the physical left. The entry-row ✓ sits here and does
   /// not cover a field. Header and rows share it so the columns still line up.
   static const tickGutter = 56.0;
 
   /// Sideways offset that shows القيمة whole (0 when it already fits).
-  static double valueOffset(double viewport) {
+  double valueOffset(double viewport) {
     final needed = valueEnd + 8 - viewport;
     return needed > 0 ? needed : 0;
   }
@@ -1862,19 +2036,18 @@ class _LedgerColumns {
       : AppStrings.ledgerColPaid;
 
   double get width =>
-      seq +
-      when +
-      by +
-      type +
-      note +
-      value +
-      operation +
-      rate +
-      debt +
-      paid +
-      (showBalance ? balance : 0) +
-      edit +
-      cancel;
+      seqWidth +
+      whenWidth +
+      typeWidth +
+      noteWidth +
+      valueWidth +
+      operationWidth +
+      rateWidth +
+      debtWidth +
+      paidWidth +
+      (showBalance ? balanceWidth : 0) +
+      editWidth +
+      cancelWidth;
 }
 
 /// The table card: one horizontal scroll for every row, the add row at the
@@ -1911,7 +2084,9 @@ class _LedgerTable extends StatelessWidget {
     return DecoratedBox(
       key: const Key('ledger-table'),
       decoration: BoxDecoration(
-        color: look.card,
+        color: _WebsiteLedgerSkin.night(context)
+            ? const Color(0xFF070707)
+            : look.card,
         borderRadius: radius,
         border: Border.all(color: _gridLine(context)),
         boxShadow: [
@@ -1947,41 +2122,90 @@ class _LedgerTable extends StatelessWidget {
             ),
             ?composer,
             if (width > scrollPort)
-              Container(
-                color: look.strip,
-                padding: const EdgeInsetsDirectional.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: AppSpacing.xs,
-                ),
-                child: Row(
-                  children: [
-                    const Spacer(),
-                    if (width > viewport)
-                      Flexible(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsetsDirectional.symmetric(
-                              horizontal: AppSpacing.sm,
-                              vertical: 2,
+              GestureDetector(
+                key: const Key('ledger-swipe-handle'),
+                behavior: HitTestBehavior.opaque,
+                onTap: _WebsiteLedgerSkin.active(context)
+                    ? () {
+                        if (!controller.hasClients) return;
+                        final position = controller.position;
+                        final next =
+                            controller.offset >= position.maxScrollExtent - 1
+                            ? position.minScrollExtent
+                            : math.min(
+                                position.maxScrollExtent,
+                                controller.offset +
+                                    position.viewportDimension * 0.8,
+                              );
+                        controller.animateTo(
+                          next,
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOut,
+                        );
+                      }
+                    : null,
+                // This footer is outside the horizontal scroll view. Forward
+                // its drag to the same controller so rows, titles and entry
+                // fields keep their existing synchronized scroll.
+                onHorizontalDragUpdate: _WebsiteLedgerSkin.active(context)
+                    ? (details) {
+                        if (!controller.hasClients) return;
+                        final direction =
+                            Directionality.of(context) == TextDirection.rtl
+                            ? 1
+                            : -1;
+                        final position = controller.position;
+                        final next =
+                            (controller.offset + details.delta.dx * direction)
+                                .clamp(
+                                  position.minScrollExtent,
+                                  position.maxScrollExtent,
+                                );
+                        controller.jumpTo(next);
+                      }
+                    : null,
+                child: Container(
+                  color: _WebsiteLedgerSkin.active(context)
+                      ? const Color(0xFF211A0B)
+                      : look.strip,
+                  padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.xs,
+                  ),
+                  child: Row(
+                    children: [
+                      const Spacer(),
+                      if (width > viewport)
+                        Flexible(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: _WebsiteLedgerSkin.active(context)
+                                  ? const Color(0xFFE7AE12)
+                                  : Theme.of(context).colorScheme.primary,
+                              borderRadius: BorderRadius.circular(999),
                             ),
-                            child: Text(
-                              AppStrings.ledgerSwipeMore,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: cairo(
-                                10.5,
-                                800,
-                                color: Theme.of(context).colorScheme.onPrimary,
+                            child: Padding(
+                              padding: const EdgeInsetsDirectional.symmetric(
+                                horizontal: AppSpacing.sm,
+                                vertical: 2,
+                              ),
+                              child: Text(
+                                AppStrings.ledgerSwipeMore,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: cairo(
+                                  10.5,
+                                  800,
+                                  color: _WebsiteLedgerSkin.active(context)
+                                      ? const Color(0xFF211600)
+                                      : Theme.of(context).colorScheme.onPrimary,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
           ],
@@ -2019,7 +2243,9 @@ class _StickyColumnHeader extends StatelessWidget {
     return DecoratedBox(
       key: const Key('ledger-sticky-header'),
       decoration: BoxDecoration(
-        color: look.card,
+        color: _WebsiteLedgerSkin.night(context)
+            ? const Color(0xFF070707)
+            : look.card,
         borderRadius: radius,
         border: Border.all(color: _gridLine(context)),
       ),
@@ -2116,13 +2342,20 @@ class _InlineViewport extends InheritedWidget {
 
 /// The ledger's grid lines: column dividers and row lines, like the website
 /// table (Ali, 2026-11-03). Subtle, but clearly visible in both themes.
-Color _gridLine(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark
+Color _gridLine(BuildContext context) => _WebsiteLedgerSkin.active(context)
+    ? const Color(0xFF776237)
+    : Theme.of(context).brightness == Brightness.dark
     ? const Color(0xFF2E3A57)
     : const Color(0xFFD3DCE8);
 
 class _Cell extends StatelessWidget {
-  const _Cell(this.width, this.child, {this.alignment, this.divider = true});
+  const _Cell(
+    this.width,
+    this.child, {
+    this.alignment,
+    this.divider = true,
+    super.key,
+  });
 
   final double width;
   final Widget child;
@@ -2143,9 +2376,9 @@ class _Cell extends StatelessWidget {
             )
           : null,
       child: Padding(
-        padding: const EdgeInsetsDirectional.symmetric(
+        padding: EdgeInsetsDirectional.symmetric(
           horizontal: 3,
-          vertical: AppSpacing.sm,
+          vertical: _WebsiteLedgerSkin.active(context) ? 6 : AppSpacing.sm,
         ),
         child: Align(
           alignment: alignment ?? AlignmentDirectional.center,
@@ -2179,6 +2412,7 @@ class _EntryTile extends ConsumerWidget {
     required this.onEdit,
     required this.onEditDone,
     required this.onCancel,
+    this.editAnchor,
     this.ordinal,
     this.balanceUnits,
     super.key,
@@ -2198,6 +2432,7 @@ class _EntryTile extends ConsumerWidget {
   final _LedgerColumns columns;
   final bool canWrite;
   final bool editing;
+  final GlobalKey? editAnchor;
   final VoidCallback onEdit;
   final ValueChanged<bool> onEditDone;
   final Future<String?> Function(MutationMeta meta) onCancel;
@@ -2207,8 +2442,12 @@ class _EntryTile extends ConsumerWidget {
     final reversed = entry.status == 'reversed';
     final look = context.look;
     // The table sits on the cream frame in both themes, so the ink stays dark.
-    const ledgerInk = Color(0xFF1C1917);
-    const ledgerMuted = Color(0xFF44403C);
+    final website = _usesWebsiteLedger(section);
+    final night = website && Theme.of(context).brightness == Brightness.dark;
+    final ledgerInk = night ? Colors.white : const Color(0xFF1C1917);
+    final ledgerMuted = night
+        ? const Color(0xFFD8D0BD)
+        : const Color(0xFF44403C);
     final muted = reversed ? ledgerMuted : ledgerInk;
     final strike = reversed ? TextDecoration.lineThrough : null;
     final body = cairo(12, 600, color: muted).copyWith(decoration: strike);
@@ -2281,7 +2520,7 @@ class _EntryTile extends ConsumerWidget {
     );
     final cells = <Widget>[
       _Cell(
-        _LedgerColumns.seq,
+        columns.seqWidth,
         _SequenceMark(
           key: Key('ledger-sequence-${entry.id}'),
           text: sequence,
@@ -2289,40 +2528,108 @@ class _EntryTile extends ConsumerWidget {
         ),
       ),
       _Cell(
-        _LedgerColumns.when,
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (date != null)
-              Text(AppStrings.weekdays[date.weekday - 1], style: small),
-            _Fit(
-              LtrText(
-                formatIsoDate(date),
-                key: Key('ledger-date-${entry.id}'),
-                style: number,
+        columns.whenWidth,
+        website
+            ? Row(
+                spacing: 6,
+                children: [
+                  SizedBox(
+                    width: 56,
+                    child: _Fit(
+                      Text(
+                        date == null
+                            ? AppStrings.dash
+                            : AppStrings.weekdays[date.weekday - 1],
+                        style: small,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 90,
+                    child: _Fit(
+                      LtrText(
+                        formatIsoDate(date),
+                        key: Key('ledger-date-${entry.id}'),
+                        style: number,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 68,
+                    child: _Fit(
+                      LtrText(
+                        date == null ? AppStrings.dash : _clock(date),
+                        style: small,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: (entry.createdByName ?? '').trim().isEmpty
+                        ? const SizedBox.shrink()
+                        : DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF272114),
+                              border: Border.all(
+                                color: const Color(0xFFB79B52),
+                              ),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              child: Text(
+                                '${AppStrings.byActor} ${entry.createdByName}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: cairo(
+                                  9,
+                                  800,
+                                  color: const Color(0xFFFFF1BC),
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (date != null)
+                    Text(AppStrings.weekdays[date.weekday - 1], style: small),
+                  _Fit(
+                    LtrText(
+                      formatIsoDate(date),
+                      key: Key('ledger-date-${entry.id}'),
+                      style: number,
+                    ),
+                  ),
+                  if (date != null) LtrText(_clock(date), style: small),
+                  if ((entry.createdByName ?? '').trim().isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF17191F),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${AppStrings.byActor} ${entry.createdByName}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: cairo(9, 800, color: Colors.white),
+                      ),
+                    ),
+                ],
               ),
-            ),
-            if (date != null) LtrText(_clock(date), style: small),
-            if ((entry.createdByName ?? '').trim().isNotEmpty)
-              Container(
-                margin: const EdgeInsets.only(top: 2),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF17191F),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '${AppStrings.byActor} ${entry.createdByName}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: cairo(9, 800, color: Colors.white),
-                ),
-              ),
-          ],
-        ),
       ),
       _Cell(
-        _LedgerColumns.type,
+        columns.typeWidth,
         _TypeChip(
           label: movementLabel(
             section: section,
@@ -2334,7 +2641,7 @@ class _EntryTile extends ConsumerWidget {
         ),
       ),
       _Cell(
-        _LedgerColumns.note,
+        columns.noteWidth,
         alignment: AlignmentDirectional.centerStart,
         Column(
           mainAxisSize: MainAxisSize.min,
@@ -2356,22 +2663,22 @@ class _EntryTile extends ConsumerWidget {
           ],
         ),
       ),
-      _Cell(_LedgerColumns.value, _Fit(_InputFigure(entry.inputValue, number))),
+      _Cell(columns.valueWidth, _Fit(_InputFigure(entry.inputValue, number))),
       _Cell(
-        _LedgerColumns.operation,
+        columns.operationWidth,
         _Fit(_OperationPill(entry.calculationMode, reversed: reversed)),
       ),
       _Cell(
-        _LedgerColumns.rate,
+        columns.rateWidth,
         entry.factorMicros == null
             ? dash
             : _Fit(_FactorFigure(entry.factorMicros!, money, number)),
       ),
-      _Cell(_LedgerColumns.debt, isPayment ? dash : _Fit(amount)),
-      _Cell(_LedgerColumns.paid, isPayment ? _Fit(amount) : dash),
+      _Cell(columns.debtWidth, isPayment ? dash : _Fit(amount)),
+      _Cell(columns.paidWidth, isPayment ? _Fit(amount) : dash),
       if (columns.showBalance)
         _Cell(
-          _LedgerColumns.balance,
+          columns.balanceWidth,
           balanceUnits == null
               ? dash
               : _Fit(
@@ -2382,13 +2689,83 @@ class _EntryTile extends ConsumerWidget {
                   ),
                 ),
         ),
-      _Cell(_LedgerColumns.edit, correct),
-      _Cell(_LedgerColumns.cancel, cancel, divider: false),
+      _Cell(columns.editWidth, correct),
+      _Cell(columns.cancelWidth, cancel, divider: false),
     ];
+    if (website && editing) {
+      return DecoratedBox(
+        key: Key('ledger-entry-${entry.id}'),
+        decoration: BoxDecoration(
+          color: night ? const Color(0xFF302B1D) : const Color(0xFFFFF3C4),
+          border: Border(bottom: BorderSide(color: _gridLine(context))),
+        ),
+        child: TransactionCorrectionForm(
+          key: Key('ledger-inline-edit-${entry.id}'),
+          section: section,
+          accountId: accountId,
+          entry: entry,
+          onDone: onEditDone,
+          rowBuilder: (fields) => IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                cells[0],
+                _Cell(columns.whenWidth, fields.date),
+                _Cell(
+                  columns.typeWidth,
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      fields.movement,
+                      if (fields.paymentMode != null) fields.paymentMode!,
+                    ],
+                  ),
+                ),
+                _Cell(columns.noteWidth, fields.note),
+                _Cell(
+                  columns.valueWidth,
+                  fields.amount ?? dash,
+                  key: editAnchor,
+                ),
+                _Cell(columns.operationWidth, fields.operation ?? dash),
+                _Cell(columns.rateWidth, fields.rate ?? dash),
+                // Keep the confirmed figures visible until the server accepts.
+                cells[7], cells[8],
+                if (columns.showBalance) cells[9],
+                _Cell(
+                  columns.editWidth,
+                  _ledgerActionSlot(
+                    _roundLedgerButton(const Color(0xFF15803D), fields.save),
+                  ),
+                ),
+                _Cell(
+                  columns.cancelWidth,
+                  IconButton(
+                    key: Key('close-inline-edit-${entry.id}'),
+                    tooltip: AppStrings.ledgerCloseEdit,
+                    onPressed: () => onEditDone(false),
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFFE11D48),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(32, 32),
+                      padding: EdgeInsets.zero,
+                    ),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                  ),
+                  divider: false,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     final viewport = _InlineViewport.of(context);
     // Zebra by the row number, so every page stripes the same way.
     final odd = (ordinal ?? entry.sequence ?? 0).isOdd;
-    final zebra = odd ? const Color(0xFFFFFBF3) : Colors.white;
+    final zebra = night
+        ? (odd ? const Color(0xFF101010) : const Color(0xFF21201C))
+        : (odd ? const Color(0xFFFFFBF3) : Colors.white);
     return Column(
       key: Key('ledger-entry-${entry.id}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2396,9 +2773,9 @@ class _EntryTile extends ConsumerWidget {
         DecoratedBox(
           decoration: BoxDecoration(
             color: reversed
-                ? const Color(0xFFE7E5E4)
+                ? (night ? const Color(0xFF292724) : const Color(0xFFE7E5E4))
                 : editing
-                ? const Color(0xFFFFF3C4)
+                ? (night ? const Color(0xFF3A3016) : const Color(0xFFFFF3C4))
                 : zebra,
             border: Border(bottom: BorderSide(color: _gridLine(context))),
           ),
@@ -2414,6 +2791,7 @@ class _EntryTile extends ConsumerWidget {
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: SizedBox(
+              key: editAnchor,
               width: viewport,
               child: DecoratedBox(
                 key: Key('ledger-inline-edit-${entry.id}'),
@@ -2678,7 +3056,13 @@ Color _movementAmountColor(
       section == AccountSection.egyptianDeposits) {
     return type == 'payment' ? colors.debtText : colors.creditText;
   }
-  // The row is cream or white in both themes, so the status ink stays dark.
+  if (_WebsiteLedgerSkin.night(context)) {
+    return type == 'debt'
+        ? const Color(0xFFFFB6BC)
+        : type == 'payment'
+        ? const Color(0xFF8FF0BD)
+        : fallback;
+  }
   return switch (type) {
     'debt' => AppStatusColors.light.debtText,
     'payment' => AppStatusColors.light.creditText,
@@ -2740,25 +3124,29 @@ class _LedgerColumnHeader extends StatelessWidget {
     );
     return DecoratedBox(
       key: const Key('ledger-column-header'),
-      decoration: const BoxDecoration(color: Color(0xFFF7F1E4)),
+      decoration: BoxDecoration(
+        color: _WebsiteLedgerSkin.night(context)
+            ? const Color(0xFF181610)
+            : const Color(0xFFF7F1E4),
+      ),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            head(_LedgerColumns.seq, AppStrings.ledgerColSeq),
-            head(_LedgerColumns.when, AppStrings.ledgerColWhen),
-            head(_LedgerColumns.type, AppStrings.ledgerColType),
-            head(_LedgerColumns.note, AppStrings.ledgerColNote),
-            head(_LedgerColumns.value, AppStrings.ledgerColValue),
-            head(_LedgerColumns.operation, AppStrings.ledgerColOperation),
-            head(_LedgerColumns.rate, AppStrings.ledgerColRate),
-            head(_LedgerColumns.debt, columns.debtLabel),
-            head(_LedgerColumns.paid, columns.paidLabel),
+            head(columns.seqWidth, AppStrings.ledgerColSeq),
+            head(columns.whenWidth, AppStrings.ledgerColWhen),
+            head(columns.typeWidth, AppStrings.ledgerColType),
+            head(columns.noteWidth, AppStrings.ledgerColNote),
+            head(columns.valueWidth, AppStrings.ledgerColValue),
+            head(columns.operationWidth, AppStrings.ledgerColOperation),
+            head(columns.rateWidth, AppStrings.ledgerColRate),
+            head(columns.debtWidth, columns.debtLabel),
+            head(columns.paidWidth, columns.paidLabel),
             if (columns.showBalance)
-              head(_LedgerColumns.balance, AppStrings.ledgerColBalance),
-            head(_LedgerColumns.edit, AppStrings.ledgerColEdit),
+              head(columns.balanceWidth, AppStrings.ledgerColBalance),
+            head(columns.editWidth, AppStrings.ledgerColEdit),
             head(
-              _LedgerColumns.cancel,
+              columns.cancelWidth,
               AppStrings.ledgerColCancel,
               divider: false,
             ),
@@ -2779,7 +3167,9 @@ class _SequenceMark extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E8),
+        color: _WebsiteLedgerSkin.night(context)
+            ? const Color(0xFF2C2617)
+            : const Color(0xFFFFF8E8),
         borderRadius: BorderRadius.circular(AppRadii.sm),
       ),
       child: Padding(
@@ -2937,3 +3327,28 @@ class _OperationPill extends StatelessWidget {
     );
   }
 }
+
+/// Shared ledger presentation only. Each section retains its repository,
+/// permissions, currency, movement labels and financial state.
+class _WebsiteLedgerSkin extends InheritedWidget {
+  const _WebsiteLedgerSkin({required this.enabled, required super.child});
+  final bool enabled;
+  static bool active(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<_WebsiteLedgerSkin>()
+          ?.enabled ??
+      false;
+  static bool night(BuildContext context) =>
+      active(context) && Theme.of(context).brightness == Brightness.dark;
+  @override
+  bool updateShouldNotify(_WebsiteLedgerSkin oldWidget) =>
+      enabled != oldWidget.enabled;
+}
+
+/// These sections share a table renderer, never a financial repository.
+bool _usesWebsiteLedger(AccountSection section) => switch (section) {
+  AccountSection.customers ||
+  AccountSection.companies ||
+  AccountSection.libyanDeposits ||
+  AccountSection.egyptianDeposits => true,
+};

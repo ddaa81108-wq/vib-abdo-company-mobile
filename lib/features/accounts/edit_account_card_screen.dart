@@ -60,6 +60,7 @@ class EditAccountCardButton extends ConsumerWidget {
     required this.section,
     required this.card,
     this.compact = false,
+    this.iconOnly = false,
     super.key,
   });
 
@@ -69,6 +70,7 @@ class EditAccountCardButton extends ConsumerWidget {
   /// A pencil in the ledger's top bar instead of a text link (Ali,
   /// 2026-11-03). Same permission and destination.
   final bool compact;
+  final bool iconOnly;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -86,7 +88,7 @@ class EditAccountCardButton extends ConsumerWidget {
           backgroundColor: const Color(0xFF211600),
           foregroundColor: const Color(0xFFF6E7A8),
           side: const BorderSide(color: Color(0xFFE7AE12), width: 1.2),
-          minimumSize: const Size(0, 36),
+          minimumSize: Size(iconOnly ? 40 : 0, iconOnly ? 40 : 36),
           padding: const EdgeInsets.symmetric(horizontal: 10),
           shape: const StadiumBorder(),
           textStyle: cairo(12, 800),
@@ -94,20 +96,25 @@ class EditAccountCardButton extends ConsumerWidget {
         onPressed: online
             ? () => context.push('/${section.path}/${card.id}/edit')
             : null,
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.edit_outlined, size: 16),
-            SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                'تعديل البيانات',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+        child: iconOnly
+            ? const Tooltip(
+                message: AppStrings.editCard,
+                child: Icon(Icons.edit_outlined, size: 20),
+              )
+            : const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.edit_outlined, size: 16),
+                  SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      'تعديل البيانات',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       );
     }
     final button = GatedButton(

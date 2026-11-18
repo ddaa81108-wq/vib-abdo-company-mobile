@@ -14,7 +14,7 @@ void main() {
     ('libyan-deposits', '/libyan-deposits', 'c_ly_02', 'LYD'),
     ('egyptian-deposits', '/egyptian-deposits', 'c_eg_02', 'EGP'),
   ]) {
-    testWidgets('${sample.$1} confirms from the preview and then refetches', (
+    testWidgets('${sample.$1} confirms directly and then refetches', (
       tester,
     ) async {
       final layer = await pumpFakeApp(tester, size: const Size(440, 1400));
@@ -40,15 +40,6 @@ void main() {
       expect(_before(tester, 'z_new', sample.$3), isTrue);
       await tester.tap(find.byKey(const ValueKey('zero-review-z_new')));
       await tester.pumpAndSettle();
-      expect(fake.mutationBodies, isEmpty);
-      await tester.tap(find.byKey(const Key('zero-preview-cancel')));
-      await tester.pumpAndSettle();
-      expect(fake.mutationPaths, isEmpty);
-      expect(_before(tester, 'z_new', sample.$3), isTrue);
-
-      await tester.tap(find.byKey(const ValueKey('zero-review-z_new')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('zero-preview-confirm')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('zero-review-z_new')), findsNothing);
       expect(_before(tester, sample.$3, 'z_new'), isTrue);
@@ -93,7 +84,6 @@ void main() {
     expect(find.byKey(const ValueKey('zero-review-co_writer')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('zero-review-co_writer')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('zero-preview-confirm')));
     await tester.pumpAndSettle();
     expect(fake.mutationPaths.single, '/api/companies/co_writer/zero-review');
     expect(fake.zeroReviewCommits, 1);
@@ -125,7 +115,6 @@ void main() {
     fake.failAccountListRemaining = 1;
     await tester.tap(find.byKey(const ValueKey('zero-review-co_refresh')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('zero-preview-confirm')));
     await tester.pumpAndSettle();
     expect(find.text('تعذر تحديث القائمة.'), findsOneWidget);
     expect(find.byKey(const ValueKey('zero-review-co_refresh')), findsNothing);
@@ -164,9 +153,7 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('zero-review-ly_stale')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('zero-preview-confirm')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('zero-preview-error')), findsOneWidget);
     expect(find.textContaining('تغيّر الكارت بعد عرضه'), findsOneWidget);
     expect(find.byKey(const ValueKey('zero-review-ly_stale')), findsOneWidget);
     expect(fake.zeroReviewCommits, 0);
@@ -198,8 +185,7 @@ void main() {
     final gate = Completer<void>();
     fake.pauseMutations = gate;
     await tester.tap(find.byKey(const ValueKey('zero-review-co_race')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('zero-preview-confirm')));
+    await tester.pump();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(fake.mutationPaths, ['/api/companies/co_race/zero-review']);

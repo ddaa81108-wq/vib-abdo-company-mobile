@@ -184,7 +184,11 @@ void main() {
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
       await go(tester, '/customers/c_55');
       final card = find.byKey(const Key('ledger-header'));
-      const gloss = websiteLedgerGold;
+      final gloss = units > 0
+          ? depositCardRed
+          : units < 0
+          ? depositCardGreen
+          : depositCardZero;
       final ink = tester.widget<Ink>(
         find.descendant(of: card, matching: find.byType(Ink)).first,
       );
@@ -297,7 +301,7 @@ void main() {
               .brightness,
           dark ? Brightness.dark : Brightness.light,
         );
-        final line = dark ? const Color(0xFF2E3A57) : const Color(0xFFD3DCE8);
+        const line = Color(0xFF776237);
         bool columnLine(Widget w) {
           if (w is! Container) return false;
           final d = w.decoration;

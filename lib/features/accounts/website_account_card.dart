@@ -272,14 +272,26 @@ class WebsiteAccountCardBody extends StatelessWidget {
             Padding(
               padding: EdgeInsetsDirectional.only(
                 start: pin != null ? 30 : 0,
-                end: zero != null ? 30 : 0,
+                end: zero != null ? 52 : 0,
               ),
               child: body,
             ),
             if (pin != null)
               PositionedDirectional(top: 0, start: 0, child: pin!),
             if (zero != null)
-              PositionedDirectional(top: 0, end: 0, child: zero!),
+              PositionedDirectional(
+                top: 0,
+                end: 0,
+                // A disabled IconButton does not claim the tap. Keep the
+                // surrounding account InkWell from opening its ledger while
+                // a review is pending or the device is offline.
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  excludeFromSemantics: true,
+                  onTap: () {},
+                  child: zero!,
+                ),
+              ),
           ],
         ),
       ),

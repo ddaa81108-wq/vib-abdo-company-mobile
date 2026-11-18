@@ -117,6 +117,7 @@ class TransactionCorrectionForm extends ConsumerStatefulWidget {
     required this.accountId,
     required this.entry,
     this.onDone,
+    this.rowBuilder,
     super.key,
   });
 
@@ -127,6 +128,9 @@ class TransactionCorrectionForm extends ConsumerStatefulWidget {
   /// Inline use: called with true after a saved correction, instead of
   /// popping the sheet. The caller refreshes the same providers.
   final ValueChanged<bool>? onDone;
+
+  /// Presentation only: reuse the same controllers, guard and submit handler.
+  final Widget Function(CorrectionRowFields fields)? rowBuilder;
 
   @override
   ConsumerState<TransactionCorrectionForm> createState() =>
@@ -201,6 +205,132 @@ class _TransactionCorrectionFormState
     final money = ref.watch(apiLayerProvider).money;
     final version = _expectedVersion();
     final normalized = _full ? null : parseUnits(_amount.text)?.toString();
+    final typeField = DropdownButton<String>(
+      key: const Key('correction-type'),
+      value: _type,
+      isExpanded: true,
+      items: [
+        DropdownMenuItem(
+          value: 'debt',
+          child: Text(movementLabel(section: widget.section, type: 'debt')),
+        ),
+        DropdownMenuItem(
+          value: 'payment',
+          child: Text(movementLabel(section: widget.section, type: 'payment')),
+        ),
+      ],
+      onChanged: (value) => setState(() => _type = value ?? 'debt'),
+    );
+    final paymentField = _type == 'payment' && _allowsFull
+        ? DropdownButton<PaymentMode>(
+            key: const Key('correction-payment-mode'),
+            value: _paymentMode,
+            isExpanded: true,
+            items: const [
+              DropdownMenuItem(
+                value: PaymentMode.partial,
+                child: Text(AppStrings.partialPayment),
+              ),
+              DropdownMenuItem(
+                value: PaymentMode.full,
+                child: Text(AppStrings.fullPayment),
+              ),
+            ],
+            onChanged: (value) =>
+                setState(() => _paymentMode = value ?? PaymentMode.partial),
+          )
+        : null;
+    final amountField = !_full
+        ? UnitsField(
+            key: const Key('correction-amount'),
+            controller: _amount,
+            dense: widget.rowBuilder != null,
+            showHint: widget.rowBuilder == null,
+            label: AppStrings.amount,
+          )
+        : null;
+    final modeField = !_full
+        ? DropdownButton<CalculationMode>(
+            key: const Key('correction-mode'),
+            value: _mode,
+            isExpanded: true,
+            items: const [
+              DropdownMenuItem(
+                value: CalculationMode.direct,
+                child: Text(AppStrings.direct),
+              ),
+              DropdownMenuItem(
+                value: CalculationMode.divide,
+                child: CalculationMark(CalculationMode.divide),
+              ),
+              DropdownMenuItem(
+                value: CalculationMode.multiply,
+                child: CalculationMark(CalculationMode.multiply),
+              ),
+            ],
+            onChanged: (value) =>
+                setState(() => _mode = value ?? CalculationMode.direct),
+          )
+        : null;
+    final factorField = !_full && _mode != CalculationMode.direct
+        ? TextField(
+            key: const Key('correction-factor'),
+            controller: _factor,
+            textDirection: TextDirection.ltr,
+            decoration: InputDecoration(
+              isDense: widget.rowBuilder != null,
+              labelText: AppStrings.factor,
+            ),
+          )
+        : null;
+    final dateField = TextField(
+      key: const Key('correction-date'),
+      controller: _date,
+      textDirection: TextDirection.ltr,
+      decoration: InputDecoration(
+        isDense: widget.rowBuilder != null,
+        labelText: AppStrings.date,
+      ),
+    );
+    final noteField = TextField(
+      key: const Key('correction-note'),
+      controller: _note,
+      decoration: InputDecoration(
+        isDense: widget.rowBuilder != null,
+        labelText: AppStrings.note,
+      ),
+    );
+    final saveField = GuardedMutation(
+      buttonKey: const Key('save-correction'),
+      glyph: widget.rowBuilder != null ? Icons.check_rounded : null,
+      filled: widget.rowBuilder == null,
+      reportErrorInline: widget.rowBuilder == null,
+      inputs:
+          '${widget.entry.id}|$_type|$_paymentMode|$_mode|$_full|${_amount.text}|${_factor.text}|${_date.text}|${_note.text}',
+      expectedVersion: version,
+      label: AppStrings.correctTransaction,
+      confirmText: AppStrings.confirmCorrect,
+      normalizedValue: normalized,
+      onSubmit: _submit,
+    );
+    final builder = widget.rowBuilder;
+    if (builder != null) {
+      return KeyedSubtree(
+        key: const Key('correction-form'),
+        child: builder(
+          CorrectionRowFields(
+            movement: typeField,
+            paymentMode: paymentField,
+            amount: amountField,
+            operation: modeField,
+            rate: factorField,
+            date: dateField,
+            note: noteField,
+            save: saveField,
+          ),
+        ),
+      );
+    }
     return Column(
       key: const Key('correction-form'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -223,100 +353,18 @@ class _TransactionCorrectionFormState
                 )
               : const MoneyText(MoneyValue.invalidLabel),
         const SizedBox(height: AppSpacing.md),
-        DropdownButton<String>(
-          key: const Key('correction-type'),
-          value: _type,
-          isExpanded: true,
-          items: [
-            DropdownMenuItem(
-              value: 'debt',
-              child: Text(movementLabel(section: widget.section, type: 'debt')),
-            ),
-            DropdownMenuItem(
-              value: 'payment',
-              child: Text(
-                movementLabel(section: widget.section, type: 'payment'),
-              ),
-            ),
-          ],
-          onChanged: (value) => setState(() => _type = value ?? 'debt'),
-        ),
-        if (_type == 'payment' && _allowsFull)
-          DropdownButton<PaymentMode>(
-            key: const Key('correction-payment-mode'),
-            value: _paymentMode,
-            isExpanded: true,
-            items: const [
-              DropdownMenuItem(
-                value: PaymentMode.partial,
-                child: Text(AppStrings.partialPayment),
-              ),
-              DropdownMenuItem(
-                value: PaymentMode.full,
-                child: Text(AppStrings.fullPayment),
-              ),
-            ],
-            onChanged: (value) =>
-                setState(() => _paymentMode = value ?? PaymentMode.partial),
-          ),
+        typeField,
+        if (_type == 'payment' && _allowsFull) paymentField!,
         if (!_full) ...[
-          UnitsField(
-            key: const Key('correction-amount'),
-            controller: _amount,
-            label: AppStrings.amount,
-          ),
+          amountField!,
           const SizedBox(height: AppSpacing.md),
-          DropdownButton<CalculationMode>(
-            key: const Key('correction-mode'),
-            value: _mode,
-            isExpanded: true,
-            items: const [
-              DropdownMenuItem(
-                value: CalculationMode.direct,
-                child: Text(AppStrings.direct),
-              ),
-              DropdownMenuItem(
-                value: CalculationMode.divide,
-                child: CalculationMark(CalculationMode.divide),
-              ),
-              DropdownMenuItem(
-                value: CalculationMode.multiply,
-                child: CalculationMark(CalculationMode.multiply),
-              ),
-            ],
-            onChanged: (value) =>
-                setState(() => _mode = value ?? CalculationMode.direct),
-          ),
-          if (_mode != CalculationMode.direct)
-            TextField(
-              key: const Key('correction-factor'),
-              controller: _factor,
-              textDirection: TextDirection.ltr,
-              decoration: const InputDecoration(labelText: AppStrings.factor),
-            ),
+          modeField!,
+          if (_mode != CalculationMode.direct) factorField!,
         ],
-        TextField(
-          key: const Key('correction-date'),
-          controller: _date,
-          textDirection: TextDirection.ltr,
-          decoration: const InputDecoration(labelText: AppStrings.date),
-        ),
-        TextField(
-          key: const Key('correction-note'),
-          controller: _note,
-          decoration: const InputDecoration(labelText: AppStrings.note),
-        ),
+        dateField,
+        noteField,
         const SizedBox(height: AppSpacing.md),
-        GuardedMutation(
-          buttonKey: const Key('save-correction'),
-          inputs:
-              '${widget.entry.id}|$_type|$_paymentMode|$_mode|$_full|${_amount.text}|${_factor.text}|${_date.text}|${_note.text}',
-          expectedVersion: version,
-          label: AppStrings.correctTransaction,
-          confirmText: AppStrings.confirmCorrect,
-          normalizedValue: normalized,
-          onSubmit: _submit,
-        ),
+        saveField,
       ],
     );
   }
@@ -405,4 +453,27 @@ class _TransactionCorrectionFormState
       return failureText(failure);
     }
   }
+}
+
+/// Controls supplied by the correction form; no financial state is duplicated
+/// by the table renderer.
+class CorrectionRowFields {
+  const CorrectionRowFields({
+    required this.movement,
+    this.paymentMode,
+    this.amount,
+    this.operation,
+    this.rate,
+    required this.date,
+    required this.note,
+    required this.save,
+  });
+  final Widget movement;
+  final Widget? paymentMode;
+  final Widget? amount;
+  final Widget? operation;
+  final Widget? rate;
+  final Widget date;
+  final Widget note;
+  final Widget save;
 }
