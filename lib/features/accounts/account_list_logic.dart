@@ -46,7 +46,6 @@ List<AccountListFilter> accountListFilters(AccountSection section) {
     const AccountListFilter(id: 'today', label: AppStrings.todayTab),
     const AccountListFilter(id: 'debts', label: AppStrings.debtsTab),
     const AccountListFilter(id: 'settled', label: AppStrings.settledTab),
-    const AccountListFilter(id: 'pinned', label: AppStrings.pinnedTab),
     if (section == AccountSection.customers)
       const AccountListFilter(
         id: 'pending-review',

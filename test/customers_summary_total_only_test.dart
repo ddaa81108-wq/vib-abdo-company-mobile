@@ -58,7 +58,7 @@ void main() {
     expect(active.dx, greaterThan(search.dx));
     expect(search.dx, greaterThan(assign.dx));
     expect((active.dy - assign.dy).abs(), lessThan(4));
-    // One card per row. Height follows the text, and the pin is on the card.
+    // One card per row. Height follows the text, without a pin control.
     final cards = find.byWidgetPredicate(
       (w) =>
           w.key is ValueKey<String> &&
@@ -70,7 +70,7 @@ void main() {
     expect(rects.length, greaterThan(2));
     expect(rects.every((r) => r.height > 80), isTrue);
     expect(rects[1].top, greaterThan(rects[0].bottom - 1));
-    expect(find.byKey(const Key('pin-c_55')), findsOneWidget);
+    expect(find.byKey(const Key('pin-c_55')), findsNothing);
     expect(find.textContaining(AppStrings.lastActivity), findsWidgets);
     expect(tester.takeException(), isNull);
   });

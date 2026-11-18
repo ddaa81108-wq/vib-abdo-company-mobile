@@ -491,7 +491,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
       selected: _selected.contains(card.id),
       onOpen: () => context.go('/${section.path}/${card.id}'),
       onToggle: () => _toggleSelection(card),
-      onPin: (meta) => _pin(card, meta),
       zeroOnline: ref.watch(onlineProvider),
       zeroBusy: _zeroLocks[card.id]?.busy ?? false,
       onZeroReview:
@@ -562,28 +561,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     );
     if (saved == true) {
       ref.invalidate(accountsProvider(section));
-    }
-  }
-
-  Future<String?> _pin(AccountCardDto card, MutationMeta meta) async {
-    try {
-      await ref
-          .read(apiLayerProvider)
-          .accounts
-          .setPinned(section, card.id, !card.pinned, meta);
-      if (!mounted) return null;
-      setState(() => _reply = AppStrings.saved);
-      ref.invalidate(accountsProvider(section));
-      return null;
-    } catch (error) {
-      if (!mounted) {
-        return failureText(ref.read(errorHandlerProvider).toFailure(error));
-      }
-      final message = failureText(
-        ref.read(errorHandlerProvider).toFailure(error),
-      );
-      setState(() => _reply = message);
-      return message;
     }
   }
 
@@ -1042,7 +1019,6 @@ class _AccountCard extends StatelessWidget {
     required this.selected,
     required this.onOpen,
     required this.onToggle,
-    required this.onPin,
     required this.onZeroReview,
     required this.zeroOnline,
     required this.zeroBusy,
@@ -1058,14 +1034,12 @@ class _AccountCard extends StatelessWidget {
   final bool selected;
   final VoidCallback onOpen;
   final VoidCallback onToggle;
-  final Future<String?> Function(MutationMeta meta) onPin;
   final VoidCallback? onZeroReview;
   final bool zeroOnline;
   final bool zeroBusy;
 
   @override
   Widget build(BuildContext context) {
-    final showPin = canWrite && !assigning;
     final showZero = onZeroReview != null && !card.systemManaged && !assigning;
     final selectable = assigning && canSelectAccountForAssignment(card);
     final blocked = assigning && !selectable;
@@ -1108,17 +1082,6 @@ class _AccountCard extends StatelessWidget {
       showAssignee:
           section == AccountSection.customers ||
           section == AccountSection.companies,
-      pin: showPin
-          ? GuardedMutation(
-              buttonKey: Key('pin-${card.id}'),
-              inputs: 'pin:${card.id}:${card.pinned}:${card.version}',
-              expectedVersion: card.version,
-              label: card.pinned ? AppStrings.unpin : AppStrings.pin,
-              tooltip: card.pinned ? AppStrings.unpin : AppStrings.pin,
-              icon: card.pinned ? Icons.push_pin : Icons.push_pin_outlined,
-              onSubmit: (meta) => onPin(meta),
-            )
-          : null,
       zero: showZero
           ? IconButton(
               key: ValueKey('zero-review-${card.id}'),
@@ -1166,14 +1129,6 @@ class _AccountCard extends StatelessWidget {
                 color: light ? websiteCardLightFill : null,
                 gradient: light ? null : fill,
                 borderRadius: radius,
-                border: Border.all(
-                  color: selected
-                      ? const Color(0xFF6DD7BC)
-                      : light
-                      ? ink
-                      : const Color(0xFFEAC04A),
-                  width: selected ? 3 : 1.4,
-                ),
               ),
               child: InkWell(
                 key: selectable ? ValueKey('assign-select-${card.id}') : null,
@@ -1187,6 +1142,14 @@ class _AccountCard extends StatelessWidget {
                       child: IgnorePointer(
                         ignoring: assigning,
                         child: cardBody,
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: CustomPaint(
+                          key: Key('account-frame-${card.id}'),
+                          painter: AccountCardFrame03(selected: selected),
+                        ),
                       ),
                     ),
                     if (selected)

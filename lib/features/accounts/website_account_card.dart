@@ -128,7 +128,6 @@ class WebsiteAccountCardBody extends StatelessWidget {
     required this.ink,
     this.showAssignee = false,
     this.wide = false,
-    this.pin,
     this.zero,
     super.key,
   });
@@ -142,7 +141,6 @@ class WebsiteAccountCardBody extends StatelessWidget {
 
   /// One card across the row. Type is larger; nothing is ellipsized.
   final bool wide;
-  final Widget? pin;
   final Widget? zero;
 
   @override
@@ -270,14 +268,9 @@ class WebsiteAccountCardBody extends StatelessWidget {
         child: Stack(
           children: [
             Padding(
-              padding: EdgeInsetsDirectional.only(
-                start: pin != null ? 30 : 0,
-                end: zero != null ? 52 : 0,
-              ),
+              padding: EdgeInsetsDirectional.only(end: zero != null ? 52 : 0),
               child: body,
             ),
-            if (pin != null)
-              PositionedDirectional(top: 0, start: 0, child: pin!),
             if (zero != null)
               PositionedDirectional(
                 top: 0,
@@ -297,4 +290,46 @@ class WebsiteAccountCardBody extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Frame 03: a fine gold perimeter and a polished lower edge. Paint only:
+/// the card content, money colours, dimensions and hit targets are unchanged.
+class AccountCardFrame03 extends CustomPainter {
+  const AccountCardFrame03({this.selected = false});
+
+  final bool selected;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final outer = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(16),
+    );
+    canvas.save();
+    canvas.clipRRect(outer);
+    final edge = Rect.fromLTWH(0, size.height - 6, size.width, 6);
+    canvas.drawRect(
+      edge,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFE7A0), Color(0xFFD2A13B), Color(0xFF93651A)],
+          stops: [0, 0.45, 1],
+        ).createShader(edge),
+    );
+    canvas.drawRRect(
+      outer.deflate(selected ? 1.5 : 0.65),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = selected ? 3 : 1.3
+        ..color = selected ? const Color(0xFF6DD7BC) : const Color(0xFFD6AA42),
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant AccountCardFrame03 oldDelegate) =>
+      selected != oldDelegate.selected;
 }

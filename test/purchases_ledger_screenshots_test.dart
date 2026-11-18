@@ -65,6 +65,8 @@ void main() {
       _expectHeaderInView(tester, header);
     }
     await saveShot(tester, 'purchases-grid-dark-ledger-end');
+    await _settle(tester);
+    await tester.pump(const Duration(seconds: 1));
     expect(find.text(AppStrings.alBayan), findsOneWidget);
     expect(tester.takeException(), isNull);
   }, tags: const ['screenshots']);
@@ -103,10 +105,16 @@ Future<void> _showLedger(WidgetTester tester) async {
 }
 
 ScrollableState _ledgerScroll(WidgetTester tester) {
+  final view = tester.widget<SingleChildScrollView>(
+    find.byKey(const Key('purchase-ledger-scroll')),
+  );
   return tester.state<ScrollableState>(
     find.descendant(
       of: find.byKey(const Key('purchase-ledger-scroll')),
-      matching: find.byType(Scrollable),
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.controller == view.controller,
+      ),
     ),
   );
 }

@@ -79,9 +79,11 @@ void main() {
         'today',
         'debts',
         'settled',
-        'pinned',
       ]);
-      expect(egyptian.map((tab) => tab.label), contains(AppStrings.pinnedTab));
+      expect(
+        egyptian.map((tab) => tab.label),
+        isNot(contains(AppStrings.pinnedTab)),
+      );
       expect(egyptian.first.label, AppStrings.activeTab);
       expect(
         accountListFilters(AccountSection.libyanDeposits).first.label,

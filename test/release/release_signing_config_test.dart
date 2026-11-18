@@ -59,6 +59,9 @@ void main() {
     final activity = File(
       'android/app/src/main/kotlin/com/vip2100/vib/MainActivity.kt',
     ).readAsStringSync();
-    expect(activity, startsWith('package com.vip2100.vib\n'));
+    expect(
+      activity.replaceAll('\r\n', '\n'),
+      startsWith('package com.vip2100.vib\n'),
+    );
   });
 }

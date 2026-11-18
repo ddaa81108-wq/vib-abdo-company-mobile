@@ -184,7 +184,7 @@ void main() {
     },
   );
 
-  testWidgets('amount fields explain the minor-unit format', (tester) async {
+  testWidgets('compact ledger amount rows omit helper notes', (tester) async {
     await pumpFakeApp(tester, size: const Size(800, 1800));
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/customers/c_55');
@@ -196,13 +196,14 @@ void main() {
       ),
       findsNothing,
     );
-    // The correction form keeps the explanation under its amount field.
+    // The approved inline correction also keeps the row compact.
     final correct = find.byKey(const Key('correct-tx_1'));
     await tester.ensureVisible(correct);
     await settle(tester);
     await tester.tap(correct);
     await settle(tester);
-    expect(find.text(AppStrings.unitsHint), findsWidgets);
+    expect(find.byKey(const Key('correction-amount')), findsOneWidget);
+    expect(find.text(AppStrings.unitsHint), findsNothing);
     await tester.pump(const Duration(seconds: 1));
   });
 }

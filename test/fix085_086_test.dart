@@ -41,7 +41,7 @@ void main() {
     }
   });
 
-  testWidgets('card text starts at the top and the pin sits in the corner', (
+  testWidgets('card text starts at the top without a pin control', (
     tester,
   ) async {
     for (final dark in [false, true]) {
@@ -57,14 +57,10 @@ void main() {
         final status = tester.getRect(
           find.byKey(const Key('account-age-c_55')),
         );
-        final pin = tester.getRect(find.byKey(const Key('pin-c_55')));
+        expect(find.byKey(const Key('pin-c_55')), findsNothing);
         final chip = find.byKey(const Key('account-assignee-c_55'));
         final first = chip.evaluate().isEmpty ? status : tester.getRect(chip);
         expect(first.top - card.top, lessThan(22), reason: path);
-        expect(pin.top - card.top, lessThan(22), reason: path);
-        expect(first.top, lessThan(pin.bottom), reason: path);
-        expect(pin.left, greaterThanOrEqualTo(card.left - 1));
-        expect(pin.right, lessThanOrEqualTo(card.right + 1));
         if (chip.evaluate().isEmpty) {
           expect(status.top - card.top, lessThan(22), reason: path);
         } else {

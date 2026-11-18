@@ -24,7 +24,7 @@ void main() {
     );
   });
 
-  testWidgets('a zero card uses أسمر text and border, debt stays red', (
+  testWidgets('a zero card keeps أسمر text with frame03, debt stays red', (
     tester,
   ) async {
     await pumpFakeApp(tester, size: const Size(360, 1400));
@@ -55,21 +55,10 @@ void _expectZero(WidgetTester tester, {required bool light}) {
   expect(status.style?.color, ink);
   expect(name.style?.color, ink);
   expect(movement.style?.color, ink.withValues(alpha: 0.92));
-  final box =
-      tester
-              .widget<Ink>(
-                find.descendant(
-                  of: find.byKey(const Key('account-card-c_57')),
-                  matching: find.byType(Ink),
-                ),
-              )
-              .decoration!
-          as BoxDecoration;
-  if (light) {
-    expect(box.border?.top.color, ink);
-  } else {
-    expect(box.border?.top.color, const Color(0xFFEAC04A));
-  }
+  final frame = tester.widget<CustomPaint>(
+    find.byKey(const Key('account-frame-c_57')),
+  );
+  expect(frame.painter, isA<AccountCardFrame03>());
 }
 
 void _expectDebt(WidgetTester tester, Color ink) {

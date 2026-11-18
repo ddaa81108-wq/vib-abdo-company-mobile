@@ -78,6 +78,8 @@ void main() {
     await saveShot(tester, 'fix060-after-wide');
     await open(const Size(360, 800), '/customers/c_55');
     await saveShot(tester, 'fix060-after-360');
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
     expect(tester.takeException(), isNull);
   }, tags: const ['screenshots']);
 }

@@ -167,7 +167,7 @@ void main() {
       path: '/customers',
       add: true,
       assign: true,
-      pin: true,
+      pin: false,
       // #25 shows this only for a 0 balance with a pending review. The
       // fixed fixture's 0-balance card has no pending review, so it stays hidden.
       zero: false,
@@ -179,7 +179,7 @@ void main() {
       path: '/companies',
       add: true,
       assign: true,
-      pin: true,
+      pin: false,
       zero: false,
       rate: false,
     );
@@ -188,7 +188,7 @@ void main() {
       path: '/libyan-deposits',
       add: true,
       assign: false,
-      pin: true,
+      pin: false,
       zero: false,
       rate: false,
     );
@@ -197,7 +197,7 @@ void main() {
       path: '/egyptian-deposits',
       add: true,
       assign: false,
-      pin: true,
+      pin: false,
       zero: false,
       rate: true,
     );
@@ -265,9 +265,7 @@ void main() {
           .onPressed,
       isNull,
     );
-    final pin = find.byKey(const Key('pin-c_55'));
-    await tester.ensureVisible(pin);
-    expect(tester.widget<IconButton>(pin).onPressed, isNull);
+    expect(find.byKey(const Key('pin-c_55')), findsNothing);
     expect(find.byKey(const Key('zero-review')), findsNothing);
   });
 
@@ -307,7 +305,7 @@ void main() {
             find.byKey(const Key('account-card-c_55')),
             list,
           );
-          await _reveal(tester, find.byKey(const Key('pin-c_55')), list);
+          expect(find.byKey(const Key('pin-c_55')), findsNothing);
           if (path == '/customers' || path == '/companies') {
             await _reveal(tester, find.byKey(const Key('assign-mode')), list);
           }

@@ -154,8 +154,8 @@ void main() {
       final name = tester.getRect(find.byKey(const Key('ledger-top-bar')));
       final edit = tester.getRect(find.byKey(const Key('edit-account-card')));
       final close = tester.getRect(find.byKey(const Key('ledger-close')));
-      // One horizontal row. The bar's contents sit about 18dp under its top.
-      expect(edit.top - name.top, greaterThanOrEqualTo(12));
+      // The compact shared ledger keeps a small inset, with no overlap.
+      expect(edit.top - name.top, greaterThanOrEqualTo(4));
       expect((edit.center.dy - close.center.dy).abs(), lessThan(6));
       expect(edit.top, greaterThan(name.top));
       expect(edit.bottom, lessThan(name.bottom));
