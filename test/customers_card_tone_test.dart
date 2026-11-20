@@ -31,18 +31,9 @@ void main() {
         await pumpFakeApp(tester, size: size);
         await signIn(tester, username: 'admin.demo', password: 'demo-only');
         await go(tester, '/customers');
-        Finder drawn(String key) => key == 'account-search'
-            ? find.descendant(
-                of: find.byKey(Key(key)),
-                matching: find.byType(InputDecorator),
-              )
-            : find.byKey(Key(key));
+        Finder drawn(String key) => find.byKey(Key(key));
         final heights = {
-          for (final key in [
-            'debt-active-filter',
-            'account-search',
-            'assign-mode',
-          ])
+          for (final key in ['debt-active-filter', 'assign-mode'])
             tester.getSize(drawn(key)).height.roundToDouble(),
         };
         expect(heights, hasLength(1), reason: '$size x$scale $heights');

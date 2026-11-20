@@ -228,6 +228,10 @@ class FakeApiClient implements ApiClient {
   /// When set, the first account-list page reports this `nextCursor` (tests).
   String? accountNextCursor;
 
+  /// Scripted read-only list responses for search UI/contract tests only.
+  Future<Map<String, dynamic>> Function(
+      String section, String query, String? cursor)? accountQueryPage;
+
   /// Items returned for an account-list read that sends `cursor` (tests).
   List<Map<String, dynamic>> accountNextItems = const [];
 
@@ -1704,6 +1708,10 @@ class FakeApiClient implements ApiClient {
             filter: filter,
           );
           return _ok(_overlayCards(head, generated));
+        }
+        final scriptedSearch = accountQueryPage;
+        if (q != null && scriptedSearch != null) {
+          return _ok(await scriptedSearch(head, q, cursor));
         }
         final page = _sectionPage(head);
         if (cursor != null) {

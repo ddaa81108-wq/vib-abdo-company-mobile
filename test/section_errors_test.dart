@@ -12,6 +12,7 @@ import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import 'support/pump_app.dart';
+import 'support/account_search_fixture.dart';
 
 void main() {
   testWidgets('customer debts shows an error and retries the list', (
@@ -200,22 +201,44 @@ void main() {
     await go(tester, '/search');
 
     final gate = Completer<void>();
-    fake.pauseAccountSearch = gate;
+    fake.pauseAccountLists = gate;
     await tester.enterText(find.byKey(const Key('unified-search')), 'عميل');
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pump();
     expect(find.byKey(const Key('search-loading')), findsOneWidget);
     gate.complete();
-    fake.pauseAccountSearch = null;
+    fake.pauseAccountLists = null;
     await settle(tester);
     expect(find.text('عميل تجريبي'), findsWidgets);
 
-    fake.failAccountSearchRemaining = 1;
+    fake.failAccountListRemaining = 1;
     await tester.enterText(find.byKey(const Key('unified-search')), 'عميل ٢');
     await tester.pump(const Duration(milliseconds: 250));
     await settle(tester);
-    expect(find.text(AppStrings.searchNoAccounts), findsOneWidget);
+    expect(find.text(AppStrings.searchNoAccounts), findsNothing);
+    expect(find.byKey(const Key('search-open-error')), findsOneWidget);
+    expect(find.byKey(const Key('search-retry')), findsOneWidget);
+    final before = fake.accountListQueries.length;
+    scriptAccountSearch(fake, [
+      {
+        'id': 'c_55',
+        'name': 'عميل ٢ بعد إعادة المحاولة',
+        'section': 'customers',
+        'balanceUnits': 320,
+        'currency': 'LYD',
+      },
+    ]);
+    await tester.tap(find.byKey(const Key('search-retry')));
+    await tester.pump(const Duration(milliseconds: 250));
+    await settle(tester);
+    expect(fake.accountListQueries.length, before + 4);
+    expect(
+      fake.accountListQueries.skip(before).every((q) => q.q == 'عميل ٢'),
+      isTrue,
+    );
+    expect(find.byKey(const Key('search-open-error')), findsNothing);
     expect(find.byKey(const Key('search-retry')), findsNothing);
+    expect(find.text('عميل ٢ بعد إعادة المحاولة'), findsOneWidget);
   });
 
   testWidgets('a string amount marks that card and leaves the list up', (

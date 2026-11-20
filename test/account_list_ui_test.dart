@@ -212,7 +212,8 @@ void main() {
       zero: false,
       rate: false,
     );
-    expect(find.byKey(const Key('account-search')), findsOneWidget);
+    expect(find.byKey(const Key('account-search')), findsNothing);
+    expect(find.byKey(const Key('unified-search-open')), findsOneWidget);
     for (final path in [
       '/companies',
       '/libyan-deposits',
@@ -298,7 +299,7 @@ void main() {
                 matching: find.byType(Scrollable),
               )
               .first;
-          await _reveal(tester, find.byKey(const Key('account-search')), list);
+          expect(find.byKey(const Key('account-search')), findsNothing);
           await _reveal(tester, find.byKey(const Key('add-account')), list);
           await _reveal(
             tester,

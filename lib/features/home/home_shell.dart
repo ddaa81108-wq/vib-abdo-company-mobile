@@ -22,6 +22,7 @@ import '../../ui/widgets/environment_badge.dart';
 import '../../ui/widgets/logout_confirm.dart';
 import '../../ui/widgets/soft_tile.dart';
 import 'home_drawer.dart';
+import '../search/search_focus.dart';
 
 class NavItem {
   const NavItem({
@@ -191,9 +192,30 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               ),
             ),
           IconButton(
+            key: const Key('unified-search-open'),
             tooltip: AppStrings.search,
             style: _barButtonStyle,
-            onPressed: () => context.go('/search'),
+            onPressed: () {
+              if (widget.location == '/search') {
+                ref.read(searchInputFocusProvider).requestFocus();
+                return;
+              }
+              final section = AccountSection.values
+                  .where(
+                    (section) =>
+                        widget.location == '/${section.path}' ||
+                        widget.location.startsWith('/${section.path}/'),
+                  )
+                  .firstOrNull;
+              context.go(
+                Uri(
+                  path: '/search',
+                  queryParameters: {
+                    if (section != null) 'section': section.path,
+                  },
+                ).toString(),
+              );
+            },
             icon: const Icon(Icons.search),
           ),
           IconButton(

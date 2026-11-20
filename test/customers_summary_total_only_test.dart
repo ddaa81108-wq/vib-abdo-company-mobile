@@ -46,17 +46,16 @@ void main() {
       lessThan(44),
     );
     expect(find.text(AppStrings.oldDebtsTitle), findsNothing);
-    // «النشطة», search, and «توجيه» share one row. No other filter words.
+    // The active count and assignment share the row; search is in the app bar.
     expect(find.byKey(const ValueKey('account-filter-all')), findsNothing);
     expect(find.text(AppStrings.todayTab), findsNothing);
     expect(find.text('${AppStrings.activeShort} (10)'), findsOneWidget);
     final active = tester.getCenter(
       find.byKey(const Key('debt-active-filter')),
     );
-    final search = tester.getCenter(find.byKey(const Key('account-search')));
+    expect(find.byKey(const Key('account-search')), findsNothing);
     final assign = tester.getCenter(find.byKey(const Key('assign-mode')));
-    expect(active.dx, greaterThan(search.dx));
-    expect(search.dx, greaterThan(assign.dx));
+    expect(active.dx, greaterThan(assign.dx));
     expect((active.dy - assign.dy).abs(), lessThan(4));
     // One card per row. Height follows the text, without a pin control.
     final cards = find.byWidgetPredicate(
@@ -113,10 +112,9 @@ void main() {
     final active = tester.getCenter(
       find.byKey(const Key('debt-active-filter')),
     );
-    final search = tester.getCenter(find.byKey(const Key('account-search')));
+    expect(find.byKey(const Key('account-search')), findsNothing);
     final assign = tester.getCenter(find.byKey(const Key('assign-mode')));
-    expect(active.dx, greaterThan(search.dx));
-    expect(search.dx, greaterThan(assign.dx));
+    expect(active.dx, greaterThan(assign.dx));
     final cards = find.byWidgetPredicate(
       (w) =>
           w.key is ValueKey<String> &&

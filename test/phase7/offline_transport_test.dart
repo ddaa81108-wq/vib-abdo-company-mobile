@@ -13,6 +13,7 @@ import 'package:vib_abdo_company_mobile/api/api_providers.dart';
 import 'package:vib_abdo_company_mobile/features/accounts/account_list_screen.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
 import 'package:vib_abdo_company_mobile/state/connectivity.dart';
+import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'package:vib_abdo_company_mobile/ui/strings.dart';
 import 'package:vib_abdo_company_mobile/ui/theme.dart';
 
@@ -21,7 +22,7 @@ import 'package:vib_abdo_company_mobile/ui/theme.dart';
 /// is still manual.
 void main() {
   testWidgets(
-    'P7-19 a read that loses the connection keeps the list and the draft',
+    'P7-19 a list refresh that loses the connection keeps the loaded data',
     (tester) async {
       final transport = _ScreenTransport();
       final connectivity = ToggleConnectivity(true);
@@ -33,18 +34,13 @@ void main() {
       await _pumpList(tester, layer, connectivity);
 
       expect(find.text('زبون القراءة'), findsWidgets);
-      await tester.enterText(
-        find.byKey(const Key('account-search')),
-        'مسودة بحث',
-      );
-      await tester.pump();
-
       final seen = transport.calls.length;
       final hold = Completer<void>();
       transport.hold = hold.future;
       transport.holdPath = ApiEndpoints.accounts('customers');
       transport.releaseHoldAsConnectionError = true;
-      await tester.testTextInput.receiveAction(TextInputAction.search);
+      ProviderScope.containerOf(tester.element(find.byKey(HomeShell.shellKey)))
+          .invalidate(accountsProvider(AccountSection.customers));
       for (var turn = 0; turn < 10 && transport.calls.length == seen; turn++) {
         await tester.pump(Duration.zero);
       }
@@ -58,7 +54,6 @@ void main() {
 
       expect(find.text('زبون القراءة'), findsWidgets);
       expect(find.text(const NetworkException().message), findsWidgets);
-      expect(find.text('مسودة بحث'), findsWidgets);
       expect(find.textContaining('DioException'), findsNothing);
       expect(find.textContaining('SocketException'), findsNothing);
       expect(find.textContaining('demo-only'), findsNothing);

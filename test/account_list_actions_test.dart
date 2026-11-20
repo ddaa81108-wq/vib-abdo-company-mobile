@@ -119,8 +119,8 @@ void main() {
         expect(find.byKey(ValueKey('account-filter-$id')), findsNothing);
       }
       expect(find.text(AppStrings.pinnedTab), findsNothing);
-      // The list loads unfiltered, and search stays.
-      expect(find.byKey(const Key('account-search')), findsOneWidget);
+      // The list loads unfiltered; unified search is in the app bar.
+      expect(find.byKey(const Key('account-search')), findsNothing);
     }
     expect(
       fake.accountListQueries
@@ -206,8 +206,7 @@ void main() {
       await go(tester, '/companies');
       expect(find.text(AppStrings.oldDebtsTitle), findsNothing);
 
-      await tester.enterText(find.byKey(const Key('account-search')), 'عميل');
-      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await _search(tester, 'عميل');
       await settle(tester);
       // Companies have no filter chips (Ali, 2026-11-03); the filter
       // provider is still the one the list reads.
@@ -334,8 +333,12 @@ Future<void> settle(WidgetTester tester) {
 }
 
 Future<void> _search(WidgetTester tester, String text) async {
-  final field = find.byKey(const Key('account-search'));
-  await tester.ensureVisible(field);
-  await tester.enterText(field, text);
-  await tester.testTextInput.receiveAction(TextInputAction.search);
+  // Provider-level regression: existing windows must still discard stale pages.
+  // User-facing query/paging is covered by unified_account_search_test.dart.
+  final context = tester.element(find.byKey(HomeShell.shellKey));
+  final container = ProviderScope.containerOf(context);
+  final path = GoRouter.of(context).state.uri.path;
+  final section = AccountSection.values.firstWhere((s) => path == '/${s.path}');
+  container.read(accountExtraCardsProvider(section).notifier).clear();
+  container.read(accountQueryProvider(section).notifier).state = text;
 }

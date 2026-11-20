@@ -19,6 +19,7 @@ import '../../ui/widgets/common.dart';
 import '../../ui/widgets/section_kit.dart';
 import '../../ui/widgets/mutation_form.dart';
 import 'account_list_logic.dart';
+import 'account_list_toolbar.dart';
 import 'account_name_suggestions.dart';
 import 'company_card_tone.dart';
 import 'customer_card_tone.dart';
@@ -29,16 +30,20 @@ import 'website_ledger_tone.dart';
 /// screen. [section] selects the repository path, currency, and labels.
 /// The ledger for a card is [LedgerScreen] with the same section.
 class AccountListScreen extends ConsumerStatefulWidget {
-  const AccountListScreen({required this.section, super.key});
+  const AccountListScreen({
+    required this.section,
+    this.revealedCardId,
+    super.key,
+  });
 
   final AccountSection section;
+  final String? revealedCardId;
 
   @override
   ConsumerState<AccountListScreen> createState() => _AccountListScreenState();
 }
 
 class _AccountListScreenState extends ConsumerState<AccountListScreen> {
-  final _search = TextEditingController();
   final _cardsScroll = ScrollController();
   var _atEnd = false;
   var _loadMoreSynced = false;
@@ -85,7 +90,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
   void dispose() {
     _cardsScroll.removeListener(_syncLoadMore);
     _cardsScroll.dispose();
-    _search.dispose();
     super.dispose();
   }
 
@@ -122,42 +126,6 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
     final isCustomers = section == AccountSection.customers;
     final debtLook = isDebtLookSection(section);
 
-    final Widget searchField = TextField(
-      key: const Key('account-search'),
-      controller: _search,
-      textInputAction: TextInputAction.search,
-      // Fills the toolbar height like the two buttons.
-      expands: debtLook,
-      maxLines: debtLook ? null : 1,
-      textAlignVertical: debtLook ? TextAlignVertical.center : null,
-      decoration: InputDecoration(
-        labelText: debtLook ? null : AppStrings.filterSearch,
-        hintText: debtLook ? AppStrings.filterSearch : null,
-        hintMaxLines: 1,
-        isDense: false,
-        prefixIcon: const Icon(Icons.search),
-        suffixIcon: ValueListenableBuilder<TextEditingValue>(
-          valueListenable: _search,
-          builder: (context, value, _) {
-            if (value.text.isEmpty) return const SizedBox.shrink();
-            return IconButton(
-              key: const Key('clear-account-search'),
-              tooltip: AppStrings.clearSearch,
-              icon: const Icon(Icons.close),
-              onPressed: () {
-                _search.clear();
-                ref.read(accountExtraCardsProvider(section).notifier).clear();
-                ref.read(accountQueryProvider(section).notifier).state = '';
-              },
-            );
-          },
-        ),
-      ),
-      onSubmitted: (value) {
-        ref.read(accountExtraCardsProvider(section).notifier).clear();
-        ref.read(accountQueryProvider(section).notifier).state = value;
-      },
-    );
     final deposits =
         section == AccountSection.libyanDeposits ||
         section == AccountSection.egyptianDeposits;
@@ -215,7 +183,22 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
           for (final card in [...data.page.items, ...extra])
             _reviewFromServer(card, ack, userId),
         ];
+        final wanted = widget.revealedCardId;
+        final target = wanted == null
+            ? null
+            : ref.watch(accountCardProvider((section, wanted)));
+        final selected = target?.asData?.value;
         final cards = settledZeroReviewsLast(loaded);
+        final existing = cards.where((card) => card.id == wanted).firstOrNull;
+        final revealed =
+            existing ??
+            (selected == null
+                ? null
+                : _reviewFromServer(selected, ack, userId));
+        if (revealed != null) {
+          cards.removeWhere((card) => card.id == revealed.id);
+          cards.insert(0, revealed);
+        }
         HistoryWindowTrace.accountWindow = [for (final card in cards) card.id];
         if (!_loadMoreSynced) {
           _loadMoreSynced = true;
@@ -250,6 +233,21 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
+                                if (wanted != null && revealed == null) ...[
+                                  if (target?.hasError == true)
+                                    TextButton(
+                                      key: const Key('search-card-retry'),
+                                      onPressed: () => ref.invalidate(
+                                        accountCardProvider((section, wanted)),
+                                      ),
+                                      child: const Text(
+                                        'تعذر إظهار الكارت. أعد المحاولة',
+                                      ),
+                                    )
+                                  else
+                                    const LinearProgressIndicator(),
+                                  const SizedBox(height: AppSpacing.sm),
+                                ],
                                 // Customers and companies: no page title (Ali, 2026-11-02).
                                 // Deposits: the toolbar already names the section (Ali, t348).
                                 if (!debtLook && !deposits) ...[
@@ -257,7 +255,7 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                                   const SizedBox(height: AppSpacing.md),
                                 ],
                                 // Deposits: الإجمالي, النشط, إضافة أمانة on one row, then a
-                                // full-width search. The Egyptian rate stays under that search.
+                                // the Egyptian exchange rate keeps its own row.
                                 if (deposits)
                                   _DepositTopRow(
                                     summary: data.summary,
@@ -295,22 +293,19 @@ class _AccountListScreenState extends ConsumerState<AccountListScreen> {
                                   const SizedBox(height: AppSpacing.md),
                                 ],
                                 if (debtLook)
-                                  _CustomersToolbar(
-                                    toolbarKey: Key(
+                                  AccountListToolbar(
+                                    key: Key(
                                       isCustomers
                                           ? 'customers-toolbar'
                                           : 'companies-toolbar',
                                     ),
-                                    add: _ActiveWord(
+                                    active: _ActiveWord(
                                       section: section,
                                       count: data.summary.activeCards,
                                     ),
-                                    search: searchField,
                                     assign: assignButton,
-                                    equalWidths: true,
                                   )
                                 else ...[
-                                  searchField,
                                   if (section ==
                                       AccountSection.egyptianDeposits)
                                     const _RateCard(),
@@ -1424,118 +1419,6 @@ class _ActiveWord extends ConsumerWidget {
           maxLines: 1,
           softWrap: false,
         ),
-      ),
-    );
-  }
-}
-
-/// «النشطة», search, and «توجيه» share one height. Narrow screens still wrap.
-/// Very narrow or large-text screens put the buttons above the search.
-class _CustomersToolbar extends StatelessWidget {
-  const _CustomersToolbar({
-    required this.toolbarKey,
-    required this.add,
-    required this.search,
-    required this.assign,
-    this.equalWidths = false,
-  });
-
-  final Key toolbarKey;
-  final Widget add;
-  final Widget search;
-  final Widget assign;
-  final bool equalWidths;
-
-  /// One height for all three controls. Shorter than the 069 row, and it
-  /// still grows with the text scale.
-  static double heightFor(double scale) => 28 + 12 * scale.clamp(1.0, 2.0);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final look = context.look;
-    final scale = MediaQuery.textScalerOf(context).scale(1);
-    final height = heightFor(scale);
-    final radius = BorderRadius.circular(AppRadii.lg);
-    final side = BorderSide(color: look.cardBorder);
-    const padding = EdgeInsetsDirectional.symmetric(horizontal: AppSpacing.sm);
-    final outline = OutlineInputBorder(borderRadius: radius, borderSide: side);
-    final themed = theme.copyWith(
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          minimumSize: Size(0, height),
-          padding: padding,
-          shape: RoundedRectangleBorder(borderRadius: radius),
-          backgroundColor: look.button,
-          foregroundColor: look.onButton,
-          textStyle: cairo(13, 700),
-        ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          minimumSize: Size(0, height),
-          padding: padding,
-          shape: RoundedRectangleBorder(borderRadius: radius, side: side),
-          foregroundColor: look.accent,
-          backgroundColor: look.card,
-          textStyle: cairo(13, 700),
-        ),
-      ),
-      inputDecorationTheme: theme.inputDecorationTheme.copyWith(
-        isDense: true,
-        filled: true,
-        fillColor: look.card,
-        contentPadding: const EdgeInsetsDirectional.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: 0,
-        ),
-        border: outline,
-        enabledBorder: outline,
-        focusedBorder: outline.copyWith(
-          borderSide: BorderSide(color: look.accent, width: 2),
-        ),
-      ),
-    );
-    Widget sized(Widget child) => SizedBox(height: height, child: child);
-    return Theme(
-      data: themed,
-      child: LayoutBuilder(
-        key: toolbarKey,
-        builder: (context, constraints) {
-          if (constraints.maxWidth / scale >= 330) {
-            final searchSlot = equalWidths
-                ? Expanded(child: sized(search))
-                : Expanded(child: sized(search));
-            final sideSlot = equalWidths
-                ? (Widget child) => Expanded(child: sized(child))
-                : (Widget child) => sized(child);
-            return Row(
-              children: [
-                sideSlot(add),
-                const SizedBox(width: AppSpacing.sm),
-                searchSlot,
-                const SizedBox(width: AppSpacing.sm),
-                sideSlot(assign),
-              ],
-            );
-          }
-          // Narrow or large text: the two buttons share one row at equal
-          // width, the search sits under them at the same height.
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(child: sized(add)),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(child: sized(assign)),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              sized(search),
-            ],
-          );
-        },
       ),
     );
   }

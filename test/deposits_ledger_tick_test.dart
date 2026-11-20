@@ -8,7 +8,7 @@ import 'support/pump_app.dart';
 
 void main() {
   testWidgets(
-    'deposit lists keep one header row and put the rate under search',
+    'deposit lists keep one header row and keep the rate below the header without a duplicate search',
     (tester) async {
       await pumpFakeApp(tester, size: const Size(440, 956), textScale: 1.3);
       await signIn(tester, username: 'admin.demo', password: 'demo-only');
@@ -40,17 +40,15 @@ void main() {
         expect(find.text(AppStrings.depositActiveCompact), findsOneWidget);
         expect(find.text(AppStrings.addDeposit), findsOneWidget);
 
-        final search = tester.getRect(find.byKey(const Key('account-search')));
+        expect(find.byKey(const Key('account-search')), findsNothing);
         final screen = tester.getSize(find.byType(Scaffold).first);
-        expect(search.width, greaterThan(screen.width - 80));
-        expect(search.top, greaterThan(total.bottom));
         expect(find.byKey(const Key('account-filter-all')), findsNothing);
 
         if (path == '/egyptian-deposits') {
           final rate = tester.getRect(
             find.byKey(const Key('exchange-rate-card')),
           );
-          expect(rate.top, greaterThan(search.bottom - 1));
+          expect(rate.top, greaterThan(total.bottom - 1));
           expect(rate.width, greaterThan(screen.width - 80));
           final symbol = tester.getRect(
             find.descendant(

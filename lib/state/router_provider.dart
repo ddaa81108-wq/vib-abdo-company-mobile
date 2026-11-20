@@ -80,7 +80,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/search',
-            builder: (context, state) => const SearchScreen(),
+            builder: (context, state) => SearchScreen(
+              originSection: AccountSection.values
+                  .where(
+                    (section) =>
+                        section.path == state.uri.queryParameters['section'],
+                  )
+                  .firstOrNull,
+            ),
           ),
           GoRoute(
             path: '/notifications',
@@ -196,7 +203,10 @@ class _RouterRefresh extends ChangeNotifier {
 List<RouteBase> _accountRoutes(AccountSection section) => [
   GoRoute(
     path: '/${section.path}',
-    builder: (context, state) => AccountListScreen(section: section),
+    builder: (context, state) => AccountListScreen(
+      section: section,
+      revealedCardId: state.uri.queryParameters['card'],
+    ),
     routes: [
       GoRoute(
         path: ':id',
