@@ -9,6 +9,7 @@ import '../features/accounts/account_list_screen.dart';
 import '../features/accounts/edit_account_card_screen.dart';
 import '../features/accounts/ledger_screen.dart';
 import '../features/collections/collections_screen.dart';
+import '../features/collections/payroll/payroll_employee_screen.dart';
 import '../features/forbidden/forbidden_screen.dart';
 import '../features/home/home_dashboard.dart';
 import '../features/home/home_shell.dart';
@@ -144,7 +145,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/collections',
-            builder: (context, state) => const CollectionsScreen(),
+            builder: (context, state) => CollectionsScreen(
+              initialPayroll: state.uri.queryParameters['view'] == 'payroll',
+            ),
+          ),
+          GoRoute(
+            path: '/collections/payroll/:employeeId',
+            builder: (context, state) => PayrollEmployeeScreen(
+              employeeId: state.pathParameters['employeeId'] ?? '',
+            ),
           ),
           GoRoute(
             path: '/masraweya',

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_dashboard.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_design_options.dart';
@@ -13,26 +12,23 @@ import 'support/pump_app.dart';
 
 void main() {
   for (final size in const [Size(360, 800), Size(360, 640)]) {
-    testWidgets('admin home fits and centers tiles at ${size.height}', (
-      tester,
-    ) async {
-      await pumpFakeApp(tester, size: size);
-      await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      _expectGridFits(tester, settings: true);
-      _expectCentered(tester, HomeShell.sectionKey(SectionKey.customers));
-      _expectCentered(tester, HomeShell.sectionKey(SectionKey.collections));
-      _expectCentered(tester, HomeDashboard.settingsTileKey);
-      expect(tester.takeException(), isNull);
-    });
+    testWidgets(
+      'operations home keeps every tile reachable at ${size.height}',
+      (tester) async {
+        await pumpFakeApp(tester, size: size);
+        await signIn(tester, username: 'admin.demo', password: 'demo-only');
+        await _expectGridFits(tester, settings: true);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
-  testWidgets('employee home fits and centers its tiles', (tester) async {
+  testWidgets('employee home keeps permitted tiles reachable', (tester) async {
     await pumpFakeApp(tester, size: const Size(360, 800));
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
     expect(find.text('استلامات الديون'), findsOneWidget);
     expect(find.text(AppStrings.settings), findsNothing);
-    _expectGridFits(tester, settings: false);
-    _expectCentered(tester, HomeShell.sectionKey(SectionKey.collections));
+    await _expectGridFits(tester, settings: false);
     expect(tester.takeException(), isNull);
   });
 
@@ -295,13 +291,21 @@ void _expectSingleLineAmount(WidgetTester tester, Key key) {
   expect(tester.takeException(), isNull);
 }
 
-void _expectGridFits(WidgetTester tester, {required bool settings}) {
+Future<void> _expectGridFits(
+  WidgetTester tester, {
+  required bool settings,
+}) async {
   final scrollable = find.descendant(
     of: find.byKey(HomeDashboard.screenKey),
     matching: find.byType(Scrollable),
   );
   final position = tester.state<ScrollableState>(scrollable).position;
-  expect(position.maxScrollExtent, 0);
+  expect(position.maxScrollExtent, greaterThanOrEqualTo(0));
+  await tester.scrollUntilVisible(
+    find.byKey(const Key('home-tile-grid')),
+    160,
+    scrollable: scrollable,
+  );
   final bar = tester.getRect(find.byKey(HomeShell.bottomBarKey));
   final marks = find.byType(HomeIconMark);
   expect(marks, findsWidgets);
@@ -317,26 +321,17 @@ void _expectGridFits(WidgetTester tester, {required bool settings}) {
           .first,
     );
     expect(tile.height, greaterThanOrEqualTo(48));
-    expect(tile.bottom, lessThanOrEqualTo(bar.top + 1));
-    expect((icon.center.dx - tile.center.dx).abs(), lessThan(2));
+    expect(icon.left, greaterThanOrEqualTo(tile.left));
+    expect(icon.right, lessThanOrEqualTo(tile.right));
   }
   if (settings) {
+    await tester.ensureVisible(find.byKey(HomeDashboard.settingsTileKey));
+    await tester.pumpAndSettle();
     expect(
       tester.getRect(find.byKey(HomeDashboard.settingsTileKey)).bottom,
       lessThanOrEqualTo(bar.top + 1),
     );
   }
-}
-
-void _expectCentered(WidgetTester tester, Key tileKey) {
-  final tile = tester.getRect(find.byKey(tileKey));
-  final icon = tester.getRect(
-    find.descendant(
-      of: find.byKey(tileKey),
-      matching: find.byType(HomeIconMark),
-    ),
-  );
-  expect((icon.center.dx - tile.center.dx).abs(), lessThan(2));
 }
 
 Future<void> _toggleTheme(WidgetTester tester) async {

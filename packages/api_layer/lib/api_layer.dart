@@ -57,6 +57,7 @@ export 'data/models/notification_models.dart';
 export 'data/models/profile_models.dart';
 export 'data/models/purchase_models.dart';
 export 'data/models/report_models.dart';
+export 'data/models/report_overview_models.dart';
 export 'data/models/treasury_models.dart';
 
 class ApiLayer {

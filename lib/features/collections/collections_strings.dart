@@ -130,6 +130,8 @@ abstract final class CollectionsText {
 
   // Payroll (website CollectionPayrollPanel).
   static const payrollTitle = 'مرتبات موظفي الاستلام';
+  static const newPayrollEntry = 'إضافة حركة';
+  static const payrollLedger = 'سجل الحركات';
   static const myPayrollTitle = 'مرتبي';
   static const currentPeriod = 'الفترة الحالية: ';
   static const base = 'المرتب الثابت';
@@ -157,6 +159,14 @@ abstract final class CollectionsText {
   static const reasonRequired = 'اكتب سبب الحركة بوضوح.';
   static const salaryRequired = 'اكتب مرتبًا ثابتًا صحيحًا غير سالب.';
   static const noEmployees = 'لا يوجد موظف استلام مفعّل حاليًا.';
+  static const employeePayroll = 'صفحات مرتبات الموظفين';
+  static const choosePayrollEmployee = 'اختر الموظف لفتح مرتبه وحركاته فقط';
+  static const openPayroll = 'فتح سجل المرتب';
+  static const backToEmployees = 'رجوع لقائمة الموظفين';
+  static const payrollNotAvailable = 'سجل هذا الموظف غير متاح لحسابك.';
+  static const cancelPayrollEntry = 'إلغاء المعاملة';
+  static const cancelPayrollQuestion =
+      'تُحذف المعاملة من الصفحة ويُصحح رصيد المرتب. يُحفظ أثر الإلغاء للمراجعة.';
 
   // Layout from Ali's two pictures (2026-11-03).
   static const filterBatch = 'دفعة العمل';

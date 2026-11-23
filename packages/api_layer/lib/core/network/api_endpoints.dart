@@ -73,6 +73,8 @@ class ApiEndpoints {
       '/api/collections/payroll/employees/$employeeId/salary';
   static String payrollEntryConfirm(String entryId) =>
       '/api/collections/payroll/entries/$entryId/confirm';
+  static String payrollEntryCancel(String entryId) =>
+      '/api/collections/payroll/entries/${Uri.encodeComponent(entryId)}/cancel';
 
   // Masraweya (EGP daily book)
   static const masraweyaDay = '/api/masraweya/day';
@@ -92,6 +94,8 @@ class ApiEndpoints {
   static const treasuryCashLedger = '/api/treasury/cash-ledger';
   static const treasuryCashEntries = '/api/treasury/cash-entries';
   static const reports = '/api/reports';
+  static const reportsOverview = '/api/reports/overview';
+  static const reportsActivity = '/api/reports/activity';
   static const financialLedger = '/api/financial-ledger';
 
   // Admin (only the parts relevant to a mobile client)

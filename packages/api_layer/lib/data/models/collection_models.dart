@@ -540,7 +540,9 @@ class PayrollEntryDto {
       this.createdAt,
       this.createdByName,
       this.confirmedAt,
-      this.confirmedByName});
+      this.confirmedByName,
+      this.cancelledAt,
+      this.cancelledByName});
   final String id;
   final String kind; // withdrawal | commission
   final MoneyValue? amountUnits;
@@ -549,6 +551,8 @@ class PayrollEntryDto {
   final String? createdByName;
   final DateTime? confirmedAt;
   final String? confirmedByName;
+  final DateTime? cancelledAt;
+  final String? cancelledByName;
   factory PayrollEntryDto.fromJson(Json j) => PayrollEntryDto(
         id: str(j['id']),
         kind: str(j['kind']),
@@ -562,6 +566,8 @@ class PayrollEntryDto {
         createdByName: strOrNull(j['createdByName']),
         confirmedAt: dateOrNull(j['confirmedAt']),
         confirmedByName: strOrNull(j['confirmedByName']),
+        cancelledAt: dateOrNull(j['cancelledAt']),
+        cancelledByName: strOrNull(j['cancelledByName']),
       );
 }
 
@@ -590,8 +596,10 @@ class PayrollEmployeeDto {
   final MoneyValue? remainingUnits; // "الباقي من المرتب" — server only
   final List<Json> entries;
 
-  List<PayrollEntryDto> get movements =>
-      entries.map(PayrollEntryDto.fromJson).toList(growable: false);
+  List<PayrollEntryDto> get movements => entries
+      .map(PayrollEntryDto.fromJson)
+      .where((entry) => entry.cancelledAt == null)
+      .toList(growable: false);
 
   factory PayrollEmployeeDto.fromJson(Json j) {
     final id = strOrNull(

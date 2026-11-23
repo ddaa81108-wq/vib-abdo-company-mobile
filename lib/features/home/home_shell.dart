@@ -170,6 +170,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             )
           : null,
       appBar: AppBar(
+        backgroundColor: widget.location == '/'
+            ? const Color(0xFF14263B)
+            : null,
+        foregroundColor: widget.location == '/' ? Colors.white : null,
+        iconTheme: widget.location == '/'
+            ? const IconThemeData(color: Colors.white)
+            : null,
         leading: _leading(phone: phone, panel: panel),
         title: Transform.translate(
           // The env badge hangs over the bottom of a crowded 320 bar.
@@ -177,7 +184,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           child: FittedBox(
             fit: BoxFit.scaleDown,
             alignment: AlignmentDirectional.centerStart,
-            child: Text(_title(widget.location)),
+            child: Text(
+              _title(widget.location),
+              style: widget.location == '/'
+                  ? const TextStyle(color: Colors.white)
+                  : null,
+            ),
           ),
         ),
         actions: [

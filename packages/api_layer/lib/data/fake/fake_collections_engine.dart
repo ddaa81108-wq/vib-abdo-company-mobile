@@ -1052,7 +1052,7 @@ class FakeCollectionsEngine {
     final id = row['employeeId'];
     final entries = [
       for (final e in _payrollEntries)
-        if (e['employeeId'] == id)
+        if (e['employeeId'] == id && e['cancelledAt'] == null)
           {
             for (final kv in e.entries)
               if (kv.key != 'employeeId' && kv.key != 'requestId')
@@ -1162,6 +1162,29 @@ class FakeCollectionsEngine {
     };
   }
 
+  /// Idempotent cancellation matches the website; original evidence is retained.
+  Map<String, dynamic> cancelPayrollEntry(
+      FakeCollectionsCaller caller, String entryId) {
+    if (!caller.seesEverything) _forbidden('collections.payroll.manage');
+    final entry = _payrollEntries.firstWhere((row) => row['id'] == entryId,
+        orElse: () => _notFound('payroll_entry'));
+    if (entry['cancelledAt'] != null) {
+      return {
+        'id': entryId,
+        'cancelledAt': entry['cancelledAt'],
+        'replayed': true,
+        'eventSequences': <int>[]
+      };
+    }
+    entry['cancelledAt'] = _now();
+    entry['cancelledByName'] = caller.name;
+    return {
+      'id': entryId,
+      'cancelledAt': entry['cancelledAt'],
+      'eventSequences': [11]
+    };
+  }
+
   /// `POST /api/collections/payroll/entries/{id}/confirm` (the employee).
   Map<String, dynamic> confirmPayrollEntry(
       FakeCollectionsCaller caller, String entryId) {
@@ -1169,6 +1192,10 @@ class FakeCollectionsEngine {
     final e = _payrollEntries.firstWhere((x) => x['id'] == entryId,
         orElse: () => _notFound('payroll_entry'));
     if (e['employeeId'] != caller.id) _forbidden('collections.payroll.confirm');
+    if (e['cancelledAt'] != null) {
+      _fail(409, 'PAYROLL_ENTRY_CANCELLED',
+          'هذه الحركة ملغاة ولا يمكن تأكيد استلامها.');
+    }
     if (e['confirmedAt'] != null) {
       _fail(409, 'PAYROLL_ALREADY_CONFIRMED', 'تم تأكيد الحركة من قبل.');
     }

@@ -135,10 +135,20 @@ void main() {
       await tester.tap(find.byKey(const Key('collections-payroll')));
       await settle(tester);
 
-      await tester.ensureVisible(find.byKey(const Key('payroll-u_12')));
-      expect(_inside(const Key('payroll-u_12'), '1,250 د.ل'), findsOneWidget);
-      await tester.ensureVisible(find.byKey(const Key('payroll-u_20')));
-      expect(_inside(const Key('payroll-u_20'), '2,580 د.ل'), findsOneWidget);
+      await tester.ensureVisible(
+        find.byKey(const Key('payroll-employee-u_12')),
+      );
+      expect(
+        _inside(const Key('payroll-employee-u_12'), '1,250 د.ل'),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('payroll-employee-u_20')),
+      );
+      expect(
+        _inside(const Key('payroll-employee-u_20'), '2,580 د.ل'),
+        findsOneWidget,
+      );
     },
   );
 

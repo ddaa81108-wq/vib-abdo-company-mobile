@@ -102,6 +102,7 @@ abstract interface class CollectionsRepository {
   Future<MutationAck> setBaseSalary(
       String employeeUserId, int baseSalaryUnits, MutationMeta meta);
   Future<MutationAck> confirmPayrollEntry(String entryId, MutationMeta meta);
+  Future<MutationAck> cancelPayrollEntry(String entryId, MutationMeta meta);
 }
 
 class RemoteCollectionsRepository implements CollectionsRepository {
@@ -297,4 +298,8 @@ class RemoteCollectionsRepository implements CollectionsRepository {
   @override
   Future<MutationAck> confirmPayrollEntry(String entryId, MutationMeta meta) =>
       _post(ApiEndpoints.payrollEntryConfirm(entryId), meta.toBody());
+
+  @override
+  Future<MutationAck> cancelPayrollEntry(String entryId, MutationMeta meta) =>
+      _post(ApiEndpoints.payrollEntryCancel(entryId), meta.toBody());
 }

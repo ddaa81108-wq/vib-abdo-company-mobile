@@ -273,6 +273,8 @@ void main() {
     await signIn(tester, username: 'admin.demo', password: 'demo-only');
     await go(tester, '/collections');
     await openPayroll(tester);
+    await tester.tap(find.byKey(const Key('payroll-employee-u_12')));
+    await settle(tester);
     await pumpUntilFound(tester, find.byKey(const Key('payroll-entry-pe_1')));
     expect(find.byKey(const Key('payroll-confirm-pe_1')), findsNothing);
     expect(find.byKey(const Key('payroll-awaiting-pe_1')), findsOneWidget);

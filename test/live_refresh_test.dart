@@ -4,6 +4,7 @@ import 'package:vib_abdo_company_mobile/state/live_refresh.dart';
 import 'package:vib_abdo_company_mobile/state/notification_providers.dart';
 import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 import 'package:vib_abdo_company_mobile/state/session_providers.dart';
+import 'package:vib_abdo_company_mobile/state/home_operations_providers.dart';
 
 void main() {
   test('a customer change reloads that list and not purchases', () {
@@ -13,6 +14,8 @@ void main() {
     expect(providers, contains(accountsProvider(AccountSection.customers)));
     expect(providers, contains(collectionsProvider));
     expect(providers, contains(homeDashboardProvider));
+    expect(providers, contains(homeClosingProvider));
+    expect(providers, contains(homeActivityProvider));
     expect(providers, isNot(contains(purchasesProvider)));
     expect(providers, isNot(contains(masraweyaProvider)));
   });
@@ -50,6 +53,8 @@ void main() {
     expect(providers, contains(purchasesProvider));
     expect(providers, contains(masraweyaProvider));
     expect(providers, contains(notificationsProvider));
+    expect(providers, contains(homeClosingProvider));
+    expect(providers, contains(homeActivityProvider));
   });
 
   test('opening a section again names that section cache', () {

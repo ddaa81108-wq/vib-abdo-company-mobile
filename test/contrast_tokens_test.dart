@@ -284,8 +284,12 @@ Future<void> _openDrawer(WidgetTester tester) async {
 }
 
 void _expectDrawerWord(WidgetTester tester, {required bool dark}) {
-  final word = tester.widget<Text>(find.text(AppStrings.brandWord));
-  final theme = Theme.of(tester.element(find.text(AppStrings.brandWord)));
+  final finder = find.descendant(
+    of: find.byType(Drawer),
+    matching: find.text(AppStrings.brandWord),
+  );
+  final word = tester.widget<Text>(finder);
+  final theme = Theme.of(tester.element(finder));
   final palette = theme.extension<AppSidebarPalette>()!;
   expect(word.style?.color, palette.bright);
   expect(word.style?.color, isNot(palette.base));
@@ -361,11 +365,8 @@ Future<void> _expectRenderedInk(
     ),
     findsOneWidget,
   );
-  final look = theme.extension<AppLook>()!;
-  // Customers tile: glossy blue. The mark is its own navy tile.
-  for (final tileColor in [look.glossBlue.top, look.glossBlue.bottom]) {
-    _expectContrast(tileLabel.style!.color!, tileColor, 4.5);
-  }
+  // Approved operations home: featured navy tile, white label.
+  _expectContrast(tileLabel.style!.color!, const Color(0xFF14263B), 4.5);
   // «عرض الكل» left home; the primary ink is still checked on /purchases.
   expect(
     scheme.primary,

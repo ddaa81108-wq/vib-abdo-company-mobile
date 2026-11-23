@@ -29,7 +29,7 @@ void main() {
     // Payroll opens from «المرتبات» in the collections bar.
     await _openPayroll(tester);
     expect(_heading(AppStrings.payroll), findsOneWidget);
-    expect(find.byKey(const Key('payroll-u_12')), findsOneWidget);
+    expect(find.byKey(const Key('payroll-employee-u_12')), findsOneWidget);
     expect(find.byKey(const Key('payroll-u_1')), findsNothing);
 
     await go(tester, '/settings');

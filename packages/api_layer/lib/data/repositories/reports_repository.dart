@@ -1,11 +1,14 @@
 import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
-import '../../core/network/logging_interceptor.dart';
 import '../models/report_models.dart';
+import '../models/report_overview_models.dart';
+import '../models/common.dart';
 
 /// Read-only: daily smart reports, admin financial ledger, statement PDF.
 abstract interface class ReportsRepository {
   Future<ReportsDto> daily({int limit = 30});
+  Future<ReportClosingOverviewDto> closingOverview();
+  Future<List<ReportActivityDto>> activity();
 
   /// [sectionKey] is the contract ledger section (`customer_debts`, …).
   /// It is sent as the query `section`, which is the name
@@ -36,6 +39,25 @@ abstract interface class ReportsRepository {
 class RemoteReportsRepository implements ReportsRepository {
   RemoteReportsRepository(this._api);
   final ApiClient _api;
+
+  @override
+  Future<ReportClosingOverviewDto> closingOverview() async {
+    const path = ApiEndpoints.reportsOverview;
+    final data = (await _api.get(path)).data;
+    return runWithMoneyEndpoint(
+        path, () => ReportClosingOverviewDto.fromData(data));
+  }
+
+  @override
+  Future<List<ReportActivityDto>> activity() async {
+    const path = ApiEndpoints.reportsActivity;
+    final data = (await _api.get(path, query: {'page': 1})).data;
+    return runWithMoneyEndpoint(
+        path,
+        () => asJsonList(asJson(data)['items'])
+            .map(ReportActivityDto.fromJson)
+            .toList(growable: false));
+  }
 
   @override
   Future<ReportsDto> daily({int limit = 30}) async {

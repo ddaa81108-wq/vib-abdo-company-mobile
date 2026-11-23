@@ -44,7 +44,8 @@ const _whiteGoldLayout = bool.fromEnvironment(
 /// Every figure is a server field or derived from the server's lists; see
 /// `collections_view_model.dart`.
 class CollectionsScreen extends ConsumerStatefulWidget {
-  const CollectionsScreen({super.key});
+  const CollectionsScreen({this.initialPayroll = false, super.key});
+  final bool initialPayroll;
 
   static const screenKey = Key('screen-collections');
 
@@ -53,7 +54,7 @@ class CollectionsScreen extends ConsumerStatefulWidget {
 }
 
 class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
-  var _payroll = false;
+  late bool _payroll = widget.initialPayroll;
 
   @override
   Widget build(BuildContext context) {

@@ -8,6 +8,7 @@ import 'router_provider.dart';
 import 'section_providers.dart';
 import 'session_providers.dart';
 import 'shell_history.dart';
+import 'home_operations_providers.dart';
 
 String? _userId(SessionState? session) => switch (session) {
   SessionAuthenticated(:final profile) => profile.id,
@@ -16,6 +17,8 @@ String? _userId(SessionState? session) => switch (session) {
 
 /// Drops cached reads and user-scoped filters. Theme and connectivity stay.
 void invalidateUserScope(WidgetRef ref) {
+  ref.invalidate(homeClosingProvider);
+  ref.invalidate(homeActivityProvider);
   ref.invalidate(homeDashboardProvider);
   ref.invalidate(accountsProvider);
   ref.invalidate(accountExtraCardsProvider);

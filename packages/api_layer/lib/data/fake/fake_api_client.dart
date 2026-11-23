@@ -16,6 +16,7 @@ import '../../core/permissions/permission_service.dart';
 import '../models/profile_models.dart';
 import '../models/purchase_models.dart';
 import 'fake_collections_engine.dart';
+import 'fake_home_operations.dart';
 import 'fake_fixtures.dart';
 import 'fake_large_catalog.dart';
 
@@ -1584,6 +1585,12 @@ class FakeApiClient implements ApiClient {
       case 'reports':
         if (method != 'GET') _requireWrite(SectionKey.reports);
         _requireRead(SectionKey.reports);
+        if (seg.length == 2 && seg[1] == 'overview') {
+          return _ok(fakeClosingOverview());
+        }
+        if (seg.length == 2 && seg[1] == 'activity') {
+          return _ok(fakeReportActivity());
+        }
         return _ok(FakeFixtures.reports());
       case 'statements':
         // Proposed endpoint, pending server confirmation. Fake mode only.
@@ -1958,6 +1965,12 @@ class FakeApiClient implements ApiClient {
     }
     if (seg.length == 3 && seg[1] == 'payroll' && seg[2] == 'entries') {
       return _engine(() => engine.addPayrollEntry(_payrollCaller, b));
+    }
+    if (seg.length == 5 &&
+        seg[1] == 'payroll' &&
+        seg[2] == 'entries' &&
+        seg[4] == 'cancel') {
+      return _engine(() => engine.cancelPayrollEntry(_payrollCaller, seg[3]));
     }
     if (seg.length == 5 &&
         seg[1] == 'payroll' &&
