@@ -85,9 +85,10 @@ void main() {
         homeActions(tester),
         contains(ManagementAction.collectionsCashReceived),
       );
-      // The admin's home shows no amounts now; it ends with settings.
+      // Approved operations home shows the read-only server 05:00 snapshot.
       expect(find.textContaining('ج.م'), findsNothing);
-      expect(find.textContaining('د.ل'), findsNothing);
+      expect(find.byKey(const Key('home-five-am')), findsOneWidget);
+      expect(find.textContaining('162,665'), findsOneWidget);
       expect(find.byKey(HomeDashboard.settingsTileKey), findsOneWidget);
       expect(
         find.byKey(HomeShell.sectionKey(SectionKey.reports)),

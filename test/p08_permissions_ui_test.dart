@@ -138,13 +138,14 @@ void main() {
     );
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
     final readsAfterSignIn = reads;
+    expect(readsAfterSignIn, 1);
     await _go(tester, '/collections');
     expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
     expect(find.text(AppStrings.forbidden), findsWidgets);
     expect(find.text('نص الخادم لا يُعرض'), findsNothing);
     expect(find.text(AppStrings.retry), findsNothing);
     await tester.pump(const Duration(seconds: 1));
-    expect(reads, readsAfterSignIn + 1);
+    expect(reads, readsAfterSignIn);
   });
 }
 

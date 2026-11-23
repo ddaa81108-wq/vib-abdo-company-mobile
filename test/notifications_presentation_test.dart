@@ -69,7 +69,12 @@ void main() {
       size: const Size(360, 700),
       overrides: [notificationsProvider.overrideWith(() => _HoldNotes(gate))],
     );
-    await signIn(tester, username: 'employee.demo', password: 'demo-only');
+    await signIn(
+      tester,
+      username: 'employee.demo',
+      password: 'demo-only',
+      settleAfter: false,
+    );
     await go(tester, '/notifications');
     expect(find.byKey(const Key('notifications-loading')), findsOneWidget);
     expect(find.byKey(NotificationsScreen.retryKey), findsNothing);
