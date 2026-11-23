@@ -124,14 +124,17 @@ void main() {
       ],
     );
     await signIn(tester, username: 'employee.demo', password: 'demo-only');
+    // Operations home already watches collections for the user's follow-up.
+    // Opening the section reuses its forbidden result rather than retrying it.
     final readsAfterSignIn = reads;
+    expect(readsAfterSignIn, 1);
     await go(tester, '/collections');
     expect(find.byKey(ForbiddenPane.paneKey), findsOneWidget);
     expect(find.text(AppStrings.forbidden), findsWidgets);
     expect(find.text(AppStrings.retry), findsNothing);
     expect(find.byKey(const Key('approve-sb_1')), findsNothing);
     await tester.pump(const Duration(seconds: 1));
-    expect(reads, readsAfterSignIn + 1);
+    expect(reads, readsAfterSignIn);
   });
 }
 
