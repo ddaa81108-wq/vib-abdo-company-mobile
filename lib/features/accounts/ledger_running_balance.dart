@@ -21,7 +21,7 @@ import 'package:flutter_api_layer/api_layer.dart';
 /// Only `posted` rows move the balance. `corrected` rows are drawn (the
 /// website labels them « — مصححة») but do not move it. `reversed` rows
 /// are not drawn; they still get a value in the map, as on the website.
-/// Integer minor units only.
+/// Integer whole currency units only (API money scale 0).
 
 /// The website draws every row except `reversed` ones.
 bool websiteShowsRow(LedgerEntryDto entry) => entry.status != 'reversed';

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_providers.dart';
 import '../error_handling/error_handler.dart';
 import '../state/live_refresh.dart';
+import '../state/live_refresh_batch.dart';
 import '../state/notification_providers.dart';
 import '../state/session_providers.dart';
 import 'background_sound_policy.dart';
@@ -34,6 +35,9 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
   var _running = false;
   var _sawBackground = false;
   var _holding = false;
+  late final _refreshBatch = LiveRefreshBatch<Object>((providers) {
+    if (mounted) invalidateLiveProviders(ref, providers);
+  });
 
   @override
   void initState() {
@@ -46,6 +50,7 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
 
   @override
   void dispose() {
+    _refreshBatch.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _signals?.cancel();
     _pushes?.cancel();
@@ -105,11 +110,12 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
         // Signal only. The topic chooses which cached reads to drop.
         // The payload is never applied. The notification bridge refetches
         // the list and does not ingest the event.
-        applyLiveSignal(
-          ref,
-          RealtimeSignalView(
-            topic: signal.topic,
-            fullResync: signal.fullResync,
+        _refreshBatch.addAll(
+          providersForSignal(
+            RealtimeSignalView(
+              topic: signal.topic,
+              fullResync: signal.fullResync,
+            ),
           ),
         );
         _bridge?.onSignal(signal);
@@ -122,6 +128,7 @@ class _RealtimeLifecycleState extends ConsumerState<RealtimeLifecycle>
       });
     } else if (!shouldRun && _running) {
       _running = false;
+      _refreshBatch.cancel();
       _signals?.cancel();
       _pushes?.cancel();
       _signals = null;

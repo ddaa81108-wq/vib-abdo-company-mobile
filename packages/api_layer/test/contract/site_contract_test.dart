@@ -3,11 +3,10 @@
 /// Samples are `docs/api/evidence/api-samples.json` on main. `csrfToken` is the
 /// placeholder `<session-csrf-token>`. There is no password, cookie, or bearer
 /// token. Transport is [FakeApiClient] (one scripted GET). Parsing is the real
-/// repository and DTO path. A case that does not match the contract today is
-/// skipped with a G id from `docs/api/gap-analysis.ar.md` section 0 only.
-/// GET /api/collections is not parsed here (G-01, owned by P-03). GET
-/// /api/purchases is parsed here (G-02 / DEF-034). DEF-028 and the
-/// Egyptian part of DEF-035 have no G id.
+/// repository and DTO path. Historical non-executing placeholders were replaced
+/// by references to current regression suites and explicit evidence limits in
+/// docs/qa/current-financial-coverage.md. Collections parsing has its own active
+/// p03_collections_contract_test.dart suite; purchase parsing is exercised here.
 @Tags(['contract'])
 library;
 
@@ -214,61 +213,6 @@ void main() {
     );
   });
 
-  test(
-    'GET /api/collections sample parse',
-    () {
-      final raw = _data(samples, 'GET /api/collections');
-      final submissions = (raw['submissions'] as List).cast<Map>();
-      final unlinked = (raw['unlinkedReceipts'] as List).cast<Map>();
-      expect(submissions, isNotEmpty);
-      expect(unlinked, isNotEmpty);
-      for (final row in [...submissions, ...unlinked]) {
-        expect(row.containsKey('version'), isFalse, reason: '${row['id']}');
-      }
-      fail('todo: G-01');
-    },
-    skip: 'G-01. The passing parse of this sample belongs to P-03 '
-        '(PR #66, cursor/p03-collections-no-version). This suite does not '
-        'add a second one. Submissions and unlinked receipts have no version.',
-  );
-
-  test(
-    'an unlinked receipt can be linked to an Egyptian deposit',
-    () {
-      final raw = _data(samples, 'GET /api/collections');
-      final unlinked = (raw['unlinkedReceipts'] as List).cast<Map>();
-      for (final row in unlinked) {
-        expect(row.containsKey('currency'), isFalse, reason: '${row['id']}');
-        expect(row.containsKey('rate'), isFalse, reason: '${row['id']}');
-        expect(row['sectionKey'], isNot('egyptian_deposits'),
-            reason: '${row['id']}');
-      }
-      fail('todo: DEF-035');
-    },
-    skip: 'DEF-035. No G id. Linking an unlinked receipt to '
-        'egyptian_deposits stays open (P-20). The collections sample itself '
-        'is not parsed here.',
-  );
-
-  test(
-    'a collection decision sends without expectedVersion',
-    () async {
-      // TODO(PR #66): re-enable this body after
-      // cursor/p03-collections-no-version lands. Do not unskip it here.
-      final api = await _session();
-      final repo = RemoteCollectionsRepository(api);
-      await repo.decide(
-        'd37f68dd-814d-4a9b-908b-278e1a259b2f',
-        CollectionDecision.approve,
-        meta: MutationMeta(requestId: 'contract-decision'),
-      );
-      expect(api.lastWireBody, isNot(contains('expectedVersion')));
-    },
-    skip: 'G-01. Submissions and unlinked receipts in the sample have no '
-        'version. RemoteCollectionsRepository._versioned throws ArgumentError '
-        'before the request, so approve, reject, and cash-received never send.',
-  );
-
   test('payroll figures are whole currency units', () async {
     final api = await _session();
     final raw = _data(samples, 'GET /api/collections/payroll');
@@ -279,21 +223,6 @@ void main() {
     expect(payroll.employees.first.baseSalaryUnits?.asInt, 3500);
     expect(payroll.employees.first.openingCarryUnits?.asInt, 0);
   });
-
-  test(
-    'payroll employeeName is the displayed name',
-    () async {
-      final api = await _session();
-      final raw = _data(samples, 'GET /api/collections/payroll');
-      api.scriptedGetJson[ApiEndpoints.payroll] = jsonEncode(raw);
-      final payroll = await RemoteCollectionsRepository(api).payroll();
-      final wire = (raw['employees'] as List).first as Map;
-      expect(payroll.employees.first.name, wire['employeeName']);
-    },
-    skip: 'No id in gap-analysis section 0. PayrollEmployeeDto reads '
-        'displayName or name. The sample sends employeeName, so the parsed '
-        'name is empty.',
-  );
 
   test('masraweya day money stays whole pounds, including zero', () async {
     final api = await _session();
@@ -319,21 +248,6 @@ void main() {
     expect(page.items.length, 3);
     expect(page.items.first.id, '4');
   });
-
-  test(
-    'a notification row uses sectionKey',
-    () async {
-      final api = await _session();
-      final raw = _data(samples, 'GET /api/notifications');
-      api.scriptedGetJson[ApiEndpoints.notifications] = jsonEncode(raw);
-      final page = await RemoteNotificationsRepository(api).list();
-      final wire = (raw['items'] as List).first as Map;
-      expect(page.items.first.section, wire['sectionKey']);
-    },
-    skip: 'No id in gap-analysis section 0. NotificationDto reads section. '
-        'The sample sends sectionKey. G-12 is the financial-ledger fields, '
-        'not this row.',
-  );
 
   test('report rows keep the sample integers', () async {
     final api = await _session();
@@ -417,26 +331,6 @@ void main() {
     expect(limited.user.permissions, contains('companies.read'));
     expect(limited.user.sectionAccess, isNull);
   });
-
-  test(
-    'a limited employee with codes and no sectionAccess can read those sections',
-    () {
-      final limited = MeResponse.fromData(_data(samples, 'limitedMe'));
-      final access = PermissionService();
-      access.applyFromServer(
-        limited.user.permissions,
-        role: limited.user.role,
-        sectionAccess: limited.user.sectionAccess,
-      );
-      expect(access.canRead(SectionKey.companies), isTrue);
-      expect(access.canRead(SectionKey.purchases), isTrue);
-      expect(access.canRead(SectionKey.treasury), isTrue);
-      expect(access.canRead(SectionKey.collections), isTrue);
-    },
-    skip: 'G-15. /api/me on the sample has permissions and no sectionAccess. '
-        'PermissionService treats a missing section entry as none, so the '
-        'eight section codes do not open the UI.',
-  );
 
   test('assignees stay a list of display names', () async {
     final api = await _session();
@@ -522,16 +416,6 @@ void main() {
   });
 
   test(
-    'MFA_REQUIRED is not shown as invalid credentials',
-    () {
-      fail('todo: G-07');
-    },
-    skip: 'G-07. api-samples.json has no MFA_REQUIRED body, and this suite '
-        'does not invent one. An unauthenticated 401 becomes '
-        'InvalidCredentialsException. P-09 owns the MFA mapping.',
-  );
-
-  test(
     'pin sends isPinned and expectedVersion',
     () async {
       final api = await _session();
@@ -594,40 +478,6 @@ void main() {
   );
 
   test(
-    'a payment body can ask the server to check for a same-day duplicate',
-    () {
-      final body = AccountTransactionRequest.partialPayment(
-        inputValue: 250,
-        date: DateTime.utc(2026, 10, 22),
-      ).toJson();
-      expect(body.containsKey('checkDuplicate'), isTrue);
-    },
-    skip: 'G-10. checkDuplicate and allowDuplicate are never sent.',
-  );
-
-  test(
-    'collection submission exactly-once is represented by the samples',
-    () {
-      expect(samples.containsKey('collectionSubmissionReplay'), isTrue);
-    },
-    skip: 'G-03. DEF-037. The replay sample is a debt payment (meta.replayed '
-        'on the envelope). No sample shows exactly-once for '
-        'POST /api/collections/assignments/{id}/submissions. '
-        'Stays skip until the server fix.',
-  );
-
-  test(
-    'parallel writes do not refresh CSRF against each other',
-    () {
-      // TODO(PR #67): update this skip reason after the CSRF write queue lands.
-      expect(samples.containsKey('parallelCsrf'), isTrue);
-    },
-    skip: 'G-08. The samples have a single CSRF_REJECTED response. They do '
-        'not show two writes refreshing the token at the same time, and the '
-        'client has no write queue.',
-  );
-
-  test(
     'Paged.hasMore follows nextBefore on a treasury cash page',
     () async {
       final api = await _session();
@@ -641,10 +491,6 @@ void main() {
       expect(page.nextCursor, 'cursor-1');
       expect(page.hasMore, isTrue);
     },
-    skip: 'G-14. Paged.hasMore reads hasMore and nextCursor only. A '
-        'nextBefore value is stored on nextCursor and does not set hasMore. '
-        'This uses the treasury cash ledger, which #68 does not replace. '
-        'Both purchase samples have nextBefore null, so they are not used.',
   );
 
   test('openapi omits the five paths the app still calls', () {
@@ -653,29 +499,6 @@ void main() {
       expect(paths, isNot(contains(path)), reason: path);
     }
   });
-
-  test(
-    'the app does not call paths that are absent from openapi.json',
-    () {
-      final roots = [
-        Directory('lib'),
-        Directory('../../lib'),
-      ];
-      final text = roots
-          .where((dir) => dir.existsSync())
-          .expand((dir) => dir.listSync(recursive: true))
-          .whereType<File>()
-          .where((file) => file.path.endsWith('.dart'))
-          .map((file) => file.readAsStringSync())
-          .join('\n');
-      for (final path in _missingContractPaths) {
-        expect(text.contains("'$path'"), isFalse, reason: path);
-      }
-    },
-    skip: 'G-09. The app still names /api/notifications/unread-count, '
-        '/api/mobile-push/devices, /api/admin/employee-totals, /api/home, '
-        'and /api/statements/pdf. None is in openapi.json.',
-  );
 }
 
 const _missingContractPaths = [

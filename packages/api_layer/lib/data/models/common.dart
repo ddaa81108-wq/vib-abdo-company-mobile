@@ -113,7 +113,8 @@ class Paged<T> {
     return Paged(
       items: asJsonList(d[itemsKey]).map(parse).toList(growable: false),
       nextCursor: strOrNull(d['nextCursor'] ?? d['nextBefore']),
-      hasMore: d['hasMore'] == true || d['nextCursor'] != null,
+      hasMore: d['hasMore'] == true ||
+          (strOrNull(d['nextCursor'] ?? d['nextBefore'])?.isNotEmpty ?? false),
       raw: d,
     );
   }

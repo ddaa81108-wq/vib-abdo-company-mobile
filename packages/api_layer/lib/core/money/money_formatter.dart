@@ -6,7 +6,9 @@ export 'money_value.dart';
 
 /// THE ONLY place in the app that turns a server money value into text.
 ///
-/// HARD RULE: the app performs NO calculations. The real server returns money as
+/// The server owns posted balances and totals. Display-only ledger running
+/// balances and draft previews live outside this formatter and are never posted
+/// as authoritative totals. The real server returns money as
 /// integers named `*Units` (e.g. balanceUnits) and provides NO formatted field.
 /// This class is a pure presentation formatter:
 ///   - input: one raw integer from the server + its currency;

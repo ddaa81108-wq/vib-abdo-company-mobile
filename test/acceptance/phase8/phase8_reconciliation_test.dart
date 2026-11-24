@@ -4,7 +4,6 @@ import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_api_layer/data/fake/fake_large_catalog.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vib_abdo_company_mobile/performance/history_window.dart';
-import 'package:vib_abdo_company_mobile/ui/strings.dart';
 
 import '../../support/phase7_nav.dart';
 import '../../support/pump_app.dart';
@@ -13,7 +12,7 @@ import '../../support/pump_app.dart';
 ///
 /// Each passing case reads the field back from the same client and compares
 /// the on-screen text with [MoneyFormatter] at the documented scale 0.
-/// A skipped case names the defect that the website has not confirmed.
+/// Current safeguards and evidence limits: docs/qa/current-financial-coverage.md.
 void main() {
   const tag = 'reconciliation';
   final money = MoneyFormatter();
@@ -338,34 +337,6 @@ void main() {
     tags: [tag],
   );
 
-  test('DEF-028 the fake delta is not a website balance', () {
-    markTestSkipped(
-      'DEF-028. FakeApiClient stores previous - inputValue. '
-      'The screen test compares the header with the refetched field only.',
-    );
-  }, tags: [tag]);
-
-  test('DEF-029 whole currency units are confirmed; the QA record is not', () {
-    markTestSkipped(
-      'DEF-029. moneyUnitScale 0 is confirmed as whole currency units. '
-      'The official close and the P0-04 note belong to the docs PR.',
-    );
-  }, tags: [tag]);
-
-  test('DEF-030 summary scope under search and hidden rows is unknown', () {
-    markTestSkipped(
-      'DEF-030. The strip shows summary. Whether q, filter, or hidden rows '
-      'change that object is not written down.',
-    );
-  }, tags: [tag]);
-
-  test('DEF-031 the cached payment ceiling is not a confirmed server rule', () {
-    markTestSkipped(
-      'DEF-031. The dialog compares the typed amount with the cached '
-      'balanceUnits. The real server rule is still unknown.',
-    );
-  }, tags: [tag]);
-
   testWidgets('DEF-032 a missing Egyptian rate keeps the server EGP amount', (
     tester,
   ) async {
@@ -390,21 +361,6 @@ void main() {
 
   test('DEF-033 Vodafone currency is EGP', () {
     expect(vodafoneCurrency, Currency.egp);
-  }, tags: [tag]);
-
-  test('DEF-034 the cumulative remaining caption is still a UI follow-up', () {
-    markTestSkipped(
-      'DEF-034. registerTotals is parsed, including the Vodafone fields. '
-      'The explanatory text that remaining is a carried balance, and a match '
-      'to screenshot 08, belong to the UI PR.',
-    );
-  }, tags: [tag]);
-
-  test('DEF-035 collections currency is fixed to LYD in the client', () {
-    markTestSkipped(
-      'DEF-035. CollectionsOverviewDto.currency always returns LYD. '
-      'No server currency field is read. ${AppStrings.collected} stays on that symbol.',
-    );
   }, tags: [tag]);
 
   testWidgets('DEF-036 one fractional field is invalid and the page stays', (

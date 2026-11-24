@@ -126,8 +126,8 @@ List<Object> allLiveProviders() => [
   ledgerPageProvider,
 ];
 
-void applyLiveSignal(WidgetRef ref, RealtimeSignalView signal) {
-  for (final provider in providersForSignal(signal)) {
+void invalidateLiveProviders(WidgetRef ref, Iterable<Object> providers) {
+  for (final provider in providers) {
     ref.invalidate(provider as dynamic);
   }
 }
