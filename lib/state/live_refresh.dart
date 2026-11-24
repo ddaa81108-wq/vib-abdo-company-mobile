@@ -8,7 +8,6 @@ import '../features/settings/financial_ledger_screen.dart';
 import 'notification_providers.dart';
 import 'section_providers.dart';
 import 'session_providers.dart';
-import 'home_operations_providers.dart';
 
 /// Providers a realtime topic should drop so the next read comes from the server.
 ///
@@ -95,8 +94,6 @@ List<Object> providersForSignal(RealtimeSignalView signal) {
     'treasury.report.closed',
   };
   if (reports.contains(topic)) {
-    add(homeClosingProvider);
-    add(homeActivityProvider);
     add(reportsProvider);
     add(financialLedgerProvider);
     add(ledgerPageProvider);
@@ -106,8 +103,6 @@ List<Object> providersForSignal(RealtimeSignalView signal) {
 
 /// Every cached section read. Used on resume and on `full_resync_required`.
 List<Object> allLiveProviders() => [
-  homeClosingProvider,
-  homeActivityProvider,
   homeDashboardProvider,
   unreadCountProvider,
   unreadNotificationsCountProvider,

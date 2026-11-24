@@ -119,7 +119,11 @@ Future<void> saveBoundaryShot(
   }
 }
 
-Future<void> saveShot(WidgetTester tester, String name) async {
+Future<void> saveShot(
+  WidgetTester tester,
+  String name, {
+  bool composite = false,
+}) async {
   await tester.pump();
   final view = tester.view.physicalSize / tester.view.devicePixelRatio;
   RenderRepaintBoundary? match;
@@ -143,9 +147,9 @@ Future<void> saveShot(WidgetTester tester, String name) async {
     if (close) match = render;
   }
   final banner = find.byKey(ForegroundNotificationBanner.bannerKey);
-  if (banner.evaluate().isNotEmpty) {
+  if (composite || banner.evaluate().isNotEmpty) {
     final view = tester.binding.renderViews.single;
-    // The banner is painted above the page, so the page boundary misses it.
+    // Overlay routes and banners need the whole view, not one page boundary.
     // ignore: invalid_use_of_protected_member
     final layer = view.layer;
     if (layer is OffsetLayer) {

@@ -423,45 +423,32 @@ void main() {
     );
   });
 
-  testWidgets(
-    'operations home tiles remain readable and reachable on small phones',
-    (tester) async {
-      // The snapshot dashboard scrolls; every section must remain reachable.
-      await pumpFakeApp(tester, size: const Size(430, 932));
-      await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      final barTop = tester.getRect(find.byType(PhoneBottomNav)).top;
-      await tester.ensureVisible(find.byKey(HomeDashboard.settingsTileKey));
-      await settle(tester);
-      final settings = tester.getRect(
-        find.byKey(HomeDashboard.settingsTileKey),
-      );
-      expect(settings.bottom, lessThanOrEqualTo(barTop + 1));
-      expect(settings.height, greaterThanOrEqualTo(102));
-      expect(tester.takeException(), isNull);
+  testWidgets('home tiles fill a phone and stay on screen when they can', (
+    tester,
+  ) async {
+    // 430x932: five rows grow toward the bottom bar, no empty band below.
+    await pumpFakeApp(tester, size: const Size(430, 932));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    final barTop = tester.getRect(find.byType(PhoneBottomNav)).top;
+    final settings = tester.getRect(find.byKey(HomeDashboard.settingsTileKey));
+    expect(barTop - settings.bottom, lessThan(40));
+    expect(settings.height, greaterThan(120));
+    expect(settings.height, lessThanOrEqualTo(190));
+    expect(tester.takeException(), isNull);
 
-      // Short phones use the same scroll surface instead of shrinking targets.
-      await pumpFakeApp(tester, size: const Size(320, 568));
-      await signIn(tester, username: 'admin.demo', password: 'demo-only');
-      await tester.scrollUntilVisible(
-        find.byKey(HomeShell.sectionKey(SectionKey.customers)),
-        160,
-        scrollable: find.descendant(
-          of: find.byKey(HomeDashboard.screenKey),
-          matching: find.byType(Scrollable),
-        ),
-      );
-      final first = tester.getRect(
-        find.byKey(HomeShell.sectionKey(SectionKey.customers)),
-      );
-      expect(first.height, greaterThanOrEqualTo(48));
-      final smallBar = tester.getRect(find.byType(PhoneBottomNav)).top;
-      await tester.ensureVisible(find.byKey(HomeDashboard.settingsTileKey));
-      await settle(tester);
-      final small = tester.getRect(find.byKey(HomeDashboard.settingsTileKey));
-      expect(small.bottom, lessThanOrEqualTo(smallBar + 1));
-      expect(tester.takeException(), isNull);
-    },
-  );
+    // 320x568: rows shrink (still at least 48) so the last tile stays above
+    // the bar instead of being pushed off the screen.
+    await pumpFakeApp(tester, size: const Size(320, 568));
+    await signIn(tester, username: 'admin.demo', password: 'demo-only');
+    final first = tester.getRect(
+      find.byKey(HomeShell.sectionKey(SectionKey.customers)),
+    );
+    expect(first.height, greaterThanOrEqualTo(48));
+    final smallBar = tester.getRect(find.byType(PhoneBottomNav)).top;
+    final small = tester.getRect(find.byKey(HomeDashboard.settingsTileKey));
+    expect(small.bottom, lessThanOrEqualTo(smallBar + 1));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('bottom bar: short debt names, full names everywhere else', (
     tester,
@@ -533,7 +520,7 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('operations home retains every section, ending with settings', (
+  testWidgets('home is the icon grid only, ending with the settings tile', (
     tester,
   ) async {
     await pumpFakeApp(tester, size: const Size(430, 1400));
@@ -562,8 +549,7 @@ void main() {
         lessThanOrEqualTo(settingsTop),
       );
     }
-    // The approved home adds a read-only 05:00 snapshot, not legacy totals.
-    expect(find.byKey(const Key('home-five-am')), findsOneWidget);
+    // Removed from home (Ali, 2026-11-01): summary, bulletin, actions, date.
     expect(find.text(AppStrings.homeCardsTitle), findsNothing);
     expect(find.text(AppStrings.oldDebtsTitle), findsNothing);
     expect(find.text(AppStrings.actionsTitle), findsNothing);

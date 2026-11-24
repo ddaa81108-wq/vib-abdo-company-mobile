@@ -267,12 +267,7 @@ void main() {
         }),
       ],
     );
-    await signIn(
-      tester,
-      username: 'employee.demo',
-      password: 'demo-only',
-      settleAfter: false,
-    );
+    await signIn(tester, username: 'employee.demo', password: 'demo-only');
     await go(tester, '/collections');
     expect(find.byKey(const Key('collections-loading')), findsOneWidget);
     expect(find.text(AppStrings.retry), findsNothing);

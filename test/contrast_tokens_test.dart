@@ -365,8 +365,18 @@ Future<void> _expectRenderedInk(
     ),
     findsOneWidget,
   );
-  // Approved operations home: featured navy tile, white label.
-  _expectContrast(tileLabel.style!.color!, const Color(0xFF14263B), 4.5);
+  // Ceramic home: readable labels across every gradient stop, day and night.
+  final homeStops = dark
+      ? const [
+          Color(0xFF203248),
+          Color(0xFF17263A),
+          Color(0xFF112033),
+          Color(0xFF1E3047),
+        ]
+      : const [Colors.white, Color(0xFFFAFAF8), Color(0xFFF0F0ED)];
+  for (final surface in homeStops) {
+    _expectContrast(tileLabel.style!.color!, surface, 4.5);
+  }
   // «عرض الكل» left home; the primary ink is still checked on /purchases.
   expect(
     scheme.primary,

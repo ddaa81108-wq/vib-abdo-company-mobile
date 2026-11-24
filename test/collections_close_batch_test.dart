@@ -4,22 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_api_layer/api_layer.dart';
 import 'package:flutter_api_layer/data/fake/fake_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vib_abdo_company_mobile/features/collections/collections_strings.dart';
 import 'package:vib_abdo_company_mobile/features/home/home_shell.dart';
-import 'package:vib_abdo_company_mobile/state/section_providers.dart';
 
 import 'shell_screenshots_test.dart' show loadScreenshotFonts, saveShot;
 import 'support/pump_app.dart';
 
 Future<void> go(WidgetTester tester, String path) async {
   final context = tester.element(find.byKey(HomeShell.shellKey));
-  // Fixture mutations bypass the UI/realtime invalidation. Drop the overview
-  // already read by operations home before displaying the prepared batch.
-  if (path == '/collections') {
-    ProviderScope.containerOf(context).invalidate(collectionsProvider);
-  }
   GoRouter.of(context).go(path);
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));

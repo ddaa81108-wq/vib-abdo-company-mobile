@@ -97,22 +97,12 @@ Future<void> signIn(
   WidgetTester tester, {
   required String username,
   required String password,
-  bool settleAfter = true,
 }) async {
   await _setText(tester, const Key('username-field'), username);
   await _setText(tester, const Key('password-field'), password);
   await tester.pump();
   final button = await _widget<FilledButton>(tester, const Key('login-button'));
   button.onPressed!.call();
-  // Tests holding a home read open must not wait for its loading animation.
-  if (!settleAfter) {
-    final shell = find.byKey(const Key('home-shell'));
-    for (var frame = 0; frame < 40 && shell.evaluate().isEmpty; frame++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    expect(shell, findsOneWidget, reason: 'sign-in did not reach the shell');
-    return;
-  }
   await tester.pumpAndSettle(
     const Duration(milliseconds: 50),
     EnginePhase.sendSemanticsUpdate,

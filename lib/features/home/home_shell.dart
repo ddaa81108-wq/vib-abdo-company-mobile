@@ -22,25 +22,11 @@ import '../../ui/widgets/environment_badge.dart';
 import '../../ui/widgets/logout_confirm.dart';
 import '../../ui/widgets/soft_tile.dart';
 import 'home_drawer.dart';
+import 'home_ceramic_style.dart';
+import 'home_nav_item.dart';
+import 'more_sheet.dart';
 import '../search/search_focus.dart';
-
-class NavItem {
-  const NavItem({
-    required this.id,
-    required this.label,
-    required this.icon,
-    required this.path,
-    this.shortLabel,
-  });
-
-  final String id;
-  final String label;
-
-  /// Bottom bar text when it differs from [label]. Semantics keep [label].
-  final String? shortLabel;
-  final IconData icon;
-  final String path;
-}
+export 'home_nav_item.dart' show NavItem;
 
 const _barButtonStyle = ButtonStyle(
   padding: WidgetStatePropertyAll(EdgeInsets.zero),
@@ -152,6 +138,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
     return Scaffold(
       key: HomeShell.shellKey,
+      backgroundColor: widget.location == '/'
+          ? HomeCeramicStyle.background(context)
+          : null,
       drawer: phone
           ? Drawer(
               child: StyledDrawer(
@@ -171,11 +160,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           : null,
       appBar: AppBar(
         backgroundColor: widget.location == '/'
-            ? const Color(0xFF14263B)
+            ? HomeCeramicStyle.bar(context)
             : null,
-        foregroundColor: widget.location == '/' ? Colors.white : null,
+        foregroundColor: widget.location == '/'
+            ? HomeCeramicStyle.ink(context)
+            : null,
         iconTheme: widget.location == '/'
-            ? const IconThemeData(color: Colors.white)
+            ? IconThemeData(color: HomeCeramicStyle.ink(context))
             : null,
         leading: _leading(phone: phone, panel: panel),
         title: Transform.translate(
@@ -187,7 +178,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             child: Text(
               _title(widget.location),
               style: widget.location == '/'
-                  ? const TextStyle(color: Colors.white)
+                  ? TextStyle(color: HomeCeramicStyle.ink(context))
                   : null,
             ),
           ),
@@ -917,51 +908,26 @@ class _BottomBar extends StatelessWidget {
       idleColor: idleColor,
       onSelected: (index) {
         if (tabs[index].id == 'more') {
-          final sheetItems = [...rest, ...tail];
           showModalBottomSheet<void>(
             context: context,
             isScrollControlled: true,
-            builder: (sheetContext) {
-              return DraggableScrollableSheet(
-                expand: false,
-                initialChildSize: 0.45,
-                minChildSize: 0.25,
-                maxChildSize: 0.85,
-                builder: (sheetBodyContext, controller) {
-                  return ListView(
-                    key: const Key('more-sheet'),
-                    controller: controller,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsetsDirectional.fromSTEB(
-                          AppSpacing.lg,
-                          AppSpacing.lg,
-                          AppSpacing.lg,
-                          AppSpacing.sm,
-                        ),
-                        child: Text(
-                          AppStrings.more,
-                          style: Theme.of(sheetBodyContext)
-                              .textTheme
-                              .titleMedium,
-                        ),
-                      ),
-                      for (final item in sheetItems)
-                        SoftTile(
-                          key: Key('more-${item.id}'),
-                          leading: Icon(item.icon),
-                          title: item.label,
-                          trailing: forwardChevron(sheetBodyContext),
-                          onTap: () {
-                            Navigator.of(sheetContext).pop();
-                            context.go(item.path);
-                          },
-                        ),
-                    ],
-                  );
-                },
-              );
-            },
+            useSafeArea: true,
+            backgroundColor: HomeCeramicStyle.background(context),
+            showDragHandle: false,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              side: BorderSide(color: HomeCeramicStyle.edge),
+            ),
+            clipBehavior: Clip.antiAlias,
+            builder: (sheetContext) => MoreSheet(
+              sections: rest,
+              accountItems: tail,
+              location: location,
+              onSelect: (item) {
+                Navigator.of(sheetContext).pop();
+                context.go(item.path);
+              },
+            ),
           );
           return;
         }
